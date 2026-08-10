@@ -1,0 +1,35 @@
+{
+  "name": "onekvm-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "check": "vue-tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@lucide/vue": "^1.27.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "d3-geo": "^3.1.1",
+    "jmuxer": "2.1.1",
+    "naive-ui": "^2.40.4",
+    "topojson-client": "^3.1.0",
+    "vue": "^3.5.13",
+    "world-atlas": "^2.0.2"
+  },
+  "devDependencies": {
+    "@types/d3-geo": "^3.1.1",
+    "@types/geojson": "^7946.0.16",
+    "@types/jmuxer": "2.0.7",
+    "@types/node": "^22.10.5",
+    "@types/topojson-client": "^3.1.5",
+    "@types/topojson-specification": "^1.0.5",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "typescript": "^5.6.3",
+    "vite": "^6.2.1",
+    "vue-tsc": "^2.2.0"
+  }
+}

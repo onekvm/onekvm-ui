@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="title desc">
+<title id="title">OneKVM favicon</title>
+<desc id="desc">Flat vector OneKVM logo using a geometric 1K monogram.</desc>
+
+<rect width="64" height="64" rx="13" fill="#061A3A"/>
+<g transform="translate(8 8) scale(0.09375)">
+  <path fill="#FFFFFF" d="M78 176L176 78H238V444H150V204H78Z"/>
+  <path fill="#1677FF" d="M238 256L356 78H454L336 256L458 444H354Z"/>
+</g>
+</svg>

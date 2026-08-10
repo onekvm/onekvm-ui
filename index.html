@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#061A3A" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="msapplication-config" content="/browserconfig.xml" />
+    <title>OneKVM</title>
+    <style>
+      #onekvm-html-loading {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        display: grid;
+        place-items: center;
+        background: #000;
+        color: #edf2f5;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        opacity: 1;
+        transition: opacity 320ms ease;
+        will-change: opacity;
+      }
+      #onekvm-html-loading.onekvm-html-loading-leave {
+        pointer-events: none;
+        opacity: 0;
+      }
+      .onekvm-html-loading-content {
+        display: grid;
+        place-items: center;
+        gap: 18px;
+      }
+      .onekvm-html-loading-brand {
+        display: block;
+        width: min(210px, 52vw);
+        height: auto;
+      }
+      .onekvm-html-loading-spinner {
+        width: 28px;
+        height: 28px;
+        box-sizing: border-box;
+        border: 3px solid rgb(22 119 255 / 22%);
+        border-top-color: #1677ff;
+        border-radius: 50%;
+        animation: onekvm-html-loading-spin .75s linear infinite;
+      }
+      @keyframes onekvm-html-loading-spin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) {
+        .onekvm-html-loading-spinner { animation-duration: 1.8s; }
+        #onekvm-html-loading { transition: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="onekvm-html-loading" role="status" aria-label="Loading OneKVM">
+      <div class="onekvm-html-loading-content">
+        <img class="onekvm-html-loading-brand" src="/brand/onekvm-logo-inverse.svg" alt="OneKVM" />
+        <div class="onekvm-html-loading-spinner" aria-hidden="true"></div>
+      </div>
+    </div>
+    <noscript>OneKVM requires JavaScript.</noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-labelledby="title desc">
+<title id="title">OneKVM app icon dark</title>
+<desc id="desc">Flat vector OneKVM logo using a geometric 1K monogram.</desc>
+
+<rect x="0" y="0" width="1024" height="1024" rx="190" fill="#061A3A"/>
+<g id="app-monogram" transform="translate(190 190) scale(1.2578125)">
+  <path id="one-mark" fill="#FFFFFF" d="M78 176L176 78H238V444H150V204H78Z"/>
+  <path id="k-mark" fill="#1677FF" d="M238 256L356 78H454L336 256L458 444H354Z"/>
+</g>
+</svg>

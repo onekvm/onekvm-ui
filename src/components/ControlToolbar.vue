@@ -24,6 +24,7 @@ import { NIcon, useDialog, useMessage, type DropdownOption } from 'naive-ui'
 
 import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type OneKVMStatus } from '@/api/client'
 import { type MouseMode } from '@/composables/useMouse'
+import type { VideoFit } from '@/lib/video-fit'
 import { currentLanguage, languageOptions, setLanguage, t } from '@/i18n/runtime'
 import { onekvm, type InputActivity, type TransportState } from '@/lib/onekvm'
 import { sendShortcut, shortcutChordLabel } from '@/lib/keyboard-shortcuts'
@@ -43,6 +44,7 @@ const props = defineProps<{
   mouseMode: MouseMode
   scrollInterval: number
   mouseReportRate: number
+  videoFit: VideoFit
   status: OneKVMStatus | null
   msdStatus: MSDStatus | null
   videoWidth: number
@@ -68,6 +70,7 @@ const emit = defineEmits<{
   overlay: [visible: boolean]
   'update:mouseMode': [mode: MouseMode]
   'update:scrollInterval': [interval: number]
+  'update:videoFit': [fit: VideoFit]
 }>()
 
 type DeviceState = 'ready' | 'waiting' | 'error'
@@ -353,7 +356,9 @@ onBeforeUnmount(() => {
         :transport="state.videoMode"
         :machine="status?.machine || ''"
         :variant="status?.variant || ''"
+        :video-fit="videoFit"
         @update:show="updateMenu('display', $event)"
+        @update:video-fit="emit('update:videoFit', $event)"
       >
         <n-tooltip :disabled="openMenu === 'display'">
           <template #trigger>

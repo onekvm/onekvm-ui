@@ -6,6 +6,7 @@ import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type O
 import { useAuth } from '@/composables/useAuth'
 import { hasPermission } from '@/build'
 import { type MouseMode } from '@/composables/useMouse'
+import { parseVideoFit, VIDEO_FIT_KEY, type VideoFit } from '@/lib/video-fit'
 import { useTransport } from '@/composables/useTransport'
 import { onekvm } from '@/lib/onekvm'
 import { loadLocalShortcuts, saveLocalShortcuts } from '@/lib/keyboard-shortcuts'
@@ -60,6 +61,7 @@ const keyboardLayout = ref<KeyboardLayout>('us')
 const mouseMode = ref<MouseMode>(
   localStorage.getItem(MOUSE_MODE_KEY) === 'relative' ? 'relative' : 'absolute',
 )
+const videoFit = ref<VideoFit>(parseVideoFit(localStorage.getItem(VIDEO_FIT_KEY)))
 const scrollInterval = ref(Number(localStorage.getItem(SCROLL_INTERVAL_KEY)) || 0)
 const storedMouseReportRate = Number(localStorage.getItem(MOUSE_REPORT_RATE_KEY))
 const mouseReportRate = ref(
@@ -83,6 +85,7 @@ const keyboardBlocked = computed(
   () => advancedSettingsOpen.value || accountOpen.value || settingsOpen.value || virtualKeyboardOpen.value || shortcutDialogOpen.value || toolbarOverlayOpen.value || state.value.websocketFallbackOffered,
 )
 watch(mouseMode, (value) => localStorage.setItem(MOUSE_MODE_KEY, value))
+watch(videoFit, (value) => localStorage.setItem(VIDEO_FIT_KEY, value))
 watch(scrollInterval, (value) => localStorage.setItem(SCROLL_INTERVAL_KEY, String(value)))
 watch(mouseReportRate, (value) => localStorage.setItem(MOUSE_REPORT_RATE_KEY, String(value)))
 watch(rightControlAsMeta, (value) => localStorage.setItem(RIGHT_CONTROL_AS_META_KEY, String(value)))
@@ -281,6 +284,7 @@ onBeforeUnmount(() => {
           :mouse-mode="mouseMode"
           :scroll-interval="scrollInterval"
           :mouse-report-rate="mouseReportRate"
+          :video-fit="videoFit"
           :status="status"
           :msd-status="msdStatus"
           :video-width="videoWidth"
@@ -301,6 +305,7 @@ onBeforeUnmount(() => {
           @fullscreen="toggleFullscreen"
           @update:right-control-as-meta="rightControlAsMeta = $event"
           @overlay="toolbarOverlayOpen = $event"
+          @update:video-fit="videoFit = $event"
         />
 
         <RemoteConsole
@@ -311,6 +316,7 @@ onBeforeUnmount(() => {
           :mouse-mode="mouseMode"
           :scroll-interval="scrollInterval"
           :mouse-report-rate="mouseReportRate"
+          :video-fit="videoFit"
           :keyboard-blocked="keyboardBlocked"
           :right-control-as-meta="rightControlAsMeta"
           @metadata="setMetadata"
@@ -356,7 +362,7 @@ onBeforeUnmount(() => {
         </n-modal>
 
         <SettingsDrawer
-          v-if="canSettings && settingsOpen"
+          v-if="canSettings"
           v-model:show="settingsOpen"
           v-model:mouse-mode="mouseMode"
           v-model:scroll-interval="scrollInterval"

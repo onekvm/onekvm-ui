@@ -1,6 +1,7 @@
 import { onBeforeUnmount, watch, type Ref } from 'vue'
 
 import { onekvm } from '@/lib/onekvm'
+import { mapAbsoluteMouse, type VideoFit } from '@/lib/video-fit'
 
 export type MouseMode = 'absolute' | 'relative'
 
@@ -11,6 +12,7 @@ export function useMouse(
   mode: Ref<MouseMode>,
   scrollInterval: Ref<number>,
   reportRate: Ref<number>,
+  videoFit: Ref<VideoFit> = { value: 'original' } as Ref<VideoFit>,
 ) {
   let buttons = 0
   let moveTimer = 0
@@ -35,22 +37,14 @@ export function useMouse(
       : element instanceof HTMLCanvasElement
         ? element.height
         : element.naturalHeight
-    const sourceRatio = sourceWidth && sourceHeight
-      ? sourceWidth / sourceHeight
-      : rect.width / rect.height
-    const boxRatio = rect.width / rect.height
-    const renderedWidth = sourceRatio > boxRatio ? rect.width : rect.height * sourceRatio
-    const renderedHeight = sourceRatio > boxRatio ? rect.width / sourceRatio : rect.height
-    const left = rect.left + (rect.width - renderedWidth) / 2
-    const top = rect.top + (rect.height - renderedHeight) / 2
-    const normalizedX = (event.clientX - left) / renderedWidth
-    const normalizedY = (event.clientY - top) / renderedHeight
-    const inside = normalizedX >= 0 && normalizedX <= 1 && normalizedY >= 0 && normalizedY <= 1
-    return {
-      inside,
-      x: 1 + Math.round(Math.max(0, Math.min(1, normalizedX)) * 0x7ffe),
-      y: 1 + Math.round(Math.max(0, Math.min(1, normalizedY)) * 0x7ffe),
-    }
+    return mapAbsoluteMouse(
+      event.clientX,
+      event.clientY,
+      rect,
+      sourceWidth,
+      sourceHeight,
+      videoFit.value,
+    )
   }
 
   const flushMove = () => {

@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue'
 import { WifiOff } from '@lucide/vue'
 
 import { useMouse, type MouseMode } from '@/composables/useMouse'
+import type { VideoFit } from '@/lib/video-fit'
 import { useKeyboard } from '@/composables/useKeyboard'
 import { useVideoFps } from '@/composables/useVideoFps'
 import { useMJPEGStream } from '@/composables/useMJPEGStream'
@@ -17,6 +18,7 @@ const props = defineProps<{
   mouseMode: MouseMode
   scrollInterval: number
   mouseReportRate: number
+  videoFit: VideoFit
   keyboardBlocked: boolean
   rightControlAsMeta: boolean
 }>()
@@ -62,6 +64,7 @@ useMouse(
   toRef(props, 'mouseMode'),
   toRef(props, 'scrollInterval'),
   toRef(props, 'mouseReportRate'),
+  toRef(props, 'videoFit'),
 )
 useKeyboard(toRef(props, 'keyboardBlocked'), inputTarget, toRef(props, 'rightControlAsMeta'))
 useVideoFps(video, (fps) => {
@@ -154,6 +157,7 @@ watch(isMJPEG, () => {
       :class="{
         'cursor-crosshair': mouseMode === 'relative',
         'console-video-ready': playing && !isMJPEG,
+        'console-video-stretch': videoFit === 'stretch',
       }"
       autoplay
       playsinline
@@ -176,6 +180,7 @@ watch(isMJPEG, () => {
       :class="{
         'cursor-crosshair': mouseMode === 'relative',
         'console-video-ready': playing && isMJPEG,
+        'console-video-stretch': videoFit === 'stretch',
       }"
       tabindex="0"
     />

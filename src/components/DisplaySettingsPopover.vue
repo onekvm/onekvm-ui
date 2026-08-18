@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { GripHorizontal, Monitor, Pin, PinOff } from '@lucide/vue'
 
 import { t } from '@/i18n/runtime'
+import type { VideoFit } from '@/lib/video-fit'
 
 import DisplayStatusValues from './DisplayStatusValues.vue'
 
@@ -17,11 +18,18 @@ const props = defineProps<{
   transport: 'webrtc' | 'websocket' | 'mjpeg'
   machine: string
   variant: string
+  videoFit: VideoFit
 }>()
 
 const emit = defineEmits<{
   'update:show': [show: boolean]
+  'update:videoFit': [fit: VideoFit]
 }>()
+
+const fitOptions = computed(() => [
+  { label: t('screen.fitOriginal', 'Original'), value: 'original' as const },
+  { label: t('screen.fitStretch', 'Stretch'), value: 'stretch' as const },
+])
 
 const popoverOpen = ref(false)
 const pinned = ref(false)
@@ -133,6 +141,19 @@ onBeforeUnmount(() => {
           </n-tooltip>
         </div>
       </header>
+      <div class="display-fit-control">
+        <span>{{ t('screen.fitMode', 'Display mode') }}</span>
+        <n-radio-group
+          :value="videoFit"
+          name="video-fit"
+          size="small"
+          @update:value="emit('update:videoFit', $event)"
+        >
+          <n-radio-button v-for="option in fitOptions" :key="option.value" :value="option.value">
+            {{ option.label }}
+          </n-radio-button>
+        </n-radio-group>
+      </div>
       <DisplayStatusValues v-bind="props" />
     </div>
   </n-popover>
@@ -164,6 +185,19 @@ onBeforeUnmount(() => {
       </header>
 
       <div class="display-status-content">
+        <div class="display-fit-control">
+          <span>{{ t('screen.fitMode', 'Display mode') }}</span>
+          <n-radio-group
+            :value="videoFit"
+            name="video-fit-pinned"
+            size="small"
+            @update:value="emit('update:videoFit', $event)"
+          >
+            <n-radio-button v-for="option in fitOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </n-radio-button>
+          </n-radio-group>
+        </div>
         <DisplayStatusValues v-bind="props" />
       </div>
     </section>

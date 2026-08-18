@@ -69,6 +69,8 @@ const zh_tw = {
       video: '視訊模式',
       videoDirectTips: '該模式需啟用 HTTPS，請前往「設定 > 裝置」中開啟',
       resolution: '解析度',
+      canvasSize: '畫布大小',
+      targetResolution: '目標解析度',
       auto: '自動',
       autoTips:
         '在某些解析度下可能存在花屏或滑鼠偏移的情況，請調整遠端主機解析度或者不使用自動模式。',

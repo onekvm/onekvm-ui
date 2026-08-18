@@ -26,13 +26,9 @@ const emit = defineEmits<{
   'update:videoFit': [fit: VideoFit]
 }>()
 
-const fitOptions = computed(() => [
-  { label: t('screen.fitOriginal', 'Original'), value: 'original' as const },
-  { label: t('screen.fitStretch', 'Stretch'), value: 'stretch' as const },
-])
-
 const popoverOpen = ref(false)
 const pinned = ref(false)
+const fitMenuOpen = ref(false)
 const panel = ref<HTMLElement | null>(null)
 const position = ref({ x: 24, y: 58 })
 let dragOffset = { x: 0, y: 0 }
@@ -44,6 +40,7 @@ const panelStyle = computed(() => ({
 }))
 
 function updateShow(show: boolean) {
+  if (!show && fitMenuOpen.value) return
   popoverOpen.value = show
   emit('update:show', show)
 }
@@ -141,25 +138,11 @@ onBeforeUnmount(() => {
           </n-tooltip>
         </div>
       </header>
-      <div class="display-fit-control">
-        <span>{{ t('screen.fitMode', 'Display mode') }}</span>
-        <n-radio-group
-          :value="videoFit"
-          name="video-fit"
-          size="small"
-          @update:value="emit('update:videoFit', $event)"
-        >
-          <n-radio-button v-for="option in fitOptions" :key="option.value" :value="option.value">
-            {{ option.label }}
-          </n-radio-button>
-        </n-radio-group>
-        <span class="display-setting-field-hint">
-          {{ videoFit === 'original'
-            ? t('screen.fitOriginalHint', 'Show 1:1 pixels. Scroll if the window is smaller.')
-            : t('screen.fitStretchHint', 'Fit the window and keep the aspect ratio') }}
-        </span>
-      </div>
-      <DisplayStatusValues v-bind="props" />
+      <DisplayStatusValues
+        v-bind="props"
+        @update:video-fit="emit('update:videoFit', $event)"
+        @fit-menu-show="fitMenuOpen = $event"
+      />
     </div>
   </n-popover>
 
@@ -176,7 +159,6 @@ onBeforeUnmount(() => {
         <GripHorizontal :size="15" class="floating-window-grip" />
         <Monitor :size="15" />
         <strong>{{ t('settings.screen.title', 'Display') }}</strong>
-        <span class="display-status-pinned-label">{{ t('screen.pinned', 'Pinned') }}</span>
         <div class="control-popover-header-actions" @pointerdown.stop>
           <n-tooltip to="body" :z-index="4000">
             <template #trigger>
@@ -190,25 +172,11 @@ onBeforeUnmount(() => {
       </header>
 
       <div class="display-status-content">
-        <div class="display-fit-control">
-          <span>{{ t('screen.fitMode', 'Display mode') }}</span>
-          <n-radio-group
-            :value="videoFit"
-            name="video-fit-pinned"
-            size="small"
-            @update:value="emit('update:videoFit', $event)"
-          >
-            <n-radio-button v-for="option in fitOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </n-radio-button>
-          </n-radio-group>
-          <span class="display-setting-field-hint">
-            {{ videoFit === 'original'
-              ? t('screen.fitOriginalHint', 'Show 1:1 pixels. Scroll if the window is smaller.')
-              : t('screen.fitStretchHint', 'Fit the window and keep the aspect ratio') }}
-          </span>
-        </div>
-        <DisplayStatusValues v-bind="props" />
+        <DisplayStatusValues
+          v-bind="props"
+          @update:video-fit="emit('update:videoFit', $event)"
+          @fit-menu-show="fitMenuOpen = $event"
+        />
       </div>
     </section>
   </Teleport>

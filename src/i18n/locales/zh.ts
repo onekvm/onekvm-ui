@@ -69,6 +69,8 @@ const zh = {
       video: '视频模式',
       videoDirectTips: '该模式需启用 HTTPS，请前往「设置 - 设备」中开启',
       resolution: '分辨率',
+      canvasSize: '画布大小',
+      targetResolution: '目标分辨率',
       auto: '自动',
       autoTips:
         '在某些分辨率下可能存在花屏或鼠标偏移的情况，请调整远程主机分辨率或者不使用自动模式。',

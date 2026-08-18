@@ -578,31 +578,12 @@ select { font: inherit; }
 
 .display-status-popover .display-status-values { padding-top: 6px; }
 
-.display-fit-control {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 4px 0 10px;
-  border-bottom: 1px solid #30363d;
+.display-status-values .display-status-fit-select {
+  width: 92px;
+  flex: 0 0 auto;
 }
 
-.display-fit-control > span {
-  color: #8b949e;
-  font-size: 11px;
-}
-
-.display-fit-control .n-radio-group {
-  width: 100%;
-}
-
-.display-fit-control .n-radio-button {
-  flex: 1;
-  justify-content: center;
-}
-
-.display-status-content .display-fit-control {
-  margin-bottom: 8px;
-}
+.display-fit-select-menu { z-index: 4100; }
 .mouse-status-values { padding-top: 8px; }
 
 .power-status-values {

@@ -70,6 +70,8 @@ const en = {
       video: 'Video Mode',
       videoDirectTips: 'Enable HTTPS in "Settings > Device" to use this mode',
       resolution: 'Resolution',
+      canvasSize: 'Canvas size',
+      targetResolution: 'Target resolution',
       auto: 'Automatic',
       autoTips:
         "Screen tearing or mouse offset may occur at specific resolutions. Consider adjusting the remote host's resolution or disable automatic mode.",

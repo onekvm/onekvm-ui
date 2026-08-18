@@ -93,6 +93,8 @@ const zh_tw = {
       fitMode: '顯示模式',
       fitOriginal: '原始',
       fitStretch: '拉伸',
+      fitOriginalHint: '以 1:1 像素顯示，視窗不夠時可捲動',
+      fitStretchHint: '維持比例鋪滿視窗',
       frameDetect: '幀差檢測',
       frameDetectTip: '開啟後，畫面靜止時暫停傳輸，畫面變化時自動恢復。',
       resetHdmi: '重置 HDMI',

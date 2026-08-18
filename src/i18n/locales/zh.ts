@@ -93,6 +93,8 @@ const zh = {
       fitMode: '显示模式',
       fitOriginal: '原始',
       fitStretch: '拉伸',
+      fitOriginalHint: '按 1:1 像素显示，窗口不够时可以滚动',
+      fitStretchHint: '保持比例铺满窗口',
       frameDetect: '帧差检测',
       noSignal: '无信号',
       checkConnection: '请检查 HDMI 连接',

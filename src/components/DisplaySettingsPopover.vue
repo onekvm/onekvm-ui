@@ -153,6 +153,11 @@ onBeforeUnmount(() => {
             {{ option.label }}
           </n-radio-button>
         </n-radio-group>
+        <span class="display-setting-field-hint">
+          {{ videoFit === 'original'
+            ? t('screen.fitOriginalHint', 'Show 1:1 pixels. Scroll if the window is smaller.')
+            : t('screen.fitStretchHint', 'Fit the window and keep the aspect ratio') }}
+        </span>
       </div>
       <DisplayStatusValues v-bind="props" />
     </div>
@@ -197,6 +202,11 @@ onBeforeUnmount(() => {
               {{ option.label }}
             </n-radio-button>
           </n-radio-group>
+          <span class="display-setting-field-hint">
+            {{ videoFit === 'original'
+              ? t('screen.fitOriginalHint', 'Show 1:1 pixels. Scroll if the window is smaller.')
+              : t('screen.fitStretchHint', 'Fit the window and keep the aspect ratio') }}
+          </span>
         </div>
         <DisplayStatusValues v-bind="props" />
       </div>

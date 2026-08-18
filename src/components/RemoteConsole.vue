@@ -74,9 +74,18 @@ useVideoFps(video, (fps) => {
 const loading = computed(
   () => !connectionProblem.value && !playing.value && ['idle', 'connecting', 'connected'].includes(props.state.connection),
 )
+const frameWidth = ref(0)
+const frameHeight = ref(0)
+const originalSizeStyle = computed(() => {
+  if (props.videoFit !== 'original' || frameWidth.value <= 0 || frameHeight.value <= 0)
+    return undefined
+  return { width: `${frameWidth.value}px`, height: `${frameHeight.value}px` }
+})
 
 function updateMetadata() {
   if (!video.value) return
+  frameWidth.value = video.value.videoWidth
+  frameHeight.value = video.value.videoHeight
   emit('metadata', video.value.videoWidth, video.value.videoHeight)
 }
 
@@ -92,6 +101,8 @@ function updateMJPEGFrame(source: CanvasImageSource, width: number, height: numb
   context.drawImage(source, 0, 0, width, height)
   playing.value = true
   mediaError.value = false
+  frameWidth.value = width
+  frameHeight.value = height
   emit('metadata', width, height)
 }
 
@@ -149,7 +160,7 @@ watch(isMJPEG, () => {
 </script>
 
 <template>
-  <main class="console-stage">
+  <main class="console-stage" :class="{ 'console-stage-original': videoFit === 'original' }">
     <video
       id="screen"
       ref="video"
@@ -157,11 +168,13 @@ watch(isMJPEG, () => {
       :class="{
         'cursor-crosshair': mouseMode === 'relative',
         'console-video-ready': playing && !isMJPEG,
+        'console-video-original': videoFit === 'original',
         'console-video-stretch': videoFit === 'stretch',
       }"
       autoplay
       playsinline
       muted
+      :style="originalSizeStyle"
       :disablePictureInPicture="true"
       controlslist="nopictureinpicture"
       tabindex="0"
@@ -180,8 +193,10 @@ watch(isMJPEG, () => {
       :class="{
         'cursor-crosshair': mouseMode === 'relative',
         'console-video-ready': playing && isMJPEG,
+        'console-video-original': videoFit === 'original',
         'console-video-stretch': videoFit === 'stretch',
       }"
+      :style="originalSizeStyle"
       tabindex="0"
     />
 

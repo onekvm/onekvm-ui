@@ -94,6 +94,8 @@ const en = {
       fitMode: 'Display mode',
       fitOriginal: 'Original',
       fitStretch: 'Stretch',
+      fitOriginalHint: 'Show 1:1 pixels. Scroll if the window is smaller.',
+      fitStretchHint: 'Fit the window and keep the aspect ratio',
       frameDetect: 'Frame Detect',
       frameDetectTip: 'When enabled, transmission pauses while the image is still and resumes automatically when it changes.',
       resetHdmi: 'Reset HDMI',

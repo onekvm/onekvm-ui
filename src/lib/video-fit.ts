@@ -3,7 +3,7 @@ export type VideoFit = 'original' | 'stretch'
 export const VIDEO_FIT_KEY = 'onekvm-video-fit'
 
 export function parseVideoFit(value: string | null | undefined): VideoFit {
-  return value === 'stretch' ? 'stretch' : 'original'
+  return value === 'original' ? 'original' : 'stretch'
 }
 
 export function mapAbsoluteMouse(
@@ -18,7 +18,9 @@ export function mapAbsoluteMouse(
   let top = rect.top
   let renderedWidth = rect.width
   let renderedHeight = rect.height
-  if (fit !== 'stretch' && sourceWidth > 0 && sourceHeight > 0 &&
+  /* Stretch fits the picture into the stage (object-fit: contain). Original
+     is 1:1, so the element box is already the picture. */
+  if (fit === 'stretch' && sourceWidth > 0 && sourceHeight > 0 &&
       rect.width > 0 && rect.height > 0) {
     const sourceRatio = sourceWidth / sourceHeight
     const boxRatio = rect.width / rect.height

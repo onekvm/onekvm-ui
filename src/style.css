@@ -145,6 +145,8 @@ select { font: inherit; }
   background: #050607;
 }
 
+.console-stage-original { overflow: auto; }
+
 .console-stage::before {
   position: absolute;
   inset: 0;
@@ -172,28 +174,38 @@ select { font: inherit; }
 }
 
 .console-video-ready { opacity: 1; }
-.console-video-stretch { object-fit: fill; }
 
-/* object-fit does not apply to canvas elements. Keep the MJPEG backing store
-   at the decoded frame size and fit the element itself into the stage, or a
-   wide/short browser window stretches every frame and makes motion appear to
-   jump vertically compared with the same JPEG stream rendered by VNC. */
-.console-video-canvas {
-  inset: 50% auto auto 50%;
+/* Original is 1:1 CSS pixels. Stretch keeps aspect and fits the stage. */
+.console-video-original {
+  position: relative;
+  inset: unset;
+  flex: 0 0 auto;
   width: auto;
   height: auto;
-  max-width: 100%;
-  max-height: 100%;
-  transform: translate(-50%, -50%);
+  max-width: none;
+  max-height: none;
+  margin: auto;
+  object-fit: none;
+}
+
+.console-video-stretch { object-fit: contain; }
+
+/* object-fit does not apply to canvas elements. Keep the MJPEG backing store
+   at the decoded frame size and size the element itself. */
+.console-video-canvas {
+  inset: auto;
+  width: auto;
+  height: auto;
 }
 
 .console-video-canvas.console-video-stretch {
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.console-video-canvas.console-video-original {
   max-width: none;
   max-height: none;
-  transform: none;
 }
 
 .cursor-crosshair { cursor: crosshair; }

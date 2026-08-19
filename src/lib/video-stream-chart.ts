@@ -31,11 +31,12 @@ export function niceCeiling(value: number, fallback: number): number {
   return nice * unit
 }
 
-export function fpsScaleMax(values: readonly number[], targetFps: number): number {
-  const peak = Math.max(0, targetFps, ...values)
-  if (peak <= 30) return 30
-  if (peak <= 60) return 60
-  return niceCeiling(peak, 60)
+export const FPS_AXIS_MAX = 60
+
+export function fpsScaleMax(_values: readonly number[], targetFps: number): number {
+  if (Number.isFinite(targetFps) && targetFps > 0)
+    return Math.min(FPS_AXIS_MAX, targetFps)
+  return FPS_AXIS_MAX
 }
 
 export function bitrateScaleMax(values: readonly number[]): number {

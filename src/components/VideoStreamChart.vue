@@ -31,7 +31,9 @@ const fpsArea = computed(() => areaPath(fpsValues.value, fpsMax.value, width, he
 const bitrateArea = computed(() => areaPath(bitrateValues.value, bitrateMax.value, width, height))
 const targetY = computed(() => {
   if (props.targetFps <= 0 || fpsMax.value <= 0) return null
-  return height - (Math.min(fpsMax.value, props.targetFps) / fpsMax.value) * height
+  const y = height - (Math.min(fpsMax.value, props.targetFps) / fpsMax.value) * height
+  if (y <= 0) return null
+  return y
 })
 const hover = computed(() => {
   const index = hoverIndex.value

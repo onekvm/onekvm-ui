@@ -4,6 +4,7 @@ import { computed, ref, watch } from 'vue'
 import type { OneKVMConfig } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { qualityTier } from '@/lib/video-quality'
+import { videoResolutionOptions } from '@/lib/video-resolution'
 import {
   clearQpOverride,
   hasQpOverride,
@@ -24,12 +25,9 @@ const video = defineModel<OneKVMConfig['video']>({ required: true })
 
 type QpPresetMode = 'auto' | QpPresetKey | 'custom'
 
-const resolutionOptions = computed(() => [
-  { label: t('screen.auto', 'Automatic'), value: 0 },
-  { label: '1920 x 1080', value: 1080 },
-  { label: '1280 x 720', value: 720 },
-  { label: '854 x 480', value: 480 },
-])
+const resolutionOptions = computed(() =>
+  videoResolutionOptions(t('screen.auto', 'Automatic')),
+)
 const allCodecOptions = computed(() => [
   { label: t('screen.auto', 'Automatic'), value: 'auto' },
   { label: 'H.264', value: 'h264' },
@@ -191,7 +189,7 @@ function fieldReadOnly(path: string) {
         <div class="display-setting-stack">
           <n-select v-model:value="video.resolution" :options="resolutionOptions" :disabled="disabled" />
           <span class="display-setting-field-hint">
-            {{ t('settings.advancedSettings.displayPage.outputResolutionHint', 'Sets the target pipeline output sent to the encoder and stream. It does not change the actual HDMI input resolution; Automatic uses the device backend default.') }}
+            {{ t('settings.advancedSettings.displayPage.outputResolutionHint', 'Sets the pipeline output sent to the encoder and stream. Options match Cube HDMI input modes; Automatic follows the current input.') }}
           </span>
         </div>
       </n-form-item>

@@ -8,6 +8,7 @@ import { type MouseMode } from '@/composables/useMouse'
 import { t } from '@/i18n/runtime'
 import { onekvm } from '@/lib/onekvm'
 import { qualityTier } from '@/lib/video-quality'
+import { videoResolutionOptions } from '@/lib/video-resolution'
 import {
   clearQpOverride,
   hasQpOverride,
@@ -40,12 +41,9 @@ const loading = ref(false)
 const saving = ref(false)
 const advancedPending = ref(false)
 
-const resolutionOptions = computed(() => [
-  { label: t('screen.auto', 'Automatic'), value: 0 },
-  { label: '1920 x 1080', value: 1080 },
-  { label: '1280 x 720', value: 720 },
-  { label: '854 x 480', value: 480 },
-])
+const resolutionOptions = computed(() =>
+  videoResolutionOptions(t('screen.auto', 'Automatic')),
+)
 const allCodecOptions = computed(() => [
   { label: t('screen.auto', 'Automatic'), value: 'auto' },
   { label: 'H.264', value: 'h264' },
@@ -222,8 +220,13 @@ function confirmAdvancedSettings() {
     positiveText: t('settings.advancedSettings.continue', 'Continue'),
     negativeText: t('common.cancel', 'Cancel'),
     onPositiveClick: () => {
-      advancedPending.value = true
+      // The parent conditionally mounts this drawer with v-if. Once show is
+      // set to false the drawer is unmounted before Naive UI can emit
+      // after-leave, so queue the route transition here instead of relying on
+      // the animation callback.
+      advancedPending.value = false
       emit('update:show', false)
+      emit('advanced')
     },
   })
 }
@@ -257,7 +260,7 @@ watch(() => props.show, (show) => {
     resetMouseDraft()
     void loadDisplay()
   }
-})
+}, { immediate: true })
 </script>
 
 <template>
@@ -283,7 +286,7 @@ watch(() => props.show, (show) => {
                 <div class="display-setting-stack">
                   <n-select v-model:value="config.video.resolution" :options="resolutionOptions" />
                   <span class="display-setting-field-hint">
-                    {{ t('settings.advancedSettings.displayPage.outputResolutionHint', 'Sets the target pipeline output sent to the encoder and stream. It does not change the actual HDMI input resolution; Automatic uses the device backend default.') }}
+                    {{ t('settings.advancedSettings.displayPage.outputResolutionHint', 'Sets the pipeline output sent to the encoder and stream. Options match Cube HDMI input modes; Automatic follows the current input.') }}
                   </span>
                 </div>
               </n-form-item>

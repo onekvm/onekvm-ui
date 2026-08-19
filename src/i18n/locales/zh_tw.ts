@@ -348,7 +348,7 @@ const zh_tw = {
         },
         displayPage: {
           outputResolution: '輸出解析度',
-          outputResolutionHint: '設定擷取管線輸出給編碼和傳輸端的目標解析度，不會改變 HDMI 輸入源的實際解析度；自動模式由裝置後端選擇。',
+          outputResolutionHint: '設定擷取管線輸出給編碼和傳輸端的目標解析度。選項與 Cube 支援的 HDMI 輸入模式一致；自動則跟隨目前輸入。',
           quality: '畫質預算（Bitrate）',
           qualityPercentHint: 'VBR 位元率預算',
           jpegQuality: 'JPEG 畫質',

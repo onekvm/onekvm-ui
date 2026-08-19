@@ -3,6 +3,7 @@ import { computed } from 'vue'
 
 import { t } from '@/i18n/runtime'
 import type { VideoFit } from '@/lib/video-fit'
+import { isVideoResolutionValue, videoResolutionOptions } from '@/lib/video-resolution'
 
 const props = defineProps<{
   canvasWidth: number
@@ -32,12 +33,9 @@ const fitOptions = computed(() => [
   { label: t('screen.fitStretch', 'Stretch'), value: 'stretch' as const },
 ])
 
-const resolutionOptions = computed(() => [
-  { label: t('screen.auto', 'Automatic'), value: 0 },
-  { label: '1920 x 1080', value: 1080 },
-  { label: '1280 x 720', value: 720 },
-  { label: '854 x 480', value: 480 },
-])
+const resolutionOptions = computed(() =>
+  videoResolutionOptions(t('screen.auto', 'Automatic')),
+)
 
 const fpsOptions = [10, 15, 24, 30, 45, 60].map((value) => ({
   label: `${value} FPS`,
@@ -58,7 +56,7 @@ function updateFit(value: string | number | null) {
 
 function updateResolution(value: string | number | null) {
   if (typeof value !== 'number') return
-  if (value !== 0 && value !== 1080 && value !== 720 && value !== 480) return
+  if (!isVideoResolutionValue(value)) return
   emit('update:videoResolution', value)
 }
 

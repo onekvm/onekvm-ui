@@ -349,7 +349,7 @@ const en = {
         },
         displayPage: {
           outputResolution: 'Output resolution',
-          outputResolutionHint: 'Sets the target pipeline output sent to the encoder and stream. It does not change the actual HDMI input resolution; Automatic uses the device backend default.',
+          outputResolutionHint: 'Sets the pipeline output sent to the encoder and stream. Options match Cube HDMI input modes; Automatic follows the current input.',
           quality: 'Quality budget (Bitrate)',
           qualityPercentHint: 'VBR bitrate budget',
           jpegQuality: 'JPEG quality',

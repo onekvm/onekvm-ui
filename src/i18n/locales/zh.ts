@@ -348,7 +348,7 @@ const zh = {
         },
         displayPage: {
           outputResolution: '输出分辨率',
-          outputResolutionHint: '设置采集管线输出给编码和传输端的目标分辨率，不会改变 HDMI 输入源的实际分辨率；自动模式由设备后端选择。',
+          outputResolutionHint: '设置采集管线输出给编码和传输端的目标分辨率。选项与 Cube 支持的 HDMI 输入模式一致；自动则跟随当前输入。',
           quality: '画质预算（Bitrate）',
           qualityPercentHint: 'VBR 码率预算',
           jpegQuality: 'JPEG 画质',

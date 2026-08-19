@@ -8,6 +8,7 @@
     "build": "vue-tsc --noEmit && vite build",
     "check": "vue-tsc --noEmit",
     "test:video-fit": "node --experimental-strip-types tests/video-fit.test.ts",
+    "test:video-resolution": "node --experimental-strip-types tests/video-resolution.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {

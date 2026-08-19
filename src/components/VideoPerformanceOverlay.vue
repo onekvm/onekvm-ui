@@ -17,6 +17,7 @@ const props = defineProps<{
   transport: 'webrtc' | 'websocket' | 'mjpeg'
   inputWidth: number
   inputHeight: number
+  visible: boolean
 }>()
 
 const emit = defineEmits<{
@@ -40,10 +41,18 @@ function hostRect() {
   return new DOMRect(0, 0, window.innerWidth, window.innerHeight)
 }
 
-function clampPosition() {
-  if (!panel.value) return
-  const host = hostRect()
+function panelRect() {
+  if (!props.visible || !panel.value) return null
+  if (!(panel.value.offsetParent instanceof HTMLElement)) return null
   const rect = panel.value.getBoundingClientRect()
+  if (rect.width <= 0 || rect.height <= 0) return null
+  return rect
+}
+
+function clampPosition() {
+  const rect = panelRect()
+  if (!rect) return
+  const host = hostRect()
   position.value = {
     x: Math.max(8, Math.min(host.width - rect.width - 8, position.value.x)),
     y: Math.max(50, Math.min(host.height - rect.height - 8, position.value.y)),
@@ -52,9 +61,9 @@ function clampPosition() {
 
 async function placePanel() {
   await nextTick()
-  if (!panel.value) return
+  const rect = panelRect()
+  if (!rect) return
   const host = hostRect()
-  const rect = panel.value.getBoundingClientRect()
   position.value = {
     x: Math.max(8, host.width - rect.width - 18),
     y: 58,
@@ -88,7 +97,7 @@ function stopDrag() {
 
 onMounted(() => {
   window.addEventListener('resize', clampPosition)
-  void placePanel()
+  if (props.visible) void placePanel()
 })
 
 onBeforeUnmount(() => {
@@ -96,7 +105,12 @@ onBeforeUnmount(() => {
   window.removeEventListener('pointermove', drag)
 })
 
-watch(() => [props.canvasWidth, props.canvasHeight], () => clampPosition())
+watch(() => props.visible, (visible) => {
+  if (visible) void placePanel()
+})
+watch(() => [props.canvasWidth, props.canvasHeight], () => {
+  if (props.visible) clampPosition()
+})
 </script>
 
 <template>

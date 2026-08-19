@@ -340,6 +340,7 @@ onBeforeUnmount(() => {
 
         <VideoPerformanceOverlay
           v-show="performanceOpen"
+          :visible="performanceOpen"
           :canvas-width="canvasWidth"
           :canvas-height="canvasHeight"
           :video-fps="videoFps"

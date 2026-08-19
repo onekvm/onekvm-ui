@@ -40,11 +40,11 @@ const protocol = computed(() => {
 <template>
   <div class="display-status-values">
     <div class="display-status-meta">
-      <div class="display-status-metric">
+      <div>
         <span>{{ t('screen.codec', 'Codec') }}</span>
         <strong>{{ codec || '-' }}</strong>
       </div>
-      <div class="display-status-metric">
+      <div>
         <span>{{ t('screen.protocol', 'Protocol') }}</span>
         <strong>{{ protocol }}</strong>
       </div>

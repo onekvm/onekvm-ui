@@ -932,6 +932,8 @@ select { font: inherit; }
   display: grid;
   min-width: 0;
   gap: 3px;
+  justify-items: center;
+  text-align: center;
 }
 
 .display-status-metric span {
@@ -943,7 +945,7 @@ select { font: inherit; }
 .display-status-values .display-status-metric strong {
   overflow-wrap: anywhere;
   font-size: 11px;
-  text-align: left;
+  text-align: center;
 }
 
 .display-status-values > .display-status-chart {
@@ -965,8 +967,16 @@ select { font: inherit; }
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 6px;
+  gap: 12px;
   padding: 0 32px;
+}
+
+.stream-chart-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #8b949e;
+  font-size: 10px;
 }
 
 .stream-chart-swatch {

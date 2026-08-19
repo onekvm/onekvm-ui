@@ -918,17 +918,39 @@ select { font: inherit; }
 
 .display-status-values > div:last-child { border-bottom: 0; }
 
-.display-status-values > .display-status-chart {
+.display-status-values > .display-status-metrics {
   display: grid;
+  grid-template-columns: 1fr 1fr;
   min-height: 0;
-  padding: 8px 0 6px;
-  gap: 6px;
-  align-items: stretch;
+  padding: 10px 0;
+  gap: 10px 14px;
+  align-items: start;
   justify-content: stretch;
 }
 
-.display-status-chart > span {
+.display-status-metric {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.display-status-metric span {
   color: #8b949e;
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.display-status-values .display-status-metric strong {
+  text-align: left;
+}
+
+.display-status-values > .display-status-chart {
+  display: grid;
+  min-height: 0;
+  padding: 8px 0 2px;
+  gap: 6px;
+  align-items: stretch;
+  justify-content: stretch;
 }
 
 .stream-chart {
@@ -939,35 +961,27 @@ select { font: inherit; }
 
 .stream-chart-legend {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 6px 8px;
-  color: #8b949e;
-  font-size: 10px;
+  justify-content: center;
+  gap: 10px;
 }
 
 .stream-chart-swatch {
   display: inline-block;
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 99px;
+  cursor: default;
 }
 
 .stream-chart-swatch-fps { background: #5eead4; }
 .stream-chart-swatch-bitrate { background: #fbbf24; }
-
-.stream-chart-window {
-  margin-left: auto;
-  color: #6e7781;
-}
 
 .stream-chart-svg {
   display: block;
   width: 100%;
   height: auto;
   overflow: visible;
-  touch-action: none;
-  cursor: crosshair;
 }
 
 .stream-chart-grid {
@@ -995,11 +1009,6 @@ select { font: inherit; }
 .stream-chart-area-fps { fill: rgb(94 234 212 / 14%); }
 .stream-chart-area-bitrate { fill: rgb(251 191 36 / 10%); }
 
-.stream-chart-cursor {
-  stroke: rgb(231 235 239 / 45%);
-  stroke-width: 1;
-}
-
 .stream-chart-axis {
   fill: #6e7781;
   font-size: 8px;
@@ -1008,26 +1017,7 @@ select { font: inherit; }
 .stream-chart-axis-fps { fill: #5eead4; }
 .stream-chart-axis-bitrate { fill: #fbbf24; }
 
-.stream-chart-empty,
-.stream-chart-readout {
-  margin: 0;
-  color: #8b949e;
-  font-size: 10px;
-}
 
-.stream-chart-readout {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-.stream-chart-readout strong {
-  color: #edf1f4;
-  font-size: 11px;
-}
-
-.stream-chart-readout-hint { justify-content: flex-start; }
 
 .display-status-values strong {
   color: #edf1f4;

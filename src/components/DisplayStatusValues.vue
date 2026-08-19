@@ -40,32 +40,33 @@ const protocol = computed(() => {
 <template>
   <div class="display-status-values">
     <div>
-      <span>{{ t('screen.inputResolution', 'Input resolution') }}</span>
-      <strong>{{ inputSize }}</strong>
-    </div>
-    <div>
-      <span>{{ t('screen.canvasSize', 'Canvas size') }}</span>
-      <strong>{{ canvasSize }}</strong>
-    </div>
-    <div>
-      <span>{{ t('screen.currentFps', 'Current FPS') }}</span>
-      <strong>{{ videoFps }} FPS</strong>
-    </div>
-    <div>
-      <span>{{ t('screen.bitrate', 'Bitrate') }}</span>
-      <strong>{{ videoBitrate }} kbps</strong>
-    </div>
-    <div class="display-status-chart">
-      <span>{{ t('screen.streamChart', 'Bitrate & FPS') }}</span>
-      <VideoStreamChart :samples="streamSamples" :target-fps="targetFps" />
-    </div>
-    <div>
       <span>{{ t('screen.codec', 'Codec') }}</span>
       <strong>{{ codec || '-' }}</strong>
     </div>
     <div>
       <span>{{ t('screen.protocol', 'Protocol') }}</span>
       <strong>{{ protocol }}</strong>
+    </div>
+    <div class="display-status-metrics">
+      <div class="display-status-metric">
+        <span>{{ t('screen.inputResolution', 'Input resolution') }}</span>
+        <strong>{{ inputSize }}</strong>
+      </div>
+      <div class="display-status-metric">
+        <span>{{ t('screen.canvasSize', 'Canvas size') }}</span>
+        <strong>{{ canvasSize }}</strong>
+      </div>
+      <div class="display-status-metric">
+        <span>{{ t('screen.currentFps', 'Current FPS') }}</span>
+        <strong>{{ videoFps }} FPS</strong>
+      </div>
+      <div class="display-status-metric">
+        <span>{{ t('screen.bitrate', 'Bitrate') }}</span>
+        <strong>{{ videoBitrate }} kbps</strong>
+      </div>
+    </div>
+    <div class="display-status-chart">
+      <VideoStreamChart :samples="streamSamples" :target-fps="targetFps" />
     </div>
   </div>
 </template>

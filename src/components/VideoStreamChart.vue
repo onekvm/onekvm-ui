@@ -81,21 +81,21 @@ function trimTrailingZero(value: number) {
     </svg>
 
     <div class="stream-chart-legend">
-      <n-tooltip to=".console-workspace" :z-index="4000">
+      <n-tooltip trigger="hover" :show-arrow="false" :to="false" placement="top">
         <template #trigger>
-          <span
+          <button
+            type="button"
             class="stream-chart-swatch stream-chart-swatch-fps"
-            role="img"
             :aria-label="t('screen.currentFps', 'Current FPS')"
           />
         </template>
         {{ t('screen.currentFps', 'Current FPS') }}
       </n-tooltip>
-      <n-tooltip to=".console-workspace" :z-index="4000">
+      <n-tooltip trigger="hover" :show-arrow="false" :to="false" placement="top">
         <template #trigger>
-          <span
+          <button
+            type="button"
             class="stream-chart-swatch stream-chart-swatch-bitrate"
-            role="img"
             :aria-label="t('screen.bitrate', 'Bitrate')"
           />
         </template>

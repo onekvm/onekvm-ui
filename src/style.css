@@ -968,7 +968,7 @@ select { font: inherit; }
   align-items: center;
   justify-content: flex-start;
   gap: 12px;
-  padding: 0 32px;
+  padding: 0 22px;
 }
 
 .stream-chart-key {

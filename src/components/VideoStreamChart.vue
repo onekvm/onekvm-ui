@@ -15,8 +15,13 @@ const props = defineProps<{
   targetFps: number
 }>()
 
-const width = 220
+const padLeft = 22
+const padRight = 26
+const padTop = 8
+const width = 252
 const height = 72
+const viewWidth = padLeft + width + padRight
+const viewHeight = padTop + height + 8
 
 const fpsValues = computed(() => props.samples.map((sample) => sample.fps))
 const bitrateValues = computed(() => props.samples.map((sample) => sample.bitrate))
@@ -47,11 +52,11 @@ function trimTrailingZero(value: number) {
   <div class="stream-chart">
     <svg
       class="stream-chart-svg"
-      viewBox="0 0 300 88"
+      :viewBox="`0 0 ${viewWidth} ${viewHeight}`"
       role="img"
       :aria-label="t('screen.streamChart', 'Bitrate & FPS')"
     >
-      <g transform="translate(32,8)">
+      <g :transform="`translate(${padLeft},${padTop})`">
         <line
           v-for="tick in 3"
           :key="tick"

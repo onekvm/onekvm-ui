@@ -41,6 +41,8 @@ assert.equal(bitrateScaleMax([800]), 1000)
 assert.equal(bitrateScaleMax([8000]), 10_000)
 
 assert.equal(sampleX(0, 1, 240), 240)
+assert.equal(sampleX(0, 2, 240), 0)
+assert.equal(sampleX(1, 2, 240), 240)
 assert.equal(sampleX(STREAM_HISTORY_CAPACITY - 1, STREAM_HISTORY_CAPACITY, 240), 240)
 assert.equal(sampleY(0, 60, 72), 72)
 assert.equal(sampleY(60, 60, 72), 0)

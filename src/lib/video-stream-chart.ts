@@ -43,15 +43,10 @@ export function bitrateScaleMax(values: readonly number[]): number {
   return niceCeiling(Math.max(0, ...values), 1_000)
 }
 
-export function sampleX(
-  index: number,
-  count: number,
-  width: number,
-  capacity = STREAM_HISTORY_CAPACITY,
-): number {
-  if (width <= 0 || capacity < 2) return 0
-  const offset = Math.max(0, capacity - count)
-  return ((offset + index) / (capacity - 1)) * width
+export function sampleX(index: number, count: number, width: number): number {
+  if (width <= 0 || count < 1) return 0
+  if (count === 1) return width
+  return (index / (count - 1)) * width
 }
 
 export function sampleY(value: number, max: number, height: number): number {
@@ -65,7 +60,6 @@ export function linePath(
   max: number,
   width: number,
   height: number,
-  capacity = STREAM_HISTORY_CAPACITY,
 ): string {
   if (values.length === 0 || width <= 0 || height <= 0 || max <= 0) return ''
   if (values.length === 1) {
@@ -73,7 +67,7 @@ export function linePath(
     return `M0 ${y} L${width.toFixed(2)} ${y}`
   }
   return values.map((value, index) => {
-    const x = sampleX(index, values.length, width, capacity).toFixed(2)
+    const x = sampleX(index, values.length, width).toFixed(2)
     const y = sampleY(value, max, height).toFixed(2)
     return `${index === 0 ? 'M' : 'L'}${x} ${y}`
   }).join(' ')
@@ -84,26 +78,20 @@ export function areaPath(
   max: number,
   width: number,
   height: number,
-  capacity = STREAM_HISTORY_CAPACITY,
 ): string {
-  const line = linePath(values, max, width, height, capacity)
+  const line = linePath(values, max, width, height)
   if (!line || values.length === 0) return ''
-  const firstX = sampleX(0, values.length, width, capacity).toFixed(2)
-  const lastX = sampleX(values.length - 1, values.length, width, capacity).toFixed(2)
+  const firstX = sampleX(0, values.length, width).toFixed(2)
+  const lastX = sampleX(values.length - 1, values.length, width).toFixed(2)
   return `${line} L${lastX} ${height.toFixed(2)} L${firstX} ${height.toFixed(2)} Z`
 }
 
-export function nearestSampleIndex(
-  offsetX: number,
-  count: number,
-  width: number,
-  capacity = STREAM_HISTORY_CAPACITY,
-): number {
+export function nearestSampleIndex(offsetX: number, count: number, width: number): number {
   if (count < 1 || width <= 0) return -1
   let best = 0
   let bestDistance = Number.POSITIVE_INFINITY
   for (let index = 0; index < count; index++) {
-    const distance = Math.abs(sampleX(index, count, width, capacity) - offsetX)
+    const distance = Math.abs(sampleX(index, count, width) - offsetX)
     if (distance < bestDistance) {
       best = index
       bestDistance = distance

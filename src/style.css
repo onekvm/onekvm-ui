@@ -958,6 +958,7 @@ select { font: inherit; }
 }
 
 .stream-chart {
+  position: relative;
   display: grid;
   gap: 4px;
   width: 100%;
@@ -1007,6 +1008,65 @@ select { font: inherit; }
   width: 100%;
   height: auto;
   overflow: visible;
+  cursor: crosshair;
+}
+
+.stream-chart-hit {
+  fill: transparent;
+  pointer-events: all;
+}
+
+.stream-chart-cursor {
+  stroke: rgb(231 235 239 / 50%);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.stream-chart-tooltip {
+  position: absolute;
+  z-index: 6;
+  display: grid;
+  gap: 4px;
+  min-width: 148px;
+  padding: 7px 8px;
+  border: 1px solid rgb(69 79 89 / 88%);
+  border-radius: 4px;
+  background: #171b20f2;
+  box-shadow: 0 8px 18px rgb(0 0 0 / 35%);
+  color: #edf1f4;
+  font-size: 11px;
+  line-height: 1.35;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 10px));
+  white-space: nowrap;
+}
+
+.stream-chart-tooltip-time {
+  color: #c5ccd3;
+  font-family: var(--onekvm-font-mono);
+  font-feature-settings: "tnum" 1, "zero" 1;
+  font-size: 11px;
+}
+
+.stream-chart-tooltip > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stream-chart-tooltip > div span:nth-child(2) {
+  color: #8b949e;
+  font-size: 10px;
+}
+
+.display-status-values .stream-chart-tooltip strong {
+  margin-left: auto;
+  color: #edf1f4;
+  font-family: var(--onekvm-font-mono);
+  font-size: 11px;
+  font-feature-settings: "tnum" 1, "zero" 1;
+  font-weight: 500;
+  text-align: right;
 }
 
 .stream-chart-grid {
@@ -1041,6 +1101,7 @@ select { font: inherit; }
 
 .stream-chart-axis-fps { fill: #5eead4; }
 .stream-chart-axis-bitrate { fill: #fbbf24; }
+.stream-chart-axis-time { fill: #8b949e; }
 
 
 

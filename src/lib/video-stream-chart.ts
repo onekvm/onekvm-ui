@@ -7,6 +7,13 @@ export type StreamSample = {
 export const STREAM_HISTORY_CAPACITY = 60
 export const STREAM_SAMPLE_MS = 1_000
 
+export function formatSampleTime(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return '--:--:--'
+  const date = new Date(ms)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
 export function pushStreamSample(
   samples: readonly StreamSample[],
   sample: StreamSample,

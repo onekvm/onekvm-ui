@@ -4,6 +4,7 @@ import {
   STREAM_HISTORY_CAPACITY,
   areaPath,
   bitrateScaleMax,
+  formatSampleTime,
   fpsScaleMax,
   linePath,
   nearestSampleIndex,
@@ -63,5 +64,7 @@ assert.equal(areaPath([], 60, 240, 72), '')
 
 assert.equal(nearestSampleIndex(240, 2, 240), 1)
 assert.equal(nearestSampleIndex(0, 0, 240), -1)
+assert.equal(formatSampleTime(0), '--:--:--')
+assert.match(formatSampleTime(Date.UTC(2026, 0, 1, 7, 8, 9)), /\d{2}:\d{2}:\d{2}/)
 
 console.log('video-stream-chart tests passed')

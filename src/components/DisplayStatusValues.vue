@@ -17,6 +17,7 @@ const props = defineProps<{
   variant: string
   videoFit: VideoFit
   videoDisabled: boolean
+  pinned?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -42,6 +43,8 @@ const fpsOptions = [10, 15, 24, 30, 45, 60].map((value) => ({
   label: `${value} FPS`,
   value,
 }))
+
+const selectTo = computed(() => props.pinned ? false : undefined)
 
 const canvasSize = computed(() => {
   if (!props.canvasWidth || !props.canvasHeight) return '-'
@@ -90,6 +93,7 @@ const protocol = computed(() => {
         menu-size="tiny"
         :value="videoFit"
         :options="fitOptions"
+        :to="selectTo"
         :consistent-menu-width="false"
         :show-checkmark="false"
         :menu-props="{ class: 'display-fit-select-menu' }"
@@ -105,6 +109,7 @@ const protocol = computed(() => {
         menu-size="tiny"
         :value="videoResolution"
         :options="resolutionOptions"
+        :to="selectTo"
         :disabled="videoDisabled"
         :consistent-menu-width="false"
         :show-checkmark="false"
@@ -121,6 +126,7 @@ const protocol = computed(() => {
         menu-size="tiny"
         :value="targetFps"
         :options="fpsOptions"
+        :to="selectTo"
         :disabled="videoDisabled"
         :consistent-menu-width="false"
         :show-checkmark="false"

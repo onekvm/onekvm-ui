@@ -61,7 +61,9 @@ async function patchVideo(key: 'video.resolution' | 'video.fps', value: number) 
   saving.value = true
   try {
     await api.patchConfig(key, String(value))
-    await onekvm.reconnect()
+    if (key === 'video.resolution') {
+      await onekvm.reconnect()
+    }
   } catch (reason) {
     resolution.value = props.videoResolution
     fps.value = props.targetFps
@@ -236,6 +238,7 @@ onBeforeUnmount(() => {
           :variant="variant"
           :video-fit="videoFit"
           :video-disabled="!canChangeVideo || saving"
+          pinned
           @update:video-fit="emit('update:videoFit', $event)"
           @update:video-resolution="updateResolution"
           @update:target-fps="updateFps"

@@ -584,6 +584,10 @@ select { font: inherit; }
 }
 
 .display-fit-select-menu { z-index: 4100; }
+
+.v-binder-follower-container:has(.display-fit-select-menu) {
+  z-index: 5000;
+}
 .mouse-status-values { padding-top: 8px; }
 
 .power-status-values {
@@ -642,7 +646,7 @@ select { font: inherit; }
   position: fixed;
   z-index: 2500;
   width: min(300px, calc(100vw - 16px));
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid rgb(69 79 89 / 88%);
   border-radius: 6px;
   background: #171b209c;

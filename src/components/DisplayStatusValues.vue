@@ -98,10 +98,6 @@ const protocol = computed(() => {
       />
     </div>
     <div>
-      <span>{{ t('screen.canvasSize', 'Canvas size') }}</span>
-      <strong>{{ canvasSize }}</strong>
-    </div>
-    <div>
       <span>{{ t('screen.targetResolution', 'Target resolution') }}</span>
       <n-select
         class="display-status-select"
@@ -132,6 +128,10 @@ const protocol = computed(() => {
         @update:value="updateFps"
         @update:show="emit('menu-show', $event)"
       />
+    </div>
+    <div>
+      <span>{{ t('screen.canvasSize', 'Canvas size') }}</span>
+      <strong>{{ canvasSize }}</strong>
     </div>
     <div>
       <span>{{ t('screen.currentFps', 'Current FPS') }}</span>

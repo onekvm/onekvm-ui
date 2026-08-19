@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue'
 import { WifiOff } from '@lucide/vue'
 
 import { useMouse, type MouseMode } from '@/composables/useMouse'
@@ -93,8 +93,20 @@ function updateMetadata() {
 }
 
 function publishCanvasSize() {
-  if (!stage.value) return
-  emit('canvas-size', Math.round(stage.value.clientWidth), Math.round(stage.value.clientHeight))
+  const target = inputTarget.value ?? stage.value
+  if (!target) return
+  const width = Math.round(target.clientWidth)
+  const height = Math.round(target.clientHeight)
+  if (width <= 0 || height <= 0) return
+  emit('canvas-size', width, height)
+}
+
+function observeCanvas() {
+  canvasObserver?.disconnect()
+  canvasObserver = new ResizeObserver(publishCanvasSize)
+  if (stage.value) canvasObserver.observe(stage.value)
+  if (inputTarget.value) canvasObserver.observe(inputTarget.value)
+  void nextTick(publishCanvasSize)
 }
 
 function updateMJPEGFrame(source: CanvasImageSource, width: number, height: number) {
@@ -151,9 +163,7 @@ onMounted(() => {
     video.value.disablePictureInPicture = true
     detachVideo = onekvm.attachVideo(video.value)
   }
-  canvasObserver = new ResizeObserver(publishCanvasSize)
-  if (stage.value) canvasObserver.observe(stage.value)
-  publishCanvasSize()
+  observeCanvas()
   void onekvm.connect().catch(() => undefined)
 })
 
@@ -168,6 +178,11 @@ watch(isMJPEG, () => {
   mediaError.value = false
   emit('fps', 0)
   emit('bitrate', 0)
+  void nextTick(observeCanvas)
+})
+
+watch([() => props.videoFit, originalSizeStyle, inputTarget], () => {
+  void nextTick(observeCanvas)
 })
 </script>
 

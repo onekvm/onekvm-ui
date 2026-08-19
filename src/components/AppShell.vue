@@ -16,6 +16,7 @@ import { uiProduct } from '@/product'
 
 import ControlToolbar from './ControlToolbar.vue'
 import RemoteConsole from './RemoteConsole.vue'
+import VideoPerformanceOverlay from './VideoPerformanceOverlay.vue'
 
 const AccountDrawer = defineAsyncComponent(() => import('./AccountDrawer.vue'))
 const AdvancedSettingsPage = defineAsyncComponent(() => import('./AdvancedSettingsPage.vue'))
@@ -27,6 +28,7 @@ const MOUSE_MODE_KEY = 'nano-kvm-mouse-mode'
 const SCROLL_INTERVAL_KEY = 'nanokvm-kvm-mouse-scroll-interval'
 const MOUSE_REPORT_RATE_KEY = 'onekvm-mouse-report-rate'
 const RIGHT_CONTROL_AS_META_KEY = 'onekvm-right-control-as-meta'
+const PERFORMANCE_OVERLAY_KEY = 'onekvm-performance-overlay'
 const ADVANCED_SETTINGS_ROUTE = '#/settings/advanced'
 
 function isAdvancedSettingsRoute(hash: string) {
@@ -54,6 +56,7 @@ const advancedSettingsRoute = ref(advancedRouteFromHash(window.location.hash))
 const consoleWorkspace = ref<HTMLElement | null>(null)
 const remoteConsole = ref<InstanceType<typeof RemoteConsole> | null>(null)
 const fullscreen = ref(false)
+const performanceOpen = ref(localStorage.getItem(PERFORMANCE_OVERLAY_KEY) !== 'false')
 const rightControlAsMeta = ref(localStorage.getItem(RIGHT_CONTROL_AS_META_KEY) === 'true')
 const userShortcuts = ref<KeyboardShortcut[]>(loadLocalShortcuts())
 const deviceShortcuts = ref<KeyboardShortcut[]>([])
@@ -91,6 +94,7 @@ watch(videoFit, (value) => localStorage.setItem(VIDEO_FIT_KEY, value))
 watch(scrollInterval, (value) => localStorage.setItem(SCROLL_INTERVAL_KEY, String(value)))
 watch(mouseReportRate, (value) => localStorage.setItem(MOUSE_REPORT_RATE_KEY, String(value)))
 watch(rightControlAsMeta, (value) => localStorage.setItem(RIGHT_CONTROL_AS_META_KEY, String(value)))
+watch(performanceOpen, (value) => localStorage.setItem(PERFORMANCE_OVERLAY_KEY, String(value)))
 watch(
   consoleHostname,
   (hostname) => {
@@ -299,6 +303,7 @@ onBeforeUnmount(() => {
           :video-fps="videoFps"
           :video-bitrate="videoBitrate"
           :fullscreen="fullscreen"
+          :performance-open="performanceOpen"
           :right-control-as-meta="rightControlAsMeta"
           :keyboard-layout="keyboardLayout"
           :user-shortcuts="userShortcuts"
@@ -310,6 +315,7 @@ onBeforeUnmount(() => {
           @media-status="msdStatus = $event"
           @edit-user-shortcuts="shortcutDialogOpen = true"
           @fullscreen="toggleFullscreen"
+          @update:performance-open="performanceOpen = $event"
           @update:right-control-as-meta="rightControlAsMeta = $event"
           @overlay="toolbarOverlayOpen = $event"
           @update:video-fit="videoFit = $event"
@@ -330,6 +336,20 @@ onBeforeUnmount(() => {
           @canvas-size="setCanvasSize"
           @fps="videoFps = $event"
           @bitrate="videoBitrate = $event"
+        />
+
+        <VideoPerformanceOverlay
+          v-show="performanceOpen"
+          :canvas-width="canvasWidth"
+          :canvas-height="canvasHeight"
+          :video-fps="videoFps"
+          :video-bitrate="videoBitrate"
+          :target-fps="status?.video.fps || 60"
+          :codec="status?.video.codec?.toUpperCase() || ''"
+          :transport="state.videoMode"
+          :input-width="status?.video.input_width ?? 0"
+          :input-height="status?.video.input_height ?? 0"
+          @close="performanceOpen = false"
         />
 
         <n-modal

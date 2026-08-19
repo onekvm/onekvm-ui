@@ -2,75 +2,31 @@
 import { computed } from 'vue'
 
 import { t } from '@/i18n/runtime'
-import type { VideoFit } from '@/lib/video-fit'
-import { isVideoResolutionValue, videoResolutionOptions } from '@/lib/video-resolution'
+import type { StreamSample } from '@/lib/video-stream-chart'
+
+import VideoStreamChart from './VideoStreamChart.vue'
 
 const props = defineProps<{
   canvasWidth: number
   canvasHeight: number
   videoFps: number
   videoBitrate: number
-  videoResolution: number
+  streamSamples: readonly StreamSample[]
   targetFps: number
   codec: string
   transport: 'webrtc' | 'websocket' | 'mjpeg'
-  machine: string
-  variant: string
-  videoFit: VideoFit
-  videoDisabled: boolean
-  pinned?: boolean
+  inputWidth: number
+  inputHeight: number
 }>()
-
-const emit = defineEmits<{
-  'update:videoFit': [fit: VideoFit]
-  'update:videoResolution': [resolution: number]
-  'update:targetFps': [fps: number]
-  'menu-show': [show: boolean]
-}>()
-
-const fitOptions = computed(() => [
-  { label: t('screen.fitOriginal', 'Original'), value: 'original' as const },
-  { label: t('screen.fitStretch', 'Stretch'), value: 'stretch' as const },
-])
-
-const resolutionOptions = computed(() =>
-  videoResolutionOptions(t('screen.auto', 'Automatic')),
-)
-
-const fpsOptions = [10, 15, 24, 30, 45, 60].map((value) => ({
-  label: `${value} FPS`,
-  value,
-}))
-
-const selectTo = computed(() => props.pinned ? false : undefined)
 
 const canvasSize = computed(() => {
   if (!props.canvasWidth || !props.canvasHeight) return '-'
   return `${props.canvasWidth} × ${props.canvasHeight}`
 })
 
-function updateFit(value: string | number | null) {
-  if (value !== 'original' && value !== 'stretch') return
-  emit('update:videoFit', value)
-}
-
-function updateResolution(value: string | number | null) {
-  if (typeof value !== 'number') return
-  if (!isVideoResolutionValue(value)) return
-  emit('update:videoResolution', value)
-}
-
-function updateFps(value: string | number | null) {
-  if (typeof value !== 'number' || value < 1) return
-  emit('update:targetFps', value)
-}
-
-const deviceVariant = computed(() => {
-  const machine = props.machine === 'nanokvm' ? 'NanoKVM' : props.machine || '-'
-  if (!props.variant) return machine
-  const normalized = props.variant.toLowerCase()
-  const variant = normalized === 'pcie' ? 'PCIe' : normalized === 'cube' ? 'Cube' : props.variant
-  return `${machine} ${variant}`
+const inputSize = computed(() => {
+  if (!props.inputWidth || !props.inputHeight) return '-'
+  return `${props.inputWidth} × ${props.inputHeight}`
 })
 
 const protocol = computed(() => {
@@ -84,54 +40,8 @@ const protocol = computed(() => {
 <template>
   <div class="display-status-values">
     <div>
-      <span>{{ t('screen.fitMode', 'Display mode') }}</span>
-      <n-select
-        class="display-status-select"
-        size="tiny"
-        menu-size="tiny"
-        :value="videoFit"
-        :options="fitOptions"
-        :to="selectTo"
-        :consistent-menu-width="false"
-        :show-checkmark="false"
-        :menu-props="{ class: 'display-fit-select-menu' }"
-        @update:value="updateFit"
-        @update:show="emit('menu-show', $event)"
-      />
-    </div>
-    <div>
-      <span>{{ t('screen.targetResolution', 'Target resolution') }}</span>
-      <n-select
-        class="display-status-select"
-        size="tiny"
-        menu-size="tiny"
-        :value="videoResolution"
-        :options="resolutionOptions"
-        :to="selectTo"
-        :disabled="videoDisabled"
-        :consistent-menu-width="false"
-        :show-checkmark="false"
-        :menu-props="{ class: 'display-fit-select-menu' }"
-        @update:value="updateResolution"
-        @update:show="emit('menu-show', $event)"
-      />
-    </div>
-    <div>
-      <span>{{ t('screen.targetFps', 'Target FPS') }}</span>
-      <n-select
-        class="display-status-select"
-        size="tiny"
-        menu-size="tiny"
-        :value="targetFps"
-        :options="fpsOptions"
-        :to="selectTo"
-        :disabled="videoDisabled"
-        :consistent-menu-width="false"
-        :show-checkmark="false"
-        :menu-props="{ class: 'display-fit-select-menu' }"
-        @update:value="updateFps"
-        @update:show="emit('menu-show', $event)"
-      />
+      <span>{{ t('screen.inputResolution', 'Input resolution') }}</span>
+      <strong>{{ inputSize }}</strong>
     </div>
     <div>
       <span>{{ t('screen.canvasSize', 'Canvas size') }}</span>
@@ -145,6 +55,10 @@ const protocol = computed(() => {
       <span>{{ t('screen.bitrate', 'Bitrate') }}</span>
       <strong>{{ videoBitrate }} kbps</strong>
     </div>
+    <div class="display-status-chart">
+      <span>{{ t('screen.streamChart', 'Bitrate & FPS') }}</span>
+      <VideoStreamChart :samples="streamSamples" :target-fps="targetFps" />
+    </div>
     <div>
       <span>{{ t('screen.codec', 'Codec') }}</span>
       <strong>{{ codec || '-' }}</strong>
@@ -152,10 +66,6 @@ const protocol = computed(() => {
     <div>
       <span>{{ t('screen.protocol', 'Protocol') }}</span>
       <strong>{{ protocol }}</strong>
-    </div>
-    <div>
-      <span>{{ t('screen.deviceVariant', 'Device variant') }}</span>
-      <strong>{{ deviceVariant }}</strong>
     </div>
   </div>
 </template>

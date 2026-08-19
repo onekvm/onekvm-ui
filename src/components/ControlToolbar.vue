@@ -8,6 +8,7 @@ import {
   Keyboard,
   Languages,
   LogOut,
+  Activity,
   Maximize,
   Minimize,
   Monitor,
@@ -52,6 +53,7 @@ const props = defineProps<{
   videoFps: number
   videoBitrate: number
   fullscreen: boolean
+  performanceOpen: boolean
   rightControlAsMeta: boolean
   keyboardLayout: KeyboardLayout
   userShortcuts: KeyboardShortcut[]
@@ -65,6 +67,7 @@ const emit = defineEmits<{
   keyboard: []
   'media-status': [status: MSDStatus]
   fullscreen: []
+  'update:performanceOpen': [open: boolean]
   'update:rightControlAsMeta': [enabled: boolean]
   'edit-user-shortcuts': []
   overlay: [visible: boolean]
@@ -172,7 +175,7 @@ function restoreMediaUpload() {
   virtualMediaPopover.value?.restoreUploadDialog()
 }
 
-const codec = computed(() => props.status?.video.codec?.toUpperCase() || '')
+
 const deviceVariant = computed(() => {
   const machine = props.status?.machine === 'nanokvm' ? 'NanoKVM' : props.status?.machine || '-'
   if (!props.status?.variant) return machine
@@ -346,17 +349,9 @@ onBeforeUnmount(() => {
 
     <div class="device-controls" :aria-label="t('deviceStatus.title', 'Device status')">
       <DisplaySettingsPopover
-        :canvas-width="canvasWidth"
-        :canvas-height="canvasHeight"
-        :video-fps="videoFps"
-        :video-bitrate="videoBitrate"
         :video-resolution="status?.video.resolution ?? 0"
         :target-fps="status?.video.fps || 0"
         :can-change-video="canSettings"
-        :codec="codec"
-        :transport="state.videoMode"
-        :machine="status?.machine || ''"
-        :variant="status?.variant || ''"
         :video-fit="videoFit"
         @update:show="updateMenu('display', $event)"
         @update:video-fit="emit('update:videoFit', $event)"
@@ -496,6 +491,25 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="toolbar-actions">
+      <n-tooltip>
+        <template #trigger>
+          <n-button
+            quaternary
+            size="small"
+            :aria-pressed="performanceOpen"
+            :aria-label="performanceOpen
+              ? t('screen.hidePerformance', 'Hide performance overlay')
+              : t('screen.showPerformance', 'Show performance overlay')"
+            @click="emit('update:performanceOpen', !performanceOpen)"
+          >
+            <template #icon><Activity /></template>
+          </n-button>
+        </template>
+        {{ performanceOpen
+          ? t('screen.hidePerformance', 'Hide performance overlay')
+          : t('screen.showPerformance', 'Show performance overlay') }}
+      </n-tooltip>
+
       <n-tooltip>
         <template #trigger>
           <n-button

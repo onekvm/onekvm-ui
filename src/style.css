@@ -35,6 +35,7 @@ select { font: inherit; }
 }
 
 .console-workspace {
+  position: relative;
   display: grid;
   min-width: 0;
   min-height: 0;
@@ -642,17 +643,20 @@ select { font: inherit; }
 
 .power-control-actions .n-button { width: 100%; }
 
-.display-status-window {
-  position: fixed;
-  z-index: 2500;
-  width: min(300px, calc(100vw - 16px));
+.display-status-window,
+.video-performance-overlay {
+  z-index: 20;
+  width: min(360px, calc(100% - 16px));
   overflow: visible;
   border: 1px solid rgb(69 79 89 / 88%);
   border-radius: 6px;
-  background: #171b209c;
+  background: #171b20d8;
   box-shadow: 0 14px 36px rgb(0 0 0 / 45%);
   backdrop-filter: blur(10px);
 }
+
+.display-status-window { position: fixed; }
+.video-performance-overlay { position: absolute; }
 
 .keyboard-status-window {
   position: fixed;
@@ -913,6 +917,117 @@ select { font: inherit; }
 }
 
 .display-status-values > div:last-child { border-bottom: 0; }
+
+.display-status-values > .display-status-chart {
+  display: grid;
+  min-height: 0;
+  padding: 8px 0 6px;
+  gap: 6px;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.display-status-chart > span {
+  color: #8b949e;
+}
+
+.stream-chart {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+}
+
+.stream-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  color: #8b949e;
+  font-size: 10px;
+}
+
+.stream-chart-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+}
+
+.stream-chart-swatch-fps { background: #5eead4; }
+.stream-chart-swatch-bitrate { background: #fbbf24; }
+
+.stream-chart-window {
+  margin-left: auto;
+  color: #6e7781;
+}
+
+.stream-chart-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.stream-chart-grid {
+  stroke: rgb(58 66 74 / 80%);
+  stroke-width: 1;
+}
+
+.stream-chart-target {
+  stroke: rgb(94 234 212 / 45%);
+  stroke-dasharray: 3 3;
+  stroke-width: 1;
+}
+
+.stream-chart-line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.stream-chart-line-fps { stroke: #5eead4; }
+.stream-chart-line-bitrate { stroke: #fbbf24; }
+
+.stream-chart-area { stroke: none; }
+.stream-chart-area-fps { fill: rgb(94 234 212 / 14%); }
+.stream-chart-area-bitrate { fill: rgb(251 191 36 / 10%); }
+
+.stream-chart-cursor {
+  stroke: rgb(231 235 239 / 45%);
+  stroke-width: 1;
+}
+
+.stream-chart-axis {
+  fill: #6e7781;
+  font-size: 8px;
+}
+
+.stream-chart-axis-fps { fill: #5eead4; }
+.stream-chart-axis-bitrate { fill: #fbbf24; }
+
+.stream-chart-empty,
+.stream-chart-readout {
+  margin: 0;
+  color: #8b949e;
+  font-size: 10px;
+}
+
+.stream-chart-readout {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.stream-chart-readout strong {
+  color: #edf1f4;
+  font-size: 11px;
+}
+
+.stream-chart-readout-hint { justify-content: flex-start; }
 
 .display-status-values strong {
   color: #edf1f4;

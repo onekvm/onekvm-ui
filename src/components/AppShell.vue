@@ -74,6 +74,8 @@ const msdStatus = ref<MSDStatus | null>(null)
 const serverUnavailable = ref(false)
 const videoWidth = ref(0)
 const videoHeight = ref(0)
+const canvasWidth = ref(0)
+const canvasHeight = ref(0)
 const videoFps = ref(0)
 const videoBitrate = ref(0)
 const switchingTransport = ref<'websocket' | 'webrtc' | ''>('')
@@ -125,6 +127,11 @@ function closeSession() {
 function setMetadata(width: number, height: number) {
   videoWidth.value = width
   videoHeight.value = height
+}
+
+function setCanvasSize(width: number, height: number) {
+  canvasWidth.value = width
+  canvasHeight.value = height
 }
 
 async function useWebSocketFallback() {
@@ -287,8 +294,8 @@ onBeforeUnmount(() => {
           :video-fit="videoFit"
           :status="status"
           :msd-status="msdStatus"
-          :video-width="videoWidth"
-          :video-height="videoHeight"
+          :canvas-width="canvasWidth"
+          :canvas-height="canvasHeight"
           :video-fps="videoFps"
           :video-bitrate="videoBitrate"
           :fullscreen="fullscreen"
@@ -320,6 +327,7 @@ onBeforeUnmount(() => {
           :keyboard-blocked="keyboardBlocked"
           :right-control-as-meta="rightControlAsMeta"
           @metadata="setMetadata"
+          @canvas-size="setCanvasSize"
           @fps="videoFps = $event"
           @bitrate="videoBitrate = $event"
         />

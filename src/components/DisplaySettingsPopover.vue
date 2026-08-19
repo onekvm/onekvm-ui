@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { GripHorizontal, Monitor, Pin, PinOff } from '@lucide/vue'
+import { useMessage } from 'naive-ui'
 
+import { api } from '@/api/client'
 import { t } from '@/i18n/runtime'
+import { onekvm } from '@/lib/onekvm'
 import type { VideoFit } from '@/lib/video-fit'
 
 import DisplayStatusValues from './DisplayStatusValues.vue'
 
 const props = defineProps<{
-  videoWidth: number
-  videoHeight: number
+  canvasWidth: number
+  canvasHeight: number
   videoFps: number
   videoBitrate: number
   videoResolution: number
@@ -19,6 +22,7 @@ const props = defineProps<{
   machine: string
   variant: string
   videoFit: VideoFit
+  canChangeVideo: boolean
 }>()
 
 const emit = defineEmits<{
@@ -26,9 +30,16 @@ const emit = defineEmits<{
   'update:videoFit': [fit: VideoFit]
 }>()
 
+const message = useMessage()
 const popoverOpen = ref(false)
 const pinned = ref(false)
-const fitMenuOpen = ref(false)
+const menuOpen = ref(false)
+const saving = ref(false)
+const resolution = ref(props.videoResolution)
+const fps = ref(props.targetFps)
+
+watch(() => props.videoResolution, (value) => { resolution.value = value })
+watch(() => props.targetFps, (value) => { fps.value = value })
 const panel = ref<HTMLElement | null>(null)
 const position = ref({ x: 24, y: 58 })
 let dragOffset = { x: 0, y: 0 }
@@ -40,9 +51,36 @@ const panelStyle = computed(() => ({
 }))
 
 function updateShow(show: boolean) {
-  if (!show && fitMenuOpen.value) return
+  if (!show && menuOpen.value) return
   popoverOpen.value = show
   emit('update:show', show)
+}
+
+async function patchVideo(key: 'video.resolution' | 'video.fps', value: number) {
+  if (!props.canChangeVideo || saving.value) return
+  saving.value = true
+  try {
+    await api.patchConfig(key, String(value))
+    await onekvm.reconnect()
+  } catch (reason) {
+    resolution.value = props.videoResolution
+    fps.value = props.targetFps
+    message.error(reason instanceof Error ? reason.message : String(reason))
+  } finally {
+    saving.value = false
+  }
+}
+
+function updateResolution(value: number) {
+  if (value === resolution.value) return
+  resolution.value = value
+  void patchVideo('video.resolution', value)
+}
+
+function updateFps(value: number) {
+  if (value === fps.value) return
+  fps.value = value
+  void patchVideo('video.fps', value)
 }
 
 function clampPosition() {
@@ -139,9 +177,22 @@ onBeforeUnmount(() => {
         </div>
       </header>
       <DisplayStatusValues
-        v-bind="props"
+        :canvas-width="canvasWidth"
+        :canvas-height="canvasHeight"
+        :video-fps="videoFps"
+        :video-bitrate="videoBitrate"
+        :video-resolution="resolution"
+        :target-fps="fps"
+        :codec="codec"
+        :transport="transport"
+        :machine="machine"
+        :variant="variant"
+        :video-fit="videoFit"
+        :video-disabled="!canChangeVideo || saving"
         @update:video-fit="emit('update:videoFit', $event)"
-        @fit-menu-show="fitMenuOpen = $event"
+        @update:video-resolution="updateResolution"
+        @update:target-fps="updateFps"
+        @menu-show="menuOpen = $event"
       />
     </div>
   </n-popover>
@@ -173,9 +224,22 @@ onBeforeUnmount(() => {
 
       <div class="display-status-content">
         <DisplayStatusValues
-          v-bind="props"
+          :canvas-width="canvasWidth"
+          :canvas-height="canvasHeight"
+          :video-fps="videoFps"
+          :video-bitrate="videoBitrate"
+          :video-resolution="resolution"
+          :target-fps="fps"
+          :codec="codec"
+          :transport="transport"
+          :machine="machine"
+          :variant="variant"
+          :video-fit="videoFit"
+          :video-disabled="!canChangeVideo || saving"
           @update:video-fit="emit('update:videoFit', $event)"
-          @fit-menu-show="fitMenuOpen = $event"
+          @update:video-resolution="updateResolution"
+          @update:target-fps="updateFps"
+          @menu-show="menuOpen = $event"
         />
       </div>
     </section>

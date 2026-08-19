@@ -25,12 +25,15 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   metadata: [width: number, height: number]
+  'canvas-size': [width: number, height: number]
   fps: [value: number]
   bitrate: [value: number]
 }>()
 
+const stage = ref<HTMLElement | null>(null)
 const video = ref<HTMLVideoElement | null>(null)
 const canvas = ref<HTMLCanvasElement | null>(null)
+let canvasObserver: ResizeObserver | undefined
 const playing = ref(false)
 const mediaError = ref(false)
 const reconnecting = ref(false)
@@ -89,6 +92,11 @@ function updateMetadata() {
   emit('metadata', video.value.videoWidth, video.value.videoHeight)
 }
 
+function publishCanvasSize() {
+  if (!stage.value) return
+  emit('canvas-size', Math.round(stage.value.clientWidth), Math.round(stage.value.clientHeight))
+}
+
 function updateMJPEGFrame(source: CanvasImageSource, width: number, height: number) {
   const target = canvas.value
   if (!target || width <= 0 || height <= 0) return
@@ -143,10 +151,14 @@ onMounted(() => {
     video.value.disablePictureInPicture = true
     detachVideo = onekvm.attachVideo(video.value)
   }
+  canvasObserver = new ResizeObserver(publishCanvasSize)
+  if (stage.value) canvasObserver.observe(stage.value)
+  publishCanvasSize()
   void onekvm.connect().catch(() => undefined)
 })
 
 onBeforeUnmount(() => {
+  canvasObserver?.disconnect()
   detachVideo?.()
   unsubscribeBitrate?.()
 })
@@ -160,7 +172,7 @@ watch(isMJPEG, () => {
 </script>
 
 <template>
-  <main class="console-stage" :class="{ 'console-stage-original': videoFit === 'original' }">
+  <main ref="stage" class="console-stage" :class="{ 'console-stage-original': videoFit === 'original' }">
     <video
       id="screen"
       ref="video"

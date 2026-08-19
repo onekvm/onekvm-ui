@@ -47,8 +47,8 @@ const props = defineProps<{
   videoFit: VideoFit
   status: OneKVMStatus | null
   msdStatus: MSDStatus | null
-  videoWidth: number
-  videoHeight: number
+  canvasWidth: number
+  canvasHeight: number
   videoFps: number
   videoBitrate: number
   fullscreen: boolean
@@ -346,12 +346,13 @@ onBeforeUnmount(() => {
 
     <div class="device-controls" :aria-label="t('deviceStatus.title', 'Device status')">
       <DisplaySettingsPopover
-        :video-width="videoWidth"
-        :video-height="videoHeight"
+        :canvas-width="canvasWidth"
+        :canvas-height="canvasHeight"
         :video-fps="videoFps"
         :video-bitrate="videoBitrate"
-        :video-resolution="status?.video.resolution || 0"
+        :video-resolution="status?.video.resolution ?? 0"
         :target-fps="status?.video.fps || 0"
+        :can-change-video="canSettings"
         :codec="codec"
         :transport="state.videoMode"
         :machine="status?.machine || ''"

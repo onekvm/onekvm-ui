@@ -942,6 +942,11 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(config),
     }),
+  patchConfig: (key: string, value: string) =>
+    request<ConfigSaveResponse>('/api/config', {
+      method: 'PATCH',
+      body: JSON.stringify({ key, value }),
+    }),
   resetConfig: () => request<{ status: string }>('/api/config/reset', { method: 'POST', keepalive: true }),
   factoryReset: () => request<{ status: string }>('/api/system/factory-reset', { method: 'POST', keepalive: true }),
   rebootSystem: () => request<{ status: string }>('/api/system/reboot', { method: 'POST', keepalive: true }),

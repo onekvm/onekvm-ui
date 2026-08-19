@@ -502,7 +502,7 @@ select { font: inherit; }
 }
 
 .mouse-control-popover { width: min(360px, calc(100vw - 16px)); }
-.display-status-control-popover { width: min(300px, calc(100vw - 16px)); }
+.display-status-control-popover { width: min(320px, calc(100vw - 16px)); }
 .keyboard-control-popover { width: min(390px, calc(100vw - 16px)); }
 .power-control-popover { width: min(320px, calc(100vw - 16px)); }
 .virtual-media-control-popover { width: min(640px, calc(100vw - 16px)); }
@@ -578,8 +578,8 @@ select { font: inherit; }
 
 .display-status-popover .display-status-values { padding-top: 6px; }
 
-.display-status-values .display-status-fit-select {
-  width: 92px;
+.display-status-values .display-status-select {
+  width: 124px;
   flex: 0 0 auto;
 }
 
@@ -641,7 +641,7 @@ select { font: inherit; }
 .display-status-window {
   position: fixed;
   z-index: 2500;
-  width: min(280px, calc(100vw - 16px));
+  width: min(300px, calc(100vw - 16px));
   overflow: hidden;
   border: 1px solid rgb(69 79 89 / 88%);
   border-radius: 6px;

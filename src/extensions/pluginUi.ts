@@ -9,6 +9,7 @@ import {
   defineComponent,
   Fragment,
   h,
+  inject,
   markRaw,
   mergeProps,
   nextTick,
@@ -17,6 +18,7 @@ import {
   onBeforeUnmount,
   onMounted,
   openBlock,
+  provide,
   reactive,
   ref,
   renderList,
@@ -36,24 +38,17 @@ import {
   type ComputedRef,
   type Ref,
 } from 'vue'
+import * as naiveUI from 'naive-ui'
 import {
-  NAlert,
-  NButton,
-  NCheckbox,
-  NDropdown,
-  NInput,
-  NInputNumber,
-  NPopover,
-  NRadioButton,
-  NRadioGroup,
-  NSelect,
-  NSlider,
-  NSpin,
-  NSwitch,
-  NTag,
-  NTooltip,
-  useDialog,
-  useMessage,
+  NCard,
+  NCollapse,
+  NCollapseItem,
+  NDivider,
+  NEmpty,
+  NSpace,
+  NText,
+  NUpload,
+  NUploadDragger,
 } from 'naive-ui'
 
 import {
@@ -89,10 +84,16 @@ export interface VueExtensionPageDefinitionV1 {
   styles?: string[]
 }
 
+export interface PluginUIXtermV1 {
+  Terminal: (typeof import('@xterm/xterm'))['Terminal']
+  FitAddon: (typeof import('@xterm/addon-fit'))['FitAddon']
+}
+
 interface PluginUIRuntimeV1 {
   vue: Record<string, unknown>
   naive: Record<string, unknown>
   i18n: PluginUII18nV1
+  xterm: { load: () => Promise<PluginUIXtermV1> }
   register: (id: string, definition: VueExtensionPageDefinitionV1) => void
 }
 
@@ -145,6 +146,22 @@ function register(id: string, definition: VueExtensionPageDefinitionV1) {
   registrations.set(id, markRaw(definition))
 }
 
+let xtermLoader: Promise<PluginUIXtermV1> | null = null
+
+async function loadXterm(): Promise<PluginUIXtermV1> {
+  const [{ Terminal }, { FitAddon }] = await Promise.all([
+    import('@xterm/xterm'),
+    import('@xterm/addon-fit'),
+    import('@xterm/xterm/css/xterm.css'),
+  ])
+  return { Terminal, FitAddon }
+}
+
+function loadHostXterm() {
+  if (!xtermLoader) xtermLoader = loadXterm()
+  return xtermLoader
+}
+
 const vueRuntime = Object.freeze({
   computed,
   createBlock,
@@ -156,6 +173,7 @@ const vueRuntime = Object.freeze({
   defineComponent,
   Fragment,
   h,
+  inject,
   markRaw,
   mergeProps,
   nextTick,
@@ -164,6 +182,7 @@ const vueRuntime = Object.freeze({
   onBeforeUnmount,
   onMounted,
   openBlock,
+  provide,
   reactive,
   ref,
   renderList,
@@ -181,24 +200,20 @@ const vueRuntime = Object.freeze({
   vModelText,
 })
 
+// Extension pages are loaded as independent Vue bundles. Expose the complete
+// Naive UI surface so pages can use the same component library as the host
+// without silently failing when a component is not in a hand-maintained list.
 const naiveRuntime = Object.freeze({
-  NAlert,
-  NButton,
-  NCheckbox,
-  NDropdown,
-  NInput,
-  NInputNumber,
-  NPopover,
-  NRadioButton,
-  NRadioGroup,
-  NSelect,
-  NSlider,
-  NSpin,
-  NSwitch,
-  NTag,
-  NTooltip,
-  useDialog,
-  useMessage,
+  ...naiveUI,
+  NCard,
+  NCollapse,
+  NCollapseItem,
+  NDivider,
+  NEmpty,
+  NSpace,
+  NText,
+  NUpload,
+  NUploadDragger,
 })
 
 window.OneKVMPluginUI = {
@@ -206,6 +221,7 @@ window.OneKVMPluginUI = {
     vue: vueRuntime,
     naive: naiveRuntime,
     i18n: Object.freeze({ createTranslator, createMessages }),
+    xterm: Object.freeze({ load: loadHostXterm }),
     register,
   }),
 }

@@ -52,6 +52,19 @@ The host exposes a curated Naive UI surface rather than a second dependency
 copy. A page must not bundle Vue or Naive UI because duplicated runtimes break
 provider injection and increase memory use.
 
+Interactive terminals must reuse the host xterm.js chunk the same way. Call
+`window.OneKVMPluginUI.v1.xterm.load()` to obtain `{ Terminal, FitAddon }` and
+the host-loaded xterm CSS. Do not add `@xterm/xterm` to an extension bundle.
+
+```js
+const { Terminal, FitAddon } = await runtime.xterm.load()
+const terminal = new Terminal()
+const fitAddon = new FitAddon()
+terminal.loadAddon(fitAddon)
+terminal.open(hostElement)
+fitAddon.fit()
+```
+
 The curated Vue runtime also exposes the rendering helpers used by compiled
 page components and built-ins such as `Teleport`. This allows a page to mount
 host-rendered controls into placeholders inside canvas markup.

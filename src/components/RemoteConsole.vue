@@ -15,6 +15,9 @@ import { emptyBrowserVideoLatency } from '@/lib/webrtc-playback-stats'
 const props = defineProps<{
   state: TransportState
   signalConnected: boolean | null
+  hdmiError?: string
+  inputWidth?: number
+  inputHeight?: number
   serverUnavailable: boolean
   mouseMode: MouseMode
   scrollInterval: number
@@ -51,6 +54,13 @@ function publishBrowserLatency() {
 }
 
 const isMJPEG = computed(() => props.state.videoMode === 'mjpeg')
+const unsupportedInput = computed(() => props.hdmiError === 'out_of_range')
+const unsupportedSize = computed(() => {
+  const width = props.inputWidth ?? 0
+  const height = props.inputHeight ?? 0
+  if (width <= 0 || height <= 0) return ''
+  return `${width} × ${height}`
+})
 const inputTarget = computed<HTMLVideoElement | HTMLCanvasElement | null>(
   () => isMJPEG.value ? canvas.value : video.value,
 )
@@ -264,6 +274,17 @@ watch([() => props.videoFit, originalSizeStyle, inputTarget], () => {
       :style="originalSizeStyle"
       tabindex="0"
     />
+
+    <div
+      v-if="unsupportedInput"
+      class="console-state console-oor"
+      role="status"
+      aria-live="polite"
+    >
+      <strong>{{ t('screen.unsupportedResolution', 'Unsupported resolution') }}</strong>
+      <span v-if="unsupportedSize">{{ unsupportedSize }}</span>
+      <p>{{ t('screen.unsupportedResolutionHint', 'Set the host output to a Cube-supported mode such as 1920×1080 or 1280×720.') }}</p>
+    </div>
 
     <Transition name="console-loading">
       <div v-if="loading" class="console-state" aria-live="polite" aria-busy="true">

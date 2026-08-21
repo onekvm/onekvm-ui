@@ -115,6 +115,8 @@ const zh_tw = {
       frameDetectTip: '開啟後，畫面靜止時暫停傳輸，畫面變化時自動恢復。',
       resetHdmi: '重置 HDMI',
       noSignal: '無信號',
+      unsupportedResolution: '不支援的解析度',
+      unsupportedResolutionHint: '請將主機輸出改為 Cube 支援的模式，例如 1920×1080 或 1280×720。',
       checkConnection: '請檢查 HDMI 連接',
       connectionLostTitle: '連線已中斷',
       connectionLostDetail: '瀏覽器目前無法連線 OneKVM，請檢查網路連線，或等待服務重新啟動。',

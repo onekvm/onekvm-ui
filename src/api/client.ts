@@ -242,6 +242,7 @@ export interface OneKVMStatus {
 		resolution: number
 		input_width?: number
 		input_height?: number
+		hdmi_error?: string
 		capture_latency_us?: number
 		encode_latency_us?: number
     source: string

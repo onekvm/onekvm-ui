@@ -233,6 +233,25 @@ select { font: inherit; }
   font-weight: 600;
 }
 
+.console-oor {
+  inset: 0;
+  z-index: 3;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  background: rgb(9 11 14 / 92%);
+}
+
+.console-oor p {
+  max-width: 28em;
+  margin: 0;
+  color: #8b949e;
+  line-height: 1.45;
+}
+
 .console-loading-enter-active,
 .console-loading-leave-active { transition: opacity 220ms ease; }
 .console-loading-enter-from,

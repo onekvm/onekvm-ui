@@ -116,6 +116,8 @@ const en = {
       frameDetectTip: 'When enabled, transmission pauses while the image is still and resumes automatically when it changes.',
       resetHdmi: 'Reset HDMI',
       noSignal: 'No Signal',
+      unsupportedResolution: 'Unsupported resolution',
+      unsupportedResolutionHint: 'Set the host output to a Cube-supported mode such as 1920×1080 or 1280×720.',
       checkConnection: 'Please check HDMI connection',
       connectionLostTitle: 'Connection interrupted',
       connectionLostDetail: 'The browser can no longer reach OneKVM. Check the network connection or wait for the service to restart.',

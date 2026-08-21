@@ -113,6 +113,8 @@ const zh = {
       fitStretchHint: '保持比例铺满窗口',
       frameDetect: '帧差检测',
       noSignal: '无信号',
+      unsupportedResolution: '不支持的分辨率',
+      unsupportedResolutionHint: '请将主机输出改为 Cube 支持的模式，例如 1920×1080 或 1280×720。',
       checkConnection: '请检查 HDMI 连接',
       connectionLostTitle: '连接已中断',
       connectionLostDetail: '浏览器当前无法连接 OneKVM，请检查网络连接，或等待服务重新启动。',

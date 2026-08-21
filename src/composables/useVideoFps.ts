@@ -4,6 +4,7 @@ export function useVideoFps(
   video: Ref<HTMLVideoElement | null>,
   update: (fps: number) => void,
   updatePresent?: (presentUs: number) => void,
+  presentEnabled?: Ref<boolean>,
 ) {
   let callbackId = 0
   let sampleTimer = 0
@@ -22,7 +23,10 @@ export function useVideoFps(
     lastFrame = now
     const receive = metadata.receiveTime
     const display = metadata.expectedDisplayTime
-    if (receive != null && display > receive) {
+    if (presentEnabled && !presentEnabled.value) {
+      presentSumUs = 0
+      presentSamples = 0
+    } else if (receive != null && display > receive) {
       const presentUs = (display - receive) * 1000
       if (presentUs > 0 && presentUs < 1_000_000) {
         presentSumUs += presentUs
@@ -52,6 +56,12 @@ export function useVideoFps(
     previousSample = now
     update(fps)
     if (!updatePresent) return
+    if (presentEnabled && !presentEnabled.value) {
+      presentSumUs = 0
+      presentSamples = 0
+      updatePresent(0)
+      return
+    }
     const presentUs = presentSamples > 0 ? Math.round(presentSumUs / presentSamples) : 0
     presentSumUs = 0
     presentSamples = 0

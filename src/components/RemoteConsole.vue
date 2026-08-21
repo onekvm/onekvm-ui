@@ -89,12 +89,13 @@ useMouse(
   toRef(props, 'videoFit'),
 )
 useKeyboard(toRef(props, 'keyboardBlocked'), inputTarget, toRef(props, 'rightControlAsMeta'))
+const webrtcPresent = computed(() => props.state.videoMode === 'webrtc')
 useVideoFps(video, (fps) => {
   if (!isMJPEG.value) emit('fps', fps)
 }, (value) => {
-  presentUs = isMJPEG.value ? 0 : value
+  presentUs = webrtcPresent.value ? value : 0
   publishBrowserLatency()
-})
+}, webrtcPresent)
 
 const loading = computed(
   () => !connectionProblem.value && !playing.value && ['idle', 'connecting', 'connected'].includes(props.state.connection),
@@ -209,6 +210,13 @@ watch(isMJPEG, () => {
   presentUs = 0
   publishBrowserLatency()
   void nextTick(observeCanvas)
+})
+
+watch(() => props.state.videoMode, (mode) => {
+  if (mode === 'webrtc') return
+  webrtcLatency = emptyBrowserVideoLatency()
+  presentUs = 0
+  publishBrowserLatency()
 })
 
 watch([() => props.videoFit, originalSizeStyle, inputTarget], () => {

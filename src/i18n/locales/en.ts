@@ -117,6 +117,8 @@ const en = {
       reconnect: 'Reconnect',
       webrtcUnavailableTitle: 'WebRTC connection unavailable',
       webrtcUnavailableDetail: 'You can try a WebSocket connection instead. Video and control latency may be higher.',
+      h265UnsupportedTitle: 'This browser cannot decode H.265',
+      h265UnsupportedDetail: 'H.265 needs a HEVC decoder. This browser has neither WebRTC H.265 nor MSE HEVC. Switch the codec to H.264, or use Safari or a Chrome/Edge build with HEVC.',
       retryWebRTC: 'Retry WebRTC',
       tryWebSocket: 'Try WebSocket',
       checkIfTitle: 'Check if:',

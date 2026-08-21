@@ -1,5 +1,11 @@
 import { api } from '@/api/client'
 import { statusEvents } from '@/lib/status-events'
+import {
+  preferredWebRTCCodecs,
+  selectEncodedVideoTransport,
+  supportsWebRTCVideo,
+  VideoCodecUnsupportedError,
+} from '@/lib/video-transport'
 import type { WebSocketVideo } from '@/lib/websocket-video'
 import { supportsWebSocketVideo } from '@/lib/websocket-video-support'
 
@@ -11,12 +17,15 @@ export type ConnectionState =
   | 'failed'
   | 'closed'
 
+export type TransportErrorKind = '' | 'codec-unsupported'
+
 export interface TransportState {
   connection: ConnectionState
   controlReady: boolean
   videoMode: 'webrtc' | 'websocket' | 'mjpeg'
   websocketFallbackAvailable: boolean
   websocketFallbackOffered: boolean
+  errorKind: TransportErrorKind
   error: string
 }
 
@@ -55,6 +64,7 @@ class OneKVMTransport {
     videoMode: 'webrtc',
     websocketFallbackAvailable: false,
     websocketFallbackOffered: false,
+    errorKind: '',
     error: '',
   }
   private statsTimer = 0
@@ -107,12 +117,16 @@ class OneKVMTransport {
         this.disposeHIDSocket()
         this.disposeWebSocketVideo()
         this.disposePeer()
+        const codecUnsupported = error instanceof VideoCodecUnsupportedError
         this.setState({
           connection: 'failed',
           error: this.errorMessage(error),
+          errorKind: codecUnsupported ? 'codec-unsupported' : '',
           controlReady: false,
           websocketFallbackOffered:
-            this.state.videoMode === 'webrtc' && this.state.websocketFallbackAvailable,
+            !codecUnsupported &&
+            this.state.videoMode === 'webrtc' &&
+            this.state.websocketFallbackAvailable,
         })
         throw error
       })
@@ -149,6 +163,7 @@ class OneKVMTransport {
       connection: 'closed',
       controlReady: false,
       websocketFallbackOffered: false,
+      errorKind: '',
       error: '',
     })
     if (sessionId) await api.closeWebRTCSession(sessionId, true).catch(() => undefined)
@@ -192,6 +207,7 @@ class OneKVMTransport {
       connection: 'connecting',
       controlReady: false,
       websocketFallbackOffered: false,
+      errorKind: '',
       error: '',
     })
 
@@ -210,17 +226,26 @@ class OneKVMTransport {
     }
 
     const websocketFallbackAvailable = supportsWebSocketVideo(codec)
-    if (this.preferredVideoTransport === 'websocket' && websocketFallbackAvailable) {
+    const transport = selectEncodedVideoTransport({
+      codec,
+      preferred: this.preferredVideoTransport,
+      webrtcSupported: codec !== 'h265' || supportsWebRTCVideo(codec),
+      websocketSupported: websocketFallbackAvailable,
+    })
+    if (transport === 'unsupported') {
+      throw new VideoCodecUnsupportedError(codec)
+    }
+    if (transport === 'websocket') {
       this.setState({ videoMode: 'websocket', websocketFallbackAvailable })
       await this.startWebSocket(codec)
       return
     }
 
     this.setState({ videoMode: 'webrtc', websocketFallbackAvailable })
-    await this.startWebRTC(status.audio.enabled)
+    await this.startWebRTC(codec, status.audio.enabled)
   }
 
-  private async startWebRTC(audioEnabled: boolean) {
+  private async startWebRTC(codec: string, audioEnabled: boolean) {
 
     const peer = new RTCPeerConnection()
     const stream = new MediaStream()
@@ -236,7 +261,7 @@ class OneKVMTransport {
       if (connection === 'connected') {
         window.clearTimeout(this.peerConnectTimer)
         window.clearTimeout(this.peerDisconnectTimer)
-        this.setState({ connection, error: '', websocketFallbackOffered: false })
+        this.setState({ connection, error: '', errorKind: '', websocketFallbackOffered: false })
       } else if (connection === 'failed') {
         this.failWebRTC('WebRTC connection failed')
       } else if (connection === 'disconnected') {
@@ -260,7 +285,20 @@ class OneKVMTransport {
     control.onmessage = (event) => this.handleControlMessage(event.data)
     control.onclose = () => this.setState({ controlReady: false })
 
-    peer.addTransceiver('video', { direction: 'recvonly' })
+    const video = peer.addTransceiver('video', { direction: 'recvonly' })
+    const preferred = preferredWebRTCCodecs(
+      codec,
+      RTCRtpReceiver.getCapabilities?.('video')?.codecs ?? [],
+    )
+    if (preferred && codec.toLowerCase() === 'h265') {
+      try {
+        video.setCodecPreferences(preferred)
+      } catch {
+        // Some Chromium builds expose HEVC in getCapabilities but reject it as
+        // a send preference. The offer still includes whatever the browser
+        // will actually negotiate.
+      }
+    }
     if (audioEnabled) {
       peer.addTransceiver('audio', { direction: 'recvonly' })
     }
@@ -292,13 +330,13 @@ class OneKVMTransport {
         },
         disconnected: (message) => {
           if (this.websocketVideo !== player) return
-          this.setState({ connection: 'disconnected', controlReady: false, error: message })
+          this.setState({ connection: 'disconnected', controlReady: false, errorKind: '', error: message })
         },
       },
     )
     this.websocketVideo = player
     await Promise.all([player.connect(), this.openHIDWebSocket()])
-    this.setState({ connection: 'connected', controlReady: true, error: '' })
+    this.setState({ connection: 'connected', controlReady: true, error: '', errorKind: '' })
   }
 
   private play(stream: MediaStream) {
@@ -423,6 +461,7 @@ class OneKVMTransport {
       connection: 'failed',
       controlReady: false,
       websocketFallbackOffered: this.state.websocketFallbackAvailable,
+      errorKind: '',
       error: message,
     })
   }

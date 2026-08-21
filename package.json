@@ -10,6 +10,7 @@
     "test:video-fit": "node --experimental-strip-types tests/video-fit.test.ts",
     "test:video-resolution": "node --experimental-strip-types tests/video-resolution.test.ts",
     "test:video-stream-chart": "node --experimental-strip-types tests/video-stream-chart.test.ts",
+    "test:video-transport": "node --experimental-strip-types tests/video-transport.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {

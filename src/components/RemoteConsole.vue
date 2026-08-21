@@ -61,6 +61,16 @@ const connectionProblem = computed(
     props.serverUnavailable || transportFailed.value || (mediaError.value && props.signalConnected !== false)
   ),
 )
+const connectionProblemTitle = computed(() =>
+  props.state.errorKind === 'codec-unsupported'
+    ? t('screen.h265UnsupportedTitle', 'This browser cannot decode H.265')
+    : t('screen.connectionLostTitle', 'Connection interrupted'),
+)
+const connectionProblemDetail = computed(() =>
+  props.state.errorKind === 'codec-unsupported'
+    ? t('screen.h265UnsupportedDetail', 'H.265 needs a HEVC decoder. This browser has neither WebRTC H.265 nor MSE HEVC. Switch the codec to H.264, or use Safari or a Chrome/Edge build with HEVC.')
+    : t('screen.connectionLostDetail', 'The browser can no longer reach OneKVM. Check the network connection or wait for the service to restart.'),
+)
 
 useMouse(
   inputTarget,
@@ -243,7 +253,7 @@ watch([() => props.videoFit, originalSizeStyle, inputTarget], () => {
       to=".console-workspace"
       preset="card"
       class="connection-problem-modal"
-      :title="t('screen.connectionLostTitle', 'Connection interrupted')"
+      :title="connectionProblemTitle"
       :closable="false"
       :mask-closable="false"
       :close-on-esc="false"
@@ -251,7 +261,7 @@ watch([() => props.videoFit, originalSizeStyle, inputTarget], () => {
     >
       <div class="connection-problem-content" aria-live="assertive">
         <WifiOff :size="42" />
-        <p>{{ t('screen.connectionLostDetail', 'The browser can no longer reach OneKVM. Check the network connection or wait for the service to restart.') }}</p>
+        <p>{{ connectionProblemDetail }}</p>
         <code v-if="state.error">{{ state.error }}</code>
       </div>
       <template #footer>

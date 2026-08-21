@@ -114,6 +114,8 @@ const zh = {
       reconnect: '重新连接',
       webrtcUnavailableTitle: 'WebRTC 连接不可用',
       webrtcUnavailableDetail: '可以尝试改用 WebSocket 连接，画面和操作延迟可能会升高。',
+      h265UnsupportedTitle: '浏览器无法解码 H.265',
+      h265UnsupportedDetail: 'H.265 需要 HEVC 解码能力。当前浏览器既不能走 WebRTC H.265，也不能用 MSE 播放 HEVC。请改用 H.264，或换 Safari / 带 HEVC 的 Chrome。',
       retryWebRTC: '重试 WebRTC',
       tryWebSocket: '尝试 WebSocket',
       checkIfTitle: '请检查：',

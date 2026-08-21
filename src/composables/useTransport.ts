@@ -9,6 +9,7 @@ export function useTransport() {
     videoMode: 'webrtc',
     websocketFallbackAvailable: false,
     websocketFallbackOffered: false,
+    errorKind: '',
     error: '',
   })
   let unsubscribe: (() => void) | undefined

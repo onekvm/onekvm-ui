@@ -1,6 +1,7 @@
 import { api } from '@/api/client'
 import { statusEvents } from '@/lib/status-events'
 import {
+  applyLowLatencyReceiver,
   preferredWebRTCCodecs,
   selectEncodedVideoTransport,
   supportsWebRTCVideo,
@@ -253,6 +254,7 @@ class OneKVMTransport {
     this.stream = stream
 
     peer.ontrack = (event) => {
+      applyLowLatencyReceiver(event.receiver)
       stream.addTrack(event.track)
       this.play(stream)
     }
@@ -286,6 +288,7 @@ class OneKVMTransport {
     control.onclose = () => this.setState({ controlReady: false })
 
     const video = peer.addTransceiver('video', { direction: 'recvonly' })
+    applyLowLatencyReceiver(video.receiver)
     const preferred = preferredWebRTCCodecs(
       codec,
       RTCRtpReceiver.getCapabilities?.('video')?.codecs ?? [],

@@ -42,6 +42,26 @@ export function preferredWebRTCCodecs<T extends { mimeType: string }>(
   return [...matching, ...codecs.filter((codec) => !codec.mimeType.toLowerCase().includes(token))]
 }
 
+/** Ask the receiver to emit frames as soon as they decode. Chrome's default
+ *  jitter target is tens of milliseconds even on a lossless LAN. */
+export function applyLowLatencyReceiver(receiver: RTCRtpReceiver | null | undefined) {
+  if (!receiver) return
+  const hinted = receiver as RTCRtpReceiver & {
+    jitterBufferTarget?: number | null
+    playoutDelayHint?: number
+  }
+  try {
+    if ('jitterBufferTarget' in hinted) hinted.jitterBufferTarget = 0
+  } catch {
+    /* Some Chromium builds reject a zero target. */
+  }
+  try {
+    if ('playoutDelayHint' in hinted) hinted.playoutDelayHint = 0
+  } catch {
+    /* Deprecated alias; ignore if missing or read-only. */
+  }
+}
+
 export function selectEncodedVideoTransport(input: {
   codec: string
   preferred: 'webrtc' | 'websocket'

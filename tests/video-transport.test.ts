@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 
 import {
+  applyLowLatencyReceiver,
   preferredWebRTCCodecs,
   selectEncodedVideoTransport,
   supportsWebRTCVideo,
@@ -75,5 +76,11 @@ assert.equal(
   }),
   'webrtc',
 )
+
+const receiver = { jitterBufferTarget: 80, playoutDelayHint: 0.04 }
+applyLowLatencyReceiver(receiver as unknown as RTCRtpReceiver)
+assert.equal(receiver.jitterBufferTarget, 0)
+assert.equal(receiver.playoutDelayHint, 0)
+applyLowLatencyReceiver(undefined)
 
 console.log('video-transport tests passed')

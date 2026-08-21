@@ -19,6 +19,10 @@ const props = defineProps<{
   inputHeight: number
   captureLatencyUs: number
   encodeLatencyUs: number
+  iceRttUs: number
+  jitterBufferUs: number
+  decodeUs: number
+  presentUs: number
 }>()
 
 const canvasSize = computed(() => {
@@ -40,6 +44,10 @@ function formatLatencyUs(value: number) {
 
 const captureLatency = computed(() => formatLatencyUs(props.captureLatencyUs))
 const encodeLatency = computed(() => formatLatencyUs(props.encodeLatencyUs))
+const iceRtt = computed(() => formatLatencyUs(props.iceRttUs))
+const jitterBuffer = computed(() => formatLatencyUs(props.jitterBufferUs))
+const decodeLatency = computed(() => formatLatencyUs(props.decodeUs))
+const presentLatency = computed(() => formatLatencyUs(props.presentUs))
 
 const protocol = computed(() => {
   if (props.transport === 'webrtc') return 'WebRTC'
@@ -87,6 +95,26 @@ const protocol = computed(() => {
       <div>
         <span>{{ t('screen.encodeLatency', 'Encode latency') }}</span>
         <strong>{{ encodeLatency }}</strong>
+      </div>
+    </div>
+    <div class="display-status-meta">
+      <div>
+        <span>{{ t('screen.iceRtt', 'ICE RTT') }}</span>
+        <strong>{{ iceRtt }}</strong>
+      </div>
+      <div>
+        <span>{{ t('screen.jitterBuffer', 'Jitter buffer') }}</span>
+        <strong>{{ jitterBuffer }}</strong>
+      </div>
+    </div>
+    <div class="display-status-meta">
+      <div>
+        <span>{{ t('screen.decodeLatency', 'Decode latency') }}</span>
+        <strong>{{ decodeLatency }}</strong>
+      </div>
+      <div>
+        <span>{{ t('screen.presentLatency', 'Receive to display') }}</span>
+        <strong>{{ presentLatency }}</strong>
       </div>
     </div>
     <div class="display-status-chart">

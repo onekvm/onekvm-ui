@@ -8,7 +8,7 @@ import { hasPermission } from '@/build'
 import { type MouseMode } from '@/composables/useMouse'
 import { parseVideoFit, VIDEO_FIT_KEY, type VideoFit } from '@/lib/video-fit'
 import { useTransport } from '@/composables/useTransport'
-import { onekvm } from '@/lib/onekvm'
+import { onekvm, type BrowserVideoLatencyUs } from '@/lib/onekvm'
 import { loadLocalShortcuts, saveLocalShortcuts } from '@/lib/keyboard-shortcuts'
 import { statusEvents } from '@/lib/status-events'
 import { t } from '@/i18n/runtime'
@@ -81,6 +81,10 @@ const canvasWidth = ref(0)
 const canvasHeight = ref(0)
 const videoFps = ref(0)
 const videoBitrate = ref(0)
+const iceRttUs = ref(0)
+const jitterBufferUs = ref(0)
+const decodeUs = ref(0)
+const presentUs = ref(0)
 const switchingTransport = ref<'websocket' | 'webrtc' | ''>('')
 let unsubscribeKeyboardLED: (() => void) | undefined
 let unsubscribeStatus: (() => void) | undefined
@@ -136,6 +140,13 @@ function setMetadata(width: number, height: number) {
 function setCanvasSize(width: number, height: number) {
   canvasWidth.value = width
   canvasHeight.value = height
+}
+
+function setBrowserLatency(latency: BrowserVideoLatencyUs & { presentUs: number }) {
+  iceRttUs.value = latency.iceRttUs
+  jitterBufferUs.value = latency.jitterBufferUs
+  decodeUs.value = latency.decodeUs
+  presentUs.value = latency.presentUs
 }
 
 async function useWebSocketFallback() {
@@ -336,6 +347,7 @@ onBeforeUnmount(() => {
           @canvas-size="setCanvasSize"
           @fps="videoFps = $event"
           @bitrate="videoBitrate = $event"
+          @browser-latency="setBrowserLatency"
         />
 
         <VideoPerformanceOverlay
@@ -352,6 +364,10 @@ onBeforeUnmount(() => {
           :input-height="status?.video.input_height ?? 0"
           :capture-latency-us="status?.video.capture_latency_us ?? 0"
           :encode-latency-us="status?.video.encode_latency_us ?? 0"
+          :ice-rtt-us="iceRttUs"
+          :jitter-buffer-us="jitterBufferUs"
+          :decode-us="decodeUs"
+          :present-us="presentUs"
           @close="performanceOpen = false"
         />
 

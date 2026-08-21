@@ -8,6 +8,11 @@ import {
 } from '@/lib/video-transport'
 import type { WebSocketVideo } from '@/lib/websocket-video'
 import { supportsWebSocketVideo } from '@/lib/websocket-video-support'
+import {
+  emptyBrowserVideoLatency,
+  PlaybackStatsSampler,
+  type BrowserVideoLatencyUs,
+} from '@/lib/webrtc-playback-stats'
 
 export type ConnectionState =
   | 'idle'
@@ -33,6 +38,8 @@ type StateListener = (state: TransportState) => void
 export type InputActivity = 'mouse' | 'keyboard'
 type ActivityListener = (activity: InputActivity) => void
 type BitrateListener = (kbps: number) => void
+type BrowserLatencyListener = (latency: BrowserVideoLatencyUs) => void
+export type { BrowserVideoLatencyUs }
 export interface KeyboardLEDState {
   known: boolean
   numLock: boolean
@@ -57,7 +64,9 @@ class OneKVMTransport {
   private listeners = new Set<StateListener>()
   private activityListeners = new Set<ActivityListener>()
   private bitrateListeners = new Set<BitrateListener>()
+  private browserLatencyListeners = new Set<BrowserLatencyListener>()
   private keyboardLEDListeners = new Set<KeyboardLEDListener>()
+  private playbackStats = new PlaybackStatsSampler()
   private state: TransportState = {
     connection: 'idle',
     controlReady: false,
@@ -70,8 +79,6 @@ class OneKVMTransport {
   private statsTimer = 0
   private peerConnectTimer = 0
   private peerDisconnectTimer = 0
-  private lastVideoBytes = 0
-  private lastVideoStatsTimestamp = 0
 
   subscribe(listener: StateListener) {
     this.listeners.add(listener)
@@ -88,6 +95,12 @@ class OneKVMTransport {
     this.bitrateListeners.add(listener)
     listener(0)
     return () => this.bitrateListeners.delete(listener)
+  }
+
+  subscribeBrowserLatency(listener: BrowserLatencyListener) {
+    this.browserLatencyListeners.add(listener)
+    listener(emptyBrowserVideoLatency())
+    return () => this.browserLatencyListeners.delete(listener)
   }
 
   subscribeKeyboardLED(listener: KeyboardLEDListener) {
@@ -221,6 +234,7 @@ class OneKVMTransport {
       })
       await this.openHIDWebSocket()
       this.emitVideoBitrate(0)
+      this.emitBrowserLatency(emptyBrowserVideoLatency())
       this.setState({ connection: 'connected', controlReady: true })
       return
     }
@@ -335,6 +349,7 @@ class OneKVMTransport {
       },
     )
     this.websocketVideo = player
+    this.emitBrowserLatency(emptyBrowserVideoLatency())
     await Promise.all([player.connect(), this.openHIDWebSocket()])
     this.setState({ connection: 'connected', controlReady: true, error: '', errorKind: '' })
   }
@@ -444,9 +459,9 @@ class OneKVMTransport {
     this.statsTimer = 0
     this.peerConnectTimer = 0
     this.peerDisconnectTimer = 0
-    this.lastVideoBytes = 0
-    this.lastVideoStatsTimestamp = 0
+    this.playbackStats.reset()
     this.emitVideoBitrate(0)
+    this.emitBrowserLatency(emptyBrowserVideoLatency())
     this.control?.close()
     this.peer?.close()
     this.control = null
@@ -477,26 +492,13 @@ class OneKVMTransport {
 
   private startVideoStats(peer: RTCPeerConnection) {
     window.clearInterval(this.statsTimer)
+    this.playbackStats.reset()
     const sample = async () => {
       const reports = await peer.getStats().catch(() => null)
       if (!reports || this.peer !== peer) return
-
-      let bytes = 0
-      let timestamp = 0
-      reports.forEach((report) => {
-        if (report.type === 'inbound-rtp' && report.kind === 'video') {
-          bytes += Number(report.bytesReceived || 0)
-          timestamp = Math.max(timestamp, Number(report.timestamp || 0))
-        }
-      })
-
-      if (this.lastVideoStatsTimestamp && timestamp > this.lastVideoStatsTimestamp) {
-        const elapsedMs = timestamp - this.lastVideoStatsTimestamp
-        const kbps = Math.max(0, Math.round(((bytes - this.lastVideoBytes) * 8) / elapsedMs))
-        this.emitVideoBitrate(kbps)
-      }
-      this.lastVideoBytes = bytes
-      this.lastVideoStatsTimestamp = timestamp
+      const { bitrateKbps, bitrateSampled, latency } = this.playbackStats.sample(reports)
+      if (bitrateSampled) this.emitVideoBitrate(bitrateKbps)
+      this.emitBrowserLatency(latency)
     }
 
     void sample()
@@ -505,6 +507,10 @@ class OneKVMTransport {
 
   private emitVideoBitrate(kbps: number) {
     this.bitrateListeners.forEach((listener) => listener(kbps))
+  }
+
+  private emitBrowserLatency(latency: BrowserVideoLatencyUs) {
+    this.browserLatencyListeners.forEach((listener) => listener(latency))
   }
 
   private errorMessage(error: unknown) {

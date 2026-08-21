@@ -1,6 +1,10 @@
 import { onBeforeUnmount, onMounted, type Ref } from 'vue'
 
-export function useVideoFps(video: Ref<HTMLVideoElement | null>, update: (fps: number) => void) {
+export function useVideoFps(
+  video: Ref<HTMLVideoElement | null>,
+  update: (fps: number) => void,
+  updatePresent?: (presentUs: number) => void,
+) {
   let callbackId = 0
   let sampleTimer = 0
   let presentedFrames = 0
@@ -8,12 +12,23 @@ export function useVideoFps(video: Ref<HTMLVideoElement | null>, update: (fps: n
   let previousSample = 0
   let lastFrame = 0
   let usesFrameCallback = false
+  let presentSumUs = 0
+  let presentSamples = 0
 
-  const framePresented: VideoFrameRequestCallback = (now) => {
+  const framePresented: VideoFrameRequestCallback = (now, metadata) => {
     const element = video.value
     if (!element) return
     presentedFrames += 1
     lastFrame = now
+    const receive = metadata.receiveTime
+    const display = metadata.expectedDisplayTime
+    if (receive != null && display > receive) {
+      const presentUs = (display - receive) * 1000
+      if (presentUs > 0 && presentUs < 1_000_000) {
+        presentSumUs += presentUs
+        presentSamples += 1
+      }
+    }
     callbackId = element.requestVideoFrameCallback(framePresented)
   }
 
@@ -36,6 +51,11 @@ export function useVideoFps(video: Ref<HTMLVideoElement | null>, update: (fps: n
     previousFrames = frames
     previousSample = now
     update(fps)
+    if (!updatePresent) return
+    const presentUs = presentSamples > 0 ? Math.round(presentSumUs / presentSamples) : 0
+    presentSumUs = 0
+    presentSamples = 0
+    updatePresent(stalled ? 0 : presentUs)
   }
 
   onMounted(() => {
@@ -51,5 +71,6 @@ export function useVideoFps(video: Ref<HTMLVideoElement | null>, update: (fps: n
     if (element && callbackId) element.cancelVideoFrameCallback(callbackId)
     window.clearInterval(sampleTimer)
     update(0)
+    updatePresent?.(0)
   })
 }

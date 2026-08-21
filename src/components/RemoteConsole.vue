@@ -9,7 +9,8 @@ import { useVideoFps } from '@/composables/useVideoFps'
 import { useMJPEGStream } from '@/composables/useMJPEGStream'
 import { api } from '@/api/client'
 import { t } from '@/i18n/runtime'
-import { onekvm, type TransportState } from '@/lib/onekvm'
+import { onekvm, type BrowserVideoLatencyUs, type TransportState } from '@/lib/onekvm'
+import { emptyBrowserVideoLatency } from '@/lib/webrtc-playback-stats'
 
 const props = defineProps<{
   state: TransportState
@@ -28,6 +29,7 @@ const emit = defineEmits<{
   'canvas-size': [width: number, height: number]
   fps: [value: number]
   bitrate: [value: number]
+  'browser-latency': [value: BrowserVideoLatencyUs & { presentUs: number }]
 }>()
 
 const stage = ref<HTMLElement | null>(null)
@@ -40,6 +42,13 @@ const reconnecting = ref(false)
 const mjpegReload = ref(0)
 let detachVideo: (() => void) | undefined
 let unsubscribeBitrate: (() => void) | undefined
+let unsubscribeBrowserLatency: (() => void) | undefined
+let webrtcLatency = emptyBrowserVideoLatency()
+let presentUs = 0
+
+function publishBrowserLatency() {
+  emit('browser-latency', { ...webrtcLatency, presentUs })
+}
 
 const isMJPEG = computed(() => props.state.videoMode === 'mjpeg')
 const inputTarget = computed<HTMLVideoElement | HTMLCanvasElement | null>(
@@ -82,6 +91,9 @@ useMouse(
 useKeyboard(toRef(props, 'keyboardBlocked'), inputTarget, toRef(props, 'rightControlAsMeta'))
 useVideoFps(video, (fps) => {
   if (!isMJPEG.value) emit('fps', fps)
+}, (value) => {
+  presentUs = isMJPEG.value ? 0 : value
+  publishBrowserLatency()
 })
 
 const loading = computed(
@@ -169,6 +181,10 @@ defineExpose({ focusVideo })
 
 onMounted(() => {
   unsubscribeBitrate = onekvm.subscribeVideoBitrate((value) => emit('bitrate', value))
+  unsubscribeBrowserLatency = onekvm.subscribeBrowserLatency((value) => {
+    webrtcLatency = value
+    publishBrowserLatency()
+  })
   if (video.value) {
     video.value.disablePictureInPicture = true
     detachVideo = onekvm.attachVideo(video.value)
@@ -181,6 +197,7 @@ onBeforeUnmount(() => {
   canvasObserver?.disconnect()
   detachVideo?.()
   unsubscribeBitrate?.()
+  unsubscribeBrowserLatency?.()
 })
 
 watch(isMJPEG, () => {
@@ -188,6 +205,9 @@ watch(isMJPEG, () => {
   mediaError.value = false
   emit('fps', 0)
   emit('bitrate', 0)
+  webrtcLatency = emptyBrowserVideoLatency()
+  presentUs = 0
+  publishBrowserLatency()
   void nextTick(observeCanvas)
 })
 

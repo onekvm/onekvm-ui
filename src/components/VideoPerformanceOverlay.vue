@@ -19,6 +19,10 @@ const props = defineProps<{
   inputHeight: number
   captureLatencyUs: number
   encodeLatencyUs: number
+  iceRttUs: number
+  jitterBufferUs: number
+  decodeUs: number
+  presentUs: number
   visible: boolean
 }>()
 
@@ -158,6 +162,10 @@ watch(() => [props.canvasWidth, props.canvasHeight], () => {
         :input-height="inputHeight"
         :capture-latency-us="captureLatencyUs"
         :encode-latency-us="encodeLatencyUs"
+        :ice-rtt-us="iceRttUs"
+        :jitter-buffer-us="jitterBufferUs"
+        :decode-us="decodeUs"
+        :present-us="presentUs"
       />
     </div>
   </section>

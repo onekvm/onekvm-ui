@@ -79,12 +79,12 @@ const protocol = computed(() => {
         <strong>{{ videoBitrate }} kbps</strong>
       </div>
     </div>
-    <div class="display-status-metrics display-status-metrics-latency">
-      <div class="display-status-metric">
+    <div class="display-status-meta">
+      <div>
         <span>{{ t('screen.captureLatency', 'Capture latency') }}</span>
         <strong>{{ captureLatency }}</strong>
       </div>
-      <div class="display-status-metric">
+      <div>
         <span>{{ t('screen.encodeLatency', 'Encode latency') }}</span>
         <strong>{{ encodeLatency }}</strong>
       </div>

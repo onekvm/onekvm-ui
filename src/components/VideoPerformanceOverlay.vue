@@ -17,6 +17,8 @@ const props = defineProps<{
   transport: 'webrtc' | 'websocket' | 'mjpeg'
   inputWidth: number
   inputHeight: number
+  captureLatencyUs: number
+  encodeLatencyUs: number
   visible: boolean
 }>()
 
@@ -154,6 +156,8 @@ watch(() => [props.canvasWidth, props.canvasHeight], () => {
         :transport="transport"
         :input-width="inputWidth"
         :input-height="inputHeight"
+        :capture-latency-us="captureLatencyUs"
+        :encode-latency-us="encodeLatencyUs"
       />
     </div>
   </section>

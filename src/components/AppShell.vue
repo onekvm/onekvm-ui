@@ -350,6 +350,8 @@ onBeforeUnmount(() => {
           :transport="state.videoMode"
           :input-width="status?.video.input_width ?? 0"
           :input-height="status?.video.input_height ?? 0"
+          :capture-latency-us="status?.video.capture_latency_us ?? 0"
+          :encode-latency-us="status?.video.encode_latency_us ?? 0"
           @close="performanceOpen = false"
         />
 

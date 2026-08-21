@@ -946,6 +946,11 @@ select { font: inherit; }
   justify-content: stretch;
 }
 
+.display-status-values > .display-status-metrics-latency {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding-top: 0;
+}
+
 .display-status-metric {
   display: grid;
   min-width: 0;

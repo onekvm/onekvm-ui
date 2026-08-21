@@ -17,6 +17,8 @@ const props = defineProps<{
   transport: 'webrtc' | 'websocket' | 'mjpeg'
   inputWidth: number
   inputHeight: number
+  captureLatencyUs: number
+  encodeLatencyUs: number
 }>()
 
 const canvasSize = computed(() => {
@@ -28,6 +30,16 @@ const inputSize = computed(() => {
   if (!props.inputWidth || !props.inputHeight) return '-'
   return `${props.inputWidth} × ${props.inputHeight}`
 })
+
+function formatLatencyUs(value: number) {
+  if (!value || value < 0) return '-'
+  if (value >= 10_000) return `${Math.round(value / 1000)} ms`
+  if (value >= 1000) return `${(value / 1000).toFixed(1)} ms`
+  return `${value} µs`
+}
+
+const captureLatency = computed(() => formatLatencyUs(props.captureLatencyUs))
+const encodeLatency = computed(() => formatLatencyUs(props.encodeLatencyUs))
 
 const protocol = computed(() => {
   if (props.transport === 'webrtc') return 'WebRTC'
@@ -65,6 +77,16 @@ const protocol = computed(() => {
       <div class="display-status-metric">
         <span>{{ t('screen.bitrate', 'Bitrate') }}</span>
         <strong>{{ videoBitrate }} kbps</strong>
+      </div>
+    </div>
+    <div class="display-status-metrics display-status-metrics-latency">
+      <div class="display-status-metric">
+        <span>{{ t('screen.captureLatency', 'Capture latency') }}</span>
+        <strong>{{ captureLatency }}</strong>
+      </div>
+      <div class="display-status-metric">
+        <span>{{ t('screen.encodeLatency', 'Encode latency') }}</span>
+        <strong>{{ encodeLatency }}</strong>
       </div>
     </div>
     <div class="display-status-chart">

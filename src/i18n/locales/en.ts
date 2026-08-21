@@ -83,6 +83,8 @@ const en = {
       currentFps: 'Current FPS',
       targetFps: 'Target FPS',
       bitrate: 'Bitrate',
+      captureLatency: 'Capture latency',
+      encodeLatency: 'Encode latency',
       streamChart: 'Bitrate & FPS',
       streamChartWindow: 'Last 60 seconds',
       streamChartEmpty: 'Waiting for samples…',

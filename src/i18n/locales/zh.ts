@@ -82,6 +82,8 @@ const zh = {
       currentFps: '实时帧率',
       targetFps: '目标帧率',
       bitrate: '码率',
+      captureLatency: '采集延迟',
+      encodeLatency: '编码延迟',
       streamChart: '码率与帧率',
       streamChartWindow: '最近 60 秒',
       streamChartEmpty: '等待采样…',

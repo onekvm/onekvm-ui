@@ -82,6 +82,8 @@ const zh_tw = {
       currentFps: '即時幀率',
       targetFps: '目標幀率',
       bitrate: '位元率',
+      captureLatency: '採集延遲',
+      encodeLatency: '編碼延遲',
       streamChart: '位元率與幀率',
       streamChartWindow: '最近 60 秒',
       streamChartEmpty: '等待取樣…',

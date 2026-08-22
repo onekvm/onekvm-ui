@@ -2,8 +2,9 @@
 import { computed } from 'vue'
 
 import { t } from '@/i18n/runtime'
-import type { StreamSample } from '@/lib/video-stream-chart'
+import { formatLatencyUs, type LatencySample, type StreamSample } from '@/lib/video-stream-chart'
 
+import VideoLatencyChart from './VideoLatencyChart.vue'
 import VideoStreamChart from './VideoStreamChart.vue'
 
 const props = defineProps<{
@@ -12,6 +13,7 @@ const props = defineProps<{
   videoFps: number
   videoBitrate: number
   streamSamples: readonly StreamSample[]
+  latencySamples: readonly LatencySample[]
   targetFps: number
   codec: string
   transport: 'webrtc' | 'websocket' | 'mjpeg'
@@ -35,13 +37,6 @@ const inputSize = computed(() => {
   return `${props.inputWidth} × ${props.inputHeight}`
 })
 
-function formatLatencyUs(value: number) {
-  if (!value || value < 0) return '-'
-  if (value >= 10_000) return `${Math.round(value / 1000)} ms`
-  if (value >= 1000) return `${(value / 1000).toFixed(1)} ms`
-  return `${value} µs`
-}
-
 const captureLatency = computed(() => formatLatencyUs(props.captureLatencyUs))
 const encodeLatency = computed(() => formatLatencyUs(props.encodeLatencyUs))
 const iceRtt = computed(() => formatLatencyUs(props.iceRttUs))
@@ -59,66 +54,76 @@ const protocol = computed(() => {
 
 <template>
   <div class="display-status-values">
-    <div class="display-status-meta">
-      <div>
-        <span>{{ t('screen.codec', 'Codec') }}</span>
-        <strong>{{ codec || '-' }}</strong>
+    <section class="display-status-column">
+      <h2>{{ t('screen.streamColumn', 'Stream') }}</h2>
+      <div class="display-status-meta">
+        <div>
+          <span>{{ t('screen.codec', 'Codec') }}</span>
+          <strong>{{ codec || '-' }}</strong>
+        </div>
+        <div>
+          <span>{{ t('screen.protocol', 'Protocol') }}</span>
+          <strong>{{ protocol }}</strong>
+        </div>
       </div>
-      <div>
-        <span>{{ t('screen.protocol', 'Protocol') }}</span>
-        <strong>{{ protocol }}</strong>
+      <div class="display-status-metrics">
+        <div class="display-status-metric">
+          <span>{{ t('screen.inputResolution', 'Input resolution') }}</span>
+          <strong>{{ inputSize }}</strong>
+        </div>
+        <div class="display-status-metric">
+          <span>{{ t('screen.canvasSize', 'Canvas size') }}</span>
+          <strong>{{ canvasSize }}</strong>
+        </div>
+        <div class="display-status-metric">
+          <span>{{ t('screen.currentFps', 'Current FPS') }}</span>
+          <strong>{{ videoFps }} FPS</strong>
+        </div>
+        <div class="display-status-metric">
+          <span>{{ t('screen.bitrate', 'Bitrate') }}</span>
+          <strong>{{ videoBitrate }} kbps</strong>
+        </div>
       </div>
-    </div>
-    <div class="display-status-metrics">
-      <div class="display-status-metric">
-        <span>{{ t('screen.inputResolution', 'Input resolution') }}</span>
-        <strong>{{ inputSize }}</strong>
+      <div class="display-status-chart">
+        <VideoStreamChart :samples="streamSamples" :target-fps="targetFps" />
       </div>
-      <div class="display-status-metric">
-        <span>{{ t('screen.canvasSize', 'Canvas size') }}</span>
-        <strong>{{ canvasSize }}</strong>
+    </section>
+
+    <section class="display-status-column">
+      <h2>{{ t('screen.latencyColumn', 'Latency') }}</h2>
+      <div class="display-status-meta">
+        <div>
+          <span>{{ t('screen.captureLatency', 'Capture latency') }}</span>
+          <strong>{{ captureLatency }}</strong>
+        </div>
+        <div>
+          <span>{{ t('screen.encodeLatency', 'Encode latency') }}</span>
+          <strong>{{ encodeLatency }}</strong>
+        </div>
       </div>
-      <div class="display-status-metric">
-        <span>{{ t('screen.currentFps', 'Current FPS') }}</span>
-        <strong>{{ videoFps }} FPS</strong>
+      <div class="display-status-meta">
+        <div>
+          <span>{{ t('screen.iceRtt', 'ICE RTT') }}</span>
+          <strong>{{ iceRtt }}</strong>
+        </div>
+        <div>
+          <span>{{ t('screen.jitterBuffer', 'Jitter buffer') }}</span>
+          <strong>{{ jitterBuffer }}</strong>
+        </div>
       </div>
-      <div class="display-status-metric">
-        <span>{{ t('screen.bitrate', 'Bitrate') }}</span>
-        <strong>{{ videoBitrate }} kbps</strong>
+      <div class="display-status-meta">
+        <div>
+          <span>{{ t('screen.decodeLatency', 'Decode latency') }}</span>
+          <strong>{{ decodeLatency }}</strong>
+        </div>
+        <div>
+          <span>{{ t('screen.presentLatency', 'Receive to display') }}</span>
+          <strong>{{ presentLatency }}</strong>
+        </div>
       </div>
-    </div>
-    <div class="display-status-meta">
-      <div>
-        <span>{{ t('screen.captureLatency', 'Capture latency') }}</span>
-        <strong>{{ captureLatency }}</strong>
+      <div class="display-status-chart">
+        <VideoLatencyChart :samples="latencySamples" />
       </div>
-      <div>
-        <span>{{ t('screen.encodeLatency', 'Encode latency') }}</span>
-        <strong>{{ encodeLatency }}</strong>
-      </div>
-    </div>
-    <div class="display-status-meta">
-      <div>
-        <span>{{ t('screen.iceRtt', 'ICE RTT') }}</span>
-        <strong>{{ iceRtt }}</strong>
-      </div>
-      <div>
-        <span>{{ t('screen.jitterBuffer', 'Jitter buffer') }}</span>
-        <strong>{{ jitterBuffer }}</strong>
-      </div>
-    </div>
-    <div class="display-status-meta">
-      <div>
-        <span>{{ t('screen.decodeLatency', 'Decode latency') }}</span>
-        <strong>{{ decodeLatency }}</strong>
-      </div>
-      <div>
-        <span>{{ t('screen.presentLatency', 'Receive to display') }}</span>
-        <strong>{{ presentLatency }}</strong>
-      </div>
-    </div>
-    <div class="display-status-chart">
-      <VideoStreamChart :samples="streamSamples" :target-fps="targetFps" />
-    </div>
+    </section>
   </div>
 </template>

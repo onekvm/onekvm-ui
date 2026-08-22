@@ -4,14 +4,20 @@ import {
   STREAM_HISTORY_CAPACITY,
   areaPath,
   bitrateScaleMax,
+  formatLatencyUs,
   formatSampleTime,
   fpsScaleMax,
+  latencyMs,
+  latencyScaleMax,
+  latencyStackBands,
+  latencyStackTotal,
   linePath,
   nearestSampleIndex,
   niceCeiling,
   pushStreamSample,
   sampleX,
   sampleY,
+  stackedBandPath,
 } from '../src/lib/video-stream-chart.ts'
 
 const first = pushStreamSample([], { t: 1, fps: 60, bitrate: 8000 })
@@ -66,5 +72,24 @@ assert.equal(nearestSampleIndex(240, 2, 240), 1)
 assert.equal(nearestSampleIndex(0, 0, 240), -1)
 assert.equal(formatSampleTime(0), '--:--:--')
 assert.match(formatSampleTime(Date.UTC(2026, 0, 1, 7, 8, 9)), /\d{2}:\d{2}:\d{2}/)
+
+assert.equal(latencyMs(9106), 9.106)
+assert.equal(latencyMs(0), 0)
+assert.equal(formatLatencyUs(0), '-')
+assert.equal(formatLatencyUs(9106), '9.1 ms')
+assert.equal(formatLatencyUs(16000), '16 ms')
+
+const latencySample = {
+  t: 1, capture: 16.7, encode: 9.1, ice: 2, jitter: 4, decode: 5, present: 8,
+}
+assert.equal(Math.round(latencyStackTotal(latencySample) * 10) / 10, 42.8)
+assert.equal(latencyScaleMax([latencySample]), 50)
+
+const band = stackedBandPath([10, 20], [0, 0], 20, 240, 72)
+assert.equal(band.endsWith(' Z'), true)
+assert.equal(stackedBandPath([], [], 20, 240, 72), '')
+
+const bands = latencyStackBands([latencySample], 50, 240, 72)
+assert.equal(Boolean(bands.capture && bands.encode && bands.present), true)
 
 console.log('video-stream-chart tests passed')

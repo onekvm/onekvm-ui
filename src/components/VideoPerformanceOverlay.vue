@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Activity, GripHorizontal, X } from '@lucide/vue'
 
 import { t } from '@/i18n/runtime'
+import { useLatencyHistory } from '@/composables/useLatencyHistory'
 import { useVideoStreamHistory } from '@/composables/useVideoStreamHistory'
 
 import DisplayStatusValues from './DisplayStatusValues.vue'
@@ -31,6 +32,14 @@ const emit = defineEmits<{
 }>()
 
 const { samples } = useVideoStreamHistory(() => props.videoFps, () => props.videoBitrate)
+const { samples: latencySamples } = useLatencyHistory(() => ({
+  capture: props.captureLatencyUs,
+  encode: props.encodeLatencyUs,
+  ice: props.iceRttUs,
+  jitter: props.jitterBufferUs,
+  decode: props.decodeUs,
+  present: props.presentUs,
+}))
 const panel = ref<HTMLElement | null>(null)
 const position = ref({ x: 24, y: 58 })
 let dragOffset = { x: 0, y: 0 }
@@ -155,6 +164,7 @@ watch(() => [props.canvasWidth, props.canvasHeight], () => {
         :video-fps="videoFps"
         :video-bitrate="videoBitrate"
         :stream-samples="samples"
+        :latency-samples="latencySamples"
         :target-fps="targetFps"
         :codec="codec"
         :transport="transport"

@@ -4,6 +4,26 @@ export type StreamSample = {
   bitrate: number
 }
 
+export type LatencySample = {
+  t: number
+  capture: number
+  encode: number
+  ice: number
+  jitter: number
+  decode: number
+  present: number
+}
+
+export const LATENCY_STACK_KEYS = [
+  'capture',
+  'encode',
+  'jitter',
+  'decode',
+  'present',
+] as const
+
+export type LatencyStackKey = (typeof LATENCY_STACK_KEYS)[number]
+
 export const STREAM_HISTORY_CAPACITY = 60
 export const STREAM_SAMPLE_MS = 1_000
 
@@ -14,17 +34,81 @@ export function formatSampleTime(ms: number): string {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
-export function pushStreamSample(
-  samples: readonly StreamSample[],
-  sample: StreamSample,
+export function pushStreamSample<T>(
+  samples: readonly T[],
+  sample: T,
   capacity = STREAM_HISTORY_CAPACITY,
-): StreamSample[] {
+): T[] {
   if (capacity < 1) return []
   const next = samples.length >= capacity
     ? samples.slice(samples.length - capacity + 1)
     : samples.slice()
   next.push(sample)
   return next
+}
+
+export function latencyMs(us: number): number {
+  if (!Number.isFinite(us) || us <= 0) return 0
+  return us / 1000
+}
+
+export function formatLatencyUs(value: number): string {
+  if (!value || value < 0) return '-'
+  if (value >= 10_000) return `${Math.round(value / 1000)} ms`
+  if (value >= 1000) return `${(value / 1000).toFixed(1)} ms`
+  return `${value} µs`
+}
+
+export function latencyStackTotal(sample: LatencySample): number {
+  let total = 0
+  for (const key of LATENCY_STACK_KEYS) total += Math.max(0, sample[key])
+  return total
+}
+
+export function latencyScaleMax(samples: readonly LatencySample[]): number {
+  let peak = 0
+  for (const sample of samples) {
+    peak = Math.max(peak, latencyStackTotal(sample), sample.ice)
+  }
+  return niceCeiling(peak, 20)
+}
+
+export function stackedBandPath(
+  upper: readonly number[],
+  lower: readonly number[],
+  max: number,
+  width: number,
+  height: number,
+): string {
+  if (upper.length === 0 || upper.length !== lower.length || width <= 0 || height <= 0 || max <= 0)
+    return ''
+  const top = linePath(upper, max, width, height)
+  if (!top) return ''
+  const count = lower.length
+  const parts = [top]
+  for (let index = count - 1; index >= 0; index--) {
+    const x = sampleX(index, count, width).toFixed(2)
+    const y = sampleY(lower[index], max, height).toFixed(2)
+    parts.push(`L${x} ${y}`)
+  }
+  return `${parts.join(' ')} Z`
+}
+
+export function latencyStackBands(
+  samples: readonly LatencySample[],
+  max: number,
+  width: number,
+  height: number,
+): Record<LatencyStackKey, string> {
+  const bands = {} as Record<LatencyStackKey, string>
+  const count = samples.length
+  const lower = Array.from({ length: count }, () => 0)
+  for (const key of LATENCY_STACK_KEYS) {
+    const upper = samples.map((sample, index) => lower[index] + Math.max(0, sample[key]))
+    bands[key] = stackedBandPath(upper, lower, max, width, height)
+    for (let index = 0; index < count; index++) lower[index] = upper[index]
+  }
+  return bands
 }
 
 export function niceCeiling(value: number, fallback: number): number {

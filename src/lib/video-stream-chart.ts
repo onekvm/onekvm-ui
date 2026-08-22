@@ -82,9 +82,15 @@ export function stackedBandPath(
 ): string {
   if (upper.length === 0 || upper.length !== lower.length || width <= 0 || height <= 0 || max <= 0)
     return ''
+  const count = lower.length
+  if (count === 1) {
+    const yTop = sampleY(upper[0], max, height).toFixed(2)
+    const yBot = sampleY(lower[0], max, height).toFixed(2)
+    const w = width.toFixed(2)
+    return `M0 ${yTop} L${w} ${yTop} L${w} ${yBot} L0 ${yBot} Z`
+  }
   const top = linePath(upper, max, width, height)
   if (!top) return ''
-  const count = lower.length
   const parts = [top]
   for (let index = count - 1; index >= 0; index--) {
     const x = sampleX(index, count, width).toFixed(2)

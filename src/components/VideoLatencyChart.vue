@@ -29,7 +29,7 @@ const viewWidth = padLeft + width + padRight
 const viewHeight = padTop + height + padBottom
 
 const hoverIndex = ref(-1)
-const tooltip = ref({ x: 0, y: 0 })
+const tooltip = ref({ x: 0, y: 0, align: 'center' as 'left' | 'center' | 'right' })
 
 const scaleMax = computed(() => latencyScaleMax(props.samples))
 const bands = computed(() => latencyStackBands(props.samples, scaleMax.value, width, height))
@@ -92,9 +92,12 @@ function setHover(event: PointerEvent) {
   const chart = target.closest('.stream-chart')
   if (!(chart instanceof HTMLElement)) return
   const box = chart.getBoundingClientRect()
+  const x = event.clientX - box.left
+  const y = event.clientY - box.top
   tooltip.value = {
-    x: event.clientX - box.left,
-    y: event.clientY - box.top,
+    x: Math.min(Math.max(x, 8), Math.max(8, box.width - 8)),
+    y: Math.max(y, 24),
+    align: x > box.width * 0.55 ? 'right' : x < box.width * 0.45 ? 'left' : 'center',
   }
 }
 
@@ -163,6 +166,7 @@ function clearHover() {
     <div
       v-if="hover"
       class="stream-chart-tooltip"
+      :data-align="tooltip.align"
       :style="{ left: `${tooltip.x}px`, top: `${tooltip.y}px` }"
     >
       <div class="stream-chart-tooltip-time">{{ hover.time }}</div>

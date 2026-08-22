@@ -922,10 +922,28 @@ select { font: inherit; }
 
 .display-status-values {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0;
   color: #aeb7c0;
   font-size: 11px;
+}
+
+.video-performance-overlay .display-status-values {
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+
+.display-status-popover .display-status-values,
+.mouse-status-values {
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.display-status-popover .display-status-values > div,
+.mouse-status-values > div {
+  display: flex;
+  min-height: 29px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
 }
 
 .display-status-column {
@@ -1125,6 +1143,14 @@ select { font: inherit; }
   pointer-events: none;
   transform: translate(-50%, calc(-100% - 10px));
   white-space: nowrap;
+}
+
+.latency-chart .stream-chart-tooltip[data-align="left"] {
+  transform: translate(0, calc(-100% - 10px));
+}
+
+.latency-chart .stream-chart-tooltip[data-align="right"] {
+  transform: translate(-100%, calc(-100% - 10px));
 }
 
 .stream-chart-tooltip-time {
@@ -2364,7 +2390,7 @@ select { font: inherit; }
 .permission-options { display: grid; gap: 10px; }
 
 @media (max-width: 760px) {
-  .display-status-values { grid-template-columns: 1fr; }
+  .video-performance-overlay .display-status-values { grid-template-columns: 1fr; }
   .display-status-column { padding-right: 0; }
   .display-status-column + .display-status-column {
     padding-top: 12px;

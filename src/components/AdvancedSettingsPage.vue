@@ -1263,7 +1263,11 @@ watch(section, (value) => {
             </header>
 
             <n-alert v-if="error || extensionError || systemDetailsError" type="error" :bordered="false">{{ error || extensionError || systemDetailsError }}</n-alert>
-            <n-spin class="advanced-settings-content" :show="loading || systemDetailsLoading">
+            <div v-if="loading && !config" class="advanced-settings-loading" role="status" aria-live="polite">
+              <n-spin size="large" />
+              <span>{{ t('common.loading', 'Loading...') }}</span>
+            </div>
+            <n-spin v-else class="advanced-settings-content" :show="loading || systemDetailsLoading">
               <section v-if="section === 'display' && config" class="advanced-settings-section">
                 <DisplaySettingsForm
                   v-model="config.video"

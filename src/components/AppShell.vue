@@ -17,9 +17,14 @@ import { uiProduct } from '@/product'
 import ControlToolbar from './ControlToolbar.vue'
 import RemoteConsole from './RemoteConsole.vue'
 import VideoPerformanceOverlay from './VideoPerformanceOverlay.vue'
+import AdvancedSettingsLoading from './AdvancedSettingsLoading.vue'
 
 const AccountDrawer = defineAsyncComponent(() => import('./AccountDrawer.vue'))
-const AdvancedSettingsPage = defineAsyncComponent(() => import('./AdvancedSettingsPage.vue'))
+const AdvancedSettingsPage = defineAsyncComponent({
+  loader: () => import('./AdvancedSettingsPage.vue'),
+  loadingComponent: AdvancedSettingsLoading,
+  delay: 0,
+})
 const KeyboardShortcutDrawer = defineAsyncComponent(() => import('./KeyboardShortcutDrawer.vue'))
 const SettingsDrawer = defineAsyncComponent(() => import('./SettingsDrawer.vue'))
 const VirtualKeyboard = defineAsyncComponent(() => import('./VirtualKeyboard.vue'))

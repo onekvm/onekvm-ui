@@ -1311,6 +1311,23 @@ select { font: inherit; }
   scrollbar-width: thin;
 }
 .advanced-settings-view { min-height: 100%; }
+.advanced-settings-loading-page {
+  display: grid;
+  grid-row: 1 / -1;
+  min-width: 0;
+  min-height: 100%;
+  place-items: center;
+  background: #0d1013;
+}
+.advanced-settings-loading {
+  display: grid;
+  min-height: 40vh;
+  place-items: center;
+  justify-items: center;
+  gap: 14px;
+  color: #aeb7c0;
+  font-size: 13px;
+}
 .advanced-section-enter-active {
   transition: opacity 170ms ease, transform 170ms ease;
 }

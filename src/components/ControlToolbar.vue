@@ -86,6 +86,7 @@ const emit = defineEmits<{
   dock: [dock: ToolbarDock]
   'update:mouseMode': [mode: MouseMode]
   'update:scrollInterval': [interval: number]
+  'update:mouseReportRate': [rate: number]
   'update:videoFit': [fit: VideoFit]
 }>()
 
@@ -639,6 +640,9 @@ onBeforeUnmount(() => {
         :mouse-report-rate="mouseReportRate"
         :placement="menuPlacement"
         @update:show="updateMenu('mouse', $event)"
+        @update:mouse-mode="emit('update:mouseMode', $event)"
+        @update:scroll-interval="emit('update:scrollInterval', $event)"
+        @update:mouse-report-rate="emit('update:mouseReportRate', $event)"
       >
         <n-tooltip :disabled="openMenu === 'mouse'">
           <template #trigger>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { WifiOff } from '@lucide/vue'
+import { useDialog } from 'naive-ui'
 
 import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type OneKVMStatus } from '@/api/client'
 import { useAuth } from '@/composables/useAuth'
@@ -26,7 +27,6 @@ const AdvancedSettingsPage = defineAsyncComponent({
   delay: 0,
 })
 const KeyboardShortcutDrawer = defineAsyncComponent(() => import('./KeyboardShortcutDrawer.vue'))
-const SettingsDrawer = defineAsyncComponent(() => import('./SettingsDrawer.vue'))
 const VirtualKeyboard = defineAsyncComponent(() => import('./VirtualKeyboard.vue'))
 
 const MOUSE_MODE_KEY = 'nano-kvm-mouse-mode'
@@ -48,10 +48,10 @@ function advancedRouteFromHash(hash: string) {
 
 const { state } = useTransport()
 const { auth, logout } = useAuth()
+const dialog = useDialog()
 const canSettings = computed(() => hasPermission(auth, 'settings.view'))
 const canPower = computed(() => hasPermission(auth, 'power.control'))
 const brandBadge = computed(() => uiProduct.badge(auth))
-const settingsOpen = ref(false)
 const accountOpen = ref(false)
 const virtualKeyboardOpen = ref(false)
 const shortcutDialogOpen = ref(false)
@@ -98,7 +98,7 @@ let unsubscribeStatus: (() => void) | undefined
 
 const consoleHostname = computed(() => status.value?.network.hostname || auth.hostname)
 const keyboardBlocked = computed(
-  () => advancedSettingsOpen.value || accountOpen.value || settingsOpen.value || virtualKeyboardOpen.value || shortcutDialogOpen.value || toolbarOverlayOpen.value || state.value.websocketFallbackOffered,
+  () => advancedSettingsOpen.value || accountOpen.value || virtualKeyboardOpen.value || shortcutDialogOpen.value || toolbarOverlayOpen.value || state.value.websocketFallbackOffered,
 )
 watch(mouseMode, (value) => localStorage.setItem(MOUSE_MODE_KEY, value))
 watch(videoFit, (value) => localStorage.setItem(VIDEO_FIT_KEY, value))
@@ -230,7 +230,6 @@ function syncRoute() {
   advancedSettingsOpen.value = advanced
   if (advanced) {
     advancedSettingsRoute.value = advancedRouteFromHash(window.location.hash)
-    settingsOpen.value = false
   }
 }
 
@@ -239,8 +238,21 @@ function openAdvancedSettings() {
   window.location.hash = '/settings/advanced/system'
 }
 
+function confirmAdvancedSettings() {
+  if (advancedSettingsOpen.value || !canSettings.value) return
+  dialog.warning({
+    title: t('settings.advancedSettings.confirmTitle', 'Open advanced settings?'),
+    content: t(
+      'settings.advancedSettings.sessionWarning',
+      'Opening advanced settings will interrupt the current remote-control session. It will reconnect after you return.',
+    ),
+    positiveText: t('settings.advancedSettings.continue', 'Continue'),
+    negativeText: t('common.cancel', 'Cancel'),
+    onPositiveClick: () => openAdvancedSettings(),
+  })
+}
+
 function closeAdvancedSettings() {
-  settingsOpen.value = false
   accountOpen.value = false
   virtualKeyboardOpen.value = false
   shortcutDialogOpen.value = false
@@ -336,7 +348,7 @@ onBeforeUnmount(() => {
           :keyboard-layout="keyboardLayout"
           :user-shortcuts="userShortcuts"
           :device-shortcuts="deviceShortcuts"
-          @settings="settingsOpen = true"
+          @settings="confirmAdvancedSettings"
           @account="accountOpen = true"
           @logout="logout"
           @keyboard="virtualKeyboardOpen = true"
@@ -348,6 +360,9 @@ onBeforeUnmount(() => {
           @overlay="toolbarOverlayOpen = $event"
           @dock="toolbarDockedTop = $event === 'top'"
           @update:video-fit="videoFit = $event"
+          @update:mouse-mode="mouseMode = $event"
+          @update:scroll-interval="scrollInterval = $event"
+          @update:mouse-report-rate="mouseReportRate = $event"
         />
 
         <RemoteConsole
@@ -433,14 +448,6 @@ onBeforeUnmount(() => {
           </template>
         </n-modal>
 
-        <SettingsDrawer
-          v-if="canSettings"
-          v-model:show="settingsOpen"
-          v-model:mouse-mode="mouseMode"
-          v-model:scroll-interval="scrollInterval"
-          v-model:mouse-report-rate="mouseReportRate"
-          @advanced="openAdvancedSettings"
-        />
         <AccountDrawer v-if="accountOpen" v-model:show="accountOpen" />
         <VirtualKeyboard v-if="virtualKeyboardOpen" v-model:show="virtualKeyboardOpen" :layout="keyboardLayout" />
         <KeyboardShortcutDrawer

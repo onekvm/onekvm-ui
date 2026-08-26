@@ -6,13 +6,15 @@ import {
   videoResolutionOptions,
 } from '../src/lib/video-resolution.ts'
 
-assert.equal(supportedInputResolutions.length, 12)
+assert.equal(supportedInputResolutions.length, 13)
+assert.ok(supportedInputResolutions.some((mode) => mode.width === 2560 && mode.height === 1440))
 assert.equal(supportedInputResolutions.some((mode) => mode.width === 854), false)
 assert.ok(supportedInputResolutions.some((mode) => mode.width === 640 && mode.height === 480))
 assert.ok(isVideoResolutionValue(0))
 assert.ok(isVideoResolutionValue(1080))
 assert.ok(isVideoResolutionValue(480))
 assert.ok(isVideoResolutionValue(12801024))
+assert.ok(isVideoResolutionValue(25601440))
 assert.equal(isVideoResolutionValue(854), false)
 
 const options = videoResolutionOptions('自动')

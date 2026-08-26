@@ -8,6 +8,7 @@ export type VideoResolutionMode = {
    still select the matching HDMI input mode. Other modes are packed as
    width * 10000 + height. 854x480 is not a Cube HDMI input. */
 export const supportedInputResolutions: readonly VideoResolutionMode[] = [
+  { width: 2560, height: 1440, value: 25601440 },
   { width: 1920, height: 1080, value: 1080 },
   { width: 1600, height: 900, value: 16000900 },
   { width: 1440, height: 1080, value: 14401080 },

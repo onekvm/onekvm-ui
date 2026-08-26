@@ -174,12 +174,12 @@ select { font: inherit; }
   font-weight: 500;
 }
 .toolbar.is-vertical .brand { min-width: 0; }
-.toolbar.is-vertical .account-name { display: none; }
-.toolbar.is-vertical .account-button { max-width: none; padding: 0; }
 .toolbar.is-vertical .device-controls,
 .toolbar.is-vertical .toolbar-actions,
 .toolbar.is-vertical .toolbar-account {
   flex-direction: column;
+  align-items: center;
+  width: 100%;
   height: auto;
   margin: 0;
   padding: 0;
@@ -190,6 +190,14 @@ select { font: inherit; }
 .toolbar.is-vertical .toolbar-account {
   padding-top: 7px;
   border-top: 1px solid #343a42;
+}
+
+.toolbar.is-vertical .account-button {
+  width: 30px;
+  min-width: 30px;
+  max-width: 30px;
+  padding: 0;
+  justify-content: center;
 }
 
 .toolbar.is-vertical .toolbar-spacer {

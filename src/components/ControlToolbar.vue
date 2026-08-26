@@ -838,7 +838,7 @@ onBeforeUnmount(() => {
                 :aria-label="t('settings.account.title', 'Account')"
               >
                 <template #icon><CircleUserRound /></template>
-                <span class="button-label account-name">{{ username }}</span>
+                <span v-if="!toolbarVertical" class="button-label account-name">{{ username }}</span>
               </n-button>
             </template>
             {{ t('settings.account.title', 'Account') }}

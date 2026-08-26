@@ -18,6 +18,8 @@ const themeOverrides: GlobalThemeOverrides = {
     successColor: '#38b879',
     warningColor: '#d6a746',
     errorColor: '#df6262',
+    cubicBezierEaseIn: 'cubic-bezier(0.4, 0, 1, 1)',
+    cubicBezierEaseOut: 'cubic-bezier(0, 0, 0, 1)',
     borderRadius: '4px',
     borderRadiusSmall: '3px',
     cardColor: '#171b20',

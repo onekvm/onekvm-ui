@@ -1,4 +1,8 @@
 :root {
+  --win11-ease-out: cubic-bezier(0, 0, 0, 1);
+  --win11-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --win11-enter: 250ms;
+  --win11-exit: 167ms;
   --onekvm-font-mono:
     ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-family:
@@ -43,13 +47,15 @@ select { font: inherit; }
   grid-template-rows: 42px minmax(0, 1fr);
 }
 
-.settings-page-enter-active,
+.settings-page-enter-active {
+  transition: opacity var(--win11-enter) var(--win11-ease-out), transform var(--win11-enter) var(--win11-ease-out);
+}
 .settings-page-leave-active {
-  transition: opacity 160ms ease, transform 160ms ease;
+  transition: opacity var(--win11-exit) var(--win11-ease-in), transform var(--win11-exit) var(--win11-ease-in);
 }
 
-.settings-page-enter-from { opacity: 0; transform: translateX(12px); }
-.settings-page-leave-to { opacity: 0; transform: translateX(-8px); }
+.settings-page-enter-from { opacity: 0; transform: scale(.94); }
+.settings-page-leave-to { opacity: 0; transform: scale(.96); }
 
 .toolbar {
   z-index: 10;
@@ -2208,10 +2214,18 @@ select { font: inherit; }
   text-align: center;
 }
 .network-apply-addresses .n-button { font-variant-numeric: tabular-nums; }
-.system-action-overlay-enter-active { transition: opacity 160ms ease; }
-.system-action-overlay-enter-active .system-action-modal-card { transition: transform 160ms ease, opacity 160ms ease; }
-.system-action-overlay-enter-from { opacity: 0; }
-.system-action-overlay-enter-from .system-action-modal-card { opacity: 0; transform: translateY(8px) scale(.985); }
+.system-action-overlay-enter-active { transition: opacity var(--win11-enter) var(--win11-ease-out); }
+.system-action-overlay-enter-active .system-action-modal-card {
+  transition: transform var(--win11-enter) var(--win11-ease-out), opacity var(--win11-enter) var(--win11-ease-out);
+}
+.system-action-overlay-leave-active { transition: opacity var(--win11-exit) var(--win11-ease-in); }
+.system-action-overlay-leave-active .system-action-modal-card {
+  transition: transform var(--win11-exit) var(--win11-ease-in), opacity var(--win11-exit) var(--win11-ease-in);
+}
+.system-action-overlay-enter-from,
+.system-action-overlay-leave-to { opacity: 0; }
+.system-action-overlay-enter-from .system-action-modal-card,
+.system-action-overlay-leave-to .system-action-modal-card { opacity: 0; transform: scale(.94); }
 
 .resource-monitor-page { display: grid; gap: 22px; }
 .resource-chart-grid {
@@ -2605,13 +2619,77 @@ select { font: inherit; }
   .metric-resolution { display: none; }
 }
 
+.win11-window-enter-active {
+  transition: opacity var(--win11-enter) var(--win11-ease-out), transform var(--win11-enter) var(--win11-ease-out);
+}
+.win11-window-leave-active {
+  transition: opacity var(--win11-exit) var(--win11-ease-in), transform var(--win11-exit) var(--win11-ease-in);
+}
+.win11-window-enter-from { opacity: 0; transform: scale(.92); }
+.win11-window-leave-to { opacity: 0; transform: scale(.96); }
+
+body .n-popover-shared.popover-transition-enter-from,
+body .n-popover-shared.popover-transition-leave-to {
+  opacity: 0;
+  transform: scale(.92);
+}
+body .n-popover-shared.popover-transition-enter-to,
+body .n-popover-shared.popover-transition-leave-from {
+  opacity: 1;
+  transform: scale(1);
+}
+body .n-popover-shared.popover-transition-enter-active {
+  transition:
+    opacity var(--win11-enter) var(--win11-ease-out),
+    transform var(--win11-enter) var(--win11-ease-out);
+}
+body .n-popover-shared.popover-transition-leave-active {
+  transition:
+    opacity var(--win11-exit) var(--win11-ease-in),
+    transform var(--win11-exit) var(--win11-ease-in);
+}
+
+body .fade-in-scale-up-transition-enter-from,
+body .fade-in-scale-up-transition-leave-to {
+  opacity: 0;
+  transform: scale(.94);
+}
+body .fade-in-scale-up-transition-enter-to,
+body .fade-in-scale-up-transition-leave-from {
+  opacity: 1;
+  transform: scale(1);
+}
+body .fade-in-scale-up-transition-enter-active {
+  transition: opacity var(--win11-enter) var(--win11-ease-out), transform var(--win11-enter) var(--win11-ease-out);
+}
+body .fade-in-scale-up-transition-leave-active {
+  transition: opacity var(--win11-exit) var(--win11-ease-in), transform var(--win11-exit) var(--win11-ease-in);
+}
+
+body .n-drawer.slide-in-from-right-transition-enter-active {
+  transition: transform 333ms var(--win11-ease-out);
+}
+body .n-drawer.slide-in-from-right-transition-leave-active {
+  transition: transform 200ms var(--win11-ease-in);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .settings-page-enter-active,
   .settings-page-leave-active,
   .advanced-section-enter-active,
   .advanced-section-leave-active,
   .system-action-overlay-enter-active,
+  .system-action-overlay-leave-active,
   .system-action-overlay-enter-active .system-action-modal-card,
+  .system-action-overlay-leave-active .system-action-modal-card,
+  .win11-window-enter-active,
+  .win11-window-leave-active,
+  body .n-popover-shared.popover-transition-enter-active,
+  body .n-popover-shared.popover-transition-leave-active,
+  body .fade-in-scale-up-transition-enter-active,
+  body .fade-in-scale-up-transition-leave-active,
+  body .n-drawer.slide-in-from-right-transition-enter-active,
+  body .n-drawer.slide-in-from-right-transition-leave-active,
   .advanced-settings-sidebar button { transition: none; }
   .console-connect-progress > span { animation-duration: 2.5s; }
   .console-video,

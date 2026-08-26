@@ -266,6 +266,7 @@ onBeforeUnmount(() => {
   </n-modal>
 
   <Teleport to="body">
+    <Transition name="win11-window">
     <section
       v-if="pinned"
       ref="panel"
@@ -316,5 +317,6 @@ onBeforeUnmount(() => {
         <n-menu accordion :value="null" :options="remainingOptions" :indent="16" class="keyboard-control-menu keyboard-secondary-menu" @update:value="selectOption" />
       </div>
     </section>
+    </Transition>
   </Teleport>
 </template>

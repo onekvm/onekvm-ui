@@ -365,6 +365,7 @@ onBeforeUnmount(() => {
           @browser-latency="setBrowserLatency"
         />
 
+        <Transition name="win11-window">
         <VideoPerformanceOverlay
           v-show="performanceOpen"
           :visible="performanceOpen"
@@ -385,6 +386,7 @@ onBeforeUnmount(() => {
           :present-us="presentUs"
           @close="performanceOpen = false"
         />
+        </Transition>
 
         <n-modal
           :show="state.websocketFallbackOffered"

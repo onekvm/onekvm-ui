@@ -243,6 +243,7 @@ onBeforeUnmount(() => {
 
 <template>
   <Teleport to="body">
+    <Transition name="win11-window">
     <section
       v-if="show"
       ref="panel"
@@ -322,5 +323,6 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </section>
+    </Transition>
   </Teleport>
 </template>

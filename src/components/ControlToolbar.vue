@@ -79,7 +79,7 @@ const emit = defineEmits<{
   keyboard: []
   'media-status': [status: MSDStatus]
   fullscreen: []
-  'update:performanceOpen': [open: boolean]
+  'update:performanceOpen': [open: boolean, event?: MouseEvent]
   'update:rightControlAsMeta': [enabled: boolean]
   'edit-user-shortcuts': []
   overlay: [visible: boolean]
@@ -750,7 +750,7 @@ onBeforeUnmount(() => {
             :aria-label="performanceOpen
               ? t('screen.hidePerformance', 'Hide performance overlay')
               : t('screen.showPerformance', 'Show performance overlay')"
-            @click="emit('update:performanceOpen', !performanceOpen)"
+            @click="emit('update:performanceOpen', !performanceOpen, $event)"
           >
             <template #icon><Activity /></template>
           </n-button>

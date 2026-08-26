@@ -25,6 +25,8 @@ const props = defineProps<{
   decodeUs: number
   presentUs: number
   visible: boolean
+  originX?: number
+  originY?: number
 }>()
 
 const emit = defineEmits<{
@@ -56,33 +58,33 @@ function hostRect() {
   return new DOMRect(0, 0, window.innerWidth, window.innerHeight)
 }
 
-function panelRect() {
+function panelSize() {
   if (!props.visible || !panel.value) return null
   if (!(panel.value.offsetParent instanceof HTMLElement)) return null
-  const rect = panel.value.getBoundingClientRect()
-  if (rect.width <= 0 || rect.height <= 0) return null
-  return rect
+  const width = panel.value.offsetWidth
+  const height = panel.value.offsetHeight
+  if (width <= 0 || height <= 0) return null
+  return { width, height }
 }
 
 function clampPosition() {
-  const rect = panelRect()
-  if (!rect) return
+  const size = panelSize()
+  if (!size) return
   const host = hostRect()
   position.value = {
-    x: Math.max(8, Math.min(host.width - rect.width - 8, position.value.x)),
-    y: Math.max(50, Math.min(host.height - rect.height - 8, position.value.y)),
+    x: Math.max(8, Math.min(host.width - size.width - 8, position.value.x)),
+    y: Math.max(50, Math.min(host.height - size.height - 8, position.value.y)),
   }
 }
 
 async function placePanel() {
   await nextTick()
-  const rect = panelRect()
-  if (!rect) return
+  const size = panelSize()
+  if (!size) return
   const host = hostRect()
-  position.value = {
-    x: Math.max(8, host.width - rect.width - 18),
-    y: 58,
-  }
+  position.value = props.originX == null || props.originY == null
+    ? { x: Math.max(8, host.width - size.width - 18), y: 58 }
+    : { x: props.originX - host.left, y: props.originY - host.top }
   clampPosition()
 }
 

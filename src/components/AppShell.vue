@@ -63,6 +63,7 @@ const consoleWorkspace = ref<HTMLElement | null>(null)
 const remoteConsole = ref<InstanceType<typeof RemoteConsole> | null>(null)
 const fullscreen = ref(false)
 const performanceOpen = ref(localStorage.getItem(PERFORMANCE_OVERLAY_KEY) !== 'false')
+const performanceOrigin = ref<{ x: number, y: number } | null>(null)
 const rightControlAsMeta = ref(localStorage.getItem(RIGHT_CONTROL_AS_META_KEY) === 'true')
 const userShortcuts = ref<KeyboardShortcut[]>(loadLocalShortcuts())
 const deviceShortcuts = ref<KeyboardShortcut[]>([])
@@ -105,6 +106,11 @@ watch(scrollInterval, (value) => localStorage.setItem(SCROLL_INTERVAL_KEY, Strin
 watch(mouseReportRate, (value) => localStorage.setItem(MOUSE_REPORT_RATE_KEY, String(value)))
 watch(rightControlAsMeta, (value) => localStorage.setItem(RIGHT_CONTROL_AS_META_KEY, String(value)))
 watch(performanceOpen, (value) => localStorage.setItem(PERFORMANCE_OVERLAY_KEY, String(value)))
+
+function setPerformanceOpen(open: boolean, event?: MouseEvent) {
+  if (open && event) performanceOrigin.value = { x: event.clientX, y: event.clientY }
+  performanceOpen.value = open
+}
 watch(
   consoleHostname,
   (hostname) => {
@@ -337,7 +343,7 @@ onBeforeUnmount(() => {
           @media-status="msdStatus = $event"
           @edit-user-shortcuts="shortcutDialogOpen = true"
           @fullscreen="toggleFullscreen"
-          @update:performance-open="performanceOpen = $event"
+          @update:performance-open="setPerformanceOpen"
           @update:right-control-as-meta="rightControlAsMeta = $event"
           @overlay="toolbarOverlayOpen = $event"
           @dock="toolbarDockedTop = $event === 'top'"
@@ -369,6 +375,8 @@ onBeforeUnmount(() => {
         <VideoPerformanceOverlay
           v-show="performanceOpen"
           :visible="performanceOpen"
+          :origin-x="performanceOrigin?.x"
+          :origin-y="performanceOrigin?.y"
           :canvas-width="canvasWidth"
           :canvas-height="canvasHeight"
           :video-fps="videoFps"

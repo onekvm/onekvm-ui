@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { Save } from '@lucide/vue'
 import { useMessage } from 'naive-ui'
 
 import { api, type ConfigSchema, type OneKVMConfig } from '@/api/client'
@@ -34,10 +33,14 @@ const emit = defineEmits<{
 const message = useMessage()
 const popoverOpen = ref(false)
 const menuOpen = ref(false)
-const loading = ref(false)
 const saving = ref(false)
-const config = ref<OneKVMConfig | null>(null)
+const resolution = ref(props.videoResolution)
+const fps = ref(props.targetFps)
+const video = ref<OneKVMConfig['video'] | null>(null)
 const schema = ref<ConfigSchema | null>(null)
+
+watch(() => props.videoResolution, (value) => { resolution.value = value })
+watch(() => props.targetFps, (value) => { fps.value = value })
 
 const fitOptions = computed(() => [
   { label: t('screen.fitOriginal', 'Original'), value: 'original' as const },
@@ -62,12 +65,18 @@ const fpsOptions = [10, 15, 24, 30, 45, 60].map((value) => ({
   label: `${value} FPS`,
   value,
 }))
-const videoDisabled = computed(() => !props.canChangeVideo || saving.value || loading.value || !config.value)
+const videoDisabled = computed(() => !props.canChangeVideo || saving.value)
 
 function qualityTierLabel(value: number) {
   const tier = qualityTier(value)
   return t(tier.key, tier.fallback)
 }
+const qualityPercent = computed({
+  get: () => Math.round((video.value?.quality_factor ?? 1) * 100),
+  set: (value: number) => {
+    if (video.value) video.value.quality_factor = value / 100
+  },
+})
 const qualityOptions = computed(() => {
   const options: Array<{ label: string; value: number | 'custom' }> = Array.from({ length: 10 }, (_, index) => {
     const value = (index + 1) * 10
@@ -75,12 +84,6 @@ const qualityOptions = computed(() => {
   })
   options.push({ label: t('screen.qualityCustom', 'Custom'), value: 'custom' })
   return options
-})
-const qualityPercent = computed({
-  get: () => Math.round((config.value?.video.quality_factor ?? 1) * 100),
-  set: (value: number) => {
-    if (config.value) config.value.video.quality_factor = value / 100
-  },
 })
 type QualityBudgetSelection = number | 'custom'
 const qualityBudgetCustomEnabled = ref(false)
@@ -96,15 +99,12 @@ const qualityBudgetSelection = computed<QualityBudgetSelection>({
   },
 })
 const qualityBudgetDisabled = computed(() => {
-  const video = config.value?.video
-  return !!video && video.codec !== 'mjpeg' && (video.bitrate_kbps ?? 0) > 0
+  const current = video.value
+  return !!current && current.codec !== 'mjpeg' && (current.bitrate_kbps ?? 0) > 0
 })
-const qualityBudgetLabel = computed(() => config.value?.video.codec === 'mjpeg'
+const qualityBudgetLabel = computed(() => video.value?.codec === 'mjpeg'
   ? t('settings.advancedSettings.displayPage.jpegQuality', 'JPEG quality')
   : t('settings.advancedSettings.displayPage.quality', 'Quality budget (Bitrate)'))
-const qualityBudgetHint = computed(() => config.value?.video.codec === 'mjpeg'
-  ? t('settings.advancedSettings.displayPage.jpegQualityHint', 'Controls JPEG compression quality; higher values retain more detail and use more bandwidth.')
-  : t('settings.advancedSettings.displayPage.qualityPercentHint', 'VBR bitrate budget'))
 type SimpleQpSelection = 'auto' | QpPresetKey | 'custom'
 const simpleQpOptions = computed(() => [
   {
@@ -123,38 +123,31 @@ const simpleQpOptions = computed(() => [
 ])
 const simpleQpSelection = computed<SimpleQpSelection>({
   get: () => {
-    const video = config.value?.video
-    if (!video || !hasQpOverride(video)) return 'auto'
-    return matchingQpPreset(video)?.value ?? 'custom'
+    const current = video.value
+    if (!current || !hasQpOverride(current)) return 'auto'
+    return matchingQpPreset(current)?.value ?? 'custom'
   },
   set: (selection) => {
-    const video = config.value?.video
-    if (!video || selection === 'custom') return
+    const current = video.value
+    if (!current || selection === 'custom') return
     if (selection === 'auto') {
-      clearQpOverride(video)
+      clearQpOverride(current)
       return
     }
-    video.bitrate_kbps = 0
-    setQpPreset(video, selection)
+    current.bitrate_kbps = 0
+    setQpPreset(current, selection)
   },
 })
-const simpleQpDescription = computed(() => {
-  const selection = simpleQpSelection.value
-  if (selection === 'auto') {
-    return t(
-      'settings.advancedSettings.displayPage.qpAutomaticHint',
-      'Does not override QP; the device backend controls it automatically.',
-    )
-  }
-  if (selection === 'custom') {
-    return t(
-      'settings.advancedSettings.displayPage.qpCustomSimpleHint',
-      'Custom QP values are active. Open Advanced settings to edit them.',
-    )
-  }
-  const preset = qpPresets.find((candidate) => candidate.value === selection)
-  return preset ? t(preset.descriptionKey, preset.descriptionFallback) : ''
-})
+
+const selectProps = {
+  class: 'display-status-select',
+  size: 'tiny' as const,
+  menuSize: 'tiny' as const,
+  consistentMenuWidth: false,
+  showCheckmark: false,
+  to: '.console-workspace',
+  menuProps: { class: 'display-fit-select-menu' },
+}
 
 function updateShow(show: boolean) {
   if (!show && menuOpen.value) return
@@ -162,9 +155,8 @@ function updateShow(show: boolean) {
   emit('update:show', show)
 }
 
-async function loadDisplay() {
+async function loadVideo() {
   if (!props.canChangeVideo) return
-  loading.value = true
   try {
     const [loadedConfig, loadedSchema] = await Promise.all([api.getConfig(), api.getConfigSchema()])
     loadedConfig.video.frame_detect ??= false
@@ -173,23 +165,32 @@ async function loadDisplay() {
     loadedConfig.video.min_qp ??= 0
     loadedConfig.video.max_qp ??= 0
     qualityBudgetCustomEnabled.value = Math.round(loadedConfig.video.quality_factor * 100) % 10 !== 0
-    config.value = loadedConfig
+    video.value = loadedConfig.video
     schema.value = loadedSchema
+    resolution.value = loadedConfig.video.resolution
+    fps.value = loadedConfig.video.fps
   } catch (reason) {
     message.error(reason instanceof Error ? reason.message : String(reason))
-  } finally {
-    loading.value = false
   }
 }
 
-async function saveDisplay() {
-  if (!config.value || !props.canChangeVideo || saving.value) return
+async function patchVideo(
+  entries: Array<[string, string | number | boolean]> | string,
+  value?: string | number | boolean,
+  reconnect = false,
+) {
+  if (!props.canChangeVideo || saving.value) return
+  const updates: Array<[string, string | number | boolean]> = typeof entries === 'string'
+    ? [[entries, value ?? '']]
+    : entries
   saving.value = true
   try {
-    await api.saveConfig(config.value)
-    await onekvm.reconnect()
-    message.success(t('settings.success', 'Settings saved'))
+    for (const [key, next] of updates) await api.patchConfig(key, String(next))
+    if (reconnect) await onekvm.reconnect()
   } catch (reason) {
+    resolution.value = props.videoResolution
+    fps.value = props.targetFps
+    await loadVideo()
     message.error(reason instanceof Error ? reason.message : String(reason))
   } finally {
     saving.value = false
@@ -202,32 +203,64 @@ function updateFit(value: string | number | null) {
 }
 
 function updateResolution(value: string | number | null) {
-  if (!config.value || typeof value !== 'number' || !isVideoResolutionValue(value)) return
-  config.value.video.resolution = value
+  if (typeof value !== 'number' || !isVideoResolutionValue(value)) return
+  if (value === resolution.value) return
+  resolution.value = value
+  if (video.value) video.value.resolution = value
+  void patchVideo('video.resolution', value, true)
 }
 
 function updateFps(value: string | number | null) {
-  if (!config.value || typeof value !== 'number' || value < 1) return
-  config.value.video.fps = value
+  if (typeof value !== 'number' || value < 1) return
+  if (value === fps.value) return
+  fps.value = value
+  if (video.value) video.value.fps = value
+  void patchVideo('video.fps', value)
 }
 
 function updateCodec(value: string | number | null) {
-  if (!config.value || typeof value !== 'string') return
-  config.value.video.codec = value
+  if (!video.value || typeof value !== 'string' || value === video.value.codec) return
+  video.value.codec = value
+  void patchVideo('video.codec', value, true)
 }
 
 function updateQualityBudget(value: string | number | null) {
   if (value !== 'custom' && (typeof value !== 'number' || value < 1 || value > 100)) return
+  const previous = qualityBudgetSelection.value
   qualityBudgetSelection.value = value
+  if (value === 'custom' || value === previous) return
+  void patchVideo('video.quality_factor', value / 100)
+}
+
+function updateCustomQuality(value: number | null) {
+  if (value === null || !Number.isFinite(value)) return
+  const percent = Math.max(1, Math.min(100, Math.round(value)))
+  if (percent === qualityPercent.value) return
+  qualityPercent.value = percent
+  void patchVideo('video.quality_factor', percent / 100)
 }
 
 function updateQpPreset(value: string | number | null) {
+  if (!video.value) return
   if (value !== 'auto' && value !== 'custom' && !qpPresets.some((preset) => preset.value === value)) return
+  if (value === simpleQpSelection.value) return
   simpleQpSelection.value = value as SimpleQpSelection
+  void patchVideo([
+    ['video.bitrate_kbps', video.value.bitrate_kbps ?? 0],
+    ['video.initial_qp', video.value.initial_qp ?? 0],
+    ['video.min_qp', video.value.min_qp ?? 0],
+    ['video.max_qp', video.value.max_qp ?? 0],
+  ])
+}
+
+function updateFrameDetect(value: boolean) {
+  if (!video.value || video.value.frame_detect === value) return
+  video.value.frame_detect = value
+  void patchVideo('video.frame_detect', value)
 }
 
 watch(popoverOpen, (open) => {
-  if (open) void loadDisplay()
+  if (open) void loadVideo()
 })
 </script>
 
@@ -246,135 +279,97 @@ watch(popoverOpen, (open) => {
       <header class="control-popover-header">
         <strong>{{ t('settings.screen.title', 'Display') }}</strong>
       </header>
-      <n-spin :show="loading">
-        <n-form label-placement="top" :show-feedback="false" class="display-popover-form">
-          <n-form-item :label="t('screen.fitMode', 'Display mode')">
-            <n-select
-              size="small"
-              :value="videoFit"
-              :options="fitOptions"
-              :show-checkmark="false"
-              to=".console-workspace"
-              :menu-props="{ class: 'display-fit-select-menu' }"
-              @update:value="updateFit"
-              @update:show="menuOpen = $event"
-            />
-          </n-form-item>
-          <n-form-item :label="t('settings.advancedSettings.displayPage.outputResolution', 'Output resolution')">
-            <div class="display-setting-stack">
-              <n-select
-                size="small"
-                :value="config?.video.resolution ?? videoResolution"
-                :options="resolutionOptions"
-                :disabled="videoDisabled"
-                :show-checkmark="false"
-                to=".console-workspace"
-                :menu-props="{ class: 'display-fit-select-menu' }"
-                @update:value="updateResolution"
-                @update:show="menuOpen = $event"
-              />
-              <span class="display-setting-field-hint">
-                {{ t('settings.advancedSettings.displayPage.outputResolutionHint', 'Sets the pipeline output sent to the encoder and stream. Options match Cube HDMI input modes; Automatic follows the current input.') }}
-              </span>
-            </div>
-          </n-form-item>
-          <n-form-item :label="t('screen.codec', 'Codec')">
-            <n-select
-              size="small"
-              :value="config?.video.codec"
-              :options="codecOptions"
-              :disabled="videoDisabled"
-              :show-checkmark="false"
-              to=".console-workspace"
-              :menu-props="{ class: 'display-fit-select-menu' }"
-              @update:value="updateCodec"
-              @update:show="menuOpen = $event"
-            />
-          </n-form-item>
-          <n-form-item :label="t('screen.targetFps', 'Target FPS')">
-            <n-select
-              size="small"
-              :value="config?.video.fps ?? targetFps"
-              :options="fpsOptions"
-              :disabled="videoDisabled"
-              :show-checkmark="false"
-              to=".console-workspace"
-              :menu-props="{ class: 'display-fit-select-menu' }"
-              @update:value="updateFps"
-              @update:show="menuOpen = $event"
-            />
-          </n-form-item>
-          <n-form-item :label="qualityBudgetLabel">
-            <div class="display-setting-stack">
-              <n-select
-                size="small"
-                :value="qualityBudgetSelection"
-                :options="qualityOptions"
-                :disabled="videoDisabled || qualityBudgetDisabled"
-                :show-checkmark="false"
-                to=".console-workspace"
-                :menu-props="{ class: 'display-fit-select-menu' }"
-                @update:value="updateQualityBudget"
-                @update:show="menuOpen = $event"
-              />
-              <div v-if="qualityBudgetCustomEnabled" class="quality-custom-field">
-                <n-slider v-model:value="qualityPercent" :min="1" :max="100" :step="1" :disabled="videoDisabled || qualityBudgetDisabled" />
-                <n-input-number v-model:value="qualityPercent" :min="1" :max="100" :step="1" :disabled="videoDisabled || qualityBudgetDisabled">
-                  <template #suffix>%</template>
-                </n-input-number>
-              </div>
-              <span v-if="qualityBudgetDisabled" class="display-setting-field-hint">
-                {{ t('settings.advancedSettings.displayPage.simpleQualityDisabledHint', 'Quality budget is replaced by the custom bitrate ceiling. Disable custom bitrate in Advanced settings to change it.') }}
-              </span>
-              <span v-else class="display-setting-field-hint">{{ qualityBudgetHint }}</span>
-            </div>
-          </n-form-item>
-          <n-form-item v-if="config && config.video.codec !== 'mjpeg'" :label="t('settings.advancedSettings.displayPage.qpPreset', 'Picture preset')">
-            <div class="display-setting-stack">
-              <n-select
-                size="small"
-                :value="simpleQpSelection"
-                :options="simpleQpOptions"
-                :disabled="videoDisabled"
-                :show-checkmark="false"
-                to=".console-workspace"
-                :menu-props="{ class: 'display-fit-select-menu' }"
-                @update:value="updateQpPreset"
-                @update:show="menuOpen = $event"
-              />
-              <span class="display-setting-field-hint">{{ simpleQpDescription }}</span>
-            </div>
-          </n-form-item>
-          <n-form-item v-else-if="config" :label="t('screen.frameDetect', 'Frame Detect')">
-            <div class="frame-detect-setting">
-              <n-switch v-model:value="config.video.frame_detect" :disabled="videoDisabled" />
-              <span>{{ t('screen.frameDetectTip', 'Pause transmission while the image is still and resume when it changes.') }}</span>
-            </div>
-          </n-form-item>
-        </n-form>
-        <footer v-if="canChangeVideo" class="display-popover-actions">
-          <n-button size="small" :disabled="loading || saving" @click="loadDisplay">
-            {{ t('common.refresh', 'Reload') }}
-          </n-button>
-          <n-button type="primary" size="small" :loading="saving" :disabled="!config || loading" @click="saveDisplay">
-            <template #icon><Save /></template>
-            {{ t('common.save', 'Save') }}
-          </n-button>
-        </footer>
-      </n-spin>
+      <div class="display-status-values">
+        <div>
+          <span>{{ t('screen.fitMode', 'Display mode') }}</span>
+          <n-select
+            v-bind="selectProps"
+            :value="videoFit"
+            :options="fitOptions"
+            @update:value="updateFit"
+            @update:show="menuOpen = $event"
+          />
+        </div>
+        <div>
+          <span>{{ t('screen.targetResolution', 'Target resolution') }}</span>
+          <n-select
+            v-bind="selectProps"
+            :value="resolution"
+            :options="resolutionOptions"
+            :disabled="videoDisabled"
+            @update:value="updateResolution"
+            @update:show="menuOpen = $event"
+          />
+        </div>
+        <div>
+          <span>{{ t('screen.targetFps', 'Target FPS') }}</span>
+          <n-select
+            v-bind="selectProps"
+            :value="fps"
+            :options="fpsOptions"
+            :disabled="videoDisabled"
+            @update:value="updateFps"
+            @update:show="menuOpen = $event"
+          />
+        </div>
+        <div>
+          <span>{{ t('screen.codec', 'Codec') }}</span>
+          <n-select
+            v-bind="selectProps"
+            :value="video?.codec"
+            :options="codecOptions"
+            :disabled="videoDisabled || !video"
+            @update:value="updateCodec"
+            @update:show="menuOpen = $event"
+          />
+        </div>
+        <div>
+          <span>{{ qualityBudgetLabel }}</span>
+          <n-select
+            v-bind="selectProps"
+            :value="qualityBudgetSelection"
+            :options="qualityOptions"
+            :disabled="videoDisabled || !video || qualityBudgetDisabled"
+            @update:value="updateQualityBudget"
+            @update:show="menuOpen = $event"
+          />
+        </div>
+        <div v-if="qualityBudgetCustomEnabled">
+          <span>{{ t('screen.qualityCustom', 'Custom') }}</span>
+          <n-input-number
+            class="display-status-select"
+            size="tiny"
+            :value="qualityPercent"
+            :min="1"
+            :max="100"
+            :step="1"
+            :disabled="videoDisabled || !video || qualityBudgetDisabled"
+            @update:value="updateCustomQuality"
+          >
+            <template #suffix>%</template>
+          </n-input-number>
+        </div>
+        <div v-if="video && video.codec !== 'mjpeg'">
+          <span>{{ t('settings.advancedSettings.displayPage.qpPreset', 'Picture preset') }}</span>
+          <n-select
+            v-bind="selectProps"
+            :value="simpleQpSelection"
+            :options="simpleQpOptions"
+            :disabled="videoDisabled"
+            @update:value="updateQpPreset"
+            @update:show="menuOpen = $event"
+          />
+        </div>
+        <div v-else-if="video">
+          <span>{{ t('screen.frameDetect', 'Frame Detect') }}</span>
+          <n-switch
+            size="small"
+            :value="video.frame_detect"
+            :disabled="videoDisabled"
+            @update:value="updateFrameDetect"
+          />
+        </div>
+      </div>
     </div>
   </n-popover>
 </template>
-
-<style scoped>
-.display-popover-form { display: grid; gap: 10px; padding-top: 10px; }
-.display-popover-form :deep(.n-form-item) { margin: 0; }
-.display-popover-form :deep(.n-select),
-.display-popover-form :deep(.n-input-number) { width: 100%; }
-.display-setting-stack { display: grid; width: 100%; gap: 7px; }
-.quality-custom-field { display: grid; grid-template-columns: minmax(0, 1fr) 108px; align-items: center; gap: 12px; width: 100%; }
-.display-setting-field-hint { display: block; color: #87919b; font-size: 12px; line-height: 1.6; }
-.frame-detect-setting { display: grid; justify-items: start; gap: 7px; width: 100%; color: #87919b; font-size: 12px; }
-.frame-detect-setting span { display: block; width: 100%; line-height: 1.6; }
-.display-popover-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
-</style>

@@ -23,9 +23,25 @@ function detectedTimezone() {
   }
 }
 
+const REMEMBER_LOGIN_KEY = 'onekvm-remember-login'
+
+function readRememberedLogin() {
+  try {
+    const raw = localStorage.getItem(REMEMBER_LOGIN_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { username?: unknown; password?: unknown }
+    if (typeof parsed.username !== 'string' || typeof parsed.password !== 'string') return null
+    return { username: parsed.username, password: parsed.password }
+  } catch {
+    return null
+  }
+}
+
 const { auth, login, setup } = useAuth()
-const username = ref('')
-const password = ref('')
+const rememberedLogin = readRememberedLogin()
+const username = ref(rememberedLogin?.username || '')
+const password = ref(rememberedLogin?.password || '')
+const rememberPassword = ref(Boolean(rememberedLogin))
 const hostname = ref('onekvm')
 const setupUsername = ref('admin')
 const setupPassword = ref('')
@@ -88,6 +104,7 @@ const setupDateTime = computed(() => {
 watch(
   () => auth.username,
   (value) => {
+    if (rememberPassword.value && username.value) return
     username.value = value || ''
   },
   { immediate: true },
@@ -95,6 +112,10 @@ watch(
 
 watch(currentLanguage, (language) => {
   setupLanguage.value = language as DeviceLanguage
+})
+watch(rememberPassword, (enabled) => {
+  if (enabled) return
+  localStorage.removeItem(REMEMBER_LOGIN_KEY)
 })
 
 async function selectUILanguage(value: string | number) {
@@ -117,6 +138,14 @@ async function submit() {
   error.value = ''
   try {
     await login(username.value, password.value)
+    if (rememberPassword.value) {
+      localStorage.setItem(REMEMBER_LOGIN_KEY, JSON.stringify({
+        username: username.value,
+        password: password.value,
+      }))
+    } else {
+      localStorage.removeItem(REMEMBER_LOGIN_KEY)
+    }
     password.value = ''
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : String(reason)
@@ -322,46 +351,53 @@ function previousSetupStep() {
   </main>
 
   <main v-else-if="auth.required && !auth.authenticated" class="auth-screen">
-    <form class="auth-panel" @submit.prevent="submit">
-      <div class="auth-panel-topline">
-        <div class="auth-brand">
-          <img class="auth-logo" src="/brand/onekvm-logo-inverse.svg" alt="OneKVM" />
-          <span v-if="brandBadge" class="brand-badge">{{ brandBadge }}</span>
+    <div class="auth-login">
+      <form class="auth-panel" @submit.prevent="submit">
+        <div class="auth-panel-topline">
+          <div class="auth-brand">
+            <img class="auth-logo" src="/brand/onekvm-logo-inverse.svg" alt="OneKVM" />
+            <span v-if="brandBadge" class="brand-badge">{{ brandBadge }}</span>
+          </div>
+          <n-dropdown trigger="click" :options="languageMenuOptions" @select="selectUILanguage">
+            <n-button quaternary size="small" class="auth-language-button">
+              <template #icon><Languages /></template>
+              {{ currentLanguageLabel }}
+            </n-button>
+          </n-dropdown>
         </div>
-        <n-dropdown trigger="click" :options="languageMenuOptions" @select="selectUILanguage">
-          <n-button quaternary size="small" class="auth-language-button">
-            <template #icon><Languages /></template>
-            {{ currentLanguageLabel }}
-          </n-button>
-        </n-dropdown>
-      </div>
-      <h1>{{ t('auth.login', 'Sign in to OneKVM') }}</h1>
-      <n-alert v-if="error" type="error" :bordered="false">{{ error }}</n-alert>
-      <n-form label-placement="top" :show-feedback="false">
-        <n-form-item :label="t('auth.username', 'Username')">
-          <n-input
-            v-model:value="username"
-            :placeholder="t('auth.placeholderUsername', 'Enter your username')"
-            autocomplete="username"
-            autofocus
-          />
-        </n-form-item>
-        <n-form-item :label="t('auth.password', 'Password')">
-          <n-input
-            v-model:value="password"
-            type="password"
-            :placeholder="t('auth.placeholderPassword', 'Enter your password')"
-            show-password-on="click"
-            autocomplete="current-password"
-            @keydown.enter.prevent="submit"
-          />
-        </n-form-item>
-      </n-form>
-      <n-button type="primary" attr-type="submit" block :loading="busy" :disabled="!username || !password">
-        <template #icon><LogIn /></template>
-        {{ t('auth.loginButtonText', 'Login') }}
-      </n-button>
-    </form>
+        <h1>{{ t('auth.login', 'Sign in to OneKVM') }}</h1>
+        <n-form label-placement="top" :show-feedback="false">
+          <n-form-item :label="t('auth.username', 'Username')">
+            <n-input
+              v-model:value="username"
+              :placeholder="t('auth.placeholderUsername', 'Enter your username')"
+              autocomplete="username"
+              autofocus
+            />
+          </n-form-item>
+          <n-form-item :label="t('auth.password', 'Password')">
+            <n-input
+              v-model:value="password"
+              type="password"
+              :placeholder="t('auth.placeholderPassword', 'Enter your password')"
+              show-password-on="click"
+              autocomplete="current-password"
+              @keydown.enter.prevent="submit"
+            />
+          </n-form-item>
+        </n-form>
+        <label class="auth-remember">
+          <n-checkbox v-model:checked="rememberPassword">
+            {{ t('auth.rememberPassword', 'Remember password') }}
+          </n-checkbox>
+        </label>
+        <n-button type="primary" attr-type="submit" block :loading="busy" :disabled="!username || !password">
+          <template #icon><LogIn /></template>
+          {{ t('auth.loginButtonText', 'Login') }}
+        </n-button>
+      </form>
+      <n-alert v-if="error" class="auth-login-error" type="error" :bordered="false">{{ error }}</n-alert>
+    </div>
   </main>
 
   <slot v-else />

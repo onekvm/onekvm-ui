@@ -45,6 +45,7 @@ const zh_tw = {
       ok: '確定',
       cancel: '取消',
       loginButtonText: '登入',
+      rememberPassword: '記住密碼',
       tips: {
         reset1: '長按裝置上的 BOOT 按鍵 10 秒鐘來重設帳號。',
         reset2: '詳細操作方法可參閱本文件：',

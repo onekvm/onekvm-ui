@@ -581,6 +581,15 @@ select { font: inherit; }
   background: #0d1013;
 }
 
+.auth-login {
+  display: grid;
+  width: min(360px, calc(100vw - 32px));
+  gap: 12px;
+  justify-items: stretch;
+}
+
+.auth-login .auth-panel { width: 100%; }
+
 .auth-panel {
   width: min(360px, calc(100vw - 32px));
   padding: 26px;
@@ -634,6 +643,11 @@ select { font: inherit; }
 
 .auth-panel .n-alert { margin-bottom: 16px; }
 .auth-panel .n-form-item { margin-bottom: 16px; }
+.auth-remember {
+  display: flex;
+  margin: 2px 0 16px;
+}
+.auth-login-error { width: 100%; }
 .setup-steps { margin-bottom: 22px; }
 .setup-actions {
   display: flex;

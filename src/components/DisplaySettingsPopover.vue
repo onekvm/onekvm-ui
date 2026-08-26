@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useMessage } from 'naive-ui'
+import { useMessage, type SelectOption } from 'naive-ui'
 
 import { api, type ConfigSchema, type OneKVMConfig } from '@/api/client'
 import { t } from '@/i18n/runtime'
@@ -104,7 +104,7 @@ const qualityBudgetDisabled = computed(() => {
 })
 const qualityBudgetLabel = computed(() => video.value?.codec === 'mjpeg'
   ? t('settings.advancedSettings.displayPage.jpegQuality', 'JPEG quality')
-  : t('settings.advancedSettings.displayPage.quality', 'Quality budget (Bitrate)'))
+  : t('screen.bitrate', 'Bitrate'))
 type SimpleQpSelection = 'auto' | QpPresetKey | 'custom'
 const simpleQpOptions = computed(() => [
   {
@@ -147,6 +147,13 @@ const selectProps = {
   showCheckmark: false,
   to: '.console-workspace',
   menuProps: { class: 'display-fit-select-menu' },
+}
+
+function renderQualityLabel(option: SelectOption, selected: boolean) {
+  if (option.value === 'custom') return t('screen.qualityCustom', 'Custom')
+  if (typeof option.value !== 'number') return String(option.label ?? '')
+  const name = qualityTierLabel(option.value)
+  return selected ? name : `${option.value}% · ${name}`
 }
 
 function updateShow(show: boolean) {
@@ -330,6 +337,7 @@ watch(popoverOpen, (open) => {
             :value="qualityBudgetSelection"
             :options="qualityOptions"
             :disabled="videoDisabled || !video || qualityBudgetDisabled"
+            :render-label="renderQualityLabel"
             @update:value="updateQualityBudget"
             @update:show="menuOpen = $event"
           />

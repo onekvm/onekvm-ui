@@ -75,6 +75,7 @@ const en = {
       performance: 'Performance',
       showPerformance: 'Show performance overlay',
       hidePerformance: 'Hide performance overlay',
+      performanceAdvanced: 'Advanced',
       targetResolution: 'Target resolution',
       auto: 'Automatic',
       autoTips:

@@ -33,6 +33,9 @@ const emit = defineEmits<{
   close: []
 }>()
 
+const ADVANCED_KEY = 'onekvm-performance-advanced'
+const advanced = ref(localStorage.getItem(ADVANCED_KEY) === 'true')
+
 const { samples } = useVideoStreamHistory(() => props.videoFps, () => props.videoBitrate)
 const { samples: latencySamples } = useLatencyHistory(() => ({
   capture: props.captureLatencyUs,
@@ -128,12 +131,18 @@ watch(() => props.visible, (visible) => {
 watch(() => [props.canvasWidth, props.canvasHeight], () => {
   if (props.visible) clampPosition()
 })
+watch(advanced, (value) => {
+  localStorage.setItem(ADVANCED_KEY, String(value))
+  if (!props.visible) return
+  void nextTick().then(() => clampPosition())
+})
 </script>
 
 <template>
   <section
     ref="panel"
     class="video-performance-overlay"
+    :class="{ 'is-advanced': advanced }"
     :style="panelStyle"
     role="dialog"
     :aria-label="t('screen.performance', 'Performance')"
@@ -143,6 +152,10 @@ watch(() => [props.canvasWidth, props.canvasHeight], () => {
       <Activity :size="15" />
       <strong>{{ t('screen.performance', 'Performance') }}</strong>
       <div class="control-popover-header-actions" @pointerdown.stop>
+        <label class="performance-advanced-toggle">
+          <span>{{ t('screen.performanceAdvanced', 'Advanced') }}</span>
+          <n-switch v-model:value="advanced" size="small" />
+        </label>
         <n-tooltip to=".console-workspace" :z-index="4000">
           <template #trigger>
             <n-button
@@ -178,6 +191,7 @@ watch(() => [props.canvasWidth, props.canvasHeight], () => {
         :jitter-buffer-us="jitterBufferUs"
         :decode-us="decodeUs"
         :present-us="presentUs"
+        :show-latency="advanced"
       />
     </div>
   </section>

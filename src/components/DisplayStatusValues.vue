@@ -25,6 +25,7 @@ const props = defineProps<{
   jitterBufferUs: number
   decodeUs: number
   presentUs: number
+  showLatency?: boolean
 }>()
 
 const canvasSize = computed(() => {
@@ -66,20 +67,22 @@ const protocol = computed(() => {
           <strong>{{ protocol }}</strong>
         </div>
       </div>
-      <div class="display-status-metrics">
-        <div class="display-status-metric">
+      <div class="display-status-meta">
+        <div>
           <span>{{ t('screen.inputResolution', 'Input resolution') }}</span>
           <strong>{{ inputSize }}</strong>
         </div>
-        <div class="display-status-metric">
+        <div>
           <span>{{ t('screen.canvasSize', 'Canvas size') }}</span>
           <strong>{{ canvasSize }}</strong>
         </div>
-        <div class="display-status-metric">
+      </div>
+      <div class="display-status-meta">
+        <div>
           <span>{{ t('screen.currentFps', 'Current FPS') }}</span>
           <strong>{{ videoFps }} FPS</strong>
         </div>
-        <div class="display-status-metric">
+        <div>
           <span>{{ t('screen.bitrate', 'Bitrate') }}</span>
           <strong>{{ videoBitrate }} kbps</strong>
         </div>
@@ -89,7 +92,7 @@ const protocol = computed(() => {
       </div>
     </section>
 
-    <section class="display-status-column">
+    <section v-if="showLatency" class="display-status-column">
       <h2>{{ t('screen.latencyColumn', 'Latency') }}</h2>
       <div class="display-status-meta">
         <div>

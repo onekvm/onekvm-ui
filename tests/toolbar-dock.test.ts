@@ -36,6 +36,12 @@ assert.equal(floating.dock, 'float')
 assert.equal(floating.x, 200)
 assert.equal(floating.y, 200)
 
+const restoreTop = snapToolbarDock(200, 120, 400, 42, 1280, 800, undefined, 640, 24)
+assert.equal(restoreTop.dock, 'top')
+
+const keepFloat = snapToolbarDock(200, 120, 400, 42, 1280, 800, undefined, 640, 300)
+assert.equal(keepFloat.dock, 'float')
+
 assert.equal(toolbarMenuPlacement('top'), 'bottom-end')
 assert.equal(toolbarMenuPlacement('float'), 'bottom-end')
 assert.equal(toolbarMenuPlacement('bottom'), 'top-end')

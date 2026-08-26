@@ -7,7 +7,7 @@ export type ToolbarDockState = {
 }
 
 export const TOOLBAR_DOCK_KEY = 'onekvm-toolbar-dock'
-export const TOOLBAR_SNAP_PX = 36
+export const TOOLBAR_SNAP_PX = 72
 export const TOOLBAR_DRAG_THRESHOLD_PX = 8
 
 const DOCKS: ToolbarDock[] = ['top', 'bottom', 'left', 'right', 'float']
@@ -62,6 +62,8 @@ export function snapToolbarDock(
   viewportWidth: number,
   viewportHeight: number,
   threshold = TOOLBAR_SNAP_PX,
+  pointerX?: number,
+  pointerY?: number,
 ): ToolbarDockState {
   const clamped = clampToolbarPosition(x, y, width, height, viewportWidth, viewportHeight)
   if (viewportWidth <= 0 || viewportHeight <= 0) {
@@ -69,10 +71,16 @@ export function snapToolbarDock(
   }
 
   const distances = {
-    top: clamped.y,
-    bottom: viewportHeight - (clamped.y + height),
-    left: clamped.x,
-    right: viewportWidth - (clamped.x + width),
+    top: Math.min(clamped.y, pointerY ?? clamped.y),
+    bottom: Math.min(
+      viewportHeight - (clamped.y + height),
+      pointerY == null ? viewportHeight - (clamped.y + height) : viewportHeight - pointerY,
+    ),
+    left: Math.min(clamped.x, pointerX ?? clamped.x),
+    right: Math.min(
+      viewportWidth - (clamped.x + width),
+      pointerX == null ? viewportWidth - (clamped.x + width) : viewportWidth - pointerX,
+    ),
   }
 
   let dock: ToolbarDock = 'float'

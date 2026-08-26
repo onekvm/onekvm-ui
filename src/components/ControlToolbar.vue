@@ -242,6 +242,9 @@ function onToolbarWindowPointerUp(event: PointerEvent) {
     rect.height,
     window.innerWidth,
     window.innerHeight,
+    undefined,
+    toolbarDragPoint.x,
+    toolbarDragPoint.y,
   ))
 }
 
@@ -368,10 +371,8 @@ const deviceVariant = computed(() => {
   return `${machine} ${variant}`
 })
 
-const brandLabel = computed(() => {
-  const name = props.brandBadge ? `OneKVM ${props.brandBadge}` : 'OneKVM'
-  return `${name} · ${deviceVariant.value}`
-})
+const brandName = computed(() => (props.brandBadge ? `OneKVM ${props.brandBadge}` : 'OneKVM'))
+const brandLabel = computed(() => `${brandName.value} · ${deviceVariant.value}`)
 
 const icon = (component: typeof Power) => () => h(NIcon, null, { default: () => h(component) })
 
@@ -540,7 +541,10 @@ onBeforeUnmount(() => {
         <template #trigger>
           <img class="brand-mark" src="/brand/onekvm-app-icon.svg" :alt="brandLabel" />
         </template>
-        {{ brandLabel }}
+        <div class="toolbar-brand-tooltip">
+          <strong>{{ brandName }}</strong>
+          <span>{{ deviceVariant }}</span>
+        </div>
       </n-tooltip>
       <div v-if="!toolbarCompact" class="brand-copy">
         <span class="brand-title-row"><span class="brand-name">OneKVM</span><span v-if="brandBadge" class="brand-badge">{{ brandBadge }}</span></span>

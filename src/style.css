@@ -139,6 +139,29 @@ select { font: inherit; }
 
 .toolbar.is-compact .brand { min-width: 0; }
 .toolbar.is-compact .brand-copy { display: none; }
+.toolbar.is-floating .toolbar-spacer,
+.toolbar.is-dragging .toolbar-spacer {
+  flex: 0 0 auto;
+  order: -1;
+  min-width: 0;
+}
+
+.toolbar-brand-tooltip {
+  display: grid;
+  gap: 3px;
+  line-height: 1.15;
+}
+
+.toolbar-brand-tooltip strong {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.toolbar-brand-tooltip span {
+  color: #929ca5;
+  font-size: 11px;
+  font-weight: 500;
+}
 .toolbar.is-vertical .brand { min-width: 0; }
 .toolbar.is-vertical .device-controls,
 .toolbar.is-vertical .toolbar-actions,

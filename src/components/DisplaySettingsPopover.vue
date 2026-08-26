@@ -13,6 +13,7 @@ const props = defineProps<{
   targetFps: number
   videoFit: VideoFit
   canChangeVideo: boolean
+  placement?: 'top-end' | 'bottom-end' | 'right-start' | 'left-start'
 }>()
 
 const emit = defineEmits<{
@@ -90,7 +91,7 @@ function updateFps(value: string | number | null) {
   <n-popover
     :show="popoverOpen"
     trigger="click"
-    placement="bottom-end"
+    :placement="placement || 'bottom-end'"
     :show-arrow="false"
     class="control-popover display-status-control-popover"
     to=".console-workspace"

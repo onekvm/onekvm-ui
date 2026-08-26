@@ -1227,6 +1227,9 @@ const en = {
     fullscreen: {
       toggle: 'Toggle Fullscreen'
     },
+    toolbar: {
+      dragHandle: 'Drag menu bar'
+    },
     deviceStatus: {
       title: 'Device status',
       ready: 'working',

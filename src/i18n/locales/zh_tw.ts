@@ -1231,6 +1231,9 @@ const zh_tw = {
     fullscreen: {
       toggle: '切換全螢幕'
     },
+    toolbar: {
+      dragHandle: '拖曳選單列'
+    },
     deviceStatus: {
       title: '裝置狀態',
       ready: '運作正常',

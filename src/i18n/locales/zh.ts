@@ -1226,6 +1226,9 @@ const zh = {
     fullscreen: {
       toggle: '切换全屏'
     },
+    toolbar: {
+      dragHandle: '拖动菜单栏'
+    },
     deviceStatus: {
       title: '设备状态',
       ready: '工作正常',

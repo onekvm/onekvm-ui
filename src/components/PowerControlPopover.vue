@@ -12,6 +12,7 @@ const props = defineProps<{
   pwrLed?: boolean
   hddLed?: boolean
   loadingAction: PowerAction | null
+  placement?: 'top-end' | 'bottom-end' | 'right-start' | 'left-start'
 }>()
 
 const emit = defineEmits<{
@@ -42,7 +43,7 @@ function ledLabel(value: boolean | undefined) {
   <n-popover
     :show="popoverOpen"
     trigger="click"
-    placement="bottom-end"
+    :placement="props.placement || 'bottom-end'"
     :show-arrow="false"
     class="control-popover power-control-popover"
     @update:show="updateShow"

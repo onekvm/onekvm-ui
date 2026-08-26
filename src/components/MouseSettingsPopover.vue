@@ -6,6 +6,7 @@ defineProps<{
   mouseMode: MouseMode
   scrollInterval: number
   mouseReportRate: number
+  placement?: 'top-end' | 'bottom-end' | 'right-start' | 'left-start'
 }>()
 
 const emit = defineEmits<{
@@ -20,7 +21,7 @@ function modeLabel(mode: MouseMode) {
 <template>
   <n-popover
     trigger="click"
-    placement="bottom-end"
+    :placement="placement || 'bottom-end'"
     :show-arrow="false"
     class="control-popover mouse-control-popover"
     @update:show="emit('update:show', $event)"

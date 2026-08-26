@@ -13,6 +13,7 @@ const props = defineProps<{
   numLock?: boolean
   capsLock?: boolean
   scrollLock?: boolean
+  placement?: 'top-end' | 'bottom-end' | 'right-start' | 'left-start'
 }>()
 
 const emit = defineEmits<{
@@ -41,7 +42,10 @@ const panelStyle = computed(() => ({
   left: `${position.value.x}px`,
   top: `${position.value.y}px`,
 }))
-const popoverPlacement = computed(() => compactViewport.value ? 'bottom-start' : 'bottom-end')
+const popoverPlacement = computed(() => {
+  if (compactViewport.value) return 'bottom-start'
+  return props.placement || 'bottom-end'
+})
 const popoverX = computed(() => compactViewport.value ? 8 : undefined)
 const popoverY = computed(() => compactViewport.value ? 36 : undefined)
 

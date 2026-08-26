@@ -56,6 +56,7 @@ const accountOpen = ref(false)
 const virtualKeyboardOpen = ref(false)
 const shortcutDialogOpen = ref(false)
 const toolbarOverlayOpen = ref(false)
+const toolbarDockedTop = ref(true)
 const advancedSettingsOpen = ref(isAdvancedSettingsRoute(window.location.hash))
 const advancedSettingsRoute = ref(advancedRouteFromHash(window.location.hash))
 const consoleWorkspace = ref<HTMLElement | null>(null)
@@ -301,7 +302,12 @@ onBeforeUnmount(() => {
       @navigate="navigateAdvancedSettings"
     />
 
-    <div v-else ref="consoleWorkspace" class="console-workspace">
+    <div
+      v-else
+      ref="consoleWorkspace"
+      class="console-workspace"
+      :class="{ 'toolbar-overlay': !toolbarDockedTop }"
+    >
         <ControlToolbar
           :state="state"
           :can-settings="canSettings"
@@ -334,6 +340,7 @@ onBeforeUnmount(() => {
           @update:performance-open="performanceOpen = $event"
           @update:right-control-as-meta="rightControlAsMeta = $event"
           @overlay="toolbarOverlayOpen = $event"
+          @dock="toolbarDockedTop = $event === 'top'"
           @update:video-fit="videoFit = $event"
         />
 

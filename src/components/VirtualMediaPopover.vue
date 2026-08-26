@@ -7,6 +7,10 @@ import { api, APIError, type MSDFileEntry, type MSDISOUpload, type MSDMedia, typ
 import { t } from '@/i18n/runtime'
 import { BrowserISO, type BrowserISOProgress } from '@/lib/browser-iso'
 
+const props = defineProps<{
+  placement?: 'top-end' | 'bottom-end' | 'right-start' | 'left-start'
+}>()
+
 const emit = defineEmits<{
   status: [status: MSDStatus]
   'update:show': [show: boolean]
@@ -1021,7 +1025,7 @@ onBeforeUnmount(() => {
   <n-popover
     :show="popoverOpen"
     trigger="click"
-    placement="bottom-end"
+    :placement="props.placement || 'bottom-end'"
     :show-arrow="false"
     :class="['control-popover', 'virtual-media-control-popover', { 'is-pinned': pinned }]"
     @update:show="updateShow"

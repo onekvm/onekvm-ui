@@ -5,6 +5,8 @@ import {
   CircleUserRound,
   Command,
   Disc3,
+  GripHorizontal,
+  GripVertical,
   Keyboard,
   Languages,
   LogOut,
@@ -29,6 +31,16 @@ import type { VideoFit } from '@/lib/video-fit'
 import { currentLanguage, languageOptions, setLanguage, t } from '@/i18n/runtime'
 import { onekvm, type InputActivity, type TransportState } from '@/lib/onekvm'
 import { sendShortcut, shortcutChordLabel } from '@/lib/keyboard-shortcuts'
+import {
+  clampToolbarPosition,
+  parseToolbarDock,
+  snapToolbarDock,
+  toolbarMenuPlacement,
+  TOOLBAR_DOCK_KEY,
+  TOOLBAR_DRAG_THRESHOLD_PX,
+  type ToolbarDock,
+  type ToolbarDockState,
+} from '@/lib/toolbar-dock'
 
 import DisplaySettingsPopover from './DisplaySettingsPopover.vue'
 import KeyboardControlPopover from './KeyboardControlPopover.vue'
@@ -71,6 +83,7 @@ const emit = defineEmits<{
   'update:rightControlAsMeta': [enabled: boolean]
   'edit-user-shortcuts': []
   overlay: [visible: boolean]
+  dock: [dock: ToolbarDock]
   'update:mouseMode': [mode: MouseMode]
   'update:scrollInterval': [interval: number]
   'update:videoFit': [fit: VideoFit]
@@ -97,6 +110,177 @@ const openMenu = ref<MenuName | null>(null)
 const mouseLed = ref<HTMLElement | null>(null)
 const keyboardLed = ref<HTMLElement | null>(null)
 const virtualMediaPopover = ref<{ restoreUploadDialog: () => void } | null>(null)
+const toolbarEl = ref<HTMLElement | null>(null)
+const toolbarDock = ref<ToolbarDockState>(parseToolbarDock(localStorage.getItem(TOOLBAR_DOCK_KEY)))
+const toolbarDragging = ref(false)
+let toolbarPointerId: number | null = null
+let toolbarGrab = { x: 0, y: 0 }
+let toolbarDragOffset = { x: 0, y: 0 }
+let toolbarDragMoved = false
+let toolbarDragReady = false
+let toolbarDragPoint = { x: 0, y: 0 }
+
+const toolbarVertical = computed(
+  () => !toolbarDragging.value && (toolbarDock.value.dock === 'left' || toolbarDock.value.dock === 'right'),
+)
+const toolbarCompact = computed(
+  () => toolbarDragging.value || toolbarDock.value.dock === 'float' || toolbarVertical.value,
+)
+const menuPlacement = computed(() => toolbarMenuPlacement(toolbarDock.value.dock))
+const toolbarClass = computed(() => ({
+  'is-floating': toolbarDock.value.dock === 'float' || toolbarDragging.value,
+  'is-docked-bottom': toolbarDock.value.dock === 'bottom' && !toolbarDragging.value,
+  'is-docked-left': toolbarDock.value.dock === 'left' && !toolbarDragging.value,
+  'is-docked-right': toolbarDock.value.dock === 'right' && !toolbarDragging.value,
+  'is-vertical': toolbarVertical.value,
+  'is-compact': toolbarCompact.value,
+  'is-dragging': toolbarDragging.value,
+}))
+const toolbarStyle = computed(() => {
+  if (!toolbarDragging.value && toolbarDock.value.dock !== 'float') return undefined
+  return {
+    left: `${toolbarDock.value.x}px`,
+    top: `${toolbarDock.value.y}px`,
+  }
+})
+
+function persistToolbarDock() {
+  localStorage.setItem(TOOLBAR_DOCK_KEY, JSON.stringify(toolbarDock.value))
+  emit('dock', toolbarDock.value.dock)
+}
+
+function setToolbarDock(next: ToolbarDockState) {
+  toolbarDock.value = next
+  persistToolbarDock()
+}
+
+function applyToolbarDragPosition(clientX: number, clientY: number) {
+  const toolbar = toolbarEl.value
+  if (!toolbar) return
+  const rect = toolbar.getBoundingClientRect()
+  const next = clampToolbarPosition(
+    clientX - toolbarDragOffset.x,
+    clientY - toolbarDragOffset.y,
+    rect.width,
+    rect.height,
+    window.innerWidth,
+    window.innerHeight,
+  )
+  toolbarDock.value = { dock: 'float', ...next }
+}
+
+function captureToolbarDragOffset(clientX: number, clientY: number) {
+  const toolbar = toolbarEl.value
+  const handle = toolbar?.querySelector('.toolbar-handle')
+  if (!toolbar) return
+  const toolbarRect = toolbar.getBoundingClientRect()
+  if (handle instanceof HTMLElement) {
+    const handleRect = handle.getBoundingClientRect()
+    toolbarDragOffset = {
+      x: handleRect.left - toolbarRect.left + toolbarGrab.x,
+      y: handleRect.top - toolbarRect.top + toolbarGrab.y,
+    }
+  } else {
+    toolbarDragOffset = {
+      x: Math.min(toolbarRect.width, Math.max(0, clientX - toolbarRect.left)),
+      y: Math.min(toolbarRect.height, Math.max(0, clientY - toolbarRect.top)),
+    }
+  }
+  applyToolbarDragPosition(clientX, clientY)
+}
+
+function stopToolbarWindowDrag() {
+  window.removeEventListener('pointermove', onToolbarWindowPointerMove)
+  window.removeEventListener('pointerup', onToolbarWindowPointerUp)
+  window.removeEventListener('pointercancel', onToolbarWindowPointerUp)
+}
+
+function onToolbarWindowPointerMove(event: PointerEvent) {
+  if (event.pointerId !== toolbarPointerId) return
+  toolbarDragPoint = { x: event.clientX, y: event.clientY }
+  if (!toolbarDragMoved) {
+    const handle = toolbarEl.value?.querySelector('.toolbar-handle')
+    if (!(handle instanceof HTMLElement)) return
+    const handleRect = handle.getBoundingClientRect()
+    const moveX = event.clientX - (handleRect.left + toolbarGrab.x)
+    const moveY = event.clientY - (handleRect.top + toolbarGrab.y)
+    if (Math.hypot(moveX, moveY) < TOOLBAR_DRAG_THRESHOLD_PX) return
+    toolbarDragMoved = true
+    toolbarDragReady = false
+    toolbarDragging.value = true
+    toolbarDock.value = { dock: 'float', x: toolbarDock.value.x, y: toolbarDock.value.y }
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (toolbarPointerId === null) return
+        captureToolbarDragOffset(toolbarDragPoint.x, toolbarDragPoint.y)
+        toolbarDragReady = true
+      })
+    })
+    return
+  }
+  if (!toolbarDragReady) return
+  applyToolbarDragPosition(event.clientX, event.clientY)
+}
+
+function onToolbarWindowPointerUp(event: PointerEvent) {
+  if (event.pointerId !== toolbarPointerId) return
+  toolbarPointerId = null
+  stopToolbarWindowDrag()
+  if (!toolbarDragMoved) {
+    toolbarDragging.value = false
+    return
+  }
+  toolbarDragging.value = false
+  toolbarDragReady = false
+  const toolbar = toolbarEl.value
+  if (!toolbar) return
+  const rect = toolbar.getBoundingClientRect()
+  setToolbarDock(snapToolbarDock(
+    rect.left,
+    rect.top,
+    rect.width,
+    rect.height,
+    window.innerWidth,
+    window.innerHeight,
+  ))
+}
+
+function onToolbarHandlePointerDown(event: PointerEvent) {
+  if (event.button !== 0) return
+  const handle = event.currentTarget
+  if (!(handle instanceof HTMLElement)) return
+  const handleRect = handle.getBoundingClientRect()
+  toolbarPointerId = event.pointerId
+  toolbarDragMoved = false
+  toolbarDragReady = false
+  toolbarGrab = {
+    x: event.clientX - handleRect.left,
+    y: event.clientY - handleRect.top,
+  }
+  toolbarDragPoint = { x: event.clientX, y: event.clientY }
+  handle.setPointerCapture(event.pointerId)
+  window.addEventListener('pointermove', onToolbarWindowPointerMove)
+  window.addEventListener('pointerup', onToolbarWindowPointerUp)
+  window.addEventListener('pointercancel', onToolbarWindowPointerUp)
+  event.preventDefault()
+}
+
+function onToolbarWindowResize() {
+  if (toolbarDock.value.dock !== 'float') return
+  const toolbar = toolbarEl.value
+  if (!toolbar) return
+  const rect = toolbar.getBoundingClientRect()
+  const next = clampToolbarPosition(
+    toolbarDock.value.x,
+    toolbarDock.value.y,
+    rect.width,
+    rect.height,
+    window.innerWidth,
+    window.innerHeight,
+  )
+  if (next.x === toolbarDock.value.x && next.y === toolbarDock.value.y) return
+  setToolbarDock({ dock: 'float', ...next })
+}
 const mediaUpload = ref<MediaUploadState>({
   minimized: false,
   uploading: false,
@@ -182,6 +366,11 @@ const deviceVariant = computed(() => {
   const normalized = props.status.variant.toLowerCase()
   const variant = normalized === 'pcie' ? 'PCIe' : normalized === 'cube' ? 'Cube' : props.status.variant
   return `${machine} ${variant}`
+})
+
+const brandLabel = computed(() => {
+  const name = props.brandBadge ? `OneKVM ${props.brandBadge}` : 'OneKVM'
+  return `${name} · ${deviceVariant.value}`
 })
 
 const icon = (component: typeof Power) => () => h(NIcon, null, { default: () => h(component) })
@@ -326,26 +515,50 @@ function pulseInputLed(activity: InputActivity) {
 
 onMounted(() => {
   unsubscribeActivity = onekvm.subscribeActivity(pulseInputLed)
+  emit('dock', toolbarDock.value.dock)
+  window.addEventListener('resize', onToolbarWindowResize)
 })
 
 onBeforeUnmount(() => {
   window.clearTimeout(mousePulseTimer)
   window.clearTimeout(keyboardPulseTimer)
+  window.removeEventListener('resize', onToolbarWindowResize)
+  stopToolbarWindowDrag()
   unsubscribeActivity?.()
 })
 </script>
 
 <template>
-  <header class="toolbar">
+  <header
+    ref="toolbarEl"
+    class="toolbar"
+    :class="toolbarClass"
+    :style="toolbarStyle"
+  >
     <div class="brand">
-      <img class="brand-mark" src="/brand/onekvm-app-icon.svg" alt="OneKVM" />
-      <div class="brand-copy">
+      <n-tooltip :disabled="!toolbarCompact">
+        <template #trigger>
+          <img class="brand-mark" src="/brand/onekvm-app-icon.svg" :alt="brandLabel" />
+        </template>
+        {{ brandLabel }}
+      </n-tooltip>
+      <div v-if="!toolbarCompact" class="brand-copy">
         <span class="brand-title-row"><span class="brand-name">OneKVM</span><span v-if="brandBadge" class="brand-badge">{{ brandBadge }}</span></span>
         <span class="brand-device">{{ deviceVariant }}</span>
       </div>
     </div>
 
-    <div class="toolbar-spacer" />
+    <div class="toolbar-spacer">
+      <button
+        type="button"
+        class="toolbar-handle"
+        :aria-label="t('toolbar.dragHandle', 'Drag menu bar')"
+        @pointerdown="onToolbarHandlePointerDown"
+      >
+        <GripVertical v-if="toolbarVertical" :size="14" />
+        <GripHorizontal v-else :size="14" />
+      </button>
+    </div>
 
     <div class="device-controls" :aria-label="t('deviceStatus.title', 'Device status')">
       <DisplaySettingsPopover
@@ -353,6 +566,7 @@ onBeforeUnmount(() => {
         :target-fps="status?.video.fps || 0"
         :can-change-video="canSettings"
         :video-fit="videoFit"
+        :placement="menuPlacement"
         @update:show="updateMenu('display', $event)"
         @update:video-fit="emit('update:videoFit', $event)"
       >
@@ -377,6 +591,7 @@ onBeforeUnmount(() => {
         :mouse-mode="mouseMode"
         :scroll-interval="scrollInterval"
         :mouse-report-rate="mouseReportRate"
+        :placement="menuPlacement"
         @update:show="updateMenu('mouse', $event)"
       >
         <n-tooltip :disabled="openMenu === 'mouse'">
@@ -402,6 +617,7 @@ onBeforeUnmount(() => {
         :num-lock="status?.hid?.num_lock"
         :caps-lock="status?.hid?.caps_lock"
         :scroll-lock="status?.hid?.scroll_lock"
+        :placement="menuPlacement"
         @select="selectKeyboard"
         @update:show="updateMenu('keyboard', $event)"
       >
@@ -428,6 +644,7 @@ onBeforeUnmount(() => {
         :pwr-led="status?.atx?.pwr_led"
         :hdd-led="status?.atx?.hdd_led"
         :loading-action="powerAction"
+        :placement="menuPlacement"
         @action="selectPower"
         @update:show="updateMenu('power', $event)"
       >
@@ -451,6 +668,7 @@ onBeforeUnmount(() => {
 
       <VirtualMediaPopover
         ref="virtualMediaPopover"
+        :placement="menuPlacement"
         @status="emit('media-status', $event)"
         @upload-state="mediaUpload = $event"
         @update:show="updateMenu('media', $event)"
@@ -535,7 +753,7 @@ onBeforeUnmount(() => {
 
       <n-dropdown
         trigger="click"
-        placement="bottom-end"
+        :placement="menuPlacement"
         :options="languageMenuOptions"
         @select="setLanguage(String($event))"
         @update:show="updateMenu('language', $event)"
@@ -553,7 +771,7 @@ onBeforeUnmount(() => {
       <div class="toolbar-account">
         <n-dropdown
           trigger="click"
-          placement="bottom-end"
+          :placement="menuPlacement"
           :options="accountOptions"
           @select="selectAccount"
           @update:show="updateMenu('account', $event)"

@@ -71,9 +71,13 @@ select { font: inherit; }
 .toolbar-spacer {
   display: flex;
   flex: 1;
+  align-self: stretch;
   min-width: 28px;
+  min-height: 18px;
   align-items: center;
   justify-content: center;
+  cursor: grab;
+  touch-action: none;
 }
 
 .toolbar-handle {
@@ -98,7 +102,8 @@ select { font: inherit; }
 }
 
 .toolbar.is-dragging { user-select: none; }
-.toolbar.is-dragging .toolbar-handle { cursor: grabbing; }
+.toolbar.is-dragging .toolbar-handle,
+.toolbar.is-dragging .toolbar-spacer { cursor: grabbing; }
 
 .toolbar.is-floating,
 .toolbar.is-dragging {

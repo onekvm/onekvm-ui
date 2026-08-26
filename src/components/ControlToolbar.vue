@@ -127,6 +127,9 @@ const toolbarVertical = computed(
 const toolbarCompact = computed(
   () => toolbarDragging.value || toolbarDock.value.dock === 'float' || toolbarVertical.value,
 )
+const toolbarHandleVisible = computed(
+  () => toolbarDock.value.dock === 'float' && !toolbarDragging.value,
+)
 const menuPlacement = computed(() => toolbarMenuPlacement(toolbarDock.value.dock))
 const toolbarClass = computed(() => ({
   'is-floating': toolbarDock.value.dock === 'float' || toolbarDragging.value,
@@ -195,20 +198,11 @@ function applyToolbarDragPosition(clientX: number, clientY: number) {
 
 function captureToolbarDragOffset(clientX: number, clientY: number) {
   const toolbar = toolbarEl.value
-  const handle = toolbar?.querySelector('.toolbar-handle')
   if (!toolbar) return
   const toolbarRect = toolbar.getBoundingClientRect()
-  if (handle instanceof HTMLElement) {
-    const handleRect = handle.getBoundingClientRect()
-    toolbarDragOffset = {
-      x: handleRect.left - toolbarRect.left + toolbarGrab.x,
-      y: handleRect.top - toolbarRect.top + toolbarGrab.y,
-    }
-  } else {
-    toolbarDragOffset = {
-      x: Math.min(toolbarRect.width, Math.max(0, clientX - toolbarRect.left)),
-      y: Math.min(toolbarRect.height, Math.max(0, clientY - toolbarRect.top)),
-    }
+  toolbarDragOffset = {
+    x: Math.min(toolbarRect.width, Math.max(0, clientX - toolbarRect.left)),
+    y: Math.min(toolbarRect.height, Math.max(0, clientY - toolbarRect.top)),
   }
   applyToolbarDragPosition(clientX, clientY)
 }
@@ -223,11 +217,8 @@ function onToolbarWindowPointerMove(event: PointerEvent) {
   if (event.pointerId !== toolbarPointerId) return
   toolbarDragPoint = { x: event.clientX, y: event.clientY }
   if (!toolbarDragMoved) {
-    const handle = toolbarEl.value?.querySelector('.toolbar-handle')
-    if (!(handle instanceof HTMLElement)) return
-    const handleRect = handle.getBoundingClientRect()
-    const moveX = event.clientX - (handleRect.left + toolbarGrab.x)
-    const moveY = event.clientY - (handleRect.top + toolbarGrab.y)
+    const moveX = event.clientX - toolbarGrab.x
+    const moveY = event.clientY - toolbarGrab.y
     if (Math.hypot(moveX, moveY) < TOOLBAR_DRAG_THRESHOLD_PX) return
     toolbarDragMoved = true
     toolbarDragReady = false
@@ -275,24 +266,42 @@ function onToolbarWindowPointerUp(event: PointerEvent) {
   ))
 }
 
-function onToolbarHandlePointerDown(event: PointerEvent) {
+function isToolbarDragChrome(target: EventTarget | null) {
+  if (!(target instanceof Element)) return false
+  if (target.closest('.toolbar-handle, .toolbar-spacer')) return true
+  if (target.closest('.device-controls, .toolbar-actions, .toolbar-account, .brand')) return false
+  return target === toolbarEl.value
+}
+
+function startToolbarDrag(event: PointerEvent) {
   if (event.button !== 0) return
-  const handle = event.currentTarget
-  if (!(handle instanceof HTMLElement)) return
-  const handleRect = handle.getBoundingClientRect()
+  if (toolbarPointerId !== null) return
   toolbarPointerId = event.pointerId
   toolbarDragMoved = false
   toolbarDragReady = false
-  toolbarGrab = {
-    x: event.clientX - handleRect.left,
-    y: event.clientY - handleRect.top,
-  }
+  toolbarGrab = { x: event.clientX, y: event.clientY }
   toolbarDragPoint = { x: event.clientX, y: event.clientY }
-  handle.setPointerCapture(event.pointerId)
+  const origin = event.currentTarget
+  if (origin instanceof HTMLElement) {
+    try {
+      origin.setPointerCapture(event.pointerId)
+    } catch {
+      // Capture is optional; window listeners still follow the pointer.
+    }
+  }
   window.addEventListener('pointermove', onToolbarWindowPointerMove)
   window.addEventListener('pointerup', onToolbarWindowPointerUp)
   window.addEventListener('pointercancel', onToolbarWindowPointerUp)
   event.preventDefault()
+}
+
+function onToolbarHandlePointerDown(event: PointerEvent) {
+  startToolbarDrag(event)
+}
+
+function onToolbarChromePointerDown(event: PointerEvent) {
+  if (!isToolbarDragChrome(event.target)) return
+  startToolbarDrag(event)
 }
 
 function onToolbarWindowResize() {
@@ -563,6 +572,7 @@ onBeforeUnmount(() => {
     class="toolbar"
     :class="toolbarClass"
     :style="toolbarStyle"
+    @pointerdown="onToolbarChromePointerDown"
   >
     <div class="brand">
       <n-tooltip :disabled="!toolbarCompact">
@@ -580,12 +590,16 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div class="toolbar-spacer">
+    <div
+      class="toolbar-spacer"
+      :aria-label="toolbarHandleVisible ? undefined : t('toolbar.dragHandle', 'Drag menu bar')"
+    >
       <button
+        v-if="toolbarHandleVisible"
         type="button"
         class="toolbar-handle"
         :aria-label="t('toolbar.dragHandle', 'Drag menu bar')"
-        @pointerdown="onToolbarHandlePointerDown"
+        @pointerdown.stop="onToolbarHandlePointerDown"
       >
         <GripVertical v-if="toolbarVertical" :size="14" />
         <GripHorizontal v-else :size="14" />

@@ -3,20 +3,8 @@ import { computed, ref, watch } from 'vue'
 import { Save, SlidersHorizontal } from '@lucide/vue'
 import { useDialog, useMessage } from 'naive-ui'
 
-import { api, type ConfigSchema, type OneKVMConfig } from '@/api/client'
 import { type MouseMode } from '@/composables/useMouse'
 import { t } from '@/i18n/runtime'
-import { onekvm } from '@/lib/onekvm'
-import { qualityTier } from '@/lib/video-quality'
-import { videoResolutionOptions } from '@/lib/video-resolution'
-import {
-  clearQpOverride,
-  hasQpOverride,
-  matchingQpPreset,
-  qpPresets,
-  setQpPreset,
-  type QpPresetKey,
-} from '@/lib/video-qp'
 
 const props = defineProps<{
   show: boolean
@@ -35,43 +23,8 @@ const emit = defineEmits<{
 
 const dialog = useDialog()
 const message = useMessage()
-const config = ref<OneKVMConfig | null>(null)
-const schema = ref<ConfigSchema | null>(null)
-const loading = ref(false)
-const saving = ref(false)
 const advancedPending = ref(false)
 
-const resolutionOptions = computed(() =>
-  videoResolutionOptions(t('screen.auto', 'Automatic')),
-)
-const allCodecOptions = computed(() => [
-  { label: t('screen.auto', 'Automatic'), value: 'auto' },
-  { label: 'H.264', value: 'h264' },
-  { label: 'H.265', value: 'h265' },
-  { label: 'MJPEG', value: 'mjpeg' },
-])
-const codecOptions = computed(() => {
-  const supported = schema.value?.video_codecs || []
-  return supported.length
-    ? allCodecOptions.value.filter((option) => supported.includes(option.value))
-    : allCodecOptions.value
-})
-const fpsOptions = [10, 15, 24, 30, 45, 60].map((value) => ({
-  label: `${value} FPS`,
-  value,
-}))
-function qualityTierLabel(value: number) {
-  const tier = qualityTier(value)
-  return t(tier.key, tier.fallback)
-}
-const qualityOptions = computed(() => {
-  const options: Array<{ label: string; value: number | 'custom' }> = Array.from({ length: 10 }, (_, index) => {
-    const value = (index + 1) * 10
-    return { label: `${value}% · ${qualityTierLabel(value)}`, value }
-  })
-  options.push({ label: t('screen.qualityCustom', 'Custom'), value: 'custom' })
-  return options
-})
 const mouseModeOptions = computed(() => [
   { label: t('mouse.absolute', 'Absolute'), value: 'absolute' },
   { label: t('mouse.relative', 'Relative'), value: 'relative' },
@@ -95,120 +48,6 @@ const mouseReportRateSelection = computed<MouseReportRateSelection>({
   },
 })
 const highMouseReportRate = computed(() => mouseReportRateDraft.value > 200)
-const qualityPercent = computed({
-  get: () => Math.round((config.value?.video.quality_factor ?? 1) * 100),
-  set: (value: number) => {
-    if (config.value) {
-      config.value.video.quality_factor = value / 100
-    }
-  },
-})
-type QualityBudgetSelection = number | 'custom'
-const qualityBudgetCustomEnabled = ref(false)
-const qualityBudgetSelection = computed<QualityBudgetSelection>({
-  get: () => qualityBudgetCustomEnabled.value ? 'custom' : qualityPercent.value,
-  set: (selection) => {
-    if (selection === 'custom') {
-      qualityBudgetCustomEnabled.value = true
-      return
-    }
-    qualityBudgetCustomEnabled.value = false
-    qualityPercent.value = selection
-  },
-})
-const qualityBudgetDisabled = computed(() => {
-  const video = config.value?.video
-  return !!video && video.codec !== 'mjpeg' && (video.bitrate_kbps ?? 0) > 0
-})
-const qualityBudgetLabel = computed(() => config.value?.video.codec === 'mjpeg'
-  ? t('settings.advancedSettings.displayPage.jpegQuality', 'JPEG quality')
-  : t('settings.advancedSettings.displayPage.quality', 'Quality budget (Bitrate)'))
-const qualityBudgetHint = computed(() => config.value?.video.codec === 'mjpeg'
-  ? t('settings.advancedSettings.displayPage.jpegQualityHint', 'Controls JPEG compression quality; higher values retain more detail and use more bandwidth.')
-  : t('settings.advancedSettings.displayPage.qualityPercentHint', 'VBR bitrate budget'))
-type SimpleQpSelection = 'auto' | QpPresetKey | 'custom'
-const simpleQpOptions = computed(() => [
-  {
-    label: t('settings.advancedSettings.displayPage.qpAutomatic', 'Automatic'),
-    value: 'auto',
-  },
-  ...qpPresets.map((preset) => ({
-    label: t(preset.labelKey, preset.labelFallback),
-    value: preset.value,
-  })),
-  {
-    label: t('settings.advancedSettings.displayPage.qpCustomAdvanced', 'Custom (Advanced settings)'),
-    value: 'custom',
-    disabled: true,
-  },
-])
-const simpleQpSelection = computed<SimpleQpSelection>({
-  get: () => {
-    const video = config.value?.video
-    if (!video || !hasQpOverride(video)) return 'auto'
-    return matchingQpPreset(video)?.value ?? 'custom'
-  },
-  set: (selection) => {
-    const video = config.value?.video
-    if (!video || selection === 'custom') return
-    if (selection === 'auto') {
-      clearQpOverride(video)
-      return
-    }
-    video.bitrate_kbps = 0
-    setQpPreset(video, selection)
-  },
-})
-const simpleQpDescription = computed(() => {
-  const selection = simpleQpSelection.value
-  if (selection === 'auto') {
-    return t(
-      'settings.advancedSettings.displayPage.qpAutomaticHint',
-      'Does not override QP; the device backend controls it automatically.',
-    )
-  }
-  if (selection === 'custom') {
-    return t(
-      'settings.advancedSettings.displayPage.qpCustomSimpleHint',
-      'Custom QP values are active. Open Advanced settings to edit them.',
-    )
-  }
-  const preset = qpPresets.find((candidate) => candidate.value === selection)
-  return preset ? t(preset.descriptionKey, preset.descriptionFallback) : ''
-})
-
-async function loadDisplay() {
-  loading.value = true
-  try {
-    const [loadedConfig, loadedSchema] = await Promise.all([api.getConfig(), api.getConfigSchema()])
-    loadedConfig.video.frame_detect ??= false
-    loadedConfig.video.bitrate_kbps ??= 0
-    loadedConfig.video.initial_qp ??= 0
-    loadedConfig.video.min_qp ??= 0
-    loadedConfig.video.max_qp ??= 0
-    qualityBudgetCustomEnabled.value = Math.round(loadedConfig.video.quality_factor * 100) % 10 !== 0
-    config.value = loadedConfig
-    schema.value = loadedSchema
-  } catch (reason) {
-    message.error(reason instanceof Error ? reason.message : String(reason))
-  } finally {
-    loading.value = false
-  }
-}
-
-async function saveDisplay() {
-  if (!config.value) return
-  saving.value = true
-  try {
-    await api.saveConfig(config.value)
-    await onekvm.reconnect()
-    message.success(t('settings.success', 'Settings saved'))
-  } catch (reason) {
-    message.error(reason instanceof Error ? reason.message : String(reason))
-  } finally {
-    saving.value = false
-  }
-}
 
 function confirmAdvancedSettings() {
   dialog.warning({
@@ -256,10 +95,7 @@ function saveMouse() {
 }
 
 watch(() => props.show, (show) => {
-  if (show) {
-    resetMouseDraft()
-    void loadDisplay()
-  }
+  if (show) resetMouseDraft()
 }, { immediate: true })
 </script>
 
@@ -276,74 +112,6 @@ watch(() => props.show, (show) => {
         <template #icon><SlidersHorizontal /></template>
         {{ t('settings.advancedSettings.title', 'Advanced settings') }}
       </n-button>
-
-      <section class="simple-settings-section">
-        <h3>{{ t('screen.title', 'Screen') }}</h3>
-        <n-spin :show="loading">
-          <n-form v-if="config" label-placement="top" :show-feedback="false" class="settings-form">
-            <div class="simple-settings-grid">
-              <n-form-item :label="t('settings.advancedSettings.displayPage.outputResolution', 'Output resolution')">
-                <div class="display-setting-stack">
-                  <n-select v-model:value="config.video.resolution" :options="resolutionOptions" />
-                  <span class="display-setting-field-hint">
-                    {{ t('settings.advancedSettings.displayPage.outputResolutionHint', 'Sets the pipeline output sent to the encoder and stream. Options match Cube HDMI input modes; Automatic follows the current input.') }}
-                  </span>
-                </div>
-              </n-form-item>
-              <n-form-item :label="t('screen.codec', 'Codec')">
-                <n-select v-model:value="config.video.codec" :options="codecOptions" />
-              </n-form-item>
-            </div>
-
-            <n-form-item :label="t('screen.targetFps', 'Target FPS')">
-              <n-select v-model:value="config.video.fps" :options="fpsOptions" />
-            </n-form-item>
-
-            <n-form-item :label="qualityBudgetLabel">
-              <div class="display-setting-stack">
-                <n-select v-model:value="qualityBudgetSelection" :options="qualityOptions" :disabled="qualityBudgetDisabled" />
-                <div v-if="qualityBudgetCustomEnabled" class="quality-custom-field">
-                  <n-slider v-model:value="qualityPercent" :min="1" :max="100" :step="1" :disabled="qualityBudgetDisabled" />
-                  <n-input-number v-model:value="qualityPercent" :min="1" :max="100" :step="1" :disabled="qualityBudgetDisabled">
-                    <template #suffix>%</template>
-                  </n-input-number>
-                </div>
-                <span v-if="qualityBudgetDisabled" class="display-setting-field-hint">
-                  {{ t('settings.advancedSettings.displayPage.simpleQualityDisabledHint', 'Quality budget is replaced by the custom bitrate ceiling. Disable custom bitrate in Advanced settings to change it.') }}
-                </span>
-                <span v-else class="display-setting-field-hint">
-                  {{ qualityBudgetHint }}
-                </span>
-              </div>
-            </n-form-item>
-
-            <n-form-item v-if="config.video.codec !== 'mjpeg'" :label="t('settings.advancedSettings.displayPage.qpPreset', 'Picture preset')">
-              <div class="display-setting-stack">
-                <n-select v-model:value="simpleQpSelection" :options="simpleQpOptions" />
-                <span class="display-setting-field-hint">{{ simpleQpDescription }}</span>
-              </div>
-            </n-form-item>
-
-            <n-form-item v-if="config.video.codec === 'mjpeg'" :label="t('screen.frameDetect', 'Frame Detect')">
-              <div class="frame-detect-setting">
-                <n-switch v-model:value="config.video.frame_detect" />
-                <span>{{ t('screen.frameDetectTip', 'Pause transmission while the image is still and resume when it changes.') }}</span>
-              </div>
-            </n-form-item>
-          </n-form>
-        </n-spin>
-        <footer class="simple-settings-actions">
-          <n-button :disabled="!config || loading" @click="loadDisplay">
-            {{ t('common.refresh', 'Reload') }}
-          </n-button>
-          <n-button type="primary" :loading="saving" :disabled="!config || loading" @click="saveDisplay">
-            <template #icon><Save /></template>
-            {{ t('common.save', 'Save') }}
-          </n-button>
-        </footer>
-      </section>
-
-      <n-divider />
 
       <section class="simple-settings-section">
         <h3>{{ t('mouse.title', 'Mouse') }}</h3>
@@ -410,16 +178,12 @@ watch(() => props.show, (show) => {
 </template>
 
 <style scoped>
-.simple-settings-section { display: grid; gap: 12px; }
+.simple-settings-section { display: grid; gap: 12px; margin-top: 18px; }
 .simple-settings-section > h3 { margin: 0; font-size: 14px; }
 .settings-form { display: grid; gap: 14px; }
-.simple-settings-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .simple-settings-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .display-setting-stack { display: grid; width: 100%; gap: 7px; }
-.quality-custom-field { display: grid; grid-template-columns: minmax(0, 1fr) 108px; align-items: center; gap: 12px; width: 100%; }
 .display-setting-field-hint { display: block; color: #87919b; font-size: 12px; line-height: 1.6; }
-.frame-detect-setting { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: start; gap: 7px; width: 100%; color: #87919b; font-size: 12px; }
-.frame-detect-setting span { display: block; width: 100%; line-height: 1.6; }
 @media (max-width: 440px) {
   .slider-field { grid-template-columns: minmax(100px, 1fr) 108px; gap: 10px; }
 }

@@ -200,6 +200,44 @@ select { font: inherit; }
   grid-template-rows: minmax(0, 1fr);
 }
 
+.toolbar-snap-preview {
+  position: fixed;
+  z-index: 30;
+  pointer-events: none;
+  border: 1px solid rgb(91 168 255 / 72%);
+  border-radius: 12px;
+  background: rgb(22 119 255 / 18%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 8%);
+}
+
+.toolbar-snap-preview.is-top {
+  top: 6px;
+  right: 6px;
+  left: 6px;
+  height: 44px;
+}
+
+.toolbar-snap-preview.is-bottom {
+  right: 6px;
+  bottom: 6px;
+  left: 6px;
+  height: 44px;
+}
+
+.toolbar-snap-preview.is-left {
+  top: 6px;
+  bottom: 6px;
+  left: 6px;
+  width: 48px;
+}
+
+.toolbar-snap-preview.is-right {
+  top: 6px;
+  right: 6px;
+  bottom: 6px;
+  width: 48px;
+}
+
 .brand {
   display: flex;
   align-items: center;

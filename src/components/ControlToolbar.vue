@@ -113,6 +113,7 @@ const virtualMediaPopover = ref<{ restoreUploadDialog: () => void } | null>(null
 const toolbarEl = ref<HTMLElement | null>(null)
 const toolbarDock = ref<ToolbarDockState>(parseToolbarDock(localStorage.getItem(TOOLBAR_DOCK_KEY)))
 const toolbarDragging = ref(false)
+const toolbarSnapHint = ref<Exclude<ToolbarDock, 'float'> | null>(null)
 let toolbarPointerId: number | null = null
 let toolbarGrab = { x: 0, y: 0 }
 let toolbarDragOffset = { x: 0, y: 0 }
@@ -154,6 +155,28 @@ function setToolbarDock(next: ToolbarDockState) {
   persistToolbarDock()
 }
 
+function updateToolbarSnapHint(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  pointerX: number,
+  pointerY: number,
+) {
+  const snapped = snapToolbarDock(
+    x,
+    y,
+    width,
+    height,
+    window.innerWidth,
+    window.innerHeight,
+    undefined,
+    pointerX,
+    pointerY,
+  )
+  toolbarSnapHint.value = snapped.dock === 'float' ? null : snapped.dock
+}
+
 function applyToolbarDragPosition(clientX: number, clientY: number) {
   const toolbar = toolbarEl.value
   if (!toolbar) return
@@ -167,6 +190,7 @@ function applyToolbarDragPosition(clientX: number, clientY: number) {
     window.innerHeight,
   )
   toolbarDock.value = { dock: 'float', ...next }
+  updateToolbarSnapHint(next.x, next.y, rect.width, rect.height, clientX, clientY)
 }
 
 function captureToolbarDragOffset(clientX: number, clientY: number) {
@@ -209,6 +233,7 @@ function onToolbarWindowPointerMove(event: PointerEvent) {
     toolbarDragReady = false
     toolbarDragging.value = true
     toolbarDock.value = { dock: 'float', x: toolbarDock.value.x, y: toolbarDock.value.y }
+    emit('dock', 'float')
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         if (toolbarPointerId === null) return
@@ -228,10 +253,12 @@ function onToolbarWindowPointerUp(event: PointerEvent) {
   stopToolbarWindowDrag()
   if (!toolbarDragMoved) {
     toolbarDragging.value = false
+    toolbarSnapHint.value = null
     return
   }
   toolbarDragging.value = false
   toolbarDragReady = false
+  toolbarSnapHint.value = null
   const toolbar = toolbarEl.value
   if (!toolbar) return
   const rect = toolbar.getBoundingClientRect()
@@ -525,6 +552,7 @@ onBeforeUnmount(() => {
   window.clearTimeout(keyboardPulseTimer)
   window.removeEventListener('resize', onToolbarWindowResize)
   stopToolbarWindowDrag()
+  toolbarSnapHint.value = null
   unsubscribeActivity?.()
 })
 </script>
@@ -798,4 +826,12 @@ onBeforeUnmount(() => {
       </div>
     </div>
   </header>
+  <Teleport to="body">
+    <div
+      v-if="toolbarSnapHint"
+      class="toolbar-snap-preview"
+      :class="`is-${toolbarSnapHint}`"
+      aria-hidden="true"
+    />
+  </Teleport>
 </template>

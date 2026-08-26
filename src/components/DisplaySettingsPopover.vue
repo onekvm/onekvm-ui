@@ -61,7 +61,7 @@ const codecOptions = computed(() => {
     ? allCodecOptions.value.filter((option) => supported.includes(option.value))
     : allCodecOptions.value
 })
-const fpsOptions = [10, 15, 24, 30, 45, 60].map((value) => ({
+const fpsOptions = [10, 15, 24, 30, 45, 60, 120].map((value) => ({
   label: `${value} FPS`,
   value,
 }))

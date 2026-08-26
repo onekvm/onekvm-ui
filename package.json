@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "check": "vue-tsc --noEmit",
+    "test:authorized-keys": "node --experimental-strip-types tests/authorized-keys.test.ts",
     "test:toolbar-dock": "node --experimental-strip-types tests/toolbar-dock.test.ts",
     "test:video-fit": "node --experimental-strip-types tests/video-fit.test.ts",
     "test:video-resolution": "node --experimental-strip-types tests/video-resolution.test.ts",

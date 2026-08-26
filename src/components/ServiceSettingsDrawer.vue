@@ -11,6 +11,7 @@ import {
   type SSHServiceSettings,
 } from '@/api/client'
 import { t } from '@/i18n/runtime'
+import { splitAuthorizedKeyLines, splitAuthorizedKeyList } from '@/lib/authorized-keys'
 
 type ServiceKind = 'onekvm' | 'ssh'
 
@@ -122,7 +123,8 @@ function assignOneKVM(settings: OneKVMServiceSettings) {
 
 function assignSSH(settings: SSHServiceSettings) {
   form.sshPort = settings.port
-  form.authorizedKeys = [...(settings.authorized_keys || [])]
+  const keys = splitAuthorizedKeyList(settings.authorized_keys || [])
+  form.authorizedKeys = keys.length > 0 ? keys : ['']
 }
 
 async function load() {
@@ -153,7 +155,7 @@ async function save() {
     } else {
       assignSSH(await api.saveSSHServiceSettings({
         port: form.sshPort,
-        authorized_keys: form.authorizedKeys,
+        authorized_keys: splitAuthorizedKeyList(form.authorizedKeys),
       }))
     }
     message.success(t('settings.success', 'Settings saved'))
@@ -253,10 +255,39 @@ async function obtainAutoSSLCertificate() {
 }
 
 function addKey() {
+  const last = form.authorizedKeys[form.authorizedKeys.length - 1]
+  if (last !== undefined && last.trim() === '') return
   form.authorizedKeys.push('')
 }
 
 function removeKey(index: number) {
+  form.authorizedKeys.splice(index, 1)
+  if (form.authorizedKeys.length === 0) form.authorizedKeys.push('')
+}
+
+function setAuthorizedKey(index: number, value: string) {
+  if (!/[\r\n]/.test(value)) {
+    form.authorizedKeys[index] = value
+    return
+  }
+  const lines = splitAuthorizedKeyLines(value)
+  if (lines.length === 0) {
+    form.authorizedKeys[index] = ''
+    return
+  }
+  form.authorizedKeys.splice(index, 1, ...lines)
+}
+
+function trimAuthorizedKey(index: number) {
+  const value = form.authorizedKeys[index]?.trim() ?? ''
+  if (value) {
+    form.authorizedKeys[index] = value
+    return
+  }
+  if (form.authorizedKeys.length === 1) {
+    form.authorizedKeys[index] = ''
+    return
+  }
   form.authorizedKeys.splice(index, 1)
 }
 
@@ -451,7 +482,14 @@ watch(
           </p>
           <div class="authorized-key-list">
             <div v-for="(_, index) in form.authorizedKeys" :key="index" class="authorized-key-row">
-              <n-input v-model:value="form.authorizedKeys[index]" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" :placeholder="t('settings.advancedSettings.servicesPage.authorizedKeyPlaceholder', 'ssh-ed25519 AAAA...')" />
+              <n-input
+                :value="form.authorizedKeys[index]"
+                type="textarea"
+                :autosize="{ minRows: 1, maxRows: 3 }"
+                :placeholder="t('settings.advancedSettings.servicesPage.authorizedKeyPlaceholder', 'ssh-ed25519 AAAA...')"
+                @update:value="setAuthorizedKey(index, $event)"
+                @blur="trimAuthorizedKey(index)"
+              />
               <n-button quaternary circle type="error" @click="removeKey(index)">×</n-button>
             </div>
           </div>

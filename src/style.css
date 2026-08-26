@@ -169,6 +169,8 @@ select { font: inherit; }
   font-weight: 500;
 }
 .toolbar.is-vertical .brand { min-width: 0; }
+.toolbar.is-vertical .account-name { display: none; }
+.toolbar.is-vertical .account-button { max-width: none; padding: 0; }
 .toolbar.is-vertical .device-controls,
 .toolbar.is-vertical .toolbar-actions,
 .toolbar.is-vertical .toolbar-account {

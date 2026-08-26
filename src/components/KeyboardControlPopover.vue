@@ -77,22 +77,21 @@ function clampPosition() {
   }
 }
 
-async function placePanel() {
+async function placePanel(originX?: number, originY?: number) {
   await nextTick()
   if (!panel.value) return
   const rect = panel.value.getBoundingClientRect()
-  position.value = {
-    x: Math.max(8, window.innerWidth - rect.width - 18),
-    y: 58,
-  }
+  position.value = originX == null || originY == null
+    ? { x: Math.max(8, window.innerWidth - rect.width - 18), y: 58 }
+    : { x: originX, y: originY }
   clampPosition()
 }
 
-function pinPanel() {
+function pinPanel(event?: MouseEvent) {
   pinned.value = true
   popoverOpen.value = false
   emit('update:show', false)
-  void placePanel()
+  void placePanel(event?.clientX, event?.clientY)
 }
 
 function unpinPanel() {
@@ -200,7 +199,7 @@ onBeforeUnmount(() => {
         <div class="control-popover-header-actions">
           <n-tooltip to="body" :z-index="4000">
             <template #trigger>
-              <n-button quaternary circle size="tiny" :aria-label="t('keyboard.pinStatus', 'Pin keyboard status')" @click="pinPanel">
+              <n-button quaternary circle size="tiny" :aria-label="t('keyboard.pinStatus', 'Pin keyboard status')" @click="pinPanel($event)">
                 <template #icon><Pin /></template>
               </n-button>
             </template>

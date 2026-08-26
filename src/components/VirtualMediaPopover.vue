@@ -215,17 +215,16 @@ function clampPosition() {
   }
 }
 
-async function pinPanel(targetTab: 'iso' | 'drive') {
+async function pinPanel(targetTab: 'iso' | 'drive', event?: MouseEvent) {
   tab.value = targetTab
   pinnedTab.value = targetTab
   pinned.value = true
   await nextTick()
   if (!panel.value) return
   const rect = panel.value.getBoundingClientRect()
-  position.value = {
-    x: Math.max(8, window.innerWidth - rect.width - 18),
-    y: 58,
-  }
+  position.value = event
+    ? { x: event.clientX, y: event.clientY }
+    : { x: Math.max(8, window.innerWidth - rect.width - 18), y: 58 }
   clampPosition()
 }
 
@@ -1079,7 +1078,7 @@ onBeforeUnmount(() => {
                   :title="t('virtualMedia.pin', 'Pin current virtual media tab')"
                   :aria-label="t('virtualMedia.pin', 'Pin current virtual media tab')"
                   @pointerdown.stop
-                  @click.stop="pinPanel('iso')"
+                  @click.stop="pinPanel('iso', $event)"
                 ><Pin :size="13" /></button>
               </span>
             </n-tab>
@@ -1092,7 +1091,7 @@ onBeforeUnmount(() => {
                   :title="t('virtualMedia.pin', 'Pin current virtual media tab')"
                   :aria-label="t('virtualMedia.pin', 'Pin current virtual media tab')"
                   @pointerdown.stop
-                  @click.stop="pinPanel('drive')"
+                  @click.stop="pinPanel('drive', $event)"
                 ><Pin :size="13" /></button>
               </span>
             </n-tab>

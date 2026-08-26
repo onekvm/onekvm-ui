@@ -1585,22 +1585,39 @@ select { font: inherit; }
   scrollbar-width: thin;
 }
 .advanced-settings-view { min-height: 100%; }
-.advanced-settings-loading-page {
+.onekvm-page-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
   display: grid;
   grid-row: 1 / -1;
-  min-width: 0;
-  min-height: 100%;
   place-items: center;
-  background: #0d1013;
+  background: #000;
+  color: #edf2f5;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
-.advanced-settings-loading {
+.onekvm-html-loading-content {
   display: grid;
-  min-height: 40vh;
   place-items: center;
-  justify-items: center;
-  gap: 14px;
-  color: #aeb7c0;
-  font-size: 13px;
+  gap: 18px;
+}
+.onekvm-html-loading-brand {
+  display: block;
+  width: min(210px, 52vw);
+  height: auto;
+}
+.onekvm-html-loading-spinner {
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  border: 3px solid rgb(22 119 255 / 22%);
+  border-top-color: #1677ff;
+  border-radius: 50%;
+  animation: onekvm-html-loading-spin .75s linear infinite;
+}
+@keyframes onekvm-html-loading-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .onekvm-html-loading-spinner { animation-duration: 1.8s; }
 }
 .advanced-section-enter-active {
   transition: opacity 170ms ease, transform 170ms ease;

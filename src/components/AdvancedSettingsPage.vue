@@ -81,6 +81,7 @@ import { timezones } from '@/lib/timezones'
 import KeyboardShortcutEditor from './KeyboardShortcutEditor.vue'
 import UserManagement from './UserManagement.vue'
 import USBSettingsForm from './USBSettingsForm.vue'
+import AdvancedSettingsLoading from './AdvancedSettingsLoading.vue'
 
 type Section = string
 type SystemAction = 'factory-reset' | 'reboot' | 'recovery'
@@ -138,7 +139,7 @@ const extensionsLoaded = ref(false)
 const extensionsLoading = ref(false)
 const extensionLoading = ref(false)
 const extensionError = ref('')
-const loading = ref(false)
+const loading = ref(true)
 const saving = ref(false)
 const keyboardShortcutsValid = ref(true)
 const usbSettingsValid = ref(true)
@@ -1187,7 +1188,8 @@ watch(section, (value) => {
 </script>
 
 <template>
-  <section class="advanced-settings-page">
+  <AdvancedSettingsLoading v-if="loading && !config" />
+  <section v-else class="advanced-settings-page">
     <header class="advanced-settings-header">
       <n-button quaternary size="small" class="advanced-settings-back" :aria-label="t('settings.advancedSettings.back', 'Back')" @click="emit('close')">
         <template #icon><ArrowLeft /></template>
@@ -1263,11 +1265,7 @@ watch(section, (value) => {
             </header>
 
             <n-alert v-if="error || extensionError || systemDetailsError" type="error" :bordered="false">{{ error || extensionError || systemDetailsError }}</n-alert>
-            <div v-if="loading && !config" class="advanced-settings-loading" role="status" aria-live="polite">
-              <n-spin size="large" />
-              <span>{{ t('common.loading', 'Loading...') }}</span>
-            </div>
-            <n-spin v-else class="advanced-settings-content" :show="loading || systemDetailsLoading">
+            <n-spin class="advanced-settings-content" :show="loading || systemDetailsLoading">
               <section v-if="section === 'display' && config" class="advanced-settings-section">
                 <DisplaySettingsForm
                   v-model="config.video"

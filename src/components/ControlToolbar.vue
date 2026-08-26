@@ -121,6 +121,7 @@ let toolbarDragOffset = { x: 0, y: 0 }
 let toolbarDragMoved = false
 let toolbarDragReady = false
 let toolbarDragPoint = { x: 0, y: 0 }
+const toolbarDragFromFloating = ref(false)
 
 const toolbarVertical = computed(
   () => !toolbarDragging.value && (toolbarDock.value.dock === 'left' || toolbarDock.value.dock === 'right'),
@@ -128,9 +129,10 @@ const toolbarVertical = computed(
 const toolbarCompact = computed(
   () => toolbarDragging.value || toolbarDock.value.dock === 'float' || toolbarVertical.value,
 )
-const toolbarHandleVisible = computed(
-  () => toolbarDock.value.dock === 'float' && !toolbarDragging.value,
-)
+const toolbarHandleVisible = computed(() => {
+  if (toolbarDragging.value) return toolbarDragFromFloating.value
+  return toolbarDock.value.dock === 'float'
+})
 const menuPlacement = computed(() => toolbarMenuPlacement(toolbarDock.value.dock))
 const toolbarClass = computed(() => ({
   'is-floating': toolbarDock.value.dock === 'float' || toolbarDragging.value,
@@ -280,6 +282,7 @@ function startToolbarDrag(event: PointerEvent) {
   toolbarPointerId = event.pointerId
   toolbarDragMoved = false
   toolbarDragReady = false
+  toolbarDragFromFloating.value = toolbarDock.value.dock === 'float'
   toolbarGrab = { x: event.clientX, y: event.clientY }
   toolbarDragPoint = { x: event.clientX, y: event.clientY }
   const origin = event.currentTarget

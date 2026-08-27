@@ -5,6 +5,13 @@ import { Activity, GripHorizontal, X } from '@lucide/vue'
 import { t } from '@/i18n/runtime'
 import { useLatencyHistory } from '@/composables/useLatencyHistory'
 import { useVideoStreamHistory } from '@/composables/useVideoStreamHistory'
+import {
+  clampOverlayPosition,
+  overlayDragHostRect,
+  overlayGrabOffset,
+  overlayPointerPosition,
+  type OverlayPoint,
+} from '@/lib/overlay-drag'
 
 import DisplayStatusValues from './DisplayStatusValues.vue'
 
@@ -27,6 +34,16 @@ const props = defineProps<{
   visible: boolean
   originX?: number
   originY?: number
+  audioEnabled?: boolean
+  audioEncoder?: string
+  audioQuality?: string
+  audioSampleRate?: number
+  audioChannels?: number
+  audioFps?: number
+  audioBitrate?: number
+  audioCaptureLatencyUs?: number
+  audioEncodeLatencyUs?: number
+  audioJitterBufferUs?: number
 }>()
 
 const emit = defineEmits<{
@@ -45,9 +62,18 @@ const { samples: latencySamples } = useLatencyHistory(() => ({
   decode: props.decodeUs,
   present: props.presentUs,
 }))
+const { samples: audioSamples } = useVideoStreamHistory(() => props.audioFps || 0, () => props.audioBitrate || 0)
+const { samples: audioLatencySamples } = useLatencyHistory(() => ({
+  capture: props.audioCaptureLatencyUs || 0,
+  encode: props.audioEncodeLatencyUs || 0,
+  ice: 0,
+  jitter: props.audioJitterBufferUs || 0,
+  decode: 0,
+  present: 0,
+}))
 const panel = ref<HTMLElement | null>(null)
-const position = ref({ x: 24, y: 58 })
-let dragOffset = { x: 0, y: 0 }
+const position = ref({ x: 24, y: 8 })
+let dragOffset: OverlayPoint = { x: 0, y: 0 }
 let dragging = false
 
 const panelStyle = computed(() => ({
@@ -56,9 +82,15 @@ const panelStyle = computed(() => ({
 }))
 
 function hostRect() {
-  const host = panel.value?.offsetParent
-  if (host instanceof HTMLElement) return host.getBoundingClientRect()
-  return new DOMRect(0, 0, window.innerWidth, window.innerHeight)
+  const parent = panel.value?.offsetParent
+  const stage = parent instanceof HTMLElement
+    ? parent.querySelector(':scope > .console-stage')
+    : null
+  return overlayDragHostRect(
+    parent instanceof HTMLElement ? parent.getBoundingClientRect() : null,
+    stage instanceof HTMLElement ? stage.getBoundingClientRect() : null,
+    { width: window.innerWidth, height: window.innerHeight },
+  )
 }
 
 function panelSize() {
@@ -73,11 +105,7 @@ function panelSize() {
 function clampPosition() {
   const size = panelSize()
   if (!size) return
-  const host = hostRect()
-  position.value = {
-    x: Math.max(8, Math.min(host.width - size.width - 8, position.value.x)),
-    y: Math.max(50, Math.min(host.height - size.height - 8, position.value.y)),
-  }
+  position.value = clampOverlayPosition(position.value, size, hostRect())
 }
 
 async function placePanel() {
@@ -86,27 +114,25 @@ async function placePanel() {
   if (!size) return
   const host = hostRect()
   position.value = props.originX == null || props.originY == null
-    ? { x: Math.max(8, host.width - size.width - 18), y: 58 }
+    ? { x: Math.max(8, host.width - size.width - 18), y: 8 }
     : { x: props.originX - host.left, y: props.originY - host.top }
   clampPosition()
 }
 
 function startDrag(event: PointerEvent) {
   if (event.button !== 0 || !panel.value || window.innerWidth < 768) return
+  event.preventDefault()
   const rect = panel.value.getBoundingClientRect()
-  dragOffset = { x: event.clientX - rect.left, y: event.clientY - rect.top }
+  dragOffset = overlayGrabOffset(event.clientX, event.clientY, rect)
   dragging = true
   window.addEventListener('pointermove', drag)
   window.addEventListener('pointerup', stopDrag, { once: true })
+  window.addEventListener('pointercancel', stopDrag, { once: true })
 }
 
 function drag(event: PointerEvent) {
   if (!dragging) return
-  const host = hostRect()
-  position.value = {
-    x: event.clientX - host.left - dragOffset.x,
-    y: event.clientY - host.top - dragOffset.y,
-  }
+  position.value = overlayPointerPosition(event.clientX, event.clientY, hostRect(), dragOffset)
   clampPosition()
 }
 
@@ -136,13 +162,17 @@ watch(advanced, (value) => {
   if (!props.visible) return
   void nextTick().then(() => clampPosition())
 })
+watch(() => props.audioEnabled, () => {
+  if (!props.visible) return
+  void nextTick().then(() => clampPosition())
+})
 </script>
 
 <template>
   <section
     ref="panel"
     class="video-performance-overlay"
-    :class="{ 'is-advanced': advanced }"
+    :class="{ 'is-advanced': advanced, 'has-audio': audioEnabled }"
     :style="panelStyle"
     role="dialog"
     :aria-label="t('screen.performance', 'Performance')"
@@ -192,6 +222,18 @@ watch(advanced, (value) => {
         :decode-us="decodeUs"
         :present-us="presentUs"
         :show-latency="advanced"
+        :audio-enabled="audioEnabled"
+        :audio-encoder="audioEncoder"
+        :audio-quality="audioQuality"
+        :audio-sample-rate="audioSampleRate"
+        :audio-channels="audioChannels"
+        :audio-fps="audioFps"
+        :audio-bitrate="audioBitrate"
+        :audio-stream-samples="audioSamples"
+        :audio-latency-samples="audioLatencySamples"
+        :audio-capture-latency-us="audioCaptureLatencyUs"
+        :audio-encode-latency-us="audioEncodeLatencyUs"
+        :audio-jitter-buffer-us="audioJitterBufferUs"
       />
     </div>
   </section>

@@ -118,4 +118,34 @@ const reset = sampler.reset()
 assert.equal(reset.iceRttUs, 0)
 assert.equal(reset.jitterBufferUs, 0)
 
+function audioInbound(overrides: Record<string, unknown> = {}): RTCStats {
+  return {
+    id: 'inbound-audio',
+    type: 'inbound-rtp',
+    timestamp: 1_000,
+    kind: 'audio',
+    bytesReceived: 1_200,
+    packetsReceived: 50,
+    jitterBufferDelay: 0.1,
+    jitterBufferEmittedCount: 50,
+    ...overrides,
+  } as unknown as RTCStats
+}
+
+const audioSampler = new PlaybackStatsSampler()
+audioSampler.sample([audioInbound(), nominatedPair])
+const audioNext = audioSampler.sample([
+  audioInbound({
+    timestamp: 2_000,
+    bytesReceived: 13_200,
+    packetsReceived: 100,
+    jitterBufferDelay: 0.16,
+    jitterBufferEmittedCount: 100,
+  }),
+  nominatedPair,
+])
+assert.equal(audioNext.audio.bitrateKbps, 96)
+assert.equal(audioNext.audio.packetsPerSecond, 50)
+assert.equal(audioNext.audio.jitterBufferUs, 1_200)
+
 console.log('webrtc-playback-stats tests passed')

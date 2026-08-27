@@ -15,7 +15,7 @@ import {
   type ToolbarDock,
 } from '@/lib/toolbar-dock'
 import { useTransport } from '@/composables/useTransport'
-import { onekvm, type BrowserVideoLatencyUs } from '@/lib/onekvm'
+import { onekvm, type BrowserAudioStats, type BrowserVideoLatencyUs } from '@/lib/onekvm'
 import { loadLocalShortcuts, saveLocalShortcuts } from '@/lib/keyboard-shortcuts'
 import { statusEvents } from '@/lib/status-events'
 import { t } from '@/i18n/runtime'
@@ -98,6 +98,9 @@ const iceRttUs = ref(0)
 const jitterBufferUs = ref(0)
 const decodeUs = ref(0)
 const presentUs = ref(0)
+const audioBitrate = ref(0)
+const audioPacketsPerSecond = ref(0)
+const audioJitterBufferUs = ref(0)
 const switchingTransport = ref<'websocket' | 'webrtc' | ''>('')
 let unsubscribeKeyboardLED: (() => void) | undefined
 let unsubscribeStatus: (() => void) | undefined
@@ -179,6 +182,12 @@ function setBrowserLatency(latency: BrowserVideoLatencyUs & { presentUs: number 
   jitterBufferUs.value = latency.jitterBufferUs
   decodeUs.value = latency.decodeUs
   presentUs.value = latency.presentUs
+}
+
+function setAudioStats(stats: BrowserAudioStats) {
+  audioBitrate.value = stats.bitrateKbps
+  audioPacketsPerSecond.value = stats.packetsPerSecond
+  audioJitterBufferUs.value = stats.jitterBufferUs
 }
 
 async function useWebSocketFallback() {
@@ -407,6 +416,7 @@ onBeforeUnmount(() => {
           @fps="videoFps = $event"
           @bitrate="videoBitrate = $event"
           @browser-latency="setBrowserLatency"
+          @audio-stats="setAudioStats"
         />
 
         <Transition name="win11-window">
@@ -430,6 +440,16 @@ onBeforeUnmount(() => {
           :jitter-buffer-us="jitterBufferUs"
           :decode-us="decodeUs"
           :present-us="presentUs"
+          :audio-enabled="status?.audio.enabled ?? false"
+          :audio-encoder="status?.audio.encoder ?? ''"
+          :audio-quality="status?.audio.quality ?? ''"
+          :audio-sample-rate="status?.audio.sample_rate ?? 0"
+          :audio-channels="status?.audio.stream_channels ?? 0"
+          :audio-fps="audioPacketsPerSecond || status?.audio.actual_fps || 0"
+          :audio-bitrate="audioBitrate || status?.audio.bitrate_kbps || 0"
+          :audio-capture-latency-us="status?.audio.capture_latency_us ?? 0"
+          :audio-encode-latency-us="status?.audio.encode_latency_us ?? 0"
+          :audio-jitter-buffer-us="audioJitterBufferUs"
           @close="performanceOpen = false"
         />
         </Transition>

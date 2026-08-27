@@ -933,7 +933,8 @@ select { font: inherit; }
   width: min(380px, calc(100% - 16px));
 }
 
-.video-performance-overlay.is-advanced {
+.video-performance-overlay.is-advanced,
+.video-performance-overlay.has-audio.is-advanced {
   width: min(760px, calc(100% - 16px));
 }
 
@@ -1202,8 +1203,34 @@ select { font: inherit; }
   gap: 0;
 }
 
+.video-performance-overlay .display-status-column:has(+ .display-status-column),
+.video-performance-overlay .display-status-column + .display-status-column {
+  padding-right: 0;
+  padding-left: 0;
+  border-left: 0;
+}
+
+.video-performance-overlay:not(.is-advanced) .display-status-column + .display-status-column {
+  padding-top: 12px;
+  border-top: 1px solid rgb(58 66 74 / 72%);
+}
+
 .video-performance-overlay.is-advanced .display-status-values {
   grid-template-columns: 1fr 1fr;
+}
+
+.video-performance-overlay.is-advanced .display-status-values > .display-status-column:nth-child(odd) {
+  padding-right: 14px;
+}
+
+.video-performance-overlay.is-advanced .display-status-values > .display-status-column:nth-child(even) {
+  padding-left: 14px;
+  border-left: 1px solid rgb(58 66 74 / 72%);
+}
+
+.video-performance-overlay.is-advanced.has-audio .display-status-values > .display-status-column:nth-child(n + 3) {
+  padding-top: 12px;
+  border-top: 1px solid rgb(58 66 74 / 72%);
 }
 
 .display-status-popover .display-status-values,
@@ -2678,8 +2705,12 @@ select { font: inherit; }
   .video-performance-overlay .display-status-values,
   .video-performance-overlay.is-advanced .display-status-values { grid-template-columns: 1fr; }
   .display-status-column:has(+ .display-status-column) { padding-right: 0; }
-  .display-status-column + .display-status-column {
+  .display-status-column + .display-status-column,
+  .video-performance-overlay.is-advanced .display-status-values > .display-status-column:nth-child(odd),
+  .video-performance-overlay.is-advanced .display-status-values > .display-status-column:nth-child(even),
+  .video-performance-overlay.is-advanced.has-audio .display-status-values > .display-status-column:nth-child(n + 3) {
     padding-top: 12px;
+    padding-right: 0;
     padding-left: 0;
     border-left: 0;
     border-top: 1px solid rgb(58 66 74 / 72%);

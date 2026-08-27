@@ -16,7 +16,17 @@ import {
 const props = defineProps<{
   samples: readonly StreamSample[]
   targetFps: number
+  kind?: 'video' | 'audio'
 }>()
+
+const isAudio = computed(() => props.kind === 'audio')
+const chartLabel = computed(() => isAudio.value
+  ? t('screen.streamChartAudio', 'Bitrate & packet rate')
+  : t('screen.streamChart', 'Bitrate & FPS'))
+const rateLabel = computed(() => isAudio.value
+  ? t('screen.audioPacketRate', 'Packet rate')
+  : t('screen.currentFps', 'Current FPS'))
+const rateValue = (fps: number) => isAudio.value ? `${fps} /s` : `${fps} FPS`
 
 const padLeft = 22
 const padRight = 26
@@ -110,7 +120,7 @@ function clearHover() {
       class="stream-chart-svg"
       :viewBox="`0 0 ${viewWidth} ${viewHeight}`"
       role="img"
-      :aria-label="t('screen.streamChart', 'Bitrate & FPS')"
+      :aria-label="chartLabel"
     >
       <g :transform="`translate(${padLeft},${padTop})`">
         <line
@@ -174,8 +184,8 @@ function clearHover() {
       <div class="stream-chart-tooltip-time">{{ hover.time }}</div>
       <div>
         <span class="stream-chart-swatch stream-chart-swatch-fps" aria-hidden="true" />
-        <span>{{ t('screen.currentFps', 'Current FPS') }}</span>
-        <strong>{{ hover.fps }} FPS</strong>
+        <span>{{ rateLabel }}</span>
+        <strong>{{ rateValue(hover.fps) }}</strong>
       </div>
       <div>
         <span class="stream-chart-swatch stream-chart-swatch-bitrate" aria-hidden="true" />
@@ -187,7 +197,7 @@ function clearHover() {
     <div class="stream-chart-legend">
       <span class="stream-chart-key">
         <span class="stream-chart-swatch stream-chart-swatch-fps" aria-hidden="true" />
-        {{ t('screen.currentFps', 'Current FPS') }}
+        {{ rateLabel }}
       </span>
       <span class="stream-chart-key">
         <span class="stream-chart-swatch stream-chart-swatch-bitrate" aria-hidden="true" />

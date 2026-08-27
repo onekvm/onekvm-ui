@@ -26,6 +26,18 @@ const props = defineProps<{
   decodeUs: number
   presentUs: number
   showLatency?: boolean
+  audioEnabled?: boolean
+  audioEncoder?: string
+  audioQuality?: string
+  audioSampleRate?: number
+  audioChannels?: number
+  audioFps?: number
+  audioBitrate?: number
+  audioStreamSamples?: readonly StreamSample[]
+  audioLatencySamples?: readonly LatencySample[]
+  audioCaptureLatencyUs?: number
+  audioEncodeLatencyUs?: number
+  audioJitterBufferUs?: number
 }>()
 
 const canvasSize = computed(() => {
@@ -43,7 +55,11 @@ const encodeLatency = computed(() => formatLatencyUs(props.encodeLatencyUs))
 const iceRtt = computed(() => formatLatencyUs(props.iceRttUs))
 const jitterBuffer = computed(() => formatLatencyUs(props.jitterBufferUs))
 const decodeLatency = computed(() => formatLatencyUs(props.decodeUs))
-const presentLatency = computed(() => formatLatencyUs(props.presentUs))
+const knownLatencyTotal = computed(() => formatLatencyUs(
+  Math.max(0, props.captureLatencyUs)
+  + Math.max(0, props.encodeLatencyUs)
+  + Math.max(0, props.presentUs),
+))
 
 const protocol = computed(() => {
   if (props.transport === 'webrtc') return 'WebRTC'
@@ -51,6 +67,37 @@ const protocol = computed(() => {
   if (props.transport === 'mjpeg') return t('screen.protocolHttpMjpeg', 'HTTP (MJPEG only)')
   return '-'
 })
+
+const audioEncoder = computed(() => (props.audioEncoder || '').toUpperCase() || '-')
+const audioQuality = computed(() => {
+  switch (props.audioQuality) {
+    case 'low':
+      return t('screen.qualityLow', 'Low')
+    case 'high':
+      return t('screen.qualityHigh', 'High')
+    case 'medium':
+      return t('screen.qualityMedium', 'Medium')
+    default:
+      return '-'
+  }
+})
+const audioSampleRate = computed(() => {
+  const rate = props.audioSampleRate || 0
+  if (rate <= 0) return '-'
+  return `${rate / 1000} kHz`
+})
+const audioChannels = computed(() => {
+  if (props.audioChannels === 1) return t('screen.audioMono', 'Mono')
+  if (props.audioChannels === 2) return t('screen.audioStereo', 'Stereo')
+  return '-'
+})
+const audioCaptureLatency = computed(() => formatLatencyUs(props.audioCaptureLatencyUs || 0))
+const audioEncodeLatency = computed(() => formatLatencyUs(props.audioEncodeLatencyUs || 0))
+const audioJitterBuffer = computed(() => formatLatencyUs(props.audioJitterBufferUs || 0))
+const audioLatencyTotal = computed(() => formatLatencyUs(
+  Math.max(0, props.audioCaptureLatencyUs || 0)
+  + Math.max(0, props.audioEncodeLatencyUs || 0),
+))
 </script>
 
 <template>
@@ -120,12 +167,80 @@ const protocol = computed(() => {
           <strong>{{ decodeLatency }}</strong>
         </div>
         <div>
-          <span>{{ t('screen.presentLatency', 'Receive to display') }}</span>
-          <strong>{{ presentLatency }}</strong>
+          <span>{{ t('screen.latencyTotal', 'Total measured latency') }}</span>
+          <strong>{{ knownLatencyTotal }}</strong>
         </div>
       </div>
       <div class="display-status-chart">
         <VideoLatencyChart :samples="latencySamples" />
+      </div>
+    </section>
+
+    <section v-if="audioEnabled" class="display-status-column">
+      <h2>{{ t('screen.audioColumn', 'Audio') }}</h2>
+      <div class="display-status-meta">
+        <div>
+          <span>{{ t('screen.codec', 'Codec') }}</span>
+          <strong>{{ audioEncoder }}</strong>
+        </div>
+        <div>
+          <span>{{ t('screen.audioQuality', 'Audio quality') }}</span>
+          <strong>{{ audioQuality }}</strong>
+        </div>
+      </div>
+      <div class="display-status-meta">
+        <div>
+          <span>{{ t('screen.audioSampleRate', 'Sample rate') }}</span>
+          <strong>{{ audioSampleRate }}</strong>
+        </div>
+        <div>
+          <span>{{ t('screen.audioChannels', 'Channels') }}</span>
+          <strong>{{ audioChannels }}</strong>
+        </div>
+      </div>
+      <div class="display-status-meta">
+        <div>
+          <span>{{ t('screen.audioPacketRate', 'Packet rate') }}</span>
+          <strong>{{ audioFps || 0 }} /s</strong>
+        </div>
+        <div>
+          <span>{{ t('screen.bitrate', 'Bitrate') }}</span>
+          <strong>{{ audioBitrate || 0 }} kbps</strong>
+        </div>
+      </div>
+      <div class="display-status-chart">
+        <VideoStreamChart
+          :samples="audioStreamSamples || []"
+          :target-fps="50"
+          kind="audio"
+        />
+      </div>
+    </section>
+
+    <section v-if="showLatency && audioEnabled" class="display-status-column">
+      <h2>{{ t('screen.audioLatencyColumn', 'Audio latency') }}</h2>
+      <div class="display-status-meta">
+        <div>
+          <span>{{ t('screen.captureLatency', 'Capture latency') }}</span>
+          <strong>{{ audioCaptureLatency }}</strong>
+        </div>
+        <div>
+          <span>{{ t('screen.encodeLatency', 'Encode latency') }}</span>
+          <strong>{{ audioEncodeLatency }}</strong>
+        </div>
+      </div>
+      <div class="display-status-meta">
+        <div>
+          <span>{{ t('screen.audioJitterBuffer', 'Audio jitter buffer') }}</span>
+          <strong>{{ audioJitterBuffer }}</strong>
+        </div>
+        <div>
+          <span>{{ t('screen.latencyTotal', 'Total measured latency') }}</span>
+          <strong>{{ audioLatencyTotal }}</strong>
+        </div>
+      </div>
+      <div class="display-status-chart">
+        <VideoLatencyChart :samples="audioLatencySamples || []" />
       </div>
     </section>
   </div>

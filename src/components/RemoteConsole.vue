@@ -9,8 +9,8 @@ import { useVideoFps } from '@/composables/useVideoFps'
 import { useMJPEGStream } from '@/composables/useMJPEGStream'
 import { api } from '@/api/client'
 import { t } from '@/i18n/runtime'
-import { onekvm, type BrowserVideoLatencyUs, type TransportState } from '@/lib/onekvm'
-import { emptyBrowserVideoLatency } from '@/lib/webrtc-playback-stats'
+import { onekvm, type BrowserAudioStats, type BrowserVideoLatencyUs, type TransportState } from '@/lib/onekvm'
+import { emptyBrowserAudioStats, emptyBrowserVideoLatency } from '@/lib/webrtc-playback-stats'
 
 const props = defineProps<{
   state: TransportState
@@ -33,6 +33,7 @@ const emit = defineEmits<{
   fps: [value: number]
   bitrate: [value: number]
   'browser-latency': [value: BrowserVideoLatencyUs & { presentUs: number }]
+  'audio-stats': [value: BrowserAudioStats]
 }>()
 
 const stage = ref<HTMLElement | null>(null)
@@ -48,6 +49,7 @@ let detachVideo: (() => void) | undefined
 let detachAudio: (() => void) | undefined
 let unsubscribeBitrate: (() => void) | undefined
 let unsubscribeBrowserLatency: (() => void) | undefined
+let unsubscribeAudioStats: (() => void) | undefined
 let webrtcLatency = emptyBrowserVideoLatency()
 let presentUs = 0
 
@@ -198,6 +200,7 @@ onMounted(() => {
     webrtcLatency = value
     publishBrowserLatency()
   })
+  unsubscribeAudioStats = onekvm.subscribeAudioStats((value) => emit('audio-stats', value))
   if (video.value) {
     video.value.disablePictureInPicture = true
     detachVideo = onekvm.attachVideo(video.value)
@@ -213,6 +216,7 @@ onBeforeUnmount(() => {
   detachAudio?.()
   unsubscribeBitrate?.()
   unsubscribeBrowserLatency?.()
+  unsubscribeAudioStats?.()
 })
 
 watch(isMJPEG, () => {
@@ -223,6 +227,7 @@ watch(isMJPEG, () => {
   webrtcLatency = emptyBrowserVideoLatency()
   presentUs = 0
   publishBrowserLatency()
+  emit('audio-stats', emptyBrowserAudioStats())
   void nextTick(observeCanvas)
 })
 

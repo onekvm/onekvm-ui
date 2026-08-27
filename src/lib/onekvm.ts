@@ -9,8 +9,10 @@ import {
 import type { WebSocketVideo } from '@/lib/websocket-video'
 import { supportsWebSocketVideo } from '@/lib/websocket-video-support'
 import {
+  emptyBrowserAudioStats,
   emptyBrowserVideoLatency,
   PlaybackStatsSampler,
+  type BrowserAudioStats,
   type BrowserVideoLatencyUs,
 } from '@/lib/webrtc-playback-stats'
 
@@ -39,7 +41,8 @@ export type InputActivity = 'mouse' | 'keyboard'
 type ActivityListener = (activity: InputActivity) => void
 type BitrateListener = (kbps: number) => void
 type BrowserLatencyListener = (latency: BrowserVideoLatencyUs) => void
-export type { BrowserVideoLatencyUs }
+type AudioStatsListener = (stats: BrowserAudioStats) => void
+export type { BrowserAudioStats, BrowserVideoLatencyUs }
 export interface KeyboardLEDState {
   known: boolean
   numLock: boolean
@@ -69,6 +72,7 @@ class OneKVMTransport {
   private activityListeners = new Set<ActivityListener>()
   private bitrateListeners = new Set<BitrateListener>()
   private browserLatencyListeners = new Set<BrowserLatencyListener>()
+  private audioStatsListeners = new Set<AudioStatsListener>()
   private keyboardLEDListeners = new Set<KeyboardLEDListener>()
   private playbackStats = new PlaybackStatsSampler()
   private state: TransportState = {
@@ -105,6 +109,12 @@ class OneKVMTransport {
     this.browserLatencyListeners.add(listener)
     listener(emptyBrowserVideoLatency())
     return () => this.browserLatencyListeners.delete(listener)
+  }
+
+  subscribeAudioStats(listener: AudioStatsListener) {
+    this.audioStatsListeners.add(listener)
+    listener(emptyBrowserAudioStats())
+    return () => this.audioStatsListeners.delete(listener)
   }
 
   subscribeKeyboardLED(listener: KeyboardLEDListener) {
@@ -550,6 +560,7 @@ class OneKVMTransport {
     this.playbackStats.reset()
     this.emitVideoBitrate(0)
     this.emitBrowserLatency(emptyBrowserVideoLatency())
+    this.emitAudioStats(emptyBrowserAudioStats())
     this.disposeLocalAudio()
     this.control?.close()
     this.peer?.close()
@@ -586,9 +597,10 @@ class OneKVMTransport {
     const sample = async () => {
       const reports = await peer.getStats().catch(() => null)
       if (!reports || this.peer !== peer) return
-      const { bitrateKbps, bitrateSampled, latency } = this.playbackStats.sample(reports)
+      const { bitrateKbps, bitrateSampled, latency, audio } = this.playbackStats.sample(reports)
       if (bitrateSampled) this.emitVideoBitrate(bitrateKbps)
       this.emitBrowserLatency(latency)
+      this.emitAudioStats(audio)
     }
 
     void sample()
@@ -601,6 +613,10 @@ class OneKVMTransport {
 
   private emitBrowserLatency(latency: BrowserVideoLatencyUs) {
     this.browserLatencyListeners.forEach((listener) => listener(latency))
+  }
+
+  private emitAudioStats(stats: BrowserAudioStats) {
+    this.audioStatsListeners.forEach((listener) => listener(stats))
   }
 
   private errorMessage(error: unknown) {

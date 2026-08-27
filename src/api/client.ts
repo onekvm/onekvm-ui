@@ -256,6 +256,14 @@ export interface OneKVMStatus {
     microphone_session?: string
     device: string
     encoder: string
+    quality?: string
+    channels?: string
+    sample_rate?: number
+    stream_channels?: number
+    actual_fps?: number
+    bitrate_kbps?: number
+    capture_latency_us?: number
+    encode_latency_us?: number
   }
   hid: {
     available: boolean

@@ -446,6 +446,15 @@ const zh_tw = {
           gop: '關鍵影格間隔',
           frames: '影格',
           sourceDevice: '擷取裝置',
+          edid: 'HDMI EDID',
+          edidUnknown: '目前對外宣告的模式無法取得',
+          edidSelect: '從任何已安裝的 EDID 提供者選擇項目',
+          edidApply: '套用 EDID',
+          edidHotplug: 'EDID 已更新。請在被控主機上重新偵測顯示器。',
+          edidRebootTitle: '需要重新啟動',
+          edidReboot: '需要重新啟動裝置後，新的 EDID 才會對被控主機生效。',
+          edidPowerCycle: '需要為裝置斷電再上電，新的 EDID 才會對外生效。',
+          edidRebootNow: '立即重新啟動',
           gopHint: '設定為 0 時，將根據目標影格率自動選擇關鍵影格間隔。'
         },
         servicesPage: {

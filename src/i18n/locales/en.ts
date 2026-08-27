@@ -447,6 +447,15 @@ const en = {
           gop: 'Keyframe interval',
           frames: 'frames',
           sourceDevice: 'Capture device',
+          edid: 'HDMI EDID',
+          edidUnknown: 'Current advertised mode is unavailable',
+          edidSelect: 'Choose a library entry from any installed EDID provider',
+          edidApply: 'Apply EDID',
+          edidHotplug: 'EDID updated. Re-detect the display on the controlled host.',
+          edidRebootTitle: 'Restart required',
+          edidReboot: 'Restart the device to advertise the new EDID to the host.',
+          edidPowerCycle: 'Power-cycle the device to advertise the new EDID.',
+          edidRebootNow: 'Restart now',
           gopHint: 'Use 0 to select the keyframe interval automatically from the target frame rate.'
         },
         servicesPage: {

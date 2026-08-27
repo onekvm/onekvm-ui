@@ -864,6 +864,45 @@ async function transferMSDDriveFile(
   return result
 }
 
+export type EDIDApplyRequired = 'none' | 'hotplug' | 'reboot' | 'power_cycle'
+
+export interface EDIDStatus {
+  supported: boolean
+  writable?: boolean
+  persistent?: boolean
+  hotplug?: boolean
+  apply_policy?: EDIDApplyRequired
+  chip_id?: string
+  board_id?: string
+  size?: number
+  data_hex?: string
+  summary?: {
+    manufacturer?: string
+    monitor_name?: string
+    preferred?: { width: number; height: number; fps: number }
+  }
+}
+
+export interface ContentLibraryFile {
+  id: string
+  name: string
+  size: number
+  extension: string
+  directory: string
+  kind: string
+  role?: string
+  writable: boolean
+}
+
+export interface ContentLibrary {
+  extension: string
+  id: string
+  kind: string
+  role?: string
+  writable: boolean
+  files: ContentLibraryFile[]
+}
+
 export const api = {
   authStatus: () => request<AuthStatus>('/api/auth/status', { cache: 'no-store' }),
   authSetup: (
@@ -900,6 +939,19 @@ export const api = {
   deleteAuthUser: (username: string) =>
     request<void>(`/api/auth/users/${encodeURIComponent(username)}`, { method: 'DELETE' }),
   getConfig: () => request<OneKVMConfig>('/api/config'),
+  getVideoEDID: () => request<EDIDStatus>('/api/video/edid', { cache: 'no-store' }),
+  applyVideoEDID: (body: { data_hex?: string; library?: { extension: string; directory: string; id: string }; preset?: string; custom?: string }) =>
+    request<{ status: string; apply_required: EDIDApplyRequired }>('/api/video/edid', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  resetVideoEDID: () => request<{ status: string; apply_required: EDIDApplyRequired }>('/api/video/edid/reset', { method: 'POST' }),
+  getContentLibraries: (kind: string) => request<{ kind: string; libraries: ContentLibrary[] }>(`/api/libraries/${encodeURIComponent(kind)}`),
+  putContentLibraryFile: (kind: string, extension: string, directory: string, id: string, data: Blob) =>
+    request<{ status: string }>(`/api/libraries/${encodeURIComponent(kind)}/${encodeURIComponent(extension)}/${encodeURIComponent(directory)}/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: data,
+    }),
   getMJPEGStreamURL: () => `${serviceBaseUrl()}/api/stream`,
   getVideoWebSocketURL: () => serviceWebSocketURL('/api/stream/ws'),
   getHIDWebSocketURL: () => serviceWebSocketURL('/api/hid/ws'),
@@ -1097,6 +1149,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ session_id: sessionId }),
       keepalive,
+    }),
+  setWebRTCMicrophone: (sessionId: string, enabled: boolean) =>
+    request<{ status: string; microphone?: boolean }>('/api/webrtc/microphone', {
+      method: 'POST',
+      body: JSON.stringify({ session_id: sessionId, enabled }),
     }),
   power: (action: 'on' | 'off' | 'reset') =>
     request<{ status: string }>(`/api/power/${action}`, { method: 'POST' }),

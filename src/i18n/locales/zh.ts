@@ -446,6 +446,15 @@ const zh = {
           gop: '关键帧间隔',
           frames: '帧',
           sourceDevice: '采集设备',
+          edid: 'HDMI EDID',
+          edidUnknown: '当前对外声明的模式不可用',
+          edidSelect: '从任意已安装的 EDID 提供者中选择条目',
+          edidApply: '应用 EDID',
+          edidHotplug: 'EDID 已更新。请在被控主机上重新检测显示器。',
+          edidRebootTitle: '需要重启',
+          edidReboot: '需要重启设备后，新的 EDID 才会对被控主机生效。',
+          edidPowerCycle: '需要给设备断电再上电，新的 EDID 才会对外生效。',
+          edidRebootNow: '立即重启',
           gopHint: '设置为 0 时，将根据目标帧率自动选择关键帧间隔。'
         },
         servicesPage: {

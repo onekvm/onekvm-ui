@@ -13,6 +13,7 @@ import {
   setQpPreset,
   type QpPresetKey,
 } from '@/lib/video-qp'
+import EdidSettingsPanel from './EdidSettingsPanel.vue'
 
 const props = defineProps<{
   disabled?: boolean
@@ -315,6 +316,7 @@ function fieldReadOnly(path: string) {
         />
       </n-form-item>
     </div>
+    <EdidSettingsPanel :disabled="disabled" />
   </n-form>
 </template>
 

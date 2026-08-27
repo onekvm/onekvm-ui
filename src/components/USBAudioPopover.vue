@@ -95,7 +95,7 @@ async function applySpeaker(value: boolean) {
     if (value) {
       onekvm.unlockAudio()
       await api.patchConfig('audio.device', 'hw:UAC1Gadget,0')
-      await api.patchConfig('audio.encoder', 'pcmu')
+      await api.patchConfig('audio.encoder', 'opus')
     }
     await api.patchConfig('audio.enabled', String(value))
     await onekvm.reconnect()
@@ -112,7 +112,7 @@ async function applyMicrophone(value: boolean) {
   try {
     if (value) {
       await api.patchConfig('audio.device', 'hw:UAC1Gadget,0')
-      await api.patchConfig('audio.encoder', 'pcmu')
+      await api.patchConfig('audio.encoder', 'opus')
     }
     await onekvm.setMicrophone(value)
     if (value && !onekvm.microphoneGranted()) {

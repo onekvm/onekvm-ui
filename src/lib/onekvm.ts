@@ -1,4 +1,4 @@
-import { api } from '@/api/client'
+import { api, isUnauthorizedError } from '@/api/client'
 import { statusEvents } from '@/lib/status-events'
 import {
   preferredWebRTCCodecs,
@@ -131,6 +131,7 @@ class OneKVMTransport {
         this.disposeWebSocketVideo()
         this.disposePeer()
         const codecUnsupported = error instanceof VideoCodecUnsupportedError
+        const unauthorized = isUnauthorizedError(error)
         this.setState({
           connection: 'failed',
           error: this.errorMessage(error),
@@ -138,6 +139,7 @@ class OneKVMTransport {
           controlReady: false,
           websocketFallbackOffered:
             !codecUnsupported &&
+            !unauthorized &&
             this.state.videoMode === 'webrtc' &&
             this.state.websocketFallbackAvailable,
         })

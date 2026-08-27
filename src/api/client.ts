@@ -649,12 +649,16 @@ export function extensionRouteURL(extension: Pick<ExtensionSummary, 'id'>, route
 }
 
 export class APIError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-  ) {
+  readonly status: number
+
+  constructor(message: string, status: number) {
     super(message)
+    this.status = status
   }
+}
+
+export function isUnauthorizedError(error: unknown): boolean {
+  return error instanceof APIError && error.status === 401
 }
 
 function serviceBaseUrl() {

@@ -8,6 +8,12 @@ import { useAuth } from '@/composables/useAuth'
 import { hasPermission } from '@/build'
 import { type MouseMode } from '@/composables/useMouse'
 import { parseVideoFit, VIDEO_FIT_KEY, type VideoFit } from '@/lib/video-fit'
+import {
+  parseToolbarDock,
+  toolbarWorkspaceClass,
+  TOOLBAR_DOCK_KEY,
+  type ToolbarDock,
+} from '@/lib/toolbar-dock'
 import { useTransport } from '@/composables/useTransport'
 import { onekvm, type BrowserVideoLatencyUs } from '@/lib/onekvm'
 import { loadLocalShortcuts, saveLocalShortcuts } from '@/lib/keyboard-shortcuts'
@@ -47,7 +53,7 @@ function advancedRouteFromHash(hash: string) {
 }
 
 const { state } = useTransport()
-const { auth, logout } = useAuth()
+const { auth, logout, refresh } = useAuth()
 const dialog = useDialog()
 const canSettings = computed(() => hasPermission(auth, 'settings.view'))
 const canPower = computed(() => hasPermission(auth, 'power.control'))
@@ -56,7 +62,7 @@ const accountOpen = ref(false)
 const virtualKeyboardOpen = ref(false)
 const shortcutDialogOpen = ref(false)
 const toolbarOverlayOpen = ref(false)
-const toolbarDockedTop = ref(true)
+const toolbarDock = ref<ToolbarDock>(parseToolbarDock(localStorage.getItem(TOOLBAR_DOCK_KEY)).dock)
 const advancedSettingsOpen = ref(isAdvancedSettingsRoute(window.location.hash))
 const advancedSettingsRoute = ref(advancedRouteFromHash(window.location.hash))
 const consoleWorkspace = ref<HTMLElement | null>(null)
@@ -106,6 +112,20 @@ watch(scrollInterval, (value) => localStorage.setItem(SCROLL_INTERVAL_KEY, Strin
 watch(mouseReportRate, (value) => localStorage.setItem(MOUSE_REPORT_RATE_KEY, String(value)))
 watch(rightControlAsMeta, (value) => localStorage.setItem(RIGHT_CONTROL_AS_META_KEY, String(value)))
 watch(performanceOpen, (value) => localStorage.setItem(PERFORMANCE_OVERLAY_KEY, String(value)))
+watch(
+  () => auth.authenticated,
+  (authenticated) => {
+    if (authenticated) return
+    void onekvm.close()
+  },
+)
+watch(
+  () => state.value.connection,
+  (connection) => {
+    if (connection !== 'failed' && connection !== 'disconnected') return
+    void refresh()
+  },
+)
 
 function setPerformanceOpen(open: boolean, event?: MouseEvent) {
   if (open && event) performanceOrigin.value = { x: event.clientX, y: event.clientY }
@@ -276,7 +296,10 @@ onMounted(() => {
 			status.value = next
 			serverUnavailable.value = false
 		},
-		() => { serverUnavailable.value = true },
+		() => {
+			serverUnavailable.value = true
+			void refresh()
+		},
 	)
 	unsubscribeKeyboardLED = onekvm.subscribeKeyboardLED((led) => {
 		if (!status.value?.hid || !led.known) return
@@ -324,7 +347,7 @@ onBeforeUnmount(() => {
       v-else
       ref="consoleWorkspace"
       class="console-workspace"
-      :class="{ 'toolbar-overlay': !toolbarDockedTop }"
+      :class="toolbarWorkspaceClass(toolbarDock)"
     >
         <ControlToolbar
           :state="state"
@@ -358,7 +381,7 @@ onBeforeUnmount(() => {
           @update:performance-open="setPerformanceOpen"
           @update:right-control-as-meta="rightControlAsMeta = $event"
           @overlay="toolbarOverlayOpen = $event"
-          @dock="toolbarDockedTop = $event === 'top'"
+          @dock="toolbarDock = $event"
           @update:video-fit="videoFit = $event"
           @update:mouse-mode="mouseMode = $event"
           @update:scroll-interval="scrollInterval = $event"
@@ -412,7 +435,7 @@ onBeforeUnmount(() => {
         </Transition>
 
         <n-modal
-          :show="state.websocketFallbackOffered"
+          :show="state.websocketFallbackOffered && auth.authenticated"
           to=".console-workspace"
           preset="card"
           class="connection-problem-modal"

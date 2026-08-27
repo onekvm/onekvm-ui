@@ -5,6 +5,7 @@ import {
   parseToolbarDock,
   snapToolbarDock,
   toolbarMenuPlacement,
+  toolbarWorkspaceClass,
 } from '../src/lib/toolbar-dock.ts'
 
 assert.deepEqual(parseToolbarDock(null), { dock: 'top', x: 0, y: 0 })
@@ -47,5 +48,11 @@ assert.equal(toolbarMenuPlacement('float'), 'bottom-end')
 assert.equal(toolbarMenuPlacement('bottom'), 'top-end')
 assert.equal(toolbarMenuPlacement('left'), 'right-start')
 assert.equal(toolbarMenuPlacement('right'), 'left-start')
+
+assert.equal(toolbarWorkspaceClass('top'), 'toolbar-dock-top')
+assert.equal(toolbarWorkspaceClass('bottom'), 'toolbar-dock-bottom')
+assert.equal(toolbarWorkspaceClass('left'), 'toolbar-dock-left')
+assert.equal(toolbarWorkspaceClass('right'), 'toolbar-dock-right')
+assert.equal(toolbarWorkspaceClass('float'), 'toolbar-overlay')
 
 console.log('toolbar-dock tests passed')

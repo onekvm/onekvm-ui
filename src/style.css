@@ -44,8 +44,39 @@ select { font: inherit; }
   min-width: 0;
   min-height: 0;
   grid-row: 1 / -1;
+  grid-template-areas: "toolbar" "stage";
   grid-template-rows: 42px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
 }
+
+.console-workspace .toolbar { grid-area: toolbar; }
+.console-workspace .console-stage,
+.console-workspace .video-performance-overlay { grid-area: stage; }
+
+.console-workspace.toolbar-dock-bottom {
+  grid-template-areas: "stage" "toolbar";
+  grid-template-rows: minmax(0, 1fr) 42px;
+}
+
+.console-workspace.toolbar-dock-left {
+  grid-template-areas: "toolbar stage";
+  grid-template-columns: 48px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.console-workspace.toolbar-dock-right {
+  grid-template-areas: "stage toolbar";
+  grid-template-columns: minmax(0, 1fr) 48px;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.console-workspace.toolbar-overlay {
+  grid-template-areas: "stage";
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.console-workspace.toolbar-overlay .toolbar { grid-area: stage; }
 
 .settings-page-enter-active {
   transition: opacity var(--win11-enter) var(--win11-ease-out), transform var(--win11-enter) var(--win11-ease-out);
@@ -117,34 +148,27 @@ select { font: inherit; }
 }
 
 .toolbar.is-docked-bottom {
-  position: fixed;
-  right: 0;
-  bottom: 0;
-  left: 0;
   z-index: 40;
+  width: 100%;
   border-bottom: 0;
   border-top: 1px solid #292f36;
 }
 
 .toolbar.is-docked-left,
 .toolbar.is-docked-right {
-  position: fixed;
-  top: 0;
-  bottom: 0;
   z-index: 40;
   flex-direction: column;
   width: 48px;
+  height: 100%;
   padding: 8px 0;
   border-bottom: 0;
 }
 
 .toolbar.is-docked-left {
-  left: 0;
   border-right: 1px solid #292f36;
 }
 
 .toolbar.is-docked-right {
-  right: 0;
   border-left: 1px solid #292f36;
 }
 
@@ -209,10 +233,6 @@ select { font: inherit; }
 .toolbar.is-vertical .toolbar-handle {
   width: 18px;
   height: 32px;
-}
-
-.console-workspace.toolbar-overlay {
-  grid-template-rows: minmax(0, 1fr);
 }
 
 .toolbar-snap-preview {

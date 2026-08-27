@@ -100,3 +100,10 @@ export function toolbarMenuPlacement(dock: ToolbarDock) {
   if (dock === 'right') return 'left-start'
   return 'bottom-end'
 }
+
+/* Docked edges reserve a grid track so stretch-fit video can shrink.
+   Floating (and dragging) overlays the full stage. */
+export function toolbarWorkspaceClass(dock: ToolbarDock) {
+  if (dock === 'float') return 'toolbar-overlay'
+  return `toolbar-dock-${dock}`
+}

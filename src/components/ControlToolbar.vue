@@ -22,6 +22,7 @@ import {
   Upload,
   Server,
   UserRound,
+  Volume2,
 } from '@lucide/vue'
 import { NIcon, useDialog, useMessage, type DropdownOption } from 'naive-ui'
 
@@ -46,6 +47,7 @@ import DisplaySettingsPopover from './DisplaySettingsPopover.vue'
 import KeyboardControlPopover from './KeyboardControlPopover.vue'
 import MouseSettingsPopover from './MouseSettingsPopover.vue'
 import PowerControlPopover from './PowerControlPopover.vue'
+import USBAudioPopover from './USBAudioPopover.vue'
 import VirtualMediaPopover from './VirtualMediaPopover.vue'
 
 const props = defineProps<{
@@ -91,7 +93,7 @@ const emit = defineEmits<{
 }>()
 
 type DeviceState = 'ready' | 'waiting' | 'error'
-type MenuName = 'display' | 'mouse' | 'keyboard' | 'power' | 'media' | 'language' | 'account'
+type MenuName = 'display' | 'mouse' | 'keyboard' | 'power' | 'audio' | 'media' | 'language' | 'account'
 type MediaUploadState = {
   minimized: boolean
   uploading: boolean
@@ -363,6 +365,11 @@ const powerStateLabel = computed(() => {
   if (led === false) return t('power.off', 'Host is Off')
   return t('power.title', 'Power')
 })
+
+const audioState = computed<DeviceState>(() => (props.status?.audio.enabled ? 'ready' : 'waiting'))
+const audioStateLabel = computed(() =>
+  props.status?.audio.enabled ? t('usbAudio.on', 'On') : t('usbAudio.off', 'Off'),
+)
 
 const mediaState = computed<DeviceState>(() => {
   if (!props.msdStatus) return 'waiting'
@@ -718,6 +725,28 @@ onBeforeUnmount(() => {
           {{ t('power.title', 'Power') }}: {{ powerStateLabel }}
         </n-tooltip>
       </PowerControlPopover>
+
+      <USBAudioPopover
+        :status="status"
+        :placement="menuPlacement"
+        @update:show="updateMenu('audio', $event)"
+      >
+        <n-tooltip :disabled="openMenu === 'audio'">
+          <template #trigger>
+            <n-button
+              quaternary
+              size="small"
+              class="device-indicator"
+              :data-state="audioState"
+              :aria-label="`${t('usbAudio.title', 'USB audio')}: ${audioStateLabel}`"
+            >
+              <template #icon><Volume2 /></template>
+              <span class="device-led" />
+            </n-button>
+          </template>
+          {{ t('usbAudio.title', 'USB audio') }}: {{ audioStateLabel }}
+        </n-tooltip>
+      </USBAudioPopover>
 
       <VirtualMediaPopover
         ref="virtualMediaPopover"

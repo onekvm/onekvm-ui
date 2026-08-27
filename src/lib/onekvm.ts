@@ -314,7 +314,14 @@ class OneKVMTransport {
       }
     }
     if (audioEnabled) {
-      peer.addTransceiver('audio', { direction: 'recvonly' })
+      const audio = peer.addTransceiver('audio', { direction: 'sendrecv' })
+      try {
+        const microphone = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+        const track = microphone.getAudioTracks()[0]
+        if (track) await audio.sender.replaceTrack(track)
+      } catch {
+        // Speaker-only if the browser microphone is denied.
+      }
     }
     await peer.setLocalDescription(await peer.createOffer())
     await this.waitForCandidates(peer)

@@ -1241,6 +1241,15 @@ const zh = {
       collapse: '收起',
       expand: '展开'
     },
+    usbAudio: {
+      title: 'USB 音频',
+      enable: '提供给目标机',
+      hint: '目标机会出现扬声器（你能听到它）和麦克风（它能听到你）。只在需要时才挂上这张 USB 声卡。',
+      enableConfirm: '目标机将出现 USB 扬声器和麦克风。键盘和鼠标会短暂断开。',
+      confirm: '继续',
+      on: '开',
+      off: '关',
+    },
     virtualMedia: {
       title: '虚拟媒体',
       mounted: '虚拟媒体已挂载',

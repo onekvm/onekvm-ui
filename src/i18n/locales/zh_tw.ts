@@ -1246,6 +1246,15 @@ const zh_tw = {
       collapse: '收起',
       expand: '展開'
     },
+    usbAudio: {
+      title: 'USB 音訊',
+      enable: '提供給目標機',
+      hint: '目標機會出現揚聲器（你能聽到它）和麥克風（它能聽到你）。只在需要時才掛上這張 USB 音效卡。',
+      enableConfirm: '目標機將出現 USB 揚聲器和麥克風。鍵盤和滑鼠會短暫中斷。',
+      confirm: '繼續',
+      on: '開',
+      off: '關',
+    },
     virtualMedia: {
       title: '虛擬媒體',
       mounted: '虛擬媒體已掛載',

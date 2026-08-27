@@ -1242,6 +1242,15 @@ const en = {
       collapse: 'Collapse Menu',
       expand: 'Expand Menu'
     },
+    usbAudio: {
+      title: 'USB audio',
+      enable: 'Present to target',
+      hint: 'Adds a speaker so you can hear the target, and a microphone so the target can hear you. Attach the USB sound card only when you need it.',
+      enableConfirm: 'The target PC will get a USB speaker and microphone. Keyboard and mouse will disconnect briefly.',
+      confirm: 'Continue',
+      on: 'On',
+      off: 'Off',
+    },
     virtualMedia: {
       title: 'Virtual Media',
       mounted: 'Virtual Media Mounted',

@@ -881,26 +881,13 @@ export interface EDIDStatus {
     monitor_name?: string
     preferred?: { width: number; height: number; fps: number }
   }
-}
-
-export interface ContentLibraryFile {
-  id: string
-  name: string
-  size: number
-  extension: string
-  directory: string
-  kind: string
-  role?: string
-  writable: boolean
-}
-
-export interface ContentLibrary {
-  extension: string
-  id: string
-  kind: string
-  role?: string
-  writable: boolean
-  files: ContentLibraryFile[]
+  directories?: {
+    extension: string
+    id: string
+    role?: string
+    writable: boolean
+    files: { id: string; size: number }[]
+  }[]
 }
 
 export const api = {
@@ -946,12 +933,6 @@ export const api = {
       body: JSON.stringify(body),
     }),
   resetVideoEDID: () => request<{ status: string; apply_required: EDIDApplyRequired }>('/api/video/edid/reset', { method: 'POST' }),
-  getContentLibraries: (kind: string) => request<{ kind: string; libraries: ContentLibrary[] }>(`/api/libraries/${encodeURIComponent(kind)}`),
-  putContentLibraryFile: (kind: string, extension: string, directory: string, id: string, data: Blob) =>
-    request<{ status: string }>(`/api/libraries/${encodeURIComponent(kind)}/${encodeURIComponent(extension)}/${encodeURIComponent(directory)}/${encodeURIComponent(id)}`, {
-      method: 'PUT',
-      body: data,
-    }),
   getMJPEGStreamURL: () => `${serviceBaseUrl()}/api/stream`,
   getVideoWebSocketURL: () => serviceWebSocketURL('/api/stream/ws'),
   getHIDWebSocketURL: () => serviceWebSocketURL('/api/hid/ws'),

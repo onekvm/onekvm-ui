@@ -456,6 +456,10 @@ const en = {
           edidReboot: 'Restart the device to advertise the new EDID to the host.',
           edidPowerCycle: 'Power-cycle the device to advertise the new EDID.',
           edidRebootNow: 'Restart now',
+          edidPolicyNone: 'Writes take effect immediately.',
+          edidPolicyHotplug: 'Writes take effect with HDMI hotplug. No reboot.',
+          edidPolicyReboot: 'Writes take effect only after restarting this device.',
+          edidPolicyPowerCycle: 'Writes take effect only after power-cycling this device.',
           gopHint: 'Use 0 to select the keyframe interval automatically from the target frame rate.'
         },
         servicesPage: {

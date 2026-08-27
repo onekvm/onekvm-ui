@@ -2,32 +2,51 @@
 import { computed, onMounted, ref } from 'vue'
 import { useDialog, useMessage } from 'naive-ui'
 
-import { api, APIError, type ContentLibrary, type EDIDApplyRequired, type EDIDStatus } from '@/api/client'
+import { api, APIError, type EDIDApplyRequired, type EDIDStatus } from '@/api/client'
 import { t } from '@/i18n/runtime'
 
-const props = defineProps<{ disabled?: boolean }>()
+defineProps<{ disabled?: boolean }>()
 
 const message = useMessage()
 const dialog = useDialog()
 const status = ref<EDIDStatus | null>(null)
-const libraries = ref<ContentLibrary[]>([])
 const busy = ref(false)
 const selection = ref('')
 
-const options = computed(() => libraries.value.flatMap((library) =>
-  library.files.map((file) => ({
-    label: `${file.id} · ${library.extension}/${library.id}`,
-    value: `${library.extension}\0${library.id}\0${file.id}`,
+const options = computed(() => (status.value?.directories || []).flatMap((directory) =>
+  directory.files.map((file) => ({
+    label: `${file.id} · ${directory.extension}/${directory.id}`,
+    value: `${directory.extension}\0${directory.id}\0${file.id}`,
   })),
 ))
 
+const applyPolicy = computed(() => status.value?.apply_policy || 'none')
+const applyPolicyText = computed(() => {
+  switch (applyPolicy.value) {
+    case 'hotplug':
+      return t('settings.advancedSettings.displayPage.edidPolicyHotplug', 'Writes take effect with HDMI hotplug. No reboot.')
+    case 'reboot':
+      return t('settings.advancedSettings.displayPage.edidPolicyReboot', 'Writes take effect only after restarting this device.')
+    case 'power_cycle':
+      return t('settings.advancedSettings.displayPage.edidPolicyPowerCycle', 'Writes take effect only after power-cycling this device.')
+    default:
+      return t('settings.advancedSettings.displayPage.edidPolicyNone', 'Writes take effect immediately.')
+  }
+})
+const applyPolicyType = computed(() => {
+  switch (applyPolicy.value) {
+    case 'reboot':
+    case 'power_cycle':
+      return 'warning'
+    case 'hotplug':
+      return 'info'
+    default:
+      return 'success'
+  }
+})
+
 async function reload() {
-  const [edid, catalog] = await Promise.all([
-    api.getVideoEDID(),
-    api.getContentLibraries('edid').catch(() => ({ kind: 'edid', libraries: [] as ContentLibrary[] })),
-  ])
-  status.value = edid
-  libraries.value = catalog.libraries
+  status.value = await api.getVideoEDID()
 }
 
 async function applySelection() {
@@ -79,8 +98,10 @@ onMounted(() => {
       {{ status.summary?.preferred
         ? `${status.summary.preferred.width}×${status.summary.preferred.height}@${status.summary.preferred.fps}`
         : t('settings.advancedSettings.displayPage.edidUnknown', 'Current advertised mode is unavailable') }}
-      · {{ status.apply_policy }}
     </p>
+    <n-alert :type="applyPolicyType" :show-icon="false">
+      {{ applyPolicyText }}
+    </n-alert>
     <n-select
       v-model:value="selection"
       :options="options"

@@ -455,6 +455,10 @@ const zh_tw = {
           edidReboot: '需要重新啟動裝置後，新的 EDID 才會對被控主機生效。',
           edidPowerCycle: '需要為裝置斷電再上電，新的 EDID 才會對外生效。',
           edidRebootNow: '立即重新啟動',
+          edidPolicyNone: '寫入後立即對外生效。',
+          edidPolicyHotplug: '寫入後透過 HDMI 熱插拔生效，無需重新啟動。',
+          edidPolicyReboot: '寫入後必須重新啟動本機，新 EDID 才會對被控主機生效。',
+          edidPolicyPowerCycle: '寫入後必須為本機斷電再上電，新 EDID 才會對外生效。',
           gopHint: '設定為 0 時，將根據目標影格率自動選擇關鍵影格間隔。'
         },
         servicesPage: {

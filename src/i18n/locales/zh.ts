@@ -455,6 +455,10 @@ const zh = {
           edidReboot: '需要重启设备后，新的 EDID 才会对被控主机生效。',
           edidPowerCycle: '需要给设备断电再上电，新的 EDID 才会对外生效。',
           edidRebootNow: '立即重启',
+          edidPolicyNone: '写入后立即对外生效。',
+          edidPolicyHotplug: '写入后通过 HDMI 热插拔生效，无需重启。',
+          edidPolicyReboot: '写入后必须重启本机，新 EDID 才会对被控主机生效。',
+          edidPolicyPowerCycle: '写入后必须给本机断电再上电，新 EDID 才会对外生效。',
           gopHint: '设置为 0 时，将根据目标帧率自动选择关键帧间隔。'
         },
         servicesPage: {

@@ -15,6 +15,7 @@
     "test:overlay-drag": "node --experimental-strip-types tests/overlay-drag.test.ts",
     "test:video-stream-chart": "node --experimental-strip-types tests/video-stream-chart.test.ts",
     "test:video-transport": "node --experimental-strip-types tests/video-transport.test.ts",
+    "test:webrtc-opus-sdp": "node --experimental-strip-types tests/webrtc-opus-sdp.test.ts",
     "test:webrtc-playback-stats": "node --experimental-strip-types tests/webrtc-playback-stats.test.ts",
     "preview": "vite preview"
   },

@@ -15,6 +15,7 @@ import {
   type BrowserAudioStats,
   type BrowserVideoLatencyUs,
 } from '@/lib/webrtc-playback-stats'
+import { applyOpusStereoPreference } from '@/lib/webrtc-opus-sdp'
 
 export type ConnectionState =
   | 'idle'
@@ -304,7 +305,12 @@ class OneKVMTransport {
     }
 
     this.setState({ videoMode: 'webrtc', websocketFallbackAvailable })
-    await this.startWebRTC(codec, Boolean(status.audio.enabled), this.wantMicrophone)
+    await this.startWebRTC(
+      codec,
+      Boolean(status.audio.enabled),
+      this.wantMicrophone,
+      status.audio.channels === 'stereo',
+    )
   }
 
   sessionID() {
@@ -323,7 +329,7 @@ class OneKVMTransport {
     }
   }
 
-  private async startWebRTC(codec: string, speaker: boolean, microphone: boolean) {
+  private async startWebRTC(codec: string, speaker: boolean, microphone: boolean, stereo = false) {
 
     const peer = new RTCPeerConnection()
     const stream = new MediaStream()
@@ -393,7 +399,11 @@ class OneKVMTransport {
         }
       }
     }
-    await peer.setLocalDescription(await peer.createOffer())
+    const offer = await peer.createOffer()
+    if (speaker && stereo && offer.sdp) {
+      offer.sdp = applyOpusStereoPreference(offer.sdp, true)
+    }
+    await peer.setLocalDescription(offer)
     await this.waitForCandidates(peer)
 
     const answer = await api.createWebRTCSession(peer.localDescription?.sdp || '', microphone)

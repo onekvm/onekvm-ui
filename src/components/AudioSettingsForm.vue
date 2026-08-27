@@ -11,7 +11,7 @@ const audio = defineModel<OneKVMConfig['audio']>({ required: true })
 watch(() => audio.value, (value) => {
   if (!value) return
   if (!value.quality) value.quality = 'medium'
-  if (!value.channels) value.channels = 'stereo'
+  if (value.channels !== 'mono' && value.channels !== 'stereo') value.channels = 'stereo'
   if (!value.product_name) value.product_name = 'OneKVM Audio'
 }, { immediate: true })
 
@@ -24,7 +24,7 @@ const quality = computed({
 })
 const channels = computed({
   get: () => audio.value.channels || 'stereo',
-  set: (value: 'mono' | 'stereo' | 'surround51') => { audio.value.channels = value },
+  set: (value: 'mono' | 'stereo') => { audio.value.channels = value },
 })
 const productName = computed({
   get: () => audio.value.product_name || 'OneKVM Audio',
@@ -42,14 +42,13 @@ const qualityOptions = computed(() => [
 const channelOptions = computed(() => [
   { label: t('settings.advancedSettings.audioPage.mono', 'Mono'), value: 'mono' },
   { label: t('settings.advancedSettings.audioPage.stereo', 'Stereo'), value: 'stereo' },
-  { label: t('settings.advancedSettings.audioPage.surround51', '5.1 surround'), value: 'surround51' },
 ])
 </script>
 
 <template>
   <div class="audio-settings">
     <n-alert type="info" :bordered="false">
-      {{ t('settings.advancedSettings.audioPage.restartHint', 'Changing the sound card layout or name re-enumerates USB. Keyboard and mouse disconnect briefly if the speaker is on. The browser preview is mixed down to mono.') }}
+      {{ t('settings.advancedSettings.audioPage.restartHint', 'Changing channels re-enumerates USB. Keyboard and mouse disconnect briefly if the speaker is on. The browser preview is mixed down to mono. This UAC1 gadget supports mono and stereo; 5.1 needs a larger USB packet size in the kernel.') }}
     </n-alert>
 
     <section class="audio-settings-card">

@@ -124,7 +124,7 @@ export interface OneKVMConfig {
     device: string
     encoder: string
     quality?: 'low' | 'medium' | 'high'
-    channels?: 'mono' | 'stereo' | 'surround51'
+    channels?: 'mono' | 'stereo'
     product_name?: string
   }
   stream: { sink: string }

@@ -358,7 +358,7 @@ const en = {
           duration: 'Connected for',
         },
         audioPage: {
-          restartHint: 'Changing the sound card layout or name re-enumerates USB. Keyboard and mouse disconnect briefly if the speaker is on. The browser preview is mixed down to mono.',
+          restartHint: 'Changing channels re-enumerates USB. Keyboard and mouse disconnect briefly if the speaker is on. The browser preview is mixed down to mono. This gadget supports mono and stereo; 5.1 needs a larger USB packet in the kernel.',
           title: 'USB sound card',
           hint: 'These options apply to the USB speaker and microphone presented to the target PC.',
           quality: 'Quality',

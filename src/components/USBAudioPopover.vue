@@ -147,13 +147,8 @@ function requestMicrophone(value: boolean) {
 async function applySpeaker(value: boolean) {
   saving.value = true
   try {
-    if (value) {
-      onekvm.unlockAudio()
-      await api.patchConfig('audio.device', 'hw:UAC1Gadget,0')
-      await api.patchConfig('audio.encoder', 'opus')
-    }
+    if (value) onekvm.unlockAudio()
     await api.patchConfig('audio.enabled', String(value))
-    await onekvm.reconnect()
     if (value) onekvm.unlockAudio()
   } catch (error) {
     message.error(error instanceof Error ? error.message : String(error))
@@ -165,10 +160,6 @@ async function applySpeaker(value: boolean) {
 async function applyMicrophone(value: boolean) {
   saving.value = true
   try {
-    if (value) {
-      await api.patchConfig('audio.device', 'hw:UAC1Gadget,0')
-      await api.patchConfig('audio.encoder', 'opus')
-    }
     await onekvm.setMicrophone(value)
     if (value && !onekvm.microphoneGranted()) {
       message.warning(t('usbAudio.microphoneBusy', 'Another session already owns the USB microphone.'))

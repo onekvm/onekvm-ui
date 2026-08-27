@@ -73,6 +73,7 @@ class OneKVMTransport {
   private control: RTCDataChannel | null = null
   private stream: MediaStream | null = null
   private localAudio: MediaStream | null = null
+  private audioSender: RTCRtpSender | null = null
   private micContext: AudioContext | null = null
   private micGain: GainNode | null = null
   private micAnalyser: AnalyserNode | null = null
@@ -385,13 +386,40 @@ class OneKVMTransport {
 
   async setMicrophone(enabled: boolean) {
     this.wantMicrophone = enabled
-    if (!enabled) this.heldMicrophone = false
-    if (this.state.connection === 'connected' || this.state.connection === 'connecting') {
-      await this.reconnect()
+    if (!enabled) {
+      this.heldMicrophone = false
+      await this.audioSender?.replaceTrack(null).catch(() => undefined)
+      this.disposeLocalAudio()
+      if (this.sessionId) await api.setWebRTCMicrophone(this.sessionId, false).catch(() => undefined)
+      return
+    }
+    if (this.state.connection !== 'connected' && this.state.connection !== 'connecting') return
+    if (!this.sessionId || !this.audioSender) {
+      this.wantMicrophone = false
+      throw new Error('Microphone requires an active WebRTC session')
+    }
+    const result = await api.setWebRTCMicrophone(this.sessionId, true)
+    if (!result.microphone) {
+      this.wantMicrophone = false
+      this.heldMicrophone = false
+      return
+    }
+    try {
+      this.disposeLocalAudio()
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      this.localAudio = stream
+      const track = this.captureMicrophoneTrack(stream)
+      if (track) await this.audioSender.replaceTrack(track)
+      this.heldMicrophone = true
+    } catch {
+      this.disposeLocalAudio()
+      this.wantMicrophone = false
+      this.heldMicrophone = false
+      await api.setWebRTCMicrophone(this.sessionId, false).catch(() => undefined)
     }
   }
 
-  private async startWebRTC(codec: string, speaker: boolean, microphone: boolean, stereo = false) {
+  private async startWebRTC(codec: string, _speaker: boolean, microphone: boolean, stereo = false) {
 
     const peer = new RTCPeerConnection()
     const stream = new MediaStream()
@@ -446,23 +474,21 @@ class OneKVMTransport {
         // will actually negotiate.
       }
     }
-    if (speaker || microphone) {
-      const direction = microphone && speaker ? 'sendrecv' : microphone ? 'sendonly' : 'recvonly'
-      const audio = peer.addTransceiver('audio', { direction })
-      if (microphone) {
-        try {
-          this.disposeLocalAudio()
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-          this.localAudio = stream
-          const track = this.captureMicrophoneTrack(stream)
-          if (track) await audio.sender.replaceTrack(track)
-        } catch {
-          this.disposeLocalAudio()
-        }
+    const audio = peer.addTransceiver('audio', { direction: 'sendrecv' })
+    this.audioSender = audio.sender
+    if (microphone) {
+      try {
+        this.disposeLocalAudio()
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+        this.localAudio = stream
+        const track = this.captureMicrophoneTrack(stream)
+        if (track) await audio.sender.replaceTrack(track)
+      } catch {
+        this.disposeLocalAudio()
       }
     }
     const offer = await peer.createOffer()
-    if (speaker && stereo && offer.sdp) {
+    if (stereo && offer.sdp) {
       offer.sdp = applyOpusStereoPreference(offer.sdp, true)
     }
     await peer.setLocalDescription(offer)
@@ -675,6 +701,7 @@ class OneKVMTransport {
     this.emitBrowserLatency(emptyBrowserVideoLatency())
     this.emitAudioStats(emptyBrowserAudioStats())
     this.disposeLocalAudio()
+    this.audioSender = null
     this.control?.close()
     this.peer?.close()
     this.control = null

@@ -55,6 +55,7 @@ class OneKVMTransport {
   private peer: RTCPeerConnection | null = null
   private control: RTCDataChannel | null = null
   private stream: MediaStream | null = null
+  private localAudio: MediaStream | null = null
   private video: HTMLVideoElement | null = null
   private hidSocket: WebSocket | null = null
   private websocketVideo: WebSocketVideo | null = null
@@ -318,10 +319,13 @@ class OneKVMTransport {
     if (audioEnabled) {
       const audio = peer.addTransceiver('audio', { direction: 'sendrecv' })
       try {
+        this.disposeLocalAudio()
         const microphone = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+        this.localAudio = microphone
         const track = microphone.getAudioTracks()[0]
         if (track) await audio.sender.replaceTrack(track)
       } catch {
+        this.disposeLocalAudio()
         // Speaker-only if the browser microphone is denied.
       }
     }
@@ -461,6 +465,11 @@ class OneKVMTransport {
     })
   }
 
+  private disposeLocalAudio() {
+    this.localAudio?.getTracks().forEach((track) => track.stop())
+    this.localAudio = null
+  }
+
   private disposePeer() {
     window.clearInterval(this.statsTimer)
     window.clearTimeout(this.peerConnectTimer)
@@ -471,6 +480,7 @@ class OneKVMTransport {
     this.playbackStats.reset()
     this.emitVideoBitrate(0)
     this.emitBrowserLatency(emptyBrowserVideoLatency())
+    this.disposeLocalAudio()
     this.control?.close()
     this.peer?.close()
     this.control = null

@@ -7,8 +7,15 @@ export type ToolbarDockState = {
 }
 
 export const TOOLBAR_DOCK_KEY = 'onekvm-toolbar-dock'
-export const TOOLBAR_SNAP_PX = 72
+export const TOOLBAR_SNAP_HINT_PX = 72
+export const TOOLBAR_SNAP_PX = 16
 export const TOOLBAR_DRAG_THRESHOLD_PX = 8
+
+export type ToolbarSnapMode = 'place' | 'snap'
+export type ToolbarSnapPreview = {
+  dock: Exclude<ToolbarDock, 'float'>
+  mode: ToolbarSnapMode
+} | null
 
 const DOCKS: ToolbarDock[] = ['top', 'bottom', 'left', 'right', 'float']
 
@@ -92,6 +99,27 @@ export function snapToolbarDock(
   }
   if (dock === 'float') return { dock, ...clamped }
   return { dock, x: 0, y: 0 }
+}
+
+export function previewToolbarSnap(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  viewportWidth: number,
+  viewportHeight: number,
+  pointerX?: number,
+  pointerY?: number,
+): ToolbarSnapPreview {
+  const snap = snapToolbarDock(
+    x, y, width, height, viewportWidth, viewportHeight, TOOLBAR_SNAP_PX, pointerX, pointerY,
+  )
+  if (snap.dock !== 'float') return { dock: snap.dock, mode: 'snap' }
+  const hint = snapToolbarDock(
+    x, y, width, height, viewportWidth, viewportHeight, TOOLBAR_SNAP_HINT_PX, pointerX, pointerY,
+  )
+  if (hint.dock === 'float') return null
+  return { dock: hint.dock, mode: 'place' }
 }
 
 export function toolbarMenuPlacement(dock: ToolbarDock) {

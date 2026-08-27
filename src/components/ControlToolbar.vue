@@ -35,6 +35,7 @@ import { sendShortcut, shortcutChordLabel } from '@/lib/keyboard-shortcuts'
 import {
   clampToolbarPosition,
   parseToolbarDock,
+  previewToolbarSnap,
   snapToolbarDock,
   toolbarHandleVisible as handleVisibleForDock,
   toolbarMenuPlacement,
@@ -42,6 +43,7 @@ import {
   TOOLBAR_DRAG_THRESHOLD_PX,
   type ToolbarDock,
   type ToolbarDockState,
+  type ToolbarSnapPreview,
 } from '@/lib/toolbar-dock'
 
 import DisplaySettingsPopover from './DisplaySettingsPopover.vue'
@@ -117,7 +119,7 @@ const virtualMediaPopover = ref<{ restoreUploadDialog: () => void } | null>(null
 const toolbarEl = ref<HTMLElement | null>(null)
 const toolbarDock = ref<ToolbarDockState>(parseToolbarDock(localStorage.getItem(TOOLBAR_DOCK_KEY)))
 const toolbarDragging = ref(false)
-const toolbarSnapHint = ref<Exclude<ToolbarDock, 'float'> | null>(null)
+const toolbarSnapHint = ref<ToolbarSnapPreview>(null)
 let toolbarPointerId: number | null = null
 let toolbarGrab = { x: 0, y: 0 }
 let toolbarDragOffset = { x: 0, y: 0 }
@@ -170,18 +172,16 @@ function updateToolbarSnapHint(
   pointerX: number,
   pointerY: number,
 ) {
-  const snapped = snapToolbarDock(
+  toolbarSnapHint.value = previewToolbarSnap(
     x,
     y,
     width,
     height,
     window.innerWidth,
     window.innerHeight,
-    undefined,
     pointerX,
     pointerY,
   )
-  toolbarSnapHint.value = snapped.dock === 'float' ? null : snapped.dock
 }
 
 function applyToolbarDragPosition(clientX: number, clientY: number) {
@@ -743,13 +743,13 @@ onBeforeUnmount(() => {
               size="small"
               class="device-indicator"
               :data-state="audioState"
-              :aria-label="`${t('usbAudio.title', 'USB audio')}: ${audioStateLabel}`"
+              :aria-label="`${t('usbAudio.title', 'Audio')}: ${audioStateLabel}`"
             >
               <template #icon><Volume2 /></template>
               <span class="device-led" />
             </n-button>
           </template>
-          {{ t('usbAudio.title', 'USB audio') }}: {{ audioStateLabel }}
+          {{ t('usbAudio.title', 'Audio') }}: {{ audioStateLabel }}
         </n-tooltip>
       </USBAudioPopover>
 
@@ -885,7 +885,7 @@ onBeforeUnmount(() => {
     <div
       v-if="toolbarSnapHint"
       class="toolbar-snap-preview"
-      :class="`is-${toolbarSnapHint}`"
+      :class="[`is-${toolbarSnapHint.dock}`, `is-${toolbarSnapHint.mode}`]"
       aria-hidden="true"
     />
   </Teleport>

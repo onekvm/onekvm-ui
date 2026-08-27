@@ -54,12 +54,31 @@ type KeyboardLEDListener = (state: KeyboardLEDState) => void
 
 const clampInt8 = (value: number) => Math.max(-127, Math.min(127, Math.round(value)))
 const clampAbsolute = (value: number) => Math.max(0, Math.min(0x7fff, Math.round(value)))
+const SPEAKER_VOLUME_KEY = 'onekvm-speaker-volume'
+const MICROPHONE_VOLUME_KEY = 'onekvm-microphone-volume'
+
+function clampVolume(value: number) {
+  if (!Number.isFinite(value)) return 1
+  return Math.min(1, Math.max(0, value))
+}
+
+function readStoredVolume(key: string) {
+  const stored = localStorage.getItem(key)
+  if (stored == null || stored === '') return 1
+  return clampVolume(Number(stored))
+}
 
 class OneKVMTransport {
   private peer: RTCPeerConnection | null = null
   private control: RTCDataChannel | null = null
   private stream: MediaStream | null = null
   private localAudio: MediaStream | null = null
+  private micContext: AudioContext | null = null
+  private micGain: GainNode | null = null
+  private micAnalyser: AnalyserNode | null = null
+  private micDestination: MediaStreamAudioDestinationNode | null = null
+  private speakerVolume = readStoredVolume(SPEAKER_VOLUME_KEY)
+  private microphoneVolume = readStoredVolume(MICROPHONE_VOLUME_KEY)
   private wantMicrophone = false
   private heldMicrophone = false
   private video: HTMLVideoElement | null = null
@@ -137,7 +156,7 @@ class OneKVMTransport {
     this.audio = audio
     audio.autoplay = true
     audio.muted = false
-    audio.volume = 1
+    audio.volume = this.speakerVolume
     this.ensureUnlockAudioListener()
     if (this.stream) this.play(this.stream)
     return () => {
@@ -145,10 +164,53 @@ class OneKVMTransport {
     }
   }
 
+  speakerGain() {
+    return this.speakerVolume
+  }
+
+  setSpeakerGain(value: number) {
+    this.speakerVolume = clampVolume(value)
+    localStorage.setItem(SPEAKER_VOLUME_KEY, String(this.speakerVolume))
+    if (this.audio) this.audio.volume = this.speakerVolume
+  }
+
+  microphoneGain() {
+    return this.microphoneVolume
+  }
+
+  setMicrophoneGain(value: number) {
+    this.microphoneVolume = clampVolume(value)
+    localStorage.setItem(MICROPHONE_VOLUME_KEY, String(this.microphoneVolume))
+    if (this.micGain) this.micGain.gain.value = this.microphoneVolume
+  }
+
+  microphoneAnalyser() {
+    return this.micAnalyser
+  }
+
+  playMicrophoneTestTone() {
+    const context = this.micContext
+    const output = this.micGain ?? this.micDestination
+    if (!context || !output) return false
+    const oscillator = context.createOscillator()
+    const tone = context.createGain()
+    oscillator.frequency.value = 880
+    tone.gain.value = 0.22
+    oscillator.connect(tone)
+    tone.connect(output)
+    oscillator.start()
+    oscillator.stop(context.currentTime + 0.55)
+    oscillator.onended = () => {
+      oscillator.disconnect()
+      tone.disconnect()
+    }
+    return true
+  }
+
   unlockAudio() {
     if (!this.audio) return
     this.audio.muted = false
-    this.audio.volume = 1
+    this.audio.volume = this.speakerVolume
     if (!this.audio.srcObject && !this.audio.getAttribute('src')) {
       // 1-sample silent WAV so the click gesture actually starts playback
       // before WebRTC attaches a live track after reconnect().
@@ -392,7 +454,7 @@ class OneKVMTransport {
           this.disposeLocalAudio()
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
           this.localAudio = stream
-          const track = stream.getAudioTracks()[0]
+          const track = this.captureMicrophoneTrack(stream)
           if (track) await audio.sender.replaceTrack(track)
         } catch {
           this.disposeLocalAudio()
@@ -564,9 +626,41 @@ class OneKVMTransport {
     })
   }
 
+  private captureMicrophoneTrack(stream: MediaStream) {
+    const raw = stream.getAudioTracks()[0]
+    if (!raw) return null
+    const AudioContextCtor = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!AudioContextCtor) return raw
+    const context = new AudioContextCtor()
+    const source = context.createMediaStreamSource(stream)
+    const gain = context.createGain()
+    const analyser = context.createAnalyser()
+    const destination = context.createMediaStreamDestination()
+    gain.gain.value = this.microphoneVolume
+    analyser.fftSize = 256
+    source.connect(gain)
+    gain.connect(analyser)
+    gain.connect(destination)
+    this.micContext = context
+    this.micGain = gain
+    this.micAnalyser = analyser
+    this.micDestination = destination
+    void context.resume().catch(() => undefined)
+    return destination.stream.getAudioTracks()[0] ?? raw
+  }
+
   private disposeLocalAudio() {
     this.localAudio?.getTracks().forEach((track) => track.stop())
     this.localAudio = null
+    this.micDestination?.stream.getTracks().forEach((track) => track.stop())
+    this.micGain?.disconnect()
+    this.micAnalyser?.disconnect()
+    this.micDestination?.disconnect()
+    void this.micContext?.close().catch(() => undefined)
+    this.micContext = null
+    this.micGain = null
+    this.micAnalyser = null
+    this.micDestination = null
   }
 
   private disposePeer() {

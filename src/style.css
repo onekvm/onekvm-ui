@@ -258,6 +258,16 @@ select { font: inherit; }
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 8%);
 }
 
+.toolbar-snap-preview.is-place {
+  border-style: dashed;
+  background: rgb(22 119 255 / 7%);
+  box-shadow: none;
+}
+
+.toolbar-snap-preview.is-snap {
+  border-style: solid;
+}
+
 .toolbar-snap-preview.is-top {
   top: 6px;
   right: 6px;
@@ -846,6 +856,40 @@ select { font: inherit; }
   color: #8f99a3;
   font-size: 11px;
   line-height: 1.45;
+}
+
+.usb-audio-slider {
+  width: 128px;
+  flex: 1 1 auto;
+}
+
+.usb-audio-debug {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgb(58 66 74 / 72%);
+}
+
+.usb-audio-debug-title {
+  color: #c5ced6;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.usb-audio-meter {
+  display: block;
+  height: 7px;
+  flex: 1 1 auto;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgb(28 34 40);
+}
+
+.usb-audio-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #3dd68c;
 }
 
 .display-status-values .display-status-select {

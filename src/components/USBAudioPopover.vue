@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useDialog, useMessage } from 'naive-ui'
 
 import { api, type ConfigSchema, type OneKVMStatus } from '@/api/client'
@@ -20,6 +20,11 @@ const message = useMessage()
 const popoverOpen = ref(false)
 const saving = ref(false)
 const schema = ref<ConfigSchema | null>(null)
+const speakerVolume = ref(Math.round(onekvm.speakerGain() * 100))
+const microphoneVolume = ref(Math.round(onekvm.microphoneGain() * 100))
+const microphoneLevel = ref(0)
+let levelTimer = 0
+const levelSamples = new Uint8Array(256)
 
 const audioAvailable = computed(() => schema.value?.capabilities?.audio === true)
 const speakerOn = computed(() => Boolean(props.status?.audio.enabled))
@@ -32,6 +37,13 @@ const microphoneBusy = computed(() => {
 watch(popoverOpen, (open) => {
   if (open) onekvm.unlockAudio()
   if (open && !schema.value) void loadSchema()
+  if (open) startLevelMeter()
+  else stopLevelMeter()
+})
+
+watch(microphoneOn, (enabled) => {
+  if (!enabled) microphoneLevel.value = 0
+  if (popoverOpen.value) startLevelMeter()
 })
 
 void loadSchema()
@@ -47,6 +59,49 @@ async function loadSchema() {
 function updateShow(open: boolean) {
   popoverOpen.value = open
   emit('update:show', open)
+}
+
+function updateSpeakerVolume(value: number) {
+  speakerVolume.value = value
+  onekvm.setSpeakerGain(value / 100)
+}
+
+function updateMicrophoneVolume(value: number) {
+  microphoneVolume.value = value
+  onekvm.setMicrophoneGain(value / 100)
+}
+
+function startLevelMeter() {
+  stopLevelMeter()
+  if (!popoverOpen.value) return
+  const tick = () => {
+    const analyser = onekvm.microphoneAnalyser()
+    if (!analyser) {
+      microphoneLevel.value = 0
+      levelTimer = window.setTimeout(tick, 80)
+      return
+    }
+    analyser.getByteTimeDomainData(levelSamples)
+    let sum = 0
+    for (const sample of levelSamples) {
+      const centered = (sample - 128) / 128
+      sum += centered * centered
+    }
+    microphoneLevel.value = Math.min(1, Math.sqrt(sum / levelSamples.length) * 3.2)
+    levelTimer = window.setTimeout(tick, 80)
+  }
+  tick()
+}
+
+function stopLevelMeter() {
+  window.clearTimeout(levelTimer)
+  levelTimer = 0
+}
+
+function playMicTest() {
+  if (!onekvm.playMicrophoneTestTone()) {
+    message.warning(t('usbAudio.micTestFailed', 'Turn on the microphone first.'))
+  }
 }
 
 function confirmGadgetChange(title: string, content: string, apply: () => Promise<void>) {
@@ -124,6 +179,8 @@ async function applyMicrophone(value: boolean) {
     saving.value = false
   }
 }
+
+onBeforeUnmount(stopLevelMeter)
 </script>
 
 <template>
@@ -140,12 +197,24 @@ async function applyMicrophone(value: boolean) {
     <template #trigger><slot /></template>
     <div class="display-status-popover">
       <header class="control-popover-header">
-        <strong>{{ t('usbAudio.title', 'USB audio') }}</strong>
+        <strong>{{ t('usbAudio.title', 'Audio') }}</strong>
       </header>
       <div class="display-status-values">
         <div>
           <span>{{ t('usbAudio.speaker', 'Speaker') }}</span>
           <n-switch size="small" :value="speakerOn" :disabled="saving" @update:value="requestSpeaker" />
+        </div>
+        <div>
+          <span>{{ t('usbAudio.volume', 'Volume') }}</span>
+          <n-slider
+            class="usb-audio-slider"
+            :value="speakerVolume"
+            :min="0"
+            :max="100"
+            :step="1"
+            :disabled="!speakerOn"
+            @update:value="updateSpeakerVolume"
+          />
         </div>
         <div>
           <span>{{ t('usbAudio.microphone', 'Microphone') }}</span>
@@ -155,6 +224,35 @@ async function applyMicrophone(value: boolean) {
             :disabled="saving || microphoneBusy"
             @update:value="requestMicrophone"
           />
+        </div>
+      </div>
+      <div class="usb-audio-debug">
+        <div class="usb-audio-debug-title">{{ t('usbAudio.micDebug', 'Microphone debug') }}</div>
+        <div class="display-status-values">
+          <div>
+            <span>{{ t('usbAudio.micVolume', 'Microphone volume') }}</span>
+            <n-slider
+              class="usb-audio-slider"
+              :value="microphoneVolume"
+              :min="0"
+              :max="100"
+              :step="1"
+              :disabled="!microphoneOn"
+              @update:value="updateMicrophoneVolume"
+            />
+          </div>
+          <div>
+            <span>{{ t('usbAudio.micLevel', 'Input level') }}</span>
+            <span class="usb-audio-meter" aria-hidden="true">
+              <span :style="{ width: `${Math.round(microphoneLevel * 100)}%` }" />
+            </span>
+          </div>
+          <div>
+            <span />
+            <n-button size="tiny" :disabled="!microphoneOn || saving" @click="playMicTest">
+              {{ t('usbAudio.micTest', 'Play test tone') }}
+            </n-button>
+          </div>
         </div>
       </div>
       <p class="usb-audio-hint">

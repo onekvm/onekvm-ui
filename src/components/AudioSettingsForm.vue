@@ -53,8 +53,8 @@ const channelOptions = computed(() => [
 
     <section class="audio-settings-card">
       <header>
-        <h2>{{ t('settings.advancedSettings.audioPage.title', 'USB sound card') }}</h2>
-        <p>{{ t('settings.advancedSettings.audioPage.hint', 'These options apply to the USB speaker and microphone presented to the target PC.') }}</p>
+        <h2>{{ t('settings.advancedSettings.audioPage.title', 'Audio') }}</h2>
+        <p>{{ t('settings.advancedSettings.audioPage.hint', 'These options apply to the speaker and microphone presented to the target PC.') }}</p>
       </header>
       <n-form label-placement="top" :show-feedback="false" class="audio-settings-grid">
         <n-form-item :label="t('settings.advancedSettings.audioPage.quality', 'Quality')">

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   clampToolbarPosition,
   parseToolbarDock,
+  previewToolbarSnap,
   snapToolbarDock,
   toolbarHandleVisible,
   toolbarMenuPlacement,
@@ -30,7 +31,7 @@ assert.equal(bottom.dock, 'bottom')
 const left = snapToolbarDock(8, 120, 420, 42, 1280, 800)
 assert.equal(left.dock, 'left')
 
-const right = snapToolbarDock(860, 120, 400, 42, 1280, 800)
+const right = snapToolbarDock(872, 120, 400, 42, 1280, 800)
 assert.equal(right.dock, 'right')
 
 const floating = snapToolbarDock(200, 200, 400, 42, 1280, 800)
@@ -38,11 +39,19 @@ assert.equal(floating.dock, 'float')
 assert.equal(floating.x, 200)
 assert.equal(floating.y, 200)
 
-const restoreTop = snapToolbarDock(200, 120, 400, 42, 1280, 800, undefined, 640, 24)
+const nearEdge = snapToolbarDock(80, 40, 400, 42, 1280, 800)
+assert.equal(nearEdge.dock, 'float')
+assert.equal(nearEdge.y, 40)
+
+const restoreTop = snapToolbarDock(200, 120, 400, 42, 1280, 800, undefined, 640, 8)
 assert.equal(restoreTop.dock, 'top')
 
 const keepFloat = snapToolbarDock(200, 120, 400, 42, 1280, 800, undefined, 640, 300)
 assert.equal(keepFloat.dock, 'float')
+
+assert.deepEqual(previewToolbarSnap(80, 10, 400, 42, 1280, 800), { dock: 'top', mode: 'snap' })
+assert.deepEqual(previewToolbarSnap(80, 40, 400, 42, 1280, 800), { dock: 'top', mode: 'place' })
+assert.equal(previewToolbarSnap(200, 200, 400, 42, 1280, 800), null)
 
 assert.equal(toolbarMenuPlacement('top'), 'bottom-end')
 assert.equal(toolbarMenuPlacement('float'), 'bottom-end')

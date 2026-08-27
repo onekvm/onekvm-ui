@@ -22,7 +22,12 @@ const saving = ref(false)
 const schema = ref<ConfigSchema | null>(null)
 
 const audioAvailable = computed(() => schema.value?.capabilities?.audio === true)
-const enabled = computed(() => Boolean(props.status?.audio.enabled))
+const speakerOn = computed(() => Boolean(props.status?.audio.enabled))
+const microphoneOn = computed(() => Boolean(props.status?.audio.microphone && onekvm.microphoneGranted()))
+const microphoneBusy = computed(() => {
+  const owner = props.status?.audio.microphone_session
+  return Boolean(owner && owner !== onekvm.sessionID())
+})
 
 watch(popoverOpen, (open) => {
   if (open && !schema.value) void loadSchema()
@@ -43,22 +48,47 @@ function updateShow(open: boolean) {
   emit('update:show', open)
 }
 
-function requestToggle(value: boolean) {
-  if (value === enabled.value || saving.value) return
-  if (!value) {
-    void applyAudio(false)
-    return
-  }
+function confirmGadgetChange(title: string, content: string, apply: () => Promise<void>) {
   dialog.warning({
-    title: t('usbAudio.title', 'USB audio'),
-    content: t('usbAudio.enableConfirm', 'The target PC will get a USB speaker and microphone. Keyboard and mouse will disconnect briefly.'),
+    title,
+    content,
     positiveText: t('usbAudio.confirm', 'Continue'),
     negativeText: t('common.cancel', 'Cancel'),
-    onPositiveClick: () => applyAudio(true),
+    onPositiveClick: () => apply(),
   })
 }
 
-async function applyAudio(value: boolean) {
+function requestSpeaker(value: boolean) {
+  if (value === speakerOn.value || saving.value) return
+  if (!value) {
+    void applySpeaker(false)
+    return
+  }
+  confirmGadgetChange(
+    t('usbAudio.speaker', 'Speaker'),
+    t('usbAudio.speakerConfirm', 'The target PC will get a USB speaker. Keyboard and mouse will disconnect briefly.'),
+    () => applySpeaker(true),
+  )
+}
+
+function requestMicrophone(value: boolean) {
+  if (value === microphoneOn.value || saving.value) return
+  if (value && microphoneBusy.value) {
+    message.warning(t('usbAudio.microphoneBusy', 'Another session already owns the USB microphone.'))
+    return
+  }
+  if (!value) {
+    void applyMicrophone(false)
+    return
+  }
+  confirmGadgetChange(
+    t('usbAudio.microphone', 'Microphone'),
+    t('usbAudio.microphoneConfirm', 'This session will exclusively use the USB microphone. Keyboard and mouse may disconnect briefly.'),
+    () => applyMicrophone(true),
+  )
+}
+
+async function applySpeaker(value: boolean) {
   saving.value = true
   try {
     if (value) {
@@ -67,6 +97,24 @@ async function applyAudio(value: boolean) {
     }
     await api.patchConfig('audio.enabled', String(value))
     await onekvm.reconnect()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : String(error))
+  } finally {
+    saving.value = false
+  }
+}
+
+async function applyMicrophone(value: boolean) {
+  saving.value = true
+  try {
+    if (value) {
+      await api.patchConfig('audio.device', 'hw:UAC1Gadget,0')
+      await api.patchConfig('audio.encoder', 'pcmu')
+    }
+    await onekvm.setMicrophone(value)
+    if (value && !onekvm.microphoneGranted()) {
+      message.warning(t('usbAudio.microphoneBusy', 'Another session already owns the USB microphone.'))
+    }
   } catch (error) {
     message.error(error instanceof Error ? error.message : String(error))
   } finally {
@@ -93,12 +141,23 @@ async function applyAudio(value: boolean) {
       </header>
       <div class="display-status-values">
         <div>
-          <span>{{ t('usbAudio.enable', 'Present to target') }}</span>
-          <n-switch size="small" :value="enabled" :disabled="saving" @update:value="requestToggle" />
+          <span>{{ t('usbAudio.speaker', 'Speaker') }}</span>
+          <n-switch size="small" :value="speakerOn" :disabled="saving" @update:value="requestSpeaker" />
+        </div>
+        <div>
+          <span>{{ t('usbAudio.microphone', 'Microphone') }}</span>
+          <n-switch
+            size="small"
+            :value="microphoneOn"
+            :disabled="saving || microphoneBusy"
+            @update:value="requestMicrophone"
+          />
         </div>
       </div>
       <p class="usb-audio-hint">
-        {{ t('usbAudio.hint', 'Adds a speaker (hear the target) and a microphone (talk to the target). Only attach the USB sound card when you need it.') }}
+        {{ microphoneBusy
+          ? t('usbAudio.microphoneBusy', 'Another session already owns the USB microphone.')
+          : t('usbAudio.hint', 'Speaker lets you hear the target. Microphone is exclusive to this session.') }}
       </p>
     </div>
   </n-popover>

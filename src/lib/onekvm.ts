@@ -56,6 +56,8 @@ class OneKVMTransport {
   private control: RTCDataChannel | null = null
   private stream: MediaStream | null = null
   private localAudio: MediaStream | null = null
+  private wantMicrophone = false
+  private heldMicrophone = false
   private video: HTMLVideoElement | null = null
   private hidSocket: WebSocket | null = null
   private websocketVideo: WebSocketVideo | null = null
@@ -259,10 +261,26 @@ class OneKVMTransport {
     }
 
     this.setState({ videoMode: 'webrtc', websocketFallbackAvailable })
-    await this.startWebRTC(codec, status.audio.enabled)
+    await this.startWebRTC(codec, Boolean(status.audio.enabled), this.wantMicrophone)
   }
 
-  private async startWebRTC(codec: string, audioEnabled: boolean) {
+  sessionID() {
+    return this.sessionId
+  }
+
+  microphoneGranted() {
+    return this.heldMicrophone
+  }
+
+  async setMicrophone(enabled: boolean) {
+    this.wantMicrophone = enabled
+    if (!enabled) this.heldMicrophone = false
+    if (this.state.connection === 'connected' || this.state.connection === 'connecting') {
+      await this.reconnect()
+    }
+  }
+
+  private async startWebRTC(codec: string, speaker: boolean, microphone: boolean) {
 
     const peer = new RTCPeerConnection()
     const stream = new MediaStream()
@@ -316,24 +334,31 @@ class OneKVMTransport {
         // will actually negotiate.
       }
     }
-    if (audioEnabled) {
-      const audio = peer.addTransceiver('audio', { direction: 'sendrecv' })
-      try {
-        this.disposeLocalAudio()
-        const microphone = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-        this.localAudio = microphone
-        const track = microphone.getAudioTracks()[0]
-        if (track) await audio.sender.replaceTrack(track)
-      } catch {
-        this.disposeLocalAudio()
-        // Speaker-only if the browser microphone is denied.
+    if (speaker || microphone) {
+      const direction = microphone && speaker ? 'sendrecv' : microphone ? 'sendonly' : 'recvonly'
+      const audio = peer.addTransceiver('audio', { direction })
+      if (microphone) {
+        try {
+          this.disposeLocalAudio()
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+          this.localAudio = stream
+          const track = stream.getAudioTracks()[0]
+          if (track) await audio.sender.replaceTrack(track)
+        } catch {
+          this.disposeLocalAudio()
+        }
       }
     }
     await peer.setLocalDescription(await peer.createOffer())
     await this.waitForCandidates(peer)
 
-    const answer = await api.createWebRTCSession(peer.localDescription?.sdp || '')
+    const answer = await api.createWebRTCSession(peer.localDescription?.sdp || '', microphone)
     this.sessionId = answer.session_id
+    this.heldMicrophone = Boolean(answer.microphone)
+    if (microphone && !this.heldMicrophone) {
+      this.wantMicrophone = false
+      this.disposeLocalAudio()
+    }
     await peer.setRemoteDescription({ type: 'answer', sdp: answer.sdp })
     this.startVideoStats(peer)
     window.clearTimeout(this.peerConnectTimer)

@@ -364,10 +364,17 @@ const powerStateLabel = computed(() => {
   return t('power.title', 'Power')
 })
 
-const audioState = computed<DeviceState>(() => (props.status?.audio.enabled ? 'ready' : 'waiting'))
-const audioStateLabel = computed(() =>
-  props.status?.audio.enabled ? t('usbAudio.on', 'On') : t('usbAudio.off', 'Off'),
+const audioState = computed<DeviceState>(() =>
+  props.status?.audio.enabled || props.status?.audio.microphone ? 'ready' : 'waiting',
 )
+const audioStateLabel = computed(() => {
+  const speaker = props.status?.audio.enabled
+  const microphone = props.status?.audio.microphone
+  if (speaker && microphone) return `${t('usbAudio.speaker', 'Speaker')} + ${t('usbAudio.microphone', 'Microphone')}`
+  if (speaker) return t('usbAudio.speaker', 'Speaker')
+  if (microphone) return t('usbAudio.microphone', 'Microphone')
+  return t('usbAudio.off', 'Off')
+})
 
 const mediaState = computed<DeviceState>(() => {
   if (!props.msdStatus) return 'waiting'

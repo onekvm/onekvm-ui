@@ -249,6 +249,8 @@ export interface OneKVMStatus {
   }
   audio: {
     enabled: boolean
+    microphone?: boolean
+    microphone_session?: string
     device: string
     encoder: string
   }
@@ -393,6 +395,7 @@ export interface WebRTCAnswer {
   sdp: string
   type: string
   session_id: string
+  microphone?: boolean
 }
 
 export interface AuthStatus {
@@ -1073,10 +1076,10 @@ export const api = {
     }),
   removeExtension: (id: string) =>
     request<{ status: string }>(`/api/extensions/${id}`, { method: 'DELETE' }),
-  createWebRTCSession: (sdp: string) =>
+  createWebRTCSession: (sdp: string, microphone = false) =>
     request<WebRTCAnswer>('/api/webrtc/offer', {
       method: 'POST',
-      body: JSON.stringify({ type: 'offer', sdp }),
+      body: JSON.stringify({ type: 'offer', sdp, microphone }),
     }),
   closeWebRTCSession: (sessionId: string, keepalive = false) =>
     request<{ status: string }>('/api/webrtc/close', {

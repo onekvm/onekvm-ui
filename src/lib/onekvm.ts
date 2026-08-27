@@ -87,6 +87,7 @@ class OneKVMTransport {
   private statsTimer = 0
   private peerConnectTimer = 0
   private peerDisconnectTimer = 0
+  private unlockAudioListener: (() => void) | null = null
 
   subscribe(listener: StateListener) {
     this.listeners.add(listener)
@@ -136,6 +137,7 @@ class OneKVMTransport {
     audio.autoplay = true
     audio.muted = false
     audio.volume = 1
+    this.ensureUnlockAudioListener()
     if (this.stream) this.play(this.stream)
     return () => {
       if (this.audio === audio) this.audio = null
@@ -145,12 +147,19 @@ class OneKVMTransport {
   unlockAudio() {
     if (!this.audio) return
     this.audio.muted = false
+    this.audio.volume = 1
     if (!this.audio.srcObject && !this.audio.getAttribute('src')) {
       // 1-sample silent WAV so the click gesture actually starts playback
       // before WebRTC attaches a live track after reconnect().
       this.audio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA'
     }
     void this.audio.play().catch(() => undefined)
+  }
+
+  private ensureUnlockAudioListener() {
+    if (this.unlockAudioListener) return
+    this.unlockAudioListener = () => this.unlockAudio()
+    window.addEventListener('pointerdown', this.unlockAudioListener, true)
   }
 
   connect() {
@@ -331,6 +340,7 @@ class OneKVMTransport {
         window.clearTimeout(this.peerConnectTimer)
         window.clearTimeout(this.peerDisconnectTimer)
         this.setState({ connection, error: '', errorKind: '', websocketFallbackOffered: false })
+        this.unlockAudio()
       } else if (connection === 'failed') {
         this.failWebRTC('WebRTC connection failed')
       } else if (connection === 'disconnected') {
@@ -449,8 +459,7 @@ class OneKVMTransport {
       this.audio.removeAttribute('src')
       this.audio.srcObject = new MediaStream([audioTrack])
     }
-    this.audio.muted = false
-    void this.audio.play().catch(() => undefined)
+    this.unlockAudio()
   }
 
   private send(report: Uint8Array) {

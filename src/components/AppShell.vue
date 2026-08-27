@@ -357,6 +357,7 @@ onBeforeUnmount(() => {
       ref="consoleWorkspace"
       class="console-workspace"
       :class="toolbarWorkspaceClass(toolbarDock)"
+      @pointerdown.capture="onekvm.unlockAudio()"
     >
         <ControlToolbar
           :state="state"

@@ -3,6 +3,7 @@
   --win11-ease-in: cubic-bezier(0.4, 0, 1, 1);
   --win11-enter: 250ms;
   --win11-exit: 167ms;
+  --onekvm-toolbar-rail: 80px;
   --onekvm-font-mono:
     ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-family:
@@ -60,13 +61,13 @@ select { font: inherit; }
 
 .console-workspace.toolbar-dock-left {
   grid-template-areas: "toolbar stage";
-  grid-template-columns: 48px minmax(0, 1fr);
+  grid-template-columns: var(--onekvm-toolbar-rail) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
 }
 
 .console-workspace.toolbar-dock-right {
   grid-template-areas: "stage toolbar";
-  grid-template-columns: minmax(0, 1fr) 48px;
+  grid-template-columns: minmax(0, 1fr) var(--onekvm-toolbar-rail);
   grid-template-rows: minmax(0, 1fr);
 }
 
@@ -158,9 +159,9 @@ select { font: inherit; }
 .toolbar.is-docked-right {
   z-index: 40;
   flex-direction: column;
-  width: 48px;
+  width: var(--onekvm-toolbar-rail);
   height: 100%;
-  padding: 8px 0;
+  padding: 8px 6px;
   border-bottom: 0;
 }
 
@@ -199,21 +200,33 @@ select { font: inherit; }
 }
 .toolbar.is-vertical .brand { min-width: 0; }
 .toolbar.is-vertical .device-controls,
-.toolbar.is-vertical .toolbar-actions,
-.toolbar.is-vertical .toolbar-account {
-  flex-direction: column;
+.toolbar.is-vertical .toolbar-actions {
+  display: grid;
+  grid-template-columns: 30px 30px;
+  justify-content: center;
   align-items: center;
   width: 100%;
   height: auto;
   margin: 0;
   padding: 0;
   border: 0;
+  gap: 4px;
 }
 
 .toolbar.is-vertical .toolbar-actions,
 .toolbar.is-vertical .toolbar-account {
   padding-top: 7px;
   border-top: 1px solid #343a42;
+}
+
+.toolbar.is-vertical .toolbar-account {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  height: auto;
+  margin: 0;
+  border-left: 0;
+  padding-left: 0;
 }
 
 .toolbar.is-vertical .account-button {
@@ -263,14 +276,14 @@ select { font: inherit; }
   top: 6px;
   bottom: 6px;
   left: 6px;
-  width: 48px;
+  width: var(--onekvm-toolbar-rail);
 }
 
 .toolbar-snap-preview.is-right {
   top: 6px;
   right: 6px;
   bottom: 6px;
-  width: 48px;
+  width: var(--onekvm-toolbar-rail);
 }
 
 .brand {

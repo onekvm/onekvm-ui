@@ -4,6 +4,7 @@ import {
   clampToolbarPosition,
   parseToolbarDock,
   snapToolbarDock,
+  toolbarHandleVisible,
   toolbarMenuPlacement,
   toolbarWorkspaceClass,
 } from '../src/lib/toolbar-dock.ts'
@@ -54,5 +55,11 @@ assert.equal(toolbarWorkspaceClass('bottom'), 'toolbar-dock-bottom')
 assert.equal(toolbarWorkspaceClass('left'), 'toolbar-dock-left')
 assert.equal(toolbarWorkspaceClass('right'), 'toolbar-dock-right')
 assert.equal(toolbarWorkspaceClass('float'), 'toolbar-overlay')
+
+assert.equal(toolbarHandleVisible('top', false), false)
+assert.equal(toolbarHandleVisible('left', false), false)
+assert.equal(toolbarHandleVisible('top', true), true)
+assert.equal(toolbarHandleVisible('left', true), true)
+assert.equal(toolbarHandleVisible('float', false), true)
 
 console.log('toolbar-dock tests passed')

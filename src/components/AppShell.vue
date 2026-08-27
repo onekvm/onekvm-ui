@@ -471,10 +471,9 @@ onBeforeUnmount(() => {
           </template>
         </n-modal>
 
-        <AccountDrawer v-if="accountOpen" v-model:show="accountOpen" />
+        <AccountDrawer v-model:show="accountOpen" />
         <VirtualKeyboard v-if="virtualKeyboardOpen" v-model:show="virtualKeyboardOpen" :layout="keyboardLayout" />
         <KeyboardShortcutDrawer
-          v-if="shortcutDialogOpen"
           v-model:show="shortcutDialogOpen"
           :shortcuts="userShortcuts"
           @save="updateUserShortcuts"

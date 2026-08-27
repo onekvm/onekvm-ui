@@ -107,3 +107,7 @@ export function toolbarWorkspaceClass(dock: ToolbarDock) {
   if (dock === 'float') return 'toolbar-overlay'
   return `toolbar-dock-${dock}`
 }
+
+export function toolbarHandleVisible(dock: ToolbarDock, dragging: boolean) {
+  return dragging || dock === 'float'
+}

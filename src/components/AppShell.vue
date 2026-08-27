@@ -106,6 +106,13 @@ let unsubscribeKeyboardLED: (() => void) | undefined
 let unsubscribeStatus: (() => void) | undefined
 
 const consoleHostname = computed(() => status.value?.network.hostname || auth.hostname)
+const audioOverlayChannels = computed(() => {
+  const stream = status.value?.audio.stream_channels || 0
+  if (stream > 0) return stream
+  if (status.value?.audio.channels === 'mono') return 1
+  if (status.value?.audio.channels === 'stereo') return 2
+  return 0
+})
 const keyboardBlocked = computed(
   () => advancedSettingsOpen.value || accountOpen.value || virtualKeyboardOpen.value || shortcutDialogOpen.value || toolbarOverlayOpen.value || state.value.websocketFallbackOffered,
 )
@@ -445,7 +452,7 @@ onBeforeUnmount(() => {
           :audio-encoder="status?.audio.encoder ?? ''"
           :audio-quality="status?.audio.quality ?? ''"
           :audio-sample-rate="status?.audio.sample_rate ?? 0"
-          :audio-channels="status?.audio.stream_channels ?? 0"
+          :audio-channels="audioOverlayChannels"
           :audio-fps="audioPacketsPerSecond || status?.audio.actual_fps || 0"
           :audio-bitrate="audioBitrate || status?.audio.bitrate_kbps || 0"
           :audio-capture-latency-us="status?.audio.capture_latency_us ?? 0"

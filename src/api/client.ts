@@ -123,6 +123,9 @@ export interface OneKVMConfig {
     enabled: boolean
     device: string
     encoder: string
+    quality?: 'low' | 'medium' | 'high'
+    channels?: 'mono' | 'stereo' | 'surround51'
+    product_name?: string
   }
   stream: { sink: string }
   network: NetworkConfig

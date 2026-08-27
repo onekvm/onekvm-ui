@@ -341,6 +341,7 @@ const zh = {
         system: '系统',
 			keyboard: '键盘',
 		usb: 'USB',
+        audio: '音频',
         time: '区域和时间',
         update: '系统升级',
         sessionsPage: {
@@ -354,6 +355,20 @@ const zh = {
           user: '用户',
           codec: '编码',
           duration: '已连接',
+        },
+        audioPage: {
+          restartHint: '更改声卡声道或名称会让 USB 重新枚举。如果扬声器已打开，键盘和鼠标会短暂断开。浏览器预览会混缩成单声道。',
+          title: 'USB 声卡',
+          hint: '这些选项作用于呈现给目标机的 USB 扬声器和麦克风。',
+          quality: '音质',
+          qualityLow: '低 (48 kbps)',
+          qualityMedium: '中 (96 kbps)',
+          qualityHigh: '高 (160 kbps)',
+          channels: '声道',
+          mono: '单声道',
+          stereo: '立体声',
+          surround51: '5.1 环绕',
+          productName: '设备名称',
         },
         usbPage: {
           restartHint: 'USB 标识会在 OneKVM 服务或设备重启后生效，被控主机会重新枚举 USB 设备。',

@@ -341,6 +341,7 @@ const zh_tw = {
         system: '系統',
 			keyboard: '鍵盤',
 		usb: 'USB',
+        audio: '音訊',
         time: '區域和時間',
         update: '系統升級',
         sessionsPage: {
@@ -354,6 +355,20 @@ const zh_tw = {
           user: '使用者',
           codec: '編碼',
           duration: '已連線',
+        },
+        audioPage: {
+          restartHint: '變更音效卡聲道或名稱會讓 USB 重新列舉。如果揚聲器已開啟，鍵盤和滑鼠會短暫中斷。瀏覽器預覽會混縮成單聲道。',
+          title: 'USB 音效卡',
+          hint: '這些選項作用於呈現給目標機的 USB 揚聲器和麥克風。',
+          quality: '音質',
+          qualityLow: '低 (48 kbps)',
+          qualityMedium: '中 (96 kbps)',
+          qualityHigh: '高 (160 kbps)',
+          channels: '聲道',
+          mono: '單聲道',
+          stereo: '立體聲',
+          surround51: '5.1 環繞',
+          productName: '裝置名稱',
         },
         usbPage: {
           restartHint: 'USB 識別會在 OneKVM 服務或裝置重新啟動後生效，受控主機會重新列舉 USB 裝置。',

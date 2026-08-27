@@ -342,6 +342,7 @@ const en = {
         system: 'System',
 			keyboard: 'Keyboard',
 		usb: 'USB',
+        audio: 'Audio',
         time: 'Region and time',
         update: 'System update',
         sessionsPage: {
@@ -355,6 +356,20 @@ const en = {
           user: 'User',
           codec: 'Codec',
           duration: 'Connected for',
+        },
+        audioPage: {
+          restartHint: 'Changing the sound card layout or name re-enumerates USB. Keyboard and mouse disconnect briefly if the speaker is on. The browser preview is mixed down to mono.',
+          title: 'USB sound card',
+          hint: 'These options apply to the USB speaker and microphone presented to the target PC.',
+          quality: 'Quality',
+          qualityLow: 'Low (48 kbps)',
+          qualityMedium: 'Medium (96 kbps)',
+          qualityHigh: 'High (160 kbps)',
+          channels: 'Channels',
+          mono: 'Mono',
+          stereo: 'Stereo',
+          surround51: '5.1 surround',
+          productName: 'Device name',
         },
         usbPage: {
           restartHint: 'USB identity changes take effect after OneKVM or the device is restarted. The controlled host will enumerate the USB device again.',

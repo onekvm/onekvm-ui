@@ -37,6 +37,7 @@ const emit = defineEmits<{
 
 const stage = ref<HTMLElement | null>(null)
 const video = ref<HTMLVideoElement | null>(null)
+const remoteAudio = ref<HTMLAudioElement | null>(null)
 const canvas = ref<HTMLCanvasElement | null>(null)
 let canvasObserver: ResizeObserver | undefined
 const playing = ref(false)
@@ -44,6 +45,7 @@ const mediaError = ref(false)
 const reconnecting = ref(false)
 const mjpegReload = ref(0)
 let detachVideo: (() => void) | undefined
+let detachAudio: (() => void) | undefined
 let unsubscribeBitrate: (() => void) | undefined
 let unsubscribeBrowserLatency: (() => void) | undefined
 let webrtcLatency = emptyBrowserVideoLatency()
@@ -200,6 +202,7 @@ onMounted(() => {
     video.value.disablePictureInPicture = true
     detachVideo = onekvm.attachVideo(video.value)
   }
+  if (remoteAudio.value) detachAudio = onekvm.attachAudio(remoteAudio.value)
   observeCanvas()
   void onekvm.connect().catch(() => undefined)
 })
@@ -207,6 +210,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   canvasObserver?.disconnect()
   detachVideo?.()
+  detachAudio?.()
   unsubscribeBitrate?.()
   unsubscribeBrowserLatency?.()
 })
@@ -235,7 +239,13 @@ watch([() => props.videoFit, originalSizeStyle, inputTarget], () => {
 </script>
 
 <template>
-  <main ref="stage" class="console-stage" :class="{ 'console-stage-original': videoFit === 'original' }">
+  <main
+    ref="stage"
+    class="console-stage"
+    :class="{ 'console-stage-original': videoFit === 'original' }"
+    @pointerdown="onekvm.unlockAudio()"
+  >
+    <audio ref="remoteAudio" class="console-remote-audio" autoplay playsinline />
     <video
       id="screen"
       ref="video"

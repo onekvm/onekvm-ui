@@ -1246,7 +1246,7 @@ const en = {
       title: 'USB audio',
       speaker: 'Speaker',
       microphone: 'Microphone',
-      hint: 'Speaker lets you hear the target. Microphone is exclusive to this browser session.',
+      hint: 'Speaker lets you hear the target. The target OS must play through the USB speaker. Microphone is exclusive to this browser session.',
       speakerConfirm: 'The target PC will get a USB speaker. Keyboard and mouse will disconnect briefly.',
       microphoneConfirm: 'This session will exclusively use the USB microphone. Keyboard and mouse may disconnect briefly.',
       microphoneBusy: 'Another session already owns the USB microphone.',

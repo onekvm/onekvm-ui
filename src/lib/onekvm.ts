@@ -59,6 +59,7 @@ class OneKVMTransport {
   private wantMicrophone = false
   private heldMicrophone = false
   private video: HTMLVideoElement | null = null
+  private audio: HTMLAudioElement | null = null
   private hidSocket: WebSocket | null = null
   private websocketVideo: WebSocketVideo | null = null
   private sessionId = ''
@@ -113,10 +114,33 @@ class OneKVMTransport {
 
   attachVideo(video: HTMLVideoElement) {
     this.video = video
+    video.muted = true
     if (this.stream) this.play(this.stream)
     return () => {
       if (this.video === video) this.video = null
     }
+  }
+
+  attachAudio(audio: HTMLAudioElement) {
+    this.audio = audio
+    audio.autoplay = true
+    audio.muted = false
+    audio.volume = 1
+    if (this.stream) this.play(this.stream)
+    return () => {
+      if (this.audio === audio) this.audio = null
+    }
+  }
+
+  unlockAudio() {
+    if (!this.audio) return
+    this.audio.muted = false
+    if (!this.audio.srcObject && !this.audio.getAttribute('src')) {
+      // 1-sample silent WAV so the click gesture actually starts playback
+      // before WebRTC attaches a live track after reconnect().
+      this.audio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA'
+    }
+    void this.audio.play().catch(() => undefined)
   }
 
   connect() {
@@ -393,9 +417,30 @@ class OneKVMTransport {
   }
 
   private play(stream: MediaStream) {
-    if (!this.video) return
-    if (this.video.srcObject !== stream) this.video.srcObject = stream
-    void this.video.play().catch(() => undefined)
+    if (this.video) {
+      const videoTrack = stream.getVideoTracks()[0]
+      const current = this.video.srcObject
+      const currentTrack = current instanceof MediaStream ? current.getVideoTracks()[0] : undefined
+      if (currentTrack !== videoTrack) {
+        this.video.srcObject = videoTrack ? new MediaStream([videoTrack]) : null
+      }
+      this.video.muted = true
+      void this.video.play().catch(() => undefined)
+    }
+    if (!this.audio) return
+    const audioTrack = stream.getAudioTracks()[0]
+    const current = this.audio.srcObject
+    const currentTrack = current instanceof MediaStream ? current.getAudioTracks()[0] : undefined
+    if (!audioTrack) {
+      this.audio.srcObject = null
+      return
+    }
+    if (currentTrack !== audioTrack) {
+      this.audio.removeAttribute('src')
+      this.audio.srcObject = new MediaStream([audioTrack])
+    }
+    this.audio.muted = false
+    void this.audio.play().catch(() => undefined)
   }
 
   private send(report: Uint8Array) {
@@ -512,6 +557,7 @@ class OneKVMTransport {
     this.peer = null
     this.stream = null
     if (this.video) this.video.srcObject = null
+    if (this.audio) this.audio.srcObject = null
   }
 
   private failWebRTC(message: string) {

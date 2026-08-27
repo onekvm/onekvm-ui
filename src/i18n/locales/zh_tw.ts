@@ -1250,7 +1250,7 @@ const zh_tw = {
       title: 'USB 音訊',
       speaker: '揚聲器',
       microphone: '麥克風',
-      hint: '揚聲器用來聽目標機；麥克風由目前瀏覽器工作階段獨占。',
+      hint: '揚聲器用來聽目標機，目標系統需要把聲音輸出切到這塊 USB 聲卡。麥克風由目前瀏覽器工作階段獨占。',
       speakerConfirm: '目標機將出現 USB 揚聲器。鍵盤和滑鼠會短暫中斷。',
       microphoneConfirm: '本工作階段將獨占 USB 麥克風。鍵盤和滑鼠可能會短暫中斷。',
       microphoneBusy: '另一個工作階段正在使用 USB 麥克風。',

@@ -1245,7 +1245,7 @@ const zh = {
       title: 'USB 音频',
       speaker: '扬声器',
       microphone: '麦克风',
-      hint: '扬声器用来听目标机；麦克风由当前浏览器会话独占。',
+      hint: '扬声器用来听目标机，目标系统需要把声音输出切到这块 USB 声卡。麦克风由当前浏览器会话独占。',
       speakerConfirm: '目标机将出现 USB 扬声器。键盘和鼠标会短暂断开。',
       microphoneConfirm: '本会话将独占 USB 麦克风。键盘和鼠标可能会短暂断开。',
       microphoneBusy: '另一个会话正在使用 USB 麦克风。',

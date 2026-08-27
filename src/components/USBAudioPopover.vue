@@ -30,6 +30,7 @@ const microphoneBusy = computed(() => {
 })
 
 watch(popoverOpen, (open) => {
+  if (open) onekvm.unlockAudio()
   if (open && !schema.value) void loadSchema()
 })
 
@@ -92,11 +93,13 @@ async function applySpeaker(value: boolean) {
   saving.value = true
   try {
     if (value) {
+      onekvm.unlockAudio()
       await api.patchConfig('audio.device', 'hw:UAC1Gadget,0')
       await api.patchConfig('audio.encoder', 'pcmu')
     }
     await api.patchConfig('audio.enabled', String(value))
     await onekvm.reconnect()
+    if (value) onekvm.unlockAudio()
   } catch (error) {
     message.error(error instanceof Error ? error.message : String(error))
   } finally {

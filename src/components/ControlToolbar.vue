@@ -650,6 +650,7 @@ onBeforeUnmount(() => {
         :mouse-mode="mouseMode"
         :scroll-interval="scrollInterval"
         :mouse-report-rate="mouseReportRate"
+        :hid="status?.hid"
         :placement="menuPlacement"
         @update:show="updateMenu('mouse', $event)"
         @update:mouse-mode="emit('update:mouseMode', $event)"
@@ -676,6 +677,7 @@ onBeforeUnmount(() => {
       <KeyboardControlPopover
         :options="keyboardOptions"
         :layout="keyboardLayout"
+        :hid="status?.hid"
         :num-lock="status?.hid?.num_lock"
         :caps-lock="status?.hid?.caps_lock"
         :scroll-lock="status?.hid?.scroll_lock"

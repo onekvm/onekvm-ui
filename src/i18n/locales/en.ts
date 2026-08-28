@@ -1274,7 +1274,11 @@ const en = {
       title: 'Device status',
       ready: 'working',
       waiting: 'connecting',
-      error: 'disconnected'
+      error: 'disconnected',
+      hidDisconnectedTitle: 'USB keyboard and mouse disconnected',
+      hidDisconnected: 'The target PC has not enumerated this USB gadget. Keystrokes and pointer movement will not reach the host.',
+      hidUnavailableTitle: 'USB keyboard and mouse unavailable',
+      hidUnavailable: 'USB keyboard and mouse are not available on this device.',
     },
     menu: {
       collapse: 'Collapse Menu',

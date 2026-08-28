@@ -3,11 +3,13 @@ import { computed, ref } from 'vue'
 
 import { type MouseMode } from '@/composables/useMouse'
 import { t } from '@/i18n/runtime'
+import HidHostAlert from './HidHostAlert.vue'
 
 const props = defineProps<{
   mouseMode: MouseMode
   scrollInterval: number
   mouseReportRate: number
+  hid?: { available: boolean; connected: boolean } | null
   placement?: 'top-end' | 'bottom-end' | 'right-start' | 'left-start'
 }>()
 
@@ -105,6 +107,7 @@ function updateCustomReportRate(value: number | null) {
       <header class="control-popover-header">
         <strong>{{ t('settings.mouse.title', 'Mouse') }}</strong>
       </header>
+      <HidHostAlert :hid="hid" />
       <div class="display-status-values">
         <div>
           <span>{{ t('mouse.mode', 'Mouse mode') }}</span>

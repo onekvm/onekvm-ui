@@ -1273,7 +1273,11 @@ const zh = {
       title: '设备状态',
       ready: '工作正常',
       waiting: '连接中',
-      error: '已断开'
+      error: '已断开',
+      hidDisconnectedTitle: 'USB 键盘鼠标未连接',
+      hidDisconnected: '被控机还没有枚举这套 USB 键盘鼠标。在主机重新识别设备之前，按键和指针不会生效。',
+      hidUnavailableTitle: 'USB 键盘鼠标不可用',
+      hidUnavailable: '此设备不提供 USB 键盘鼠标。',
     },
     menu: {
       collapse: '收起',

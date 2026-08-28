@@ -1278,7 +1278,11 @@ const zh_tw = {
       title: '裝置狀態',
       ready: '運作正常',
       waiting: '連線中',
-      error: '已中斷連線'
+      error: '已中斷連線',
+      hidDisconnectedTitle: 'USB 鍵盤滑鼠未連線',
+      hidDisconnected: '被控端尚未列舉這套 USB 鍵盤滑鼠。在主機重新識別裝置之前，按鍵和指標不會生效。',
+      hidUnavailableTitle: 'USB 鍵盤滑鼠不可用',
+      hidUnavailable: '此裝置不提供 USB 鍵盤滑鼠。',
     },
     menu: {
       collapse: '收起',

@@ -816,6 +816,12 @@ select { font: inherit; }
   padding-bottom: 8px;
 }
 
+.display-status-popover > .hid-host-alert,
+.keyboard-control-panel > .hid-host-alert,
+.keyboard-status-content > .hid-host-alert {
+  margin: 2px 0 8px;
+}
+
 .keyboard-control-heading {
   display: flex;
   min-width: 0;

@@ -6,10 +6,12 @@ import { useMessage, type DropdownOption, type InputInst } from 'naive-ui'
 import { api, type KeyboardLayout } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { filterKeyboardText } from '@/input/keyboard-text'
+import HidHostAlert from './HidHostAlert.vue'
 
 const props = defineProps<{
   options: DropdownOption[]
   layout: KeyboardLayout
+  hid?: { available: boolean; connected: boolean } | null
   numLock?: boolean
   capsLock?: boolean
   scrollLock?: boolean
@@ -207,6 +209,7 @@ onBeforeUnmount(() => {
           </n-tooltip>
         </div>
       </header>
+      <HidHostAlert :hid="hid" />
       <div class="keyboard-lock-status" role="status">
         <span class="keyboard-lock-indicator" :data-state="lockState(capsLock)" :aria-label="`${t('keyboard.capsLock', 'Caps Lock')}: ${lockLabel(capsLock)}`">
           <i />
@@ -291,6 +294,7 @@ onBeforeUnmount(() => {
         </div>
       </header>
       <div class="keyboard-status-content">
+        <HidHostAlert :hid="hid" />
         <div class="keyboard-pinned-layout">
           <span>{{ t('keyboard.layout', 'Keyboard layout') }}</span>
           <strong>{{ layoutLabel(layout) }}</strong>

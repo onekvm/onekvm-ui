@@ -30,6 +30,7 @@ import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type O
 import { type MouseMode } from '@/composables/useMouse'
 import type { VideoFit } from '@/lib/video-fit'
 import { currentLanguage, languageOptions, setLanguage, t } from '@/i18n/runtime'
+import { hidIndicatorState } from '@/lib/hid-status'
 import { onekvm, type InputActivity, type TransportState } from '@/lib/onekvm'
 import { sendShortcut, shortcutChordLabel } from '@/lib/keyboard-shortcuts'
 import {
@@ -345,11 +346,7 @@ const screenState = computed<DeviceState>(() => {
   return 'error'
 })
 
-const inputState = computed<DeviceState>(() => {
-  if (props.state.connection === 'connected' && props.state.controlReady) return 'ready'
-  if (['idle', 'connecting', 'connected'].includes(props.state.connection)) return 'waiting'
-  return 'error'
-})
+const inputState = computed<DeviceState>(() => hidIndicatorState(props.status?.hid))
 
 const powerState = computed<DeviceState>(() => {
   if (!props.status) return 'waiting'

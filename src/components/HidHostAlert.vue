@@ -14,7 +14,7 @@ const copy = computed<Record<HIDHostAlert, { title: string; detail: string }>>((
     title: t('deviceStatus.hidDisconnectedTitle', 'USB keyboard and mouse disconnected'),
     detail: t(
       'deviceStatus.hidDisconnected',
-      'The target PC has not enumerated this USB gadget. Keystrokes and pointer movement will not reach the host.',
+      'The target PC has not enumerated this USB gadget. Keystrokes and mouse movement will not reach the host.',
     ),
   },
   unavailable: {

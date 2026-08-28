@@ -1571,7 +1571,7 @@ watch(section, (value) => {
                       </li>
                       <li>
                         <Keyboard :size="18" />
-                        <span>{{ t('settings.advancedSettings.systemPage.hid', 'Keyboard and pointer') }}</span>
+                        <span>{{ t('settings.advancedSettings.systemPage.hid', 'Keyboard and mouse') }}</span>
                         <strong
                           class="system-state-value"
                           :class="{ connected: status.hid.connected, unavailable: !status.hid.available }"

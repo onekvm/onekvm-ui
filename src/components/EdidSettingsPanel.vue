@@ -95,6 +95,9 @@ onMounted(() => {
   <section v-if="status?.supported" class="edid-settings-panel">
     <h3>{{ t('settings.advancedSettings.displayPage.edid', 'HDMI EDID') }}</h3>
     <p class="display-setting-field-hint">
+      {{ t('settings.advancedSettings.displayPage.edidHint', 'Apply a saved EDID file to the HDMI capture chip. Edit files in the EDID Editor plugin.') }}
+    </p>
+    <p class="display-setting-field-hint">
       {{ status.summary?.preferred
         ? `${status.summary.preferred.width}×${status.summary.preferred.height}@${status.summary.preferred.fps}`
         : t('settings.advancedSettings.displayPage.edidUnknown', 'Current advertised mode is unavailable') }}
@@ -106,7 +109,7 @@ onMounted(() => {
       v-model:value="selection"
       :options="options"
       :disabled="disabled || busy || !status.writable"
-      :placeholder="t('settings.advancedSettings.displayPage.edidSelect', 'Choose a library entry from any installed EDID provider')"
+      :placeholder="t('settings.advancedSettings.displayPage.edidSelect', 'Choose a saved EDID file')"
     />
     <n-button type="primary" :disabled="disabled || !selection || !status.writable" :loading="busy" @click="applySelection">
       {{ t('settings.advancedSettings.displayPage.edidApply', 'Apply EDID') }}

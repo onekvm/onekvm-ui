@@ -1194,8 +1194,8 @@ watch(section, (value) => {
 </script>
 
 <template>
-  <AdvancedSettingsLoading v-if="loading && !config" />
-  <section v-else class="advanced-settings-page">
+  <div class="advanced-settings-root">
+  <section class="advanced-settings-page">
     <header class="advanced-settings-header">
       <n-button quaternary size="small" class="advanced-settings-back" :aria-label="t('settings.advancedSettings.back', 'Back')" @click="emit('close')">
         <template #icon><ArrowLeft /></template>
@@ -1828,6 +1828,10 @@ watch(section, (value) => {
     </div>
     <AccountDrawer v-model:show="accountOpen" />
   </section>
+  <Transition name="onekvm-page-loading">
+    <AdvancedSettingsLoading v-if="loading && !config" />
+  </Transition>
+  </div>
 
   <Teleport to="body">
 	<Transition name="system-action-overlay">

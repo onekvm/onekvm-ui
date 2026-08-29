@@ -13,12 +13,54 @@ const status = ref<EDIDStatus | null>(null)
 const busy = ref(false)
 const selection = ref('')
 
-const options = computed(() => (status.value?.directories || []).flatMap((directory) =>
-  directory.files.map((file) => ({
-    label: `${file.id} · ${directory.extension}/${directory.id}`,
-    value: `${directory.extension}\0${directory.id}\0${file.id}`,
-  })),
-))
+function machinePresetLabel(id: string) {
+  switch (id) {
+    case 'factory':
+      return t('settings.advancedSettings.displayPage.edidFactory', 'Factory')
+    case '1080p60':
+      return '1920×1080 @ 60 Hz'
+    case '1440p30':
+      return '2560×1440 @ 30 Hz'
+    case '720p120':
+      return '1280×720 @ 120 Hz'
+    default:
+      return id
+  }
+}
+
+const options = computed(() => {
+  const directories = status.value?.directories || []
+  const presets = directories.filter((directory) => directory.role === 'preset').flatMap((directory) =>
+    directory.files.map((file) => ({
+      label: machinePresetLabel(file.id),
+      value: `${directory.extension}\0${directory.id}\0${file.id}`,
+    })),
+  )
+  const custom = directories.filter((directory) => directory.role === 'custom').flatMap((directory) =>
+    directory.files.map((file) => ({
+      label: `${file.id}.edid.bin`,
+      value: `${directory.extension}\0${directory.id}\0${file.id}`,
+    })),
+  )
+  const groups = []
+  if (presets.length) {
+    groups.push({
+      type: 'group' as const,
+      label: t('settings.advancedSettings.displayPage.edidMachinePresets', 'Machine presets'),
+      key: 'machine',
+      children: presets,
+    })
+  }
+  if (custom.length) {
+    groups.push({
+      type: 'group' as const,
+      label: t('settings.advancedSettings.displayPage.edidCustomFiles', 'Custom files'),
+      key: 'custom',
+      children: custom,
+    })
+  }
+  return groups
+})
 
 const applyPolicy = computed(() => status.value?.apply_policy || 'none')
 const applyPolicyText = computed(() => {
@@ -109,7 +151,7 @@ onMounted(() => {
       v-model:value="selection"
       :options="options"
       :disabled="disabled || busy || !status.writable"
-      :placeholder="t('settings.advancedSettings.displayPage.edidSelect', 'Choose a saved EDID file')"
+      :placeholder="t('settings.advancedSettings.displayPage.edidSelect', 'Choose a machine preset or a custom file')"
     />
     <n-button type="primary" :disabled="disabled || !selection || !status.writable" :loading="busy" @click="applySelection">
       {{ t('settings.advancedSettings.displayPage.edidApply', 'Apply EDID') }}

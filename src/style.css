@@ -412,9 +412,20 @@ select { font: inherit; }
   object-fit: contain;
   transition: opacity 280ms ease-out;
   user-select: none;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .console-video-ready { opacity: 1; }
+
+/* HID sits above the video so pointer events do not stall compositor frames. */
+.console-hid-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  outline: 0;
+  background: transparent;
+}
 
 /* Original is 1:1 CSS pixels. Stretch keeps aspect and fits the stage. */
 .console-video-original {

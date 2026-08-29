@@ -40,6 +40,7 @@ const stage = ref<HTMLElement | null>(null)
 const video = ref<HTMLVideoElement | null>(null)
 const remoteAudio = ref<HTMLAudioElement | null>(null)
 const canvas = ref<HTMLCanvasElement | null>(null)
+const inputSurface = ref<HTMLElement | null>(null)
 let canvasObserver: ResizeObserver | undefined
 const playing = ref(false)
 const mediaError = ref(false)
@@ -101,8 +102,9 @@ useMouse(
   toRef(props, 'scrollInterval'),
   toRef(props, 'mouseReportRate'),
   toRef(props, 'videoFit'),
+  inputSurface,
 )
-useKeyboard(toRef(props, 'keyboardBlocked'), inputTarget, toRef(props, 'rightControlAsMeta'))
+useKeyboard(toRef(props, 'keyboardBlocked'), inputSurface, toRef(props, 'rightControlAsMeta'))
 const webrtcPresent = computed(() => props.state.videoMode === 'webrtc')
 useVideoFps(video, (fps) => {
   if (!isMJPEG.value) emit('fps', fps)
@@ -127,6 +129,14 @@ function updateMetadata() {
   frameWidth.value = video.value.videoWidth
   frameHeight.value = video.value.videoHeight
   emit('metadata', video.value.videoWidth, video.value.videoHeight)
+}
+
+function onVideoWaiting() {
+  const element = video.value
+  /* High-motion HID drags make WebRTC fire waiting without emptying the
+     element. Treating that as a stall fades the picture and zeros overlay FPS. */
+  if (element && element.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) return
+  playing.value = false
 }
 
 function publishCanvasSize() {
@@ -189,7 +199,7 @@ function exitPictureInPicture() {
 }
 
 function focusVideo() {
-  inputTarget.value?.focus({ preventScroll: true })
+  inputSurface.value?.focus({ preventScroll: true })
 }
 
 defineExpose({ focusVideo })
@@ -267,9 +277,9 @@ watch([() => props.videoFit, originalSizeStyle, inputTarget], () => {
       :style="originalSizeStyle"
       :disablePictureInPicture="true"
       controlslist="nopictureinpicture"
-      tabindex="0"
+      tabindex="-1"
       @playing="playing = true"
-      @waiting="playing = false"
+      @waiting="onVideoWaiting"
       @emptied="playing = false"
       @loadedmetadata="updateMetadata"
       @resize="updateMetadata"
@@ -283,6 +293,17 @@ watch([() => props.videoFit, originalSizeStyle, inputTarget], () => {
       :class="{
         'cursor-crosshair': mouseMode === 'relative',
         'console-video-ready': playing && isMJPEG,
+        'console-video-original': videoFit === 'original',
+        'console-video-stretch': videoFit === 'stretch',
+      }"
+      :style="originalSizeStyle"
+      tabindex="-1"
+    />
+    <div
+      ref="inputSurface"
+      class="console-hid-layer"
+      :class="{
+        'cursor-crosshair': mouseMode === 'relative',
         'console-video-original': videoFit === 'original',
         'console-video-stretch': videoFit === 'stretch',
       }"

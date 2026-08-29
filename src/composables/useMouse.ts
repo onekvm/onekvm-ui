@@ -13,6 +13,7 @@ export function useMouse(
   scrollInterval: Ref<number>,
   reportRate: Ref<number>,
   videoFit: Ref<VideoFit> = { value: 'original' } as Ref<VideoFit>,
+  surface?: Readonly<Ref<HTMLElement | null>>,
 ) {
   let buttons = 0
   let moveTimer = 0
@@ -79,7 +80,7 @@ export function useMouse(
       absoluteX = point.x
       absoluteY = point.y
     } else {
-      if (document.pointerLockElement !== video.value) return
+      if (document.pointerLockElement !== eventTarget()) return
       if (!event.movementX && !event.movementY) return
       pendingX += event.movementX
       pendingY += event.movementY
@@ -87,13 +88,16 @@ export function useMouse(
     scheduleMove()
   }
 
+  const eventTarget = () => surface?.value ?? video.value
+
   const mouseDown = (event: MouseEvent) => {
     const bit = buttonBits[event.button]
     if (!bit) return
     event.preventDefault()
-    video.value?.focus({ preventScroll: true })
-    if (mode.value === 'relative' && document.pointerLockElement !== video.value) {
-      void video.value?.requestPointerLock()
+    const target = eventTarget()
+    target?.focus({ preventScroll: true })
+    if (mode.value === 'relative' && document.pointerLockElement !== target) {
+      void target?.requestPointerLock()
       return
     }
     buttons |= bit
@@ -148,26 +152,25 @@ export function useMouse(
   const bind = () => {
     removeListeners()
     removeListeners = () => undefined
-    const element = video.value
-    if (!element) return
-    const eventTarget: HTMLElement = element
-    eventTarget.addEventListener('mousemove', mouseMove)
-    eventTarget.addEventListener('mousedown', mouseDown)
+    const target = eventTarget()
+    if (!target) return
+    target.addEventListener('mousemove', mouseMove)
+    target.addEventListener('mousedown', mouseDown)
     window.addEventListener('mouseup', mouseUp)
     window.addEventListener('blur', releaseButtons)
-    eventTarget.addEventListener('wheel', wheel, { passive: false })
-    eventTarget.addEventListener('click', blockBrowserAction)
-    eventTarget.addEventListener('auxclick', blockBrowserAction)
-    eventTarget.addEventListener('contextmenu', blockBrowserAction)
+    target.addEventListener('wheel', wheel, { passive: false })
+    target.addEventListener('click', blockBrowserAction)
+    target.addEventListener('auxclick', blockBrowserAction)
+    target.addEventListener('contextmenu', blockBrowserAction)
     removeListeners = () => {
-      eventTarget.removeEventListener('mousemove', mouseMove)
-      eventTarget.removeEventListener('mousedown', mouseDown)
+      target.removeEventListener('mousemove', mouseMove)
+      target.removeEventListener('mousedown', mouseDown)
       window.removeEventListener('mouseup', mouseUp)
       window.removeEventListener('blur', releaseButtons)
-      eventTarget.removeEventListener('wheel', wheel)
-      eventTarget.removeEventListener('click', blockBrowserAction)
-      eventTarget.removeEventListener('auxclick', blockBrowserAction)
-      eventTarget.removeEventListener('contextmenu', blockBrowserAction)
+      target.removeEventListener('wheel', wheel)
+      target.removeEventListener('click', blockBrowserAction)
+      target.removeEventListener('auxclick', blockBrowserAction)
+      target.removeEventListener('contextmenu', blockBrowserAction)
     }
   }
 
@@ -176,7 +179,7 @@ export function useMouse(
     if (document.pointerLockElement) void document.exitPointerLock()
   })
 
-  watch(video, bind, { immediate: true, flush: 'post' })
+  watch([video, () => surface?.value], bind, { immediate: true, flush: 'post' })
   onBeforeUnmount(() => {
     removeListeners()
     if (moveTimer) window.clearTimeout(moveTimer)

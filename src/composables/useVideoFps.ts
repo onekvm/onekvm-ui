@@ -1,5 +1,11 @@
 import { onBeforeUnmount, onMounted, type Ref } from 'vue'
 
+import {
+  fpsFromFrameDelta,
+  playbackFrameCount,
+  videoFrameCallbackStalled,
+} from '@/lib/video-fps'
+
 export function useVideoFps(
   video: Ref<HTMLVideoElement | null>,
   update: (fps: number) => void,
@@ -36,25 +42,23 @@ export function useVideoFps(
     callbackId = element.requestVideoFrameCallback(framePresented)
   }
 
-  const currentFrameCount = () => {
-    const element = video.value
-    if (!element) return 0
-    if (usesFrameCallback) return presentedFrames
-    return element.getVideoPlaybackQuality?.().totalVideoFrames ?? 0
+  const armFrameCallback = (element: HTMLVideoElement) => {
+    if (callbackId) element.cancelVideoFrameCallback(callbackId)
+    callbackId = element.requestVideoFrameCallback(framePresented)
   }
+
+  const currentFrameCount = () => playbackFrameCount(video.value, presentedFrames)
 
   const sample = () => {
     const now = performance.now()
+    const element = video.value
     const frames = currentFrameCount()
     const elapsed = now - previousSample
-    const stalled = usesFrameCallback && (!lastFrame || now - lastFrame > 1_500)
-    const fps = elapsed > 0 && !stalled
-      ? Math.max(0, Math.round(((frames - previousFrames) * 1_000) / elapsed))
-      : 0
-
+    const stalled = usesFrameCallback && videoFrameCallbackStalled(lastFrame, now)
+    update(fpsFromFrameDelta(frames, previousFrames, elapsed))
     previousFrames = frames
     previousSample = now
-    update(fps)
+    if (stalled && element && usesFrameCallback) armFrameCallback(element)
     if (!updatePresent) return
     if (presentEnabled && !presentEnabled.value) {
       presentSumUs = 0
@@ -72,7 +76,7 @@ export function useVideoFps(
     const element = video.value
     previousSample = performance.now()
     usesFrameCallback = Boolean(element?.requestVideoFrameCallback)
-    if (element && usesFrameCallback) callbackId = element.requestVideoFrameCallback(framePresented)
+    if (element && usesFrameCallback) armFrameCallback(element)
     sampleTimer = window.setInterval(sample, 1_000)
   })
 

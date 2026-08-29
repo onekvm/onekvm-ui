@@ -21,6 +21,8 @@ function machinePresetLabel(id: string) {
       return '1920×1080 @ 60 Hz'
     case '1440p30':
       return '2560×1440 @ 30 Hz'
+    case '720p90':
+      return '1280×720 @ 90 Hz'
     case '720p120':
       return '1280×720 @ 120 Hz'
     default:

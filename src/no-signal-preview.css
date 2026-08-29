@@ -1,6 +1,7 @@
 .no-signal {
   position: absolute;
   inset: 0;
+  z-index: 1;
   display: grid;
   place-items: center;
   padding: clamp(18px, 5vw, 64px);

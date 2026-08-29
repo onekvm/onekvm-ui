@@ -48,6 +48,7 @@ import App from './App.vue'
 import { api, APIError } from './api/client'
 import { initializeLanguage } from './i18n/runtime'
 import './style.css'
+import './no-signal-preview.css'
 
 const naive = create({
   components: [

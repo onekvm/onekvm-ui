@@ -1616,7 +1616,7 @@ select { font: inherit; }
 .advanced-settings-layer {
   position: fixed;
   inset: 0;
-  z-index: 3000;
+  z-index: 200;
   display: grid;
   grid-row: 1 / -1;
   background: #0d1013;

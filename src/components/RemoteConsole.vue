@@ -302,12 +302,7 @@ watch([() => props.videoFit, originalSizeStyle, inputTarget], () => {
     <div
       ref="inputSurface"
       class="console-hid-layer"
-      :class="{
-        'cursor-crosshair': mouseMode === 'relative',
-        'console-video-original': videoFit === 'original',
-        'console-video-stretch': videoFit === 'stretch',
-      }"
-      :style="originalSizeStyle"
+      :class="{ 'cursor-crosshair': mouseMode === 'relative' }"
       tabindex="0"
     />
 

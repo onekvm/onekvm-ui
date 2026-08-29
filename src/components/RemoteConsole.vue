@@ -10,7 +10,6 @@ import { useMJPEGStream } from '@/composables/useMJPEGStream'
 import { api } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { onekvm, type BrowserAudioStats, type BrowserVideoLatencyUs, type TransportState } from '@/lib/onekvm'
-import NoSignal from './NoSignal.vue'
 import { emptyBrowserAudioStats, emptyBrowserVideoLatency } from '@/lib/webrtc-playback-stats'
 
 const props = defineProps<{
@@ -96,9 +95,6 @@ const connectionProblemDetail = computed(() =>
     ? t('screen.h265UnsupportedDetail', 'H.265 needs a HEVC decoder. This browser has neither WebRTC H.265 nor MSE HEVC. Switch the codec to H.264, or use Safari or a Chrome/Edge build with HEVC.')
     : t('screen.connectionLostDetail', 'The browser can no longer reach OneKVM. Check the network connection or wait for the service to restart.'),
 )
-const noSignal = computed(
-  () => props.signalConnected === false && !unsupportedInput.value && !connectionProblem.value,
-)
 
 useMouse(
   inputTarget,
@@ -118,7 +114,7 @@ useVideoFps(video, (fps) => {
 }, webrtcPresent)
 
 const loading = computed(
-  () => !connectionProblem.value && !noSignal.value && !playing.value && ['idle', 'connecting', 'connected'].includes(props.state.connection),
+  () => !connectionProblem.value && !playing.value && ['idle', 'connecting', 'connected'].includes(props.state.connection),
 )
 const frameWidth = ref(0)
 const frameHeight = ref(0)
@@ -320,8 +316,6 @@ watch([() => props.videoFit, originalSizeStyle, inputTarget], () => {
       <span v-if="unsupportedSize">{{ unsupportedSize }}</span>
       <p>{{ t('screen.unsupportedResolutionHint', 'Set the host output to a Cube-supported mode such as 1920×1080 or 1280×720.') }}</p>
     </div>
-
-    <NoSignal v-if="noSignal" />
 
     <Transition name="console-loading">
       <div v-if="loading" class="console-state" aria-live="polite" aria-busy="true">

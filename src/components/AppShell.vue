@@ -299,6 +299,9 @@ function closeAdvancedSettings() {
   url.hash = ''
   window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}`)
   void refreshDeviceShortcuts()
+}
+
+function focusConsole() {
   void nextTick(() => remoteConsole.value?.focusVideo())
 }
 
@@ -351,16 +354,19 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="app-shell">
-    <AdvancedSettingsPage
-      v-if="advancedSettingsOpen"
-      :status="status"
-      :route="advancedSettingsRoute"
-      @close="closeAdvancedSettings"
-      @navigate="navigateAdvancedSettings"
-    />
+    <Transition name="onekvm-page-loading" @after-leave="focusConsole">
+      <div v-if="advancedSettingsOpen" class="advanced-settings-layer">
+        <AdvancedSettingsPage
+          :status="status"
+          :route="advancedSettingsRoute"
+          @close="closeAdvancedSettings"
+          @navigate="navigateAdvancedSettings"
+        />
+      </div>
+    </Transition>
 
     <div
-      v-else
+      v-if="!advancedSettingsOpen"
       ref="consoleWorkspace"
       class="console-workspace"
       :class="toolbarWorkspaceClass(toolbarDock)"

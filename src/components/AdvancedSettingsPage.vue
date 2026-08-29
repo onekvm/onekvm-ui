@@ -767,6 +767,10 @@ function stopPluginFrameObserver() {
   pluginFrameAnimationFrame = null
 }
 
+function pluginFrameCap() {
+  return Math.max(240, Math.round(Math.min(720, window.innerHeight - 150)))
+}
+
 function syncPluginFrameHeight() {
   const frame = pluginFrame.value
   const document = frame?.contentDocument
@@ -777,7 +781,7 @@ function syncPluginFrameHeight() {
     document.body?.scrollHeight || 0,
     document.body?.offsetHeight || 0,
   )
-  if (height > 0) pluginFrameHeight.value = Math.ceil(height)
+  if (height > 0) pluginFrameHeight.value = Math.min(Math.ceil(height), pluginFrameCap())
 }
 
 function schedulePluginFrameHeight() {
@@ -794,8 +798,6 @@ function observePluginFrame() {
   try {
     const document = pluginFrame.value?.contentDocument
     if (!document) return
-    document.documentElement.style.overflow = 'hidden'
-    document.body.style.overflow = 'hidden'
     pluginFrameObserver = new ResizeObserver(schedulePluginFrameHeight)
     const observeResizeTargets = () => {
       pluginFrameObserver?.disconnect()
@@ -1395,7 +1397,6 @@ watch(section, (value) => {
                   :title="activeExtension.page?.title || activeExtension.name"
                   :style="pluginFrameHeight ? { height: `${pluginFrameHeight}px` } : undefined"
                   sandbox="allow-forms allow-scripts allow-same-origin"
-                  scrolling="no"
                   @load="observePluginFrame"
                 />
               </section>

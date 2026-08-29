@@ -1805,12 +1805,16 @@ select { font: inherit; }
 	color: #818b95;
 	font-size: 12px;
 }
-.plugin-page-section { min-height: min(720px, calc(100dvh - 150px)); }
+.advanced-settings-view:has(.plugin-page-section) .advanced-settings-section-header {
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+}
+.plugin-page-section { min-height: 0; }
 .plugin-page-frame {
   display: block;
   width: 100%;
   height: min(720px, calc(100dvh - 150px));
-  min-height: min(720px, calc(100dvh - 150px));
+  max-height: min(720px, calc(100dvh - 150px));
   border: 1px solid #30363d;
   border-radius: 6px;
   background: #11151a;

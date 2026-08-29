@@ -61,18 +61,18 @@ async function start(service: ExtensionService) {
 .extension-service-recovery {
   display: grid;
   overflow: hidden;
-  margin-bottom: 18px;
+  margin-bottom: 10px;
   border: 1px solid #3a4148;
   border-radius: 6px;
   background: #171b20;
 }
 .extension-service-recovery-row {
   display: flex;
-  min-height: 50px;
+  min-height: 36px;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 8px 12px;
+  padding: 4px 12px;
 }
 .extension-service-recovery-row + .extension-service-recovery-row { border-top: 1px solid #30363d; }
 .extension-service-recovery-state { display: flex; min-width: 0; align-items: center; gap: 9px; }

@@ -1370,6 +1370,8 @@ select { font: inherit; }
 
 .latency-band-capture { fill: rgb(96 165 250 / 55%); }
 .latency-band-encode { fill: rgb(192 132 252 / 55%); }
+.latency-band-jitter { fill: rgb(244 114 182 / 45%); }
+.latency-band-decode { fill: rgb(251 146 60 / 45%); }
 .latency-band-present { fill: rgb(163 230 53 / 45%); }
 .latency-line-jitter {
   stroke: #f472b6;

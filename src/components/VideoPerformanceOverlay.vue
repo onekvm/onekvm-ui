@@ -75,6 +75,8 @@ const panel = ref<HTMLElement | null>(null)
 const position = ref({ x: 24, y: 8 })
 let dragOffset: OverlayPoint = { x: 0, y: 0 }
 let dragging = false
+let dragHandle: HTMLElement | null = null
+let dragPointerId: number | null = null
 
 const panelStyle = computed(() => ({
   left: `${position.value.x}px`,
@@ -121,24 +123,39 @@ async function placePanel() {
 
 function startDrag(event: PointerEvent) {
   if (event.button !== 0 || !panel.value || window.innerWidth < 768) return
+  const handle = event.currentTarget
+  if (!(handle instanceof HTMLElement)) return
+  handle.setPointerCapture(event.pointerId)
   event.preventDefault()
+  event.stopPropagation()
   const rect = panel.value.getBoundingClientRect()
   dragOffset = overlayGrabOffset(event.clientX, event.clientY, rect)
   dragging = true
+  dragHandle = handle
+  dragPointerId = event.pointerId
   window.addEventListener('pointermove', drag)
-  window.addEventListener('pointerup', stopDrag, { once: true })
-  window.addEventListener('pointercancel', stopDrag, { once: true })
+  window.addEventListener('pointerup', stopDrag)
+  window.addEventListener('pointercancel', stopDrag)
 }
 
 function drag(event: PointerEvent) {
   if (!dragging) return
+  event.preventDefault()
   position.value = overlayPointerPosition(event.clientX, event.clientY, hostRect(), dragOffset)
   clampPosition()
 }
 
 function stopDrag() {
+  if (!dragging) return
   dragging = false
+  if (dragHandle && dragPointerId != null && dragHandle.hasPointerCapture(dragPointerId)) {
+    dragHandle.releasePointerCapture(dragPointerId)
+  }
+  dragHandle = null
+  dragPointerId = null
   window.removeEventListener('pointermove', drag)
+  window.removeEventListener('pointerup', stopDrag)
+  window.removeEventListener('pointercancel', stopDrag)
 }
 
 onMounted(() => {
@@ -148,7 +165,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', clampPosition)
-  window.removeEventListener('pointermove', drag)
+  stopDrag()
 })
 
 watch(() => props.visible, (visible) => {

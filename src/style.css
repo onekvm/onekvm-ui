@@ -369,6 +369,7 @@ select { font: inherit; }
 }
 .console-stage {
   position: relative;
+  z-index: 1;
   display: flex;
   min-width: 0;
   min-height: 0;
@@ -975,13 +976,14 @@ select { font: inherit; }
 
 .display-status-window,
 .video-performance-overlay {
-  z-index: 20;
+  z-index: 25;
   overflow: visible;
   border: 1px solid rgb(69 79 89 / 88%);
   border-radius: 6px;
   background: #171b20d8;
   box-shadow: 0 14px 36px rgb(0 0 0 / 45%);
   backdrop-filter: blur(10px);
+  pointer-events: auto;
 }
 
 .display-status-window {

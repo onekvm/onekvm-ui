@@ -19,7 +19,14 @@ const usbStringValid = (value: string, allowEmpty = false) =>
   (allowEmpty && value === '') || (value.length > 0 && new TextEncoder().encode(value).length <= 126 && !/[\u0000-\u001f\u007f]/.test(value))
 const scsiStringValid = (value: string, maximum: number) =>
   value.length > 0 && value.length <= maximum && /^[\x20-\x7e]+$/.test(value)
-const intervalValid = (value: number | undefined) => value == null || (Number.isInteger(value) && value >= 0 && value <= 255)
+const intervalValid = (value: number | null | undefined) => {
+  const interval = value ?? 0
+  return Number.isInteger(interval) && interval >= 0 && interval <= 255
+}
+
+function setInterval(field: 'keyboard_interval' | 'mouse_interval', value: number | null) {
+  usb.value[field] = value ?? 0
+}
 
 if (usb.value.gamepad == null) usb.value.gamepad = false
 if (!usb.value.keyboard_name) usb.value.keyboard_name = 'Keyboard'
@@ -83,7 +90,8 @@ const valid = computed(() =>
   scsiStringValid(usb.value.storage_vendor, 8) &&
   scsiStringValid(usb.value.iso_product, 16) &&
   scsiStringValid(usb.value.drive_product, 16) &&
-  audioValid.value,
+  audioValid.value &&
+  !overBudget.value,
 )
 
 watch(valid, (value) => emit('validity', value), { immediate: true })
@@ -155,7 +163,7 @@ watch(valid, (value) => emit('validity', value), { immediate: true })
           <n-input v-model:value="usb.keyboard_name" :disabled="props.disabled" maxlength="126" :status="usbStringValid(usb.keyboard_name || '') ? undefined : 'error'" />
         </n-form-item>
         <n-form-item :label="t('settings.advancedSettings.usbPage.pollInterval', 'Polling interval (ms)')">
-          <n-input-number v-model:value="usb.keyboard_interval" :disabled="props.disabled" :min="0" :max="255" :show-button="false" />
+          <n-input-number :value="usb.keyboard_interval ?? 0" :disabled="props.disabled" :min="0" :max="255" :show-button="false" @update:value="setInterval('keyboard_interval', $event)" />
         </n-form-item>
         <n-form-item :label="t('settings.advancedSettings.usbPage.keyboardLeds', 'Keyboard LED endpoint')">
           <n-switch :value="!usb.keyboard_no_out" :disabled="props.disabled" @update:value="usb.keyboard_no_out = !$event" />
@@ -173,7 +181,7 @@ watch(valid, (value) => emit('validity', value), { immediate: true })
           <n-input v-model:value="usb.mouse_name" :disabled="props.disabled" maxlength="126" :status="usbStringValid(usb.mouse_name || '') ? undefined : 'error'" />
         </n-form-item>
         <n-form-item :label="t('settings.advancedSettings.usbPage.pollInterval', 'Polling interval (ms)')">
-          <n-input-number v-model:value="usb.mouse_interval" :disabled="props.disabled" :min="0" :max="255" :show-button="false" />
+          <n-input-number :value="usb.mouse_interval ?? 0" :disabled="props.disabled" :min="0" :max="255" :show-button="false" @update:value="setInterval('mouse_interval', $event)" />
         </n-form-item>
       </n-form>
     </section>

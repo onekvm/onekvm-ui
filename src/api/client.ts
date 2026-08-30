@@ -512,6 +512,8 @@ export interface ExtensionUpload {
 export interface MSDStatus {
   available: boolean
   connected: boolean
+  mtp_available?: boolean
+  mtp?: boolean
   reason?: string
   iso_mounted?: string
   drive_mounted?: string
@@ -950,6 +952,8 @@ export const api = {
   getMSDStatus: () => request<MSDStatus>('/api/msd/status', { cache: 'no-store' }),
   connectMSD: () => request<MSDStatus>('/api/msd/connect', { method: 'POST' }),
   disconnectMSD: () => request<MSDStatus>('/api/msd/disconnect', { method: 'POST' }),
+  connectMSDMTP: () => request<MSDStatus>('/api/msd/mtp/connect', { method: 'POST' }),
+  disconnectMSDMTP: () => request<MSDStatus>('/api/msd/mtp/disconnect', { method: 'POST' }),
   getMSDMedia: () => request<MSDMedia[]>('/api/msd/media', { cache: 'no-store' }),
   mountMSDMedia: (id: string) => request<MSDStatus>(`/api/msd/media/${encodeURIComponent(id)}/mount`, { method: 'POST' }),
   ejectMSD: (kind: 'iso' | 'drive') => request<MSDStatus>(`/api/msd/eject/${kind}`, { method: 'POST' }),

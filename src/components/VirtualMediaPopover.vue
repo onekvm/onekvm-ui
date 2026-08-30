@@ -71,6 +71,7 @@ const dialog = useDialog()
 const loading = ref(false)
 const connecting = ref(false)
 const disconnecting = ref(false)
+const mtpBusy = ref(false)
 const status = ref<MSDStatus | null>(null)
 const media = ref<MSDMedia[]>([])
 const tab = ref<'iso' | 'drive'>('iso')
@@ -445,6 +446,24 @@ async function refresh() {
     message.error(error instanceof Error ? error.message : String(error))
   } finally {
     loading.value = false
+  }
+}
+
+async function setMTP(enabled: boolean) {
+  if (mtpBusy.value) return
+  mtpBusy.value = true
+  try {
+    const nextStatus = enabled ? await api.connectMSDMTP() : await api.disconnectMSDMTP()
+    status.value = nextStatus
+    emit('status', nextStatus)
+    message.success(enabled
+      ? t('virtualMedia.mtpEnabled', 'Virtual media folder is shared over MTP')
+      : t('virtualMedia.mtpDisabled', 'MTP share stopped'))
+  } catch (error) {
+    message.error(`${t('virtualMedia.mtpFailed', 'MTP failed')}: ${error instanceof Error ? error.message : String(error)}`)
+    await refresh()
+  } finally {
+    mtpBusy.value = false
   }
 }
 
@@ -1086,6 +1105,14 @@ onBeforeUnmount(() => {
           <n-button v-else-if="status?.available" type="primary" size="small" :loading="connecting" class="virtual-media-disconnect-button" @click="connectVirtualMedia">
             <template #icon><Plug /></template>{{ connecting ? t('virtualMedia.connecting', 'Connecting') : t('virtualMedia.connect', 'Connect') }}
           </n-button>
+          <n-button
+            v-if="status?.mtp_available"
+            size="small"
+            :type="status.mtp ? 'primary' : 'default'"
+            :loading="mtpBusy"
+            class="virtual-media-disconnect-button"
+            @click="setMTP(!status.mtp)"
+          >{{ status.mtp ? t('virtualMedia.mtpOn', 'MTP on') : t('virtualMedia.mtpOff', 'Share as MTP') }}</n-button>
           <n-tabs v-if="status?.available" v-model:value="tab" type="segment" size="small" class="virtual-media-title-tabs">
             <n-tab name="iso">
               <span class="virtual-media-tab-label">

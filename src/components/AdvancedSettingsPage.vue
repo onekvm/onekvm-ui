@@ -33,7 +33,6 @@ import {
   Trash2,
   Upload,
 	Usb,
-  Volume2,
   Wifi,
   icons,
 } from '@lucide/vue'
@@ -82,7 +81,6 @@ import { timezones } from '@/lib/timezones'
 import KeyboardShortcutEditor from './KeyboardShortcutEditor.vue'
 import UserManagement from './UserManagement.vue'
 import USBSettingsForm from './USBSettingsForm.vue'
-import AudioSettingsForm from './AudioSettingsForm.vue'
 import AdvancedSettingsLoading from './AdvancedSettingsLoading.vue'
 
 type Section = string
@@ -107,7 +105,8 @@ function sectionFromRoute(route: string): Section {
     }
   }
   if (uiProduct.settingsSections?.some((item) => item.key === normalized)) return normalized
-  return ['display', 'network', 'keyboard', 'usb', 'audio', 'plugins', 'services', 'logs', 'resources', 'sessions', 'system', 'users', 'time', 'update'].includes(normalized) ? normalized : 'system'
+  if (normalized === 'audio') return 'usb'
+  return ['display', 'network', 'keyboard', 'usb', 'plugins', 'services', 'logs', 'resources', 'sessions', 'system', 'users', 'time', 'update'].includes(normalized) ? normalized : 'system'
 }
 
 function routeFromSection(value: Section) {
@@ -145,7 +144,6 @@ const loading = ref(true)
 const saving = ref(false)
 const keyboardShortcutsValid = ref(true)
 const usbSettingsValid = ref(true)
-const audioSettingsValid = ref(true)
 const keyboardLayoutOptions = computed(() => [
 	{ value: 'us', label: t('keyboard.layouts.us', 'English (US)') },
 	{ value: 'uk', label: t('keyboard.layouts.uk', 'English (UK)') },
@@ -373,7 +371,6 @@ const sections = computed<SidebarSection[]>(() => {
     { key: 'display', label: t('settings.advancedSettings.display', 'Display'), icon: MonitorUp },
 		{ key: 'keyboard', label: t('settings.advancedSettings.keyboard', 'Keyboard'), icon: Keyboard },
 	{ key: 'usb', label: t('settings.advancedSettings.usb', 'USB'), icon: Usb },
-    { key: 'audio', label: t('settings.advancedSettings.audio', 'Audio'), icon: Volume2 },
     { key: 'network', label: t('settings.advancedSettings.network', 'Network'), icon: Network },
     { key: 'plugins', label: t('settings.advancedSettings.plugins', 'Plugins'), icon: Box },
     ...extensionPages,
@@ -1323,7 +1320,13 @@ watch(section, (value) => {
               </section>
 
               <section v-else-if="section === 'usb' && config" class="advanced-settings-section">
-                <USBSettingsForm v-model="config.usb" :disabled="saving" @validity="usbSettingsValid = $event" />
+                <USBSettingsForm
+                  v-model="config.usb"
+                  v-model:audio="config.audio"
+                  :gadget="status?.hid?.gadget"
+                  :disabled="saving"
+                  @validity="usbSettingsValid = $event"
+                />
                 <footer class="advanced-settings-actions">
                   <n-button :disabled="saving" @click="load">{{ t('common.refresh', 'Reload') }}</n-button>
                   <n-button type="primary" :loading="saving" :disabled="!usbSettingsValid" @click="save">
@@ -1333,20 +1336,14 @@ watch(section, (value) => {
                 </footer>
               </section>
 
-              <section v-else-if="section === 'audio' && config" class="advanced-settings-section">
-                <AudioSettingsForm v-model="config.audio" :disabled="saving" @validity="audioSettingsValid = $event" />
-                <footer class="advanced-settings-actions">
-                  <n-button :disabled="saving" @click="load">{{ t('common.refresh', 'Reload') }}</n-button>
-                  <n-button type="primary" :loading="saving" :disabled="!audioSettingsValid" @click="save">
-                    <template #icon><Save /></template>
-                    {{ t('common.save', 'Save') }}
-                  </n-button>
-                </footer>
-              </section>
-
               <section v-else-if="section === 'network' && config" class="advanced-settings-section">
                 <NetworkInterfaceManager v-model="config.network" :disabled="saving" @validity="networkEditorsValid = $event" />
-				<HostnameSettingsForm v-model="config.network.hostname" :disabled="saving" />
+				<HostnameSettingsForm
+				  v-model="config.network.hostname"
+				  :mdns="config.network.mdns"
+				  :disabled="saving"
+				  @update:mdns="config.network.mdns = $event"
+				/>
 				<DNSSettingsForm v-model="config.network.dns" :disabled="saving" />
 				<ActiveRoutesPanel />
 				<StaticRoutesForm

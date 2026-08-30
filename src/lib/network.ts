@@ -16,6 +16,7 @@ export function defaultNetworkConfig(): NetworkConfig {
 		static_routes: [],
     wifi_ssid: '',
     hostname: '',
+    mdns: false,
     http_port: 80,
     https_port: 443,
     tls_enabled: true,
@@ -70,6 +71,24 @@ export function withManagementVLAN(config: NetworkConfig, vlanID: number): Netwo
   }
 }
 
+export function isDNSServer(value: string) {
+  const server = value.trim()
+  if (!server) return false
+  if (/^https:\/\//i.test(server)) {
+    try {
+      const parsed = new URL(server)
+      return parsed.protocol === 'https:' && Boolean(parsed.host)
+    } catch {
+      return false
+    }
+  }
+  const separator = server.indexOf('#')
+  if (separator === -1) return isIPv4(server) || isIPv6(server)
+  const address = server.slice(0, separator)
+  const name = server.slice(separator + 1)
+  return (isIPv4(address) || isIPv6(address)) && /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/.test(name)
+}
+
 export function isIPv4(value: string) {
   const parts = value.split('.')
   return parts.length === 4 && parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) <= 255)
@@ -105,7 +124,7 @@ export function isNetworkConfigValid(config: NetworkConfig) {
     if (!validCIDR(config.ipv6_address, 6)) return false
     if (config.ipv6_gateway && !isIPv6(config.ipv6_gateway)) return false
   }
-  if (!(config.dns || []).every((server) => isIPv4(server) || isIPv6(server))) return false
+  if (!(config.dns || []).every((server) => isDNSServer(server))) return false
   const names = new Set<string>()
   for (const wireGuard of config.wireguard || []) {
     if (!/^[A-Za-z0-9_.:@-]+$/.test(wireGuard.name) || wireGuard.name === config.device || names.has(wireGuard.name)) return false

@@ -4,8 +4,8 @@ import { computed } from 'vue'
 import { t } from '@/i18n/runtime'
 import { validHostname } from '@/lib/network'
 
-const props = defineProps<{ modelValue: string; disabled?: boolean }>()
-const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
+const props = defineProps<{ modelValue: string; mdns?: boolean; disabled?: boolean }>()
+const emit = defineEmits<{ 'update:modelValue': [value: string]; 'update:mdns': [value: boolean] }>()
 const valid = computed(() => validHostname(props.modelValue))
 </script>
 
@@ -27,6 +27,16 @@ const valid = computed(() => validHostname(props.modelValue))
           :status="valid ? undefined : 'error'"
           @update:value="emit('update:modelValue', $event.trim())"
         />
+      </n-form-item>
+      <n-form-item :label="t('network.mdns.title', 'mDNS')">
+        <n-switch
+          :value="Boolean(props.mdns)"
+          :disabled="disabled"
+          @update:value="emit('update:mdns', $event)"
+        />
+        <template #feedback>
+          {{ t('network.mdns.hint', 'Advertise hostname.local on the LAN. Turn this off if you do not use discovery.') }}
+        </template>
       </n-form-item>
     </n-form>
   </section>

@@ -397,7 +397,7 @@ const zh_tw = {
           productName: '裝置名稱',
         },
         usbPage: {
-          restartHint: 'USB 識別會在 OneKVM 服務或裝置重新啟動後生效，受控主機會重新列舉 USB 裝置。',
+          restartHint: 'USB 識別和 HID 名稱在 OneKVM 服務或裝置重新啟動後生效。開啟音訊或手把會立即重新列舉 USB。',
           deviceIdentity: 'USB 裝置識別',
           deviceIdentityHint: '這些描述元用於在受控主機上識別複合 KVM 裝置。',
           manufacturer: '製造商',
@@ -413,6 +413,18 @@ const zh_tw = {
           gamepad: 'WebHID 手把',
           gamepadHint: '在複合 USB 裝置上增加一個手把，以便瀏覽器透過 WebHID 轉發本機手把。儲存此選項會讓受控主機重新列舉 USB。',
           gamepadEnable: '啟用 USB 手把',
+          gamepadBlocked: '手把還需要一個 IN 端點，目前控制器已經沒有空閒額度。',
+          audioBlocked: 'USB 音訊還需要各一個 IN 和 OUT 端點，目前控制器已經沒有空閒額度。',
+          endpoints: 'UDC 端點',
+          endpointsHint: '每個 USB 裝置控制器的 IN/OUT 端點數量是固定的。音訊、手把、大容量儲存和 MTP 都會占用這份額度。',
+          endpointsExceeded: '目前組合超過了控制器的端點上限。請關閉音訊、手把、MTP，或鍵盤 LED 端點。',
+          keyboard: 'USB 鍵盤',
+          keyboardHint: 'HID 鍵盤的介面名稱和輪詢間隔。間隔 0 表示使用核心預設值。LED 端點用於 Num/Caps/Scroll Lock。',
+          mouse: 'USB 滑鼠',
+          mouseHint: '相對滑鼠和絕對滑鼠共用的介面名稱與輪詢間隔。',
+          interfaceName: '介面名稱',
+          pollInterval: '輪詢間隔（毫秒）',
+          keyboardLeds: '鍵盤 LED 端點',
         },
         displayPage: {
           outputResolution: '輸出解析度',
@@ -1183,8 +1195,13 @@ const zh_tw = {
       },
 	  dns: {
 		title: 'DNS 伺服器',
-		description: '供所有網路介面使用的系統級名稱伺服器。',
+		description: '供所有網路介面使用的系統級名稱伺服器。DoT 使用 位址#名稱，例如 1.1.1.1#one.one.one.one。DoH 使用 https:// URL。',
 		servers: '名稱伺服器',
+		dohDotHint: 'DoT：1.1.1.1#one.one.one.one。DoH：https://cloudflare-dns.com/dns-query。一般 IP 仍走明文 DNS。',
+	  },
+	  mdns: {
+		title: 'mDNS',
+		hint: '在區域網路廣播 hostname.local。如果不用探索功能，建議關閉。',
 	  },
 	  routes: {
 		title: '靜態路由',

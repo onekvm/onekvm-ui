@@ -398,7 +398,7 @@ const en = {
           productName: 'Device name',
         },
         usbPage: {
-          restartHint: 'USB identity changes take effect after OneKVM or the device is restarted. The controlled host will enumerate the USB device again.',
+          restartHint: 'USB identity and HID names take effect after OneKVM or the device is restarted. Enabling audio or the gamepad re-enumerates USB immediately.',
           deviceIdentity: 'USB device identity',
           deviceIdentityHint: 'These descriptors identify the composite KVM device on the controlled host.',
           manufacturer: 'Manufacturer',
@@ -414,6 +414,18 @@ const en = {
           gamepad: 'WebHID gamepad',
           gamepadHint: 'Adds a USB game pad to the composite gadget so a local controller can be forwarded through the browser. Saving this option re-enumerates USB on the controlled host.',
           gamepadEnable: 'Enable USB gamepad',
+          gamepadBlocked: 'The gamepad needs one more IN endpoint than this controller has free.',
+          audioBlocked: 'USB audio needs one more IN and OUT endpoint than this controller has free.',
+          endpoints: 'UDC endpoints',
+          endpointsHint: 'Each USB device controller has a fixed number of IN and OUT endpoints. Extra functions such as audio, a gamepad, mass storage, or MTP share this budget.',
+          endpointsExceeded: 'This combination uses more endpoints than the controller provides. Disable audio, the gamepad, MTP, or the keyboard LED endpoint.',
+          keyboard: 'USB keyboard',
+          keyboardHint: 'Interface name and polling interval for the HID keyboard. Interval 0 keeps the kernel default. The LED endpoint is required for Num/Caps/Scroll Lock.',
+          mouse: 'USB mouse',
+          mouseHint: 'Shared interface name and polling interval for the relative and absolute mouse functions.',
+          interfaceName: 'Interface name',
+          pollInterval: 'Polling interval (ms)',
+          keyboardLeds: 'Keyboard LED endpoint',
         },
         displayPage: {
           outputResolution: 'Output resolution',
@@ -1179,8 +1191,13 @@ const en = {
       },
 	  dns: {
 		title: 'DNS servers',
-		description: 'System-wide name servers used by all network interfaces.',
+		description: 'System-wide name servers used by all network interfaces. DoT uses address#name, for example 1.1.1.1#one.one.one.one. DoH uses an https:// URL.',
 		servers: 'Name servers',
+		dohDotHint: 'DoT: 1.1.1.1#one.one.one.one. DoH: https://cloudflare-dns.com/dns-query. Plain IP addresses stay unencrypted.',
+	  },
+	  mdns: {
+		title: 'mDNS',
+		hint: 'Advertise hostname.local on the LAN. Turn this off if you do not use discovery.',
 	  },
 	  routes: {
 		title: 'Static routes',

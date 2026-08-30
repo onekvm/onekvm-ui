@@ -18,6 +18,7 @@ export interface NetworkConfig {
   wifi_ssid: string
   wifi_psk?: string
   hostname: string
+  mdns?: boolean
   http_port: number
   https_port: number
   tls_enabled: boolean
@@ -149,6 +150,11 @@ export interface USBConfig {
 	iso_product: string
 	drive_product: string
 	gamepad: boolean
+	keyboard_name?: string
+	keyboard_interval?: number
+	keyboard_no_out?: boolean
+	mouse_name?: string
+	mouse_interval?: number
 }
 
 export interface KeyboardShortcut {
@@ -273,6 +279,13 @@ export interface OneKVMStatus {
     num_lock?: boolean
     caps_lock?: boolean
     scroll_lock?: boolean
+    gadget?: {
+      udc?: string
+      in_limit: number
+      out_limit: number
+      mass_storage: boolean
+      mtp: boolean
+    }
   }
   atx: {
     available: boolean

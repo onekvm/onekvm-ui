@@ -7,7 +7,7 @@ import {
   formatSampleTime,
   latencyScaleMax,
   latencyStackBands,
-  latencyStackTotal,
+  latencyKnownTotal,
   linePath,
   nearestSampleIndex,
   sampleX,
@@ -46,7 +46,7 @@ const hover = computed(() => {
   return {
     x: sampleX(index, props.samples.length, width),
     time: formatSampleTime(sample.t),
-    total: latencyStackTotal(sample),
+    total: latencyKnownTotal(sample),
     sample,
   }
 })

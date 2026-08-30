@@ -96,7 +96,8 @@ const audioEncodeLatency = computed(() => formatLatencyUs(props.audioEncodeLaten
 const audioJitterBuffer = computed(() => formatLatencyUs(props.audioJitterBufferUs || 0))
 const audioLatencyTotal = computed(() => formatLatencyUs(
   Math.max(0, props.audioCaptureLatencyUs || 0)
-  + Math.max(0, props.audioEncodeLatencyUs || 0),
+  + Math.max(0, props.audioEncodeLatencyUs || 0)
+  + Math.max(0, props.audioJitterBufferUs || 0),
 ))
 </script>
 

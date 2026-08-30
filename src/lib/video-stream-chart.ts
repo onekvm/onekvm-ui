@@ -65,10 +65,21 @@ export function latencyStackTotal(sample: LatencySample): number {
   return total
 }
 
+export function latencyKnownTotal(sample: LatencySample): number {
+  const capture = Math.max(0, sample.capture)
+  const encode = Math.max(0, sample.encode)
+  const present = Math.max(0, sample.present)
+  /* Present is receive→display and already includes jitter+decode. Audio
+     samples have no present, so browser delay is jitter+decode. ICE RTT is
+     a separate path measurement, not added into the one-way total. */
+  if (present > 0) return capture + encode + present
+  return capture + encode + Math.max(0, sample.jitter) + Math.max(0, sample.decode)
+}
+
 export function latencyScaleMax(samples: readonly LatencySample[]): number {
   let peak = 0
   for (const sample of samples) {
-    peak = Math.max(peak, latencyStackTotal(sample), sample.ice)
+    peak = Math.max(peak, latencyStackTotal(sample), latencyKnownTotal(sample), sample.ice)
   }
   return niceCeiling(peak, 20)
 }

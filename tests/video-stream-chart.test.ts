@@ -10,6 +10,7 @@ import {
   latencyMs,
   latencyScaleMax,
   latencyStackBands,
+  latencyKnownTotal,
   latencyStackTotal,
   linePath,
   nearestSampleIndex,
@@ -83,6 +84,11 @@ const latencySample = {
   t: 1, capture: 16.7, encode: 9.1, ice: 2, jitter: 4, decode: 5, present: 8,
 }
 assert.equal(Math.round(latencyStackTotal(latencySample) * 10) / 10, 42.8)
+assert.equal(Math.round(latencyKnownTotal(latencySample) * 10) / 10, 33.8)
+assert.equal(
+  latencyKnownTotal({ t: 1, capture: 0.02, encode: 1.7, ice: 0, jitter: 328, decode: 0, present: 0 }),
+  329.72,
+)
 assert.equal(latencyScaleMax([latencySample]), 50)
 
 const band = stackedBandPath([10, 20], [0, 0], 20, 240, 72)

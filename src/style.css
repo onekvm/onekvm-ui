@@ -207,8 +207,8 @@ select { font: inherit; }
 .toolbar.is-vertical .device-controls,
 .toolbar.is-vertical .toolbar-actions {
   display: grid;
-  grid-template-columns: 30px 30px;
-  justify-content: center;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  justify-items: center;
   align-items: center;
   width: 100%;
   height: auto;
@@ -218,20 +218,43 @@ select { font: inherit; }
   gap: 4px;
 }
 
+.toolbar.is-vertical {
+  align-items: stretch;
+}
+
 .toolbar.is-vertical .toolbar-actions,
 .toolbar.is-vertical .toolbar-account {
+  position: relative;
+  box-sizing: border-box;
+  align-self: stretch;
+  width: 100%;
+  margin-left: 0;
   padding-top: 7px;
+  padding-right: 0;
+  padding-left: 0;
+  border-top: 0;
+  border-left: 0;
+}
+
+.toolbar.is-vertical .toolbar-actions::before,
+.toolbar.is-vertical .toolbar-account::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: var(--onekvm-toolbar-rail);
   border-top: 1px solid #343a42;
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 
 .toolbar.is-vertical .toolbar-account {
+  grid-column: 1 / -1;
   display: flex;
   justify-content: center;
-  width: 100%;
+  justify-self: stretch;
   height: auto;
-  margin: 0;
-  border-left: 0;
-  padding-left: 0;
+  min-height: 24px;
 }
 
 .toolbar.is-vertical .account-button {

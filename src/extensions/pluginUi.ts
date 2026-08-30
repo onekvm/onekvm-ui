@@ -60,7 +60,7 @@ import {
   type OneKVMStatus,
 } from '@/api/client'
 import { currentLanguage } from '@/i18n/runtime'
-import { isToolbarSlot, sortToolbarItems, type ToolbarSlot } from '@/lib/toolbar-extensions'
+import { assertToolbarRegistrationId, isToolbarSlot, sortToolbarItems, type ToolbarSlot } from '@/lib/toolbar-extensions'
 
 export interface ExtensionPageSettingsAdapterV1 {
   dirty: Readonly<Ref<boolean>>
@@ -137,6 +137,8 @@ declare global {
 const registrations = new Map<string, VueExtensionPageDefinitionV1>()
 const toolbarRegistrations = new Map<string, ToolbarRegistrationV1>()
 const toolbarItemsState = shallowRef<LoadedToolbarItem[]>([])
+let loadingToolbarId: string | null = null
+let loadingPageId: string | null = null
 
 function publishToolbarItems() {
   const items: LoadedToolbarItem[] = []
@@ -156,6 +158,7 @@ function publishToolbarItems() {
 
 function registerToolbar(id: string, definition: ToolbarRegistrationV1) {
   if (!/^[a-z0-9][a-z0-9-]{1,62}$/.test(id)) throw new Error('Invalid extension toolbar ID')
+  assertToolbarRegistrationId(id, loadingToolbarId)
   if (definition?.apiVersion !== 1 || !Array.isArray(definition.items)) {
     throw new Error(`Extension ${id} does not provide a compatible toolbar`)
   }
@@ -194,6 +197,12 @@ function createMessages(messages: PluginMessagesV1) {
 
 function register(id: string, definition: VueExtensionPageDefinitionV1) {
   if (!/^[a-z0-9][a-z0-9-]{1,62}$/.test(id)) throw new Error('Invalid extension page ID')
+  if (!loadingPageId) {
+    throw new Error('Extension page registration is only allowed while the host is loading that extension')
+  }
+  if (id !== loadingPageId) {
+    throw new Error(`Extension page ID ${id} does not match ${loadingPageId}`)
+  }
   if (definition?.apiVersion !== 1 || !definition.component) {
     throw new Error(`Extension ${id} does not provide a compatible Vue page`)
   }
@@ -305,6 +314,7 @@ export async function loadExtensionToolbars(extensions: ExtensionSummary[]) {
       script.addEventListener('load', () => resolve(), { once: true })
       script.addEventListener('error', () => reject(new Error(`Failed to load ${extension.name} toolbar`)), { once: true })
     })
+    loadingToolbarId = extension.id
     document.head.append(script)
     try {
       await loaded
@@ -312,6 +322,8 @@ export async function loadExtensionToolbars(extensions: ExtensionSummary[]) {
     } catch (error) {
       script.remove()
       console.warn(error)
+    } finally {
+      loadingToolbarId = null
     }
   }
   for (const [key, script] of loadedToolbarScripts) {
@@ -338,6 +350,7 @@ export async function loadVueExtensionPage(extension: ExtensionStatus): Promise<
     script.addEventListener('load', () => resolve(), { once: true })
     script.addEventListener('error', () => reject(new Error(`Failed to load ${extension.name} page`)), { once: true })
   })
+  loadingPageId = extension.id
   document.head.append(script)
 
   try {
@@ -363,6 +376,8 @@ export async function loadVueExtensionPage(extension: ExtensionStatus): Promise<
     script.remove()
     registrations.delete(extension.id)
     throw reason
+  } finally {
+    loadingPageId = null
   }
 }
 

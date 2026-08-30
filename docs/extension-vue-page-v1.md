@@ -124,9 +124,11 @@ window.OneKVMPluginUI.v1.toolbar.register('example', {
 })
 ```
 
-The host passes `compact`, `placement`, `status`, and `state` props. Keep the
-control small: an `n-button` or popover trigger that matches the existing
-toolbar density. Do not bundle Vue or Naive UI.
+The register ID must match the extension currently being loaded, and
+`toolbar.register` is rejected after that script's `load` event. The host does
+not pass `invoke`; toolbar items receive `compact`, `placement`, `status`, and
+`state`. Keep the control small: an `n-button` or popover trigger that matches
+the existing toolbar density. Do not bundle Vue or Naive UI.
 
 ## Settings adapter
 

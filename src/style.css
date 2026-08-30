@@ -1009,13 +1009,40 @@ select { font: inherit; }
 
 .performance-compact-bar {
   display: flex;
-  height: 32px;
+  height: 36px;
   align-items: center;
   gap: 8px;
   padding: 0 4px 0 8px;
   cursor: move;
   touch-action: none;
   user-select: none;
+}
+
+.performance-compact-chart {
+  display: block;
+  flex: 0 0 auto;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.performance-compact-chart-fps-fill {
+  fill: rgb(94 234 212 / 22%);
+}
+
+.performance-compact-chart-fps {
+  fill: none;
+  stroke: #5eead4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.25;
+}
+
+.performance-compact-chart-bitrate {
+  fill: none;
+  stroke: #fbbf24;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.25;
 }
 
 .performance-compact-metric {

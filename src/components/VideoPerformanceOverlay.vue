@@ -12,7 +12,13 @@ import {
   overlayPointerPosition,
   type OverlayPoint,
 } from '@/lib/overlay-drag'
-import { formatCompactBitrate } from '@/lib/performance-compact'
+import {
+  COMPACT_CHART_HEIGHT,
+  COMPACT_CHART_WIDTH,
+  formatCompactBitrate,
+  formatCompactResolution,
+} from '@/lib/performance-compact'
+import { compactChartPaths } from '@/lib/video-stream-chart'
 
 import DisplayStatusValues from './DisplayStatusValues.vue'
 
@@ -127,6 +133,13 @@ async function placePanel() {
 }
 
 const showAudioColumn = computed(() => showAudio.value)
+const compactResolution = computed(() => formatCompactResolution(props.inputWidth, props.inputHeight))
+const compactChart = computed(() => compactChartPaths(
+  samples.value,
+  props.targetFps,
+  COMPACT_CHART_WIDTH,
+  COMPACT_CHART_HEIGHT,
+))
 
 function startDrag(event: PointerEvent) {
   if (event.button !== 0 || !panel.value) return
@@ -216,14 +229,35 @@ watch(compact, (value) => {
       @pointerdown="startDrag"
     >
       <GripHorizontal :size="14" class="floating-window-grip" />
+      <svg
+        class="performance-compact-chart"
+        :viewBox="`0 0 ${COMPACT_CHART_WIDTH} ${COMPACT_CHART_HEIGHT}`"
+        :width="COMPACT_CHART_WIDTH"
+        :height="COMPACT_CHART_HEIGHT"
+        aria-hidden="true"
+      >
+        <path v-if="compactChart.fpsArea" class="performance-compact-chart-fps-fill" :d="compactChart.fpsArea" />
+        <path v-if="compactChart.bitrate" class="performance-compact-chart-bitrate" :d="compactChart.bitrate" />
+        <path v-if="compactChart.fps" class="performance-compact-chart-fps" :d="compactChart.fps" />
+      </svg>
       <span class="performance-compact-metric">
         <strong>{{ videoFps }}</strong>
         <span>FPS</span>
       </span>
       <span class="performance-compact-sep" />
       <span class="performance-compact-metric">
+        <strong>{{ compactResolution }}</strong>
+        <span>{{ t('screen.resolution', 'Resolution') }}</span>
+      </span>
+      <span class="performance-compact-sep" />
+      <span class="performance-compact-metric">
         <strong>{{ formatCompactBitrate(videoBitrate) }}</strong>
-        <span>{{ codec || '—' }}</span>
+        <span>{{ t('screen.bitrate', 'Bitrate') }}</span>
+      </span>
+      <span class="performance-compact-sep" />
+      <span class="performance-compact-metric">
+        <strong>{{ codec || '—' }}</strong>
+        <span>{{ t('screen.codec', 'Codec') }}</span>
       </span>
       <template v-if="showAudioColumn">
         <span class="performance-compact-sep" />

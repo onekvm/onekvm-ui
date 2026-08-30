@@ -163,6 +163,23 @@ export function sampleY(value: number, max: number, height: number): number {
   return height - (clamped / max) * height
 }
 
+export function compactChartPaths(
+  samples: readonly Pick<StreamSample, 'fps' | 'bitrate'>[],
+  targetFps: number,
+  width: number,
+  height: number,
+) {
+  const fpsValues = samples.map((sample) => sample.fps)
+  const bitrateValues = samples.map((sample) => sample.bitrate)
+  const fpsMax = fpsScaleMax(fpsValues, targetFps)
+  const bitrateMax = bitrateScaleMax(bitrateValues)
+  return {
+    fps: linePath(fpsValues, fpsMax, width, height),
+    bitrate: linePath(bitrateValues, bitrateMax, width, height),
+    fpsArea: areaPath(fpsValues, fpsMax, width, height),
+  }
+}
+
 export function linePath(
   values: readonly number[],
   max: number,

@@ -366,7 +366,7 @@ const zh_tw = {
         system: '系統',
 			keyboard: '鍵盤',
 		usb: 'USB',
-        audio: '音訊',
+        audio: 'USB 音訊',
         time: '區域和時間',
         update: '系統升級',
         sessionsPage: {
@@ -382,9 +382,10 @@ const zh_tw = {
           duration: '已連線',
         },
         audioPage: {
-          restartHint: '變更聲道會讓 USB 重新列舉。如果揚聲器已開啟，鍵盤和滑鼠會短暫中斷。瀏覽器預覽會混縮成單聲道。目前 UAC1 只支援單聲道和立體聲；5.1 需要更大的核心 USB 封包。',
-          title: '音訊',
-          hint: '這些選項作用於呈現給目標機的揚聲器和麥克風。',
+          restartHint: '開啟 USB 音訊或變更聲道會讓 gadget 重新列舉，鍵盤和滑鼠會短暫中斷。這是呈現給目標機的 UAC1 揚聲器。',
+          title: 'USB 音訊',
+          hint: '向目標機提供 USB 揚聲器。開啟後，主控台才會顯示音訊按鈕。',
+          enable: '啟用 USB 音訊',
           quality: '音質',
           qualityLow: '低 (48 kbps)',
           qualityMedium: '中 (96 kbps)',

@@ -127,8 +127,13 @@ select { font: inherit; }
   touch-action: none;
 }
 
+.toolbar-handle svg {
+  pointer-events: none;
+}
+
 .toolbar-handle:hover,
-.toolbar-handle:focus-visible {
+.toolbar-handle:focus-visible,
+.toolbar-spacer:hover .toolbar-handle {
   background: #23282e;
   color: #d5dde4;
 }
@@ -143,9 +148,9 @@ select { font: inherit; }
   z-index: 40;
   width: max-content;
   max-width: calc(100vw - 16px);
-  border: 1px solid #343a42;
-  border-radius: 10px;
-  box-shadow: 0 12px 32px rgb(0 0 0 / 42%);
+  border: 1px solid rgb(69 79 89 / 88%);
+  border-radius: 6px;
+  box-shadow: 0 14px 36px rgb(0 0 0 / 45%);
 }
 
 .toolbar.is-docked-bottom {
@@ -1668,7 +1673,17 @@ select { font: inherit; }
   text-align: right;
 }
 
-.floating-window-grip { color: #78838d; }
+.floating-window-grip {
+  flex: 0 0 auto;
+  color: #78838d;
+  border-radius: 6px;
+}
+
+.display-status-titlebar:hover .floating-window-grip,
+.performance-compact-bar:hover .floating-window-grip,
+.floating-window-grip:hover {
+  color: #d5dde4;
+}
 
 .setting-row h3 {
   margin: 0;

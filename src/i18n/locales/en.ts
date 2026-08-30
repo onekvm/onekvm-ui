@@ -367,7 +367,7 @@ const en = {
         system: 'System',
 			keyboard: 'Keyboard',
 		usb: 'USB',
-        audio: 'Audio',
+        audio: 'USB audio',
         time: 'Region and time',
         update: 'System update',
         sessionsPage: {
@@ -383,9 +383,10 @@ const en = {
           duration: 'Connected for',
         },
         audioPage: {
-          restartHint: 'Changing channels re-enumerates USB. Keyboard and mouse disconnect briefly if the speaker is on. The browser preview is mixed down to mono. This gadget supports mono and stereo; 5.1 needs a larger USB packet in the kernel.',
-          title: 'Audio',
-          hint: 'These options apply to the speaker and microphone presented to the target PC.',
+          restartHint: 'Enabling USB audio or changing channels re-enumerates the gadget. Keyboard and mouse disconnect briefly. This is a UAC1 speaker presented to the target PC.',
+          title: 'USB audio',
+          hint: 'Presents a USB speaker to the target PC. The console Audio control appears after this is enabled.',
+          enable: 'Enable USB audio',
           quality: 'Quality',
           qualityLow: 'Low (48 kbps)',
           qualityMedium: 'Medium (96 kbps)',

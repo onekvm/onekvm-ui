@@ -15,13 +15,14 @@ watch(() => audio.value, (value) => {
   if (!value.product_name) value.product_name = 'OneKVM Audio'
 }, { immediate: true })
 
+const enabled = computed({
+  get: () => Boolean(audio.value.enabled),
+  set: (value: boolean) => { audio.value.enabled = value },
+})
+
 const usbStringValid = (value: string) =>
   value.length > 0 && new TextEncoder().encode(value).length <= 126 && !/[\u0000-\u001f\u007f]/.test(value)
 
-const quality = computed({
-  get: () => audio.value.quality || 'medium',
-  set: (value: 'low' | 'medium' | 'high') => { audio.value.quality = value },
-})
 const channels = computed({
   get: () => audio.value.channels || 'stereo',
   set: (value: 'mono' | 'stereo') => { audio.value.channels = value },
@@ -34,11 +35,6 @@ const productName = computed({
 const valid = computed(() => usbStringValid(productName.value))
 watch(valid, (value) => emit('validity', value), { immediate: true })
 
-const qualityOptions = computed(() => [
-  { label: t('settings.advancedSettings.audioPage.qualityLow', 'Low (48 kbps)'), value: 'low' },
-  { label: t('settings.advancedSettings.audioPage.qualityMedium', 'Medium (96 kbps)'), value: 'medium' },
-  { label: t('settings.advancedSettings.audioPage.qualityHigh', 'High (160 kbps)'), value: 'high' },
-])
 const channelOptions = computed(() => [
   { label: t('settings.advancedSettings.audioPage.mono', 'Mono'), value: 'mono' },
   { label: t('settings.advancedSettings.audioPage.stereo', 'Stereo'), value: 'stereo' },
@@ -48,17 +44,17 @@ const channelOptions = computed(() => [
 <template>
   <div class="audio-settings">
     <n-alert type="info" :bordered="false">
-      {{ t('settings.advancedSettings.audioPage.restartHint', 'Changing channels re-enumerates USB. Keyboard and mouse disconnect briefly if the speaker is on. The browser preview is mixed down to mono. This UAC1 gadget supports mono and stereo; 5.1 needs a larger USB packet size in the kernel.') }}
+      {{ t('settings.advancedSettings.audioPage.restartHint', 'Enabling USB audio or changing channels re-enumerates the gadget. Keyboard and mouse disconnect briefly. This is a UAC1 speaker presented to the target PC.') }}
     </n-alert>
 
     <section class="audio-settings-card">
       <header>
-        <h2>{{ t('settings.advancedSettings.audioPage.title', 'Audio') }}</h2>
-        <p>{{ t('settings.advancedSettings.audioPage.hint', 'These options apply to the speaker and microphone presented to the target PC.') }}</p>
+        <h2>{{ t('settings.advancedSettings.audioPage.title', 'USB audio') }}</h2>
+        <p>{{ t('settings.advancedSettings.audioPage.hint', 'Presents a USB speaker to the target PC. The console Audio control appears after this is enabled.') }}</p>
       </header>
       <n-form label-placement="top" :show-feedback="false" class="audio-settings-grid">
-        <n-form-item :label="t('settings.advancedSettings.audioPage.quality', 'Quality')">
-          <n-select v-model:value="quality" :options="qualityOptions" :disabled="props.disabled" />
+        <n-form-item :label="t('settings.advancedSettings.audioPage.enable', 'Enable USB audio')">
+          <n-switch v-model:value="enabled" :disabled="props.disabled" />
         </n-form-item>
         <n-form-item :label="t('settings.advancedSettings.audioPage.channels', 'Channels')">
           <n-select v-model:value="channels" :options="channelOptions" :disabled="props.disabled" />

@@ -366,7 +366,7 @@ const zh = {
         system: '系统',
 			keyboard: '键盘',
 		usb: 'USB',
-        audio: '音频',
+        audio: 'USB 音频',
         time: '区域和时间',
         update: '系统升级',
         sessionsPage: {
@@ -382,9 +382,10 @@ const zh = {
           duration: '已连接',
         },
         audioPage: {
-          restartHint: '更改声道会让 USB 重新枚举。如果扬声器已打开，键盘和鼠标会短暂断开。浏览器预览会混缩成单声道。当前 UAC1 只支持单声道和立体声；5.1 需要更大的内核 USB 包长。',
-          title: '音频',
-          hint: '这些选项作用于呈现给目标机的扬声器和麦克风。',
+          restartHint: '开启 USB 音频或更改声道会让 gadget 重新枚举，键盘和鼠标会短暂断开。这是呈现给目标机的 UAC1 扬声器。',
+          title: 'USB 音频',
+          hint: '向目标机提供 USB 扬声器。开启后，控制台才会显示音频按钮。',
+          enable: '启用 USB 音频',
           quality: '音质',
           qualityLow: '低 (48 kbps)',
           qualityMedium: '中 (96 kbps)',

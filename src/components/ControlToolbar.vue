@@ -723,6 +723,7 @@ onBeforeUnmount(() => {
       </KeyboardControlPopover>
 
       <GamepadPopover
+        v-if="status?.hid?.gamepad"
         :hid="status?.hid"
         :placement="menuPlacement"
         @update:show="updateMenu('gamepad', $event)"
@@ -773,6 +774,7 @@ onBeforeUnmount(() => {
       </PowerControlPopover>
 
       <USBAudioPopover
+        v-if="status?.audio.enabled"
         :status="status"
         :placement="menuPlacement"
         @update:show="updateMenu('audio', $event)"

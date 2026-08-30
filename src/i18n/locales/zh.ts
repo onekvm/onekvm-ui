@@ -241,6 +241,18 @@ const zh = {
       requestPointer: '正在使用鼠标相对模式，请点击桌面获取鼠标指针。',
       resetHid: '重置 HID',
     },
+    gamepad: {
+      title: '手柄',
+      request: '连接 WebHID 手柄',
+      disconnect: '断开',
+      empty: '还没有正在转发的手柄。',
+      enableFirst: '请先在高级设置 → USB 中打开 USB 手柄。',
+      webhidUnsupported: '当前浏览器不支持 WebHID。USB 手柄透传需要 Chrome 或 Edge。',
+      requestFailed: '打开手柄失败。',
+      enabledHint: 'USB 手柄已启用。用 WebHID 连接本地手柄后，按键会注入到被控主机。',
+      disabledHint: 'USB 手柄未打开。请到高级设置 → USB 启用 WebHID 手柄支持。被控主机会重新枚举 USB。',
+      fallbackHint: '当前浏览器没有 WebHID。页面保持焦点时会转发标准 Gamepad API 设备。',
+    },
     image: {
       title: '镜像',
       loading: '加载中',
@@ -393,7 +405,10 @@ const zh = {
           storageIdentityHint: 'SCSI Vendor 最多 8 个 ASCII 字符，Product 最多 16 个；保存时会分别填充到各自的固定宽度字段。',
           storageVendor: 'SCSI 厂商',
           isoProduct: '虚拟 ISO 产品名称',
-          driveProduct: '虚拟存储产品名称'
+          driveProduct: '虚拟存储产品名称',
+          gamepad: 'WebHID 手柄',
+          gamepadHint: '在复合 USB 设备上增加一个手柄，以便浏览器通过 WebHID 转发本地手柄。保存此选项会让被控主机重新枚举 USB。',
+          gamepadEnable: '启用 USB 手柄',
         },
         displayPage: {
           outputResolution: '输出分辨率',

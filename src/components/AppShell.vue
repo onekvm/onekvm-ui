@@ -19,6 +19,7 @@ import { onekvm, type BrowserAudioStats, type BrowserVideoLatencyUs } from '@/li
 import { loadLocalShortcuts, saveLocalShortcuts } from '@/lib/keyboard-shortcuts'
 import { statusEvents } from '@/lib/status-events'
 import { t } from '@/i18n/runtime'
+import { loadExtensionToolbars } from '@/extensions/pluginUi'
 import { uiProduct } from '@/product'
 
 import ControlToolbar from './ControlToolbar.vue'
@@ -125,6 +126,7 @@ watch(performanceOpen, (value) => localStorage.setItem(PERFORMANCE_OVERLAY_KEY, 
 watch(
   () => auth.authenticated,
   (authenticated) => {
+    void refreshExtensionToolbars()
     if (authenticated) return
     void onekvm.close()
   },
@@ -148,6 +150,18 @@ watch(
   },
   { immediate: true },
 )
+
+async function refreshExtensionToolbars() {
+  if (!auth.authenticated) {
+    await loadExtensionToolbars([])
+    return
+  }
+  try {
+    await loadExtensionToolbars(await api.getExtensions())
+  } catch {
+    await loadExtensionToolbars([])
+  }
+}
 
 async function refreshMSDStatus() {
   try {
@@ -334,6 +348,7 @@ onMounted(() => {
 	})
 	void refreshMSDStatus()
   void refreshDeviceShortcuts()
+  void refreshExtensionToolbars()
   window.addEventListener('pagehide', closeSession)
   window.addEventListener('hashchange', syncRoute)
   document.addEventListener('fullscreenchange', syncFullscreen)

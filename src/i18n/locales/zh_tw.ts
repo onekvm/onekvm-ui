@@ -239,7 +239,19 @@ const zh_tw = {
       fast: '快',
       slow: '慢',
       requestPointer: '正在使用滑鼠相對模式，請點擊桌面獲取滑鼠指標。',
-      resetHid: '重設 HID'
+      resetHid: '重設 HID',
+    },
+    gamepad: {
+      title: '手把',
+      request: '連接 WebHID 手把',
+      disconnect: '中斷',
+      empty: '還沒有正在轉發的手把。',
+      enableFirst: '請先在進階設定 → USB 中開啟 USB 手把。',
+      webhidUnsupported: '目前瀏覽器不支援 WebHID。USB 手把透傳需要 Chrome 或 Edge。',
+      requestFailed: '開啟手把失敗。',
+      enabledHint: 'USB 手把已啟用。用 WebHID 連接本機手把後，按鍵會注入到受控主機。',
+      disabledHint: 'USB 手把未開啟。請到進階設定 → USB 啟用 WebHID 手把支援。受控主機會重新列舉 USB。',
+      fallbackHint: '目前瀏覽器沒有 WebHID。頁面保持焦點時會轉發標準 Gamepad API 裝置。',
     },
     image: {
       title: '鏡像',
@@ -393,7 +405,10 @@ const zh_tw = {
           storageIdentityHint: 'SCSI Vendor 最多 8 個 ASCII 字元，Product 最多 16 個；儲存時會分別填充至各自的固定寬度欄位。',
           storageVendor: 'SCSI 廠商',
           isoProduct: '虛擬 ISO 產品名稱',
-          driveProduct: '虛擬儲存產品名稱'
+          driveProduct: '虛擬儲存產品名稱',
+          gamepad: 'WebHID 手把',
+          gamepadHint: '在複合 USB 裝置上增加一個手把，以便瀏覽器透過 WebHID 轉發本機手把。儲存此選項會讓受控主機重新列舉 USB。',
+          gamepadEnable: '啟用 USB 手把',
         },
         displayPage: {
           outputResolution: '輸出解析度',

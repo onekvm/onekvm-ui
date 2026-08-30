@@ -148,6 +148,7 @@ export interface USBConfig {
 	storage_vendor: string
 	iso_product: string
 	drive_product: string
+	gamepad: boolean
 }
 
 export interface KeyboardShortcut {
@@ -268,6 +269,7 @@ export interface OneKVMStatus {
   hid: {
     available: boolean
     connected: boolean
+    gamepad?: boolean
     num_lock?: boolean
     caps_lock?: boolean
     scroll_lock?: boolean
@@ -473,6 +475,10 @@ export interface ExtensionSummary {
     | { source: 'lucide'; name: string }
     | { source: 'custom'; path: string }
   has_page?: boolean
+  has_toolbar?: boolean
+  toolbar?: {
+    entrypoint: string
+  }
   has_settings?: boolean
   services?: ExtensionService[]
 	memory_budget_bytes?: number
@@ -594,6 +600,9 @@ export interface ExtensionStatus extends ExtensionSummary {
     icon?:
       | { source: 'lucide'; name: string }
       | { source: 'custom'; path: string }
+  }
+  toolbar?: {
+    entrypoint: string
   }
   routes?: ExtensionRoute[]
   settings_schema: {

@@ -56,9 +56,11 @@ import {
   extensionLocalizedText,
   type ExtensionSettingValue,
   type ExtensionStatus,
+  type ExtensionSummary,
   type OneKVMStatus,
 } from '@/api/client'
 import { currentLanguage } from '@/i18n/runtime'
+import { isToolbarSlot, sortToolbarItems, type ToolbarSlot } from '@/lib/toolbar-extensions'
 
 export interface ExtensionPageSettingsAdapterV1 {
   dirty: Readonly<Ref<boolean>>
@@ -84,6 +86,26 @@ export interface VueExtensionPageDefinitionV1 {
   styles?: string[]
 }
 
+export type ToolbarSlotV1 = ToolbarSlot
+
+export interface ToolbarItemDefinitionV1 {
+  slot: ToolbarSlotV1
+  order?: number
+  component: Component
+}
+
+export interface ToolbarRegistrationV1 {
+  apiVersion: 1
+  items: ToolbarItemDefinitionV1[]
+}
+
+export interface LoadedToolbarItem {
+  extensionId: string
+  slot: ToolbarSlotV1
+  order: number
+  component: Component
+}
+
 export interface PluginUIXtermV1 {
   Terminal: (typeof import('@xterm/xterm'))['Terminal']
   FitAddon: (typeof import('@xterm/addon-fit'))['FitAddon']
@@ -95,6 +117,7 @@ interface PluginUIRuntimeV1 {
   i18n: PluginUII18nV1
   xterm: { load: () => Promise<PluginUIXtermV1> }
   register: (id: string, definition: VueExtensionPageDefinitionV1) => void
+  toolbar: { register: (id: string, definition: ToolbarRegistrationV1) => void }
 }
 
 type PluginMessageValuesV1 = Record<string, string | number>
@@ -112,6 +135,37 @@ declare global {
 }
 
 const registrations = new Map<string, VueExtensionPageDefinitionV1>()
+const toolbarRegistrations = new Map<string, ToolbarRegistrationV1>()
+const toolbarItemsState = shallowRef<LoadedToolbarItem[]>([])
+
+function publishToolbarItems() {
+  const items: LoadedToolbarItem[] = []
+  for (const [extensionId, definition] of toolbarRegistrations) {
+    for (const item of definition.items || []) {
+      if (!item?.component || !isToolbarSlot(item.slot)) continue
+      items.push({
+        extensionId,
+        slot: item.slot,
+        order: Number.isFinite(item.order) ? Number(item.order) : 0,
+        component: markRaw(item.component),
+      })
+    }
+  }
+  toolbarItemsState.value = sortToolbarItems(items)
+}
+
+function registerToolbar(id: string, definition: ToolbarRegistrationV1) {
+  if (!/^[a-z0-9][a-z0-9-]{1,62}$/.test(id)) throw new Error('Invalid extension toolbar ID')
+  if (definition?.apiVersion !== 1 || !Array.isArray(definition.items)) {
+    throw new Error(`Extension ${id} does not provide a compatible toolbar`)
+  }
+  toolbarRegistrations.set(id, definition)
+  publishToolbarItems()
+}
+
+export function toolbarItemsFor(slot: ToolbarSlotV1) {
+  return computed(() => toolbarItemsState.value.filter((item) => item.slot === slot))
+}
 
 function createTranslator(messages: PluginMessagesV1) {
   const fallback = messages.default || messages.en || Object.values(messages)[0] || {}
@@ -223,12 +277,52 @@ window.OneKVMPluginUI = {
     i18n: Object.freeze({ createTranslator, createMessages }),
     xterm: Object.freeze({ load: loadHostXterm }),
     register,
+    toolbar: Object.freeze({ register: registerToolbar }),
   }),
 }
 
 export interface LoadedVueExtensionPage {
   component: Component
   dispose: () => void
+}
+
+const loadedToolbarScripts = new Map<string, HTMLScriptElement>()
+
+export async function loadExtensionToolbars(extensions: ExtensionSummary[]) {
+  const wantedIds = new Set<string>()
+  const wantedKeys = new Set<string>()
+  for (const extension of extensions) {
+    if (!extension.enabled || !extension.version || !extension.toolbar?.entrypoint) continue
+    wantedIds.add(extension.id)
+    const key = `${extension.id}@${extension.version}`
+    wantedKeys.add(key)
+    if (loadedToolbarScripts.has(key)) continue
+    const script = document.createElement('script')
+    script.async = true
+    script.dataset.onekvmToolbar = key
+    script.src = extensionAssetURL(extension, extension.toolbar.entrypoint)
+    const loaded = new Promise<void>((resolve, reject) => {
+      script.addEventListener('load', () => resolve(), { once: true })
+      script.addEventListener('error', () => reject(new Error(`Failed to load ${extension.name} toolbar`)), { once: true })
+    })
+    document.head.append(script)
+    try {
+      await loaded
+      loadedToolbarScripts.set(key, script)
+    } catch (error) {
+      script.remove()
+      console.warn(error)
+    }
+  }
+  for (const [key, script] of loadedToolbarScripts) {
+    if (wantedKeys.has(key)) continue
+    script.remove()
+    loadedToolbarScripts.delete(key)
+  }
+  for (const id of [...toolbarRegistrations.keys()]) {
+    if (!wantedIds.has(id)) toolbarRegistrations.delete(id)
+  }
+  publishToolbarItems()
 }
 
 export async function loadVueExtensionPage(extension: ExtensionStatus): Promise<LoadedVueExtensionPage> {

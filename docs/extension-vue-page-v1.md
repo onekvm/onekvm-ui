@@ -92,6 +92,42 @@ always supplies the current extension ID, so a page cannot invoke another
 extension. Method availability and enabled-state policy are enforced by the
 extension host.
 
+## Console toolbar hooks
+
+Enabled extensions can add buttons to the remote-console toolbar without opening
+Advanced Settings. Declare a compiled JavaScript file:
+
+```json
+{
+  "toolbar": {
+    "entrypoint": "web/toolbar.js"
+  }
+}
+```
+
+Register one or more Vue components against these slots:
+
+- `device-controls` — with the HID and virtual-media indicators
+- `actions-start` — at the start of the right-hand action group
+- `actions-end` — before language and account
+
+```ts
+window.OneKVMPluginUI.v1.toolbar.register('example', {
+  apiVersion: 1,
+  items: [
+    {
+      slot: 'device-controls',
+      order: 50,
+      component: ExampleToolbarButton,
+    },
+  ],
+})
+```
+
+The host passes `compact`, `placement`, `status`, and `state` props. Keep the
+control small: an `n-button` or popover trigger that matches the existing
+toolbar density. Do not bundle Vue or Naive UI.
+
 ## Settings adapter
 
 Complex pages keep their draft state and serialization logic, then register it

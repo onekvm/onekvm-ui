@@ -7,6 +7,7 @@ import {
   Disc3,
   GripHorizontal,
   GripVertical,
+  Gamepad2,
   Keyboard,
   Languages,
   LogOut,
@@ -30,6 +31,7 @@ import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type O
 import { type MouseMode } from '@/composables/useMouse'
 import type { VideoFit } from '@/lib/video-fit'
 import { currentLanguage, languageOptions, setLanguage, t } from '@/i18n/runtime'
+import { toolbarItemsFor } from '@/extensions/pluginUi'
 import { hidIndicatorState } from '@/lib/hid-status'
 import { onekvm, type InputActivity, type TransportState } from '@/lib/onekvm'
 import { sendShortcut, shortcutChordLabel } from '@/lib/keyboard-shortcuts'
@@ -49,6 +51,7 @@ import {
 
 import DisplaySettingsPopover from './DisplaySettingsPopover.vue'
 import KeyboardControlPopover from './KeyboardControlPopover.vue'
+import GamepadPopover from './GamepadPopover.vue'
 import MouseSettingsPopover from './MouseSettingsPopover.vue'
 import PowerControlPopover from './PowerControlPopover.vue'
 import USBAudioPopover from './USBAudioPopover.vue'
@@ -97,7 +100,7 @@ const emit = defineEmits<{
 }>()
 
 type DeviceState = 'ready' | 'waiting' | 'error'
-type MenuName = 'display' | 'mouse' | 'keyboard' | 'power' | 'audio' | 'media' | 'language' | 'account'
+type MenuName = 'display' | 'mouse' | 'keyboard' | 'gamepad' | 'power' | 'audio' | 'media' | 'language' | 'account'
 type MediaUploadState = {
   minimized: boolean
   uploading: boolean
@@ -116,6 +119,7 @@ const powerAction = ref<PowerAction | null>(null)
 const openMenu = ref<MenuName | null>(null)
 const mouseLed = ref<HTMLElement | null>(null)
 const keyboardLed = ref<HTMLElement | null>(null)
+const gamepadLed = ref<HTMLElement | null>(null)
 const virtualMediaPopover = ref<{ restoreUploadDialog: () => void } | null>(null)
 const toolbarEl = ref<HTMLElement | null>(null)
 const toolbarDock = ref<ToolbarDockState>(parseToolbarDock(localStorage.getItem(TOOLBAR_DOCK_KEY)))
@@ -338,6 +342,7 @@ const mediaUpload = ref<MediaUploadState>({
 let unsubscribeActivity: (() => void) | undefined
 let mousePulseTimer = 0
 let keyboardPulseTimer = 0
+let gamepadPulseTimer = 0
 let lastMousePulse = 0
 
 const screenState = computed<DeviceState>(() => {
@@ -347,6 +352,19 @@ const screenState = computed<DeviceState>(() => {
 })
 
 const inputState = computed<DeviceState>(() => hidIndicatorState(props.status?.hid))
+const deviceControlExtensions = toolbarItemsFor('device-controls')
+const actionStartExtensions = toolbarItemsFor('actions-start')
+const actionEndExtensions = toolbarItemsFor('actions-end')
+const extensionHostProps = computed(() => ({
+  compact: toolbarCompact.value,
+  placement: menuPlacement.value,
+  status: props.status,
+  state: props.state,
+}))
+const gamepadState = computed<DeviceState>(() => {
+  if (!props.status?.hid?.gamepad) return 'waiting'
+  return inputState.value
+})
 
 const powerState = computed<DeviceState>(() => {
   if (!props.status) return 'waiting'
@@ -551,15 +569,16 @@ function pulseInputLed(activity: InputActivity) {
   if (activity === 'mouse' && now - lastMousePulse < 220) return
   if (activity === 'mouse') lastMousePulse = now
 
-  const led = activity === 'mouse' ? mouseLed.value : keyboardLed.value
+  const led = activity === 'mouse' ? mouseLed.value : activity === 'gamepad' ? gamepadLed.value : keyboardLed.value
   if (!led) return
-  const timer = activity === 'mouse' ? mousePulseTimer : keyboardPulseTimer
+  const timer = activity === 'mouse' ? mousePulseTimer : activity === 'gamepad' ? gamepadPulseTimer : keyboardPulseTimer
   window.clearTimeout(timer)
   led.classList.remove('device-led-active')
   void led.offsetWidth
   led.classList.add('device-led-active')
   const nextTimer = window.setTimeout(() => led.classList.remove('device-led-active'), 170)
   if (activity === 'mouse') mousePulseTimer = nextTimer
+  else if (activity === 'gamepad') gamepadPulseTimer = nextTimer
   else keyboardPulseTimer = nextTimer
 }
 
@@ -572,6 +591,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.clearTimeout(mousePulseTimer)
   window.clearTimeout(keyboardPulseTimer)
+  window.clearTimeout(gamepadPulseTimer)
   window.removeEventListener('resize', onToolbarWindowResize)
   stopToolbarWindowDrag()
   toolbarSnapHint.value = null
@@ -702,6 +722,28 @@ onBeforeUnmount(() => {
         </n-tooltip>
       </KeyboardControlPopover>
 
+      <GamepadPopover
+        :hid="status?.hid"
+        :placement="menuPlacement"
+        @update:show="updateMenu('gamepad', $event)"
+      >
+        <n-tooltip :disabled="openMenu === 'gamepad'">
+          <template #trigger>
+            <n-button
+              quaternary
+              size="small"
+              class="device-indicator"
+              :data-state="gamepadState"
+              :aria-label="deviceStateLabel(t('gamepad.title', 'Gamepad'), gamepadState)"
+            >
+              <template #icon><Gamepad2 /></template>
+              <span ref="gamepadLed" class="device-led" />
+            </n-button>
+          </template>
+          {{ deviceStateLabel(t('gamepad.title', 'Gamepad'), gamepadState) }}
+        </n-tooltip>
+      </GamepadPopover>
+
       <PowerControlPopover
         :available="Boolean(status?.atx?.available)"
         :can-power="canPower && Boolean(status?.atx?.available)"
@@ -776,6 +818,13 @@ onBeforeUnmount(() => {
         </n-tooltip>
       </VirtualMediaPopover>
 
+      <component
+        v-for="item in deviceControlExtensions"
+        :key="`${item.extensionId}:${item.slot}:${item.order}`"
+        :is="item.component"
+        v-bind="extensionHostProps"
+      />
+
       <n-tooltip v-if="mediaUpload.minimized">
         <template #trigger>
           <n-button
@@ -795,6 +844,13 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="toolbar-actions">
+      <component
+        v-for="item in actionStartExtensions"
+        :key="`${item.extensionId}:${item.slot}:${item.order}`"
+        :is="item.component"
+        v-bind="extensionHostProps"
+      />
+
       <n-tooltip>
         <template #trigger>
           <n-button
@@ -836,6 +892,13 @@ onBeforeUnmount(() => {
         </template>
         {{ t('settings.title') }}
       </n-tooltip>
+
+      <component
+        v-for="item in actionEndExtensions"
+        :key="`${item.extensionId}:${item.slot}:${item.order}`"
+        :is="item.component"
+        v-bind="extensionHostProps"
+      />
 
       <n-dropdown
         trigger="click"

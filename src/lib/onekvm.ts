@@ -38,7 +38,18 @@ export interface TransportState {
 }
 
 type StateListener = (state: TransportState) => void
-export type InputActivity = 'mouse' | 'keyboard'
+export type InputActivity = 'mouse' | 'keyboard' | 'gamepad'
+
+export interface GamepadReport {
+  buttons: number
+  hat: number
+  lx: number
+  ly: number
+  rx: number
+  ry: number
+  lt: number
+  rt: number
+}
 type ActivityListener = (activity: InputActivity) => void
 type BitrateListener = (kbps: number) => void
 type BrowserLatencyListener = (latency: BrowserVideoLatencyUs) => void
@@ -325,6 +336,34 @@ class OneKVMTransport {
     view.setUint16(2, clampAbsolute(x), true)
     view.setUint16(4, clampAbsolute(y), true)
     if (this.send(report)) this.emitActivity('mouse')
+  }
+
+  sendGamepad(report: GamepadReport) {
+    const payload = new Uint8Array(10)
+    payload[0] = 4
+    const view = new DataView(payload.buffer)
+    view.setUint16(1, report.buttons & 0xffff, true)
+    payload[3] = Math.min(8, Math.max(0, report.hat | 0))
+    payload[4] = report.lx & 0xff
+    payload[5] = report.ly & 0xff
+    payload[6] = report.rx & 0xff
+    payload[7] = report.ry & 0xff
+    payload[8] = report.lt & 0xff
+    payload[9] = report.rt & 0xff
+    if (this.send(payload)) this.emitActivity('gamepad')
+  }
+
+  sendIdleGamepad() {
+    this.sendGamepad({
+      buttons: 0,
+      hat: 8,
+      lx: 128,
+      ly: 128,
+      rx: 128,
+      ry: 128,
+      lt: 0,
+      rt: 0,
+    })
   }
 
   private async start() {

@@ -242,6 +242,18 @@ const en = {
       requestPointer: 'Using relative mode. Please click desktop to get mouse pointer.',
       resetHid: 'Reset HID',
     },
+    gamepad: {
+      title: 'Gamepad',
+      request: 'Connect WebHID controller',
+      disconnect: 'Disconnect',
+      empty: 'No controller is forwarding yet.',
+      enableFirst: 'Enable the USB gamepad in Advanced settings → USB first.',
+      webhidUnsupported: 'This browser does not support WebHID. Chrome or Edge is required for USB controller passthrough.',
+      requestFailed: 'Failed to open the controller.',
+      enabledHint: 'USB gamepad is enabled. Connect a controller with WebHID, then press buttons on the remote host.',
+      disabledHint: 'USB gamepad is off. Open Advanced settings → USB and enable WebHID gamepad support. The controlled host will re-enumerate USB.',
+      fallbackHint: 'WebHID is unavailable in this browser. Standard Gamepad API devices are forwarded while this page stays focused.',
+    },
     image: {
       title: 'Images',
       loading: 'Loading...',
@@ -394,7 +406,10 @@ const en = {
           storageIdentityHint: 'SCSI Vendor is limited to 8 ASCII characters and Product to 16. They are padded into separate fixed-width fields.',
           storageVendor: 'SCSI vendor',
           isoProduct: 'Virtual ISO product',
-          driveProduct: 'Virtual storage product'
+          driveProduct: 'Virtual storage product',
+          gamepad: 'WebHID gamepad',
+          gamepadHint: 'Adds a USB game pad to the composite gadget so a local controller can be forwarded through the browser. Saving this option re-enumerates USB on the controlled host.',
+          gamepadEnable: 'Enable USB gamepad',
         },
         displayPage: {
           outputResolution: 'Output resolution',

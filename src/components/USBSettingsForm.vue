@@ -26,6 +26,8 @@ const valid = computed(() =>
   scsiStringValid(usb.value.drive_product, 16),
 )
 
+if (usb.value.gamepad == null) usb.value.gamepad = false
+
 watch(valid, (value) => emit('validity', value), { immediate: true })
 </script>
 
@@ -58,6 +60,18 @@ watch(valid, (value) => emit('validity', value), { immediate: true })
         </n-form-item>
         <n-form-item :label="t('settings.advancedSettings.usbPage.configuration', 'Configuration name')">
           <n-input v-model:value="usb.configuration" :disabled="props.disabled" maxlength="126" :status="usbStringValid(usb.configuration) ? undefined : 'error'" />
+        </n-form-item>
+      </n-form>
+    </section>
+
+    <section class="usb-settings-card">
+      <header>
+        <h2>{{ t('settings.advancedSettings.usbPage.gamepad', 'WebHID gamepad') }}</h2>
+        <p>{{ t('settings.advancedSettings.usbPage.gamepadHint', 'Adds a USB game pad to the composite gadget so a local controller can be forwarded through the browser. Saving this option re-enumerates USB on the controlled host.') }}</p>
+      </header>
+      <n-form label-placement="top" :show-feedback="false">
+        <n-form-item :label="t('settings.advancedSettings.usbPage.gamepadEnable', 'Enable USB gamepad')">
+          <n-switch v-model:value="usb.gamepad" :disabled="props.disabled" />
         </n-form-item>
       </n-form>
     </section>

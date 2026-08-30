@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Activity, GripHorizontal, X } from '@lucide/vue'
+import { Activity, GripHorizontal, Minus, Square, X } from '@lucide/vue'
 
 import { t } from '@/i18n/runtime'
 import { useLatencyHistory } from '@/composables/useLatencyHistory'
@@ -12,6 +12,7 @@ import {
   overlayPointerPosition,
   type OverlayPoint,
 } from '@/lib/overlay-drag'
+import { formatCompactBitrate } from '@/lib/performance-compact'
 
 import DisplayStatusValues from './DisplayStatusValues.vue'
 
@@ -51,7 +52,11 @@ const emit = defineEmits<{
 }>()
 
 const ADVANCED_KEY = 'onekvm-performance-advanced'
+const AUDIO_KEY = 'onekvm-performance-audio'
+const COMPACT_KEY = 'onekvm-performance-compact'
 const advanced = ref(localStorage.getItem(ADVANCED_KEY) === 'true')
+const showAudio = ref(localStorage.getItem(AUDIO_KEY) !== 'false')
+const compact = ref(localStorage.getItem(COMPACT_KEY) === 'true')
 
 const { samples } = useVideoStreamHistory(() => props.videoFps, () => props.videoBitrate)
 const { samples: latencySamples } = useLatencyHistory(() => ({
@@ -121,8 +126,11 @@ async function placePanel() {
   clampPosition()
 }
 
+const showAudioColumn = computed(() => showAudio.value)
+
 function startDrag(event: PointerEvent) {
-  if (event.button !== 0 || !panel.value || window.innerWidth < 768) return
+  if (event.button !== 0 || !panel.value) return
+  if (!compact.value && window.innerWidth < 768) return
   const handle = event.currentTarget
   if (!(handle instanceof HTMLElement)) return
   handle.setPointerCapture(event.pointerId)
@@ -174,14 +182,22 @@ watch(() => props.visible, (visible) => {
 watch(() => [props.canvasWidth, props.canvasHeight], () => {
   if (props.visible) clampPosition()
 })
+function persistLayout() {
+  if (!props.visible) return
+  void nextTick().then(() => clampPosition())
+}
+
 watch(advanced, (value) => {
   localStorage.setItem(ADVANCED_KEY, String(value))
-  if (!props.visible) return
-  void nextTick().then(() => clampPosition())
+  persistLayout()
 })
-watch(() => props.audioEnabled, () => {
-  if (!props.visible) return
-  void nextTick().then(() => clampPosition())
+watch(showAudio, (value) => {
+  localStorage.setItem(AUDIO_KEY, String(value))
+  persistLayout()
+})
+watch(compact, (value) => {
+  localStorage.setItem(COMPACT_KEY, String(value))
+  persistLayout()
 })
 </script>
 
@@ -189,20 +205,85 @@ watch(() => props.audioEnabled, () => {
   <section
     ref="panel"
     class="video-performance-overlay"
-    :class="{ 'is-advanced': advanced, 'has-audio': audioEnabled }"
+    :class="{ 'is-advanced': advanced && !compact, 'has-audio': showAudioColumn && !compact, 'is-compact': compact }"
     :style="panelStyle"
     role="dialog"
     :aria-label="t('screen.performance', 'Performance')"
   >
-    <header class="display-status-titlebar" @pointerdown="startDrag">
+    <div
+      v-if="compact"
+      class="performance-compact-bar"
+      @pointerdown="startDrag"
+    >
+      <GripHorizontal :size="14" class="floating-window-grip" />
+      <span class="performance-compact-metric">
+        <strong>{{ videoFps }}</strong>
+        <span>FPS</span>
+      </span>
+      <span class="performance-compact-sep" />
+      <span class="performance-compact-metric">
+        <strong>{{ formatCompactBitrate(videoBitrate) }}</strong>
+        <span>{{ codec || '—' }}</span>
+      </span>
+      <template v-if="showAudioColumn">
+        <span class="performance-compact-sep" />
+        <span class="performance-compact-metric">
+          <strong>{{ audioFps || 0 }}</strong>
+          <span>/s</span>
+        </span>
+        <span class="performance-compact-metric">
+          <strong>{{ formatCompactBitrate(audioBitrate || 0) }}</strong>
+          <span>{{ (audioEncoder || '').toUpperCase() || 'AUD' }}</span>
+        </span>
+      </template>
+      <div class="performance-compact-actions" @pointerdown.stop>
+        <n-button
+          quaternary
+          circle
+          size="tiny"
+          :aria-label="t('screen.performanceExpand', 'Expand performance overlay')"
+          @click="compact = false"
+        >
+          <template #icon><Square :size="11" /></template>
+        </n-button>
+        <n-button
+          quaternary
+          circle
+          size="tiny"
+          :aria-label="t('screen.hidePerformance', 'Hide performance overlay')"
+          @click="emit('close')"
+        >
+          <template #icon><X :size="13" /></template>
+        </n-button>
+      </div>
+    </div>
+    <header v-else class="display-status-titlebar" @pointerdown="startDrag">
       <GripHorizontal :size="15" class="floating-window-grip" />
       <Activity :size="15" />
       <strong>{{ t('screen.performance', 'Performance') }}</strong>
       <div class="control-popover-header-actions" @pointerdown.stop>
         <label class="performance-advanced-toggle">
+          <span>{{ t('screen.performanceAudio', 'Audio') }}</span>
+          <n-switch v-model:value="showAudio" size="small" />
+        </label>
+        <label class="performance-advanced-toggle">
           <span>{{ t('screen.performanceAdvanced', 'Advanced') }}</span>
           <n-switch v-model:value="advanced" size="small" />
         </label>
+        <n-tooltip to=".console-workspace" :z-index="4000">
+          <template #trigger>
+            <n-button
+              quaternary
+              circle
+              size="tiny"
+              :aria-label="t('screen.performanceMinimize', 'Compact performance overlay')"
+              @click="compact = true"
+            >
+              <template #icon><Minus /></template>
+            </n-button>
+          </template>
+          {{ t('screen.performanceMinimize', 'Compact performance overlay') }}
+        </n-tooltip>
         <n-tooltip to=".console-workspace" :z-index="4000">
           <template #trigger>
             <n-button
@@ -219,7 +300,7 @@ watch(() => props.audioEnabled, () => {
         </n-tooltip>
       </div>
     </header>
-    <div class="display-status-content">
+    <div v-if="!compact" class="display-status-content">
       <DisplayStatusValues
         :canvas-width="canvasWidth"
         :canvas-height="canvasHeight"
@@ -239,7 +320,7 @@ watch(() => props.audioEnabled, () => {
         :decode-us="decodeUs"
         :present-us="presentUs"
         :show-latency="advanced"
-        :audio-enabled="audioEnabled"
+        :audio-enabled="showAudioColumn"
         :audio-encoder="audioEncoder"
         :audio-quality="audioQuality"
         :audio-sample-rate="audioSampleRate"

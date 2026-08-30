@@ -1001,6 +1001,59 @@ select { font: inherit; }
   width: min(760px, calc(100% - 16px));
 }
 
+.video-performance-overlay.is-compact {
+  width: max-content;
+  max-width: calc(100% - 16px);
+  overflow: hidden;
+}
+
+.performance-compact-bar {
+  display: flex;
+  height: 32px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px 0 8px;
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+}
+
+.performance-compact-metric {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-feature-settings: "tnum" 1, "zero" 1;
+  white-space: nowrap;
+}
+
+.performance-compact-metric strong {
+  color: #edf1f4;
+  font-family: var(--onekvm-font-mono);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1;
+}
+
+.performance-compact-metric span {
+  color: #8b949e;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+
+.performance-compact-sep {
+  width: 1px;
+  height: 14px;
+  background: rgb(69 79 89 / 88%);
+}
+
+.performance-compact-actions {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
 .keyboard-status-window {
   position: fixed;
   z-index: 2500;
@@ -1032,6 +1085,14 @@ select { font: inherit; }
 .display-status-titlebar strong {
   font-size: 12px;
   font-weight: 600;
+}
+
+.video-performance-overlay .display-status-titlebar strong {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .performance-advanced-toggle {
@@ -2816,6 +2877,7 @@ select { font: inherit; }
   .device-indicator { width: 27px; min-width: 27px !important; }
   .n-drawer.n-drawer--right-placement { width: 100vw !important; }
   .display-status-titlebar { cursor: default; }
+  .video-performance-overlay.is-compact .performance-compact-bar { cursor: move; }
   .advanced-settings-header { padding: 0 8px; }
   .advanced-settings-layout {
     grid-template-columns: 1fr;

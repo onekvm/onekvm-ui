@@ -76,6 +76,9 @@ const zh_tw = {
       showPerformance: '顯示效能監控',
       hidePerformance: '隱藏效能監控',
       performanceAdvanced: '進階',
+      performanceAudio: '音訊',
+      performanceMinimize: '精簡效能列',
+      performanceExpand: '展開效能視窗',
       targetResolution: '目標解析度',
       auto: '自動',
       autoTips:

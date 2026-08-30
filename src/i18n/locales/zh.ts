@@ -76,6 +76,9 @@ const zh = {
       showPerformance: '显示性能监控',
       hidePerformance: '隐藏性能监控',
       performanceAdvanced: '高级',
+      performanceAudio: '音频',
+      performanceMinimize: '精简性能条',
+      performanceExpand: '展开性能窗口',
       targetResolution: '目标分辨率',
       auto: '自动',
       autoTips:

@@ -77,6 +77,9 @@ const en = {
       showPerformance: 'Show performance overlay',
       hidePerformance: 'Hide performance overlay',
       performanceAdvanced: 'Advanced',
+      performanceAudio: 'Audio',
+      performanceMinimize: 'Compact performance overlay',
+      performanceExpand: 'Expand performance overlay',
       targetResolution: 'Target resolution',
       auto: 'Automatic',
       autoTips:

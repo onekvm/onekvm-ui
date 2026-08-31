@@ -74,12 +74,13 @@ const disconnecting = ref(false)
 const mtpBusy = ref(false)
 const status = ref<MSDStatus | null>(null)
 const media = ref<MSDMedia[]>([])
-const tab = ref<'iso' | 'drive'>('iso')
+type MediaTab = 'iso' | 'drive' | 'mtp'
+const tab = ref<MediaTab>('iso')
 const driveCreateOpen = ref(false)
 const folderCreateOpen = ref(false)
 const popoverOpen = ref(false)
 const pinned = ref(false)
-const pinnedTab = ref<'iso' | 'drive' | null>(null)
+const pinnedTab = ref<MediaTab | null>(null)
 const panel = ref<HTMLElement | null>(null)
 const position = ref({ x: 24, y: 58 })
 let dragOffset = { x: 0, y: 0 }
@@ -161,9 +162,19 @@ const panelStyle = computed(() => pinned.value
 const uploadWindowStyle = computed(() => uploadPosition.value
   ? { position: 'fixed' as const, left: `${uploadPosition.value.x}px`, top: `${uploadPosition.value.y}px` }
   : undefined)
-const activeTabLabel = computed(() => (pinnedTab.value || tab.value) === 'iso'
-  ? t('virtualMedia.isoTab', 'ISO mounting')
-  : t('virtualMedia.driveTab', 'Virtual USB drive'))
+function tabLabel(name: MediaTab) {
+  if (name === 'drive') return t('virtualMedia.driveTab', 'Virtual USB drive')
+  if (name === 'mtp') return t('virtualMedia.mtpTab', 'MTP')
+  return t('virtualMedia.isoTab', 'ISO mounting')
+}
+const activeTabLabel = computed(() => tabLabel(pinnedTab.value || tab.value))
+const pinnedConnectionLabel = computed(() => {
+  const current = pinnedTab.value || tab.value
+  if (current === 'mtp') {
+    return status.value?.mtp ? t('virtualMedia.connected', 'Connected') : t('virtualMedia.disconnected', 'Disconnected')
+  }
+  return hostConnected.value ? t('virtualMedia.connected', 'Connected') : t('virtualMedia.disconnected', 'Disconnected')
+})
 const uploadRemainingSeconds = computed(() => {
   const total = pendingUpload.value?.size || uploadFileSize.value
   if (!uploading.value || uploadSpeed.value <= 0 || total <= uploadTransferred.value) return 0
@@ -218,7 +229,7 @@ function clampPosition() {
   }
 }
 
-async function pinPanel(targetTab: 'iso' | 'drive', event?: MouseEvent) {
+async function pinPanel(targetTab: MediaTab, event?: MouseEvent) {
   tab.value = targetTab
   pinnedTab.value = targetTab
   pinned.value = true
@@ -1069,24 +1080,8 @@ onBeforeUnmount(() => {
           <GripHorizontal :size="15" class="floating-window-grip" />
           <Disc3 :size="15" />
           <strong>{{ t('virtualMedia.title', 'Virtual Media') }}</strong>
-          <span class="display-status-pinned-label">{{ activeTabLabel }} · {{ hostConnected ? t('virtualMedia.connected', 'Connected') : t('virtualMedia.disconnected', 'Disconnected') }} · {{ t('virtualMedia.pinned', 'Pinned') }}</span>
+          <span class="display-status-pinned-label">{{ activeTabLabel }} · {{ pinnedConnectionLabel }} · {{ t('virtualMedia.pinned', 'Pinned') }}</span>
           <div class="control-popover-header-actions" @pointerdown.stop>
-            <n-tooltip v-if="status?.available && hostConnected" to="body" :z-index="4000">
-              <template #trigger>
-                <n-button quaternary circle size="tiny" :loading="disconnecting" :aria-label="t('virtualMedia.disconnect', 'Disconnect')" @click="disconnectVirtualMedia">
-                  <template #icon><Unplug /></template>
-                </n-button>
-              </template>
-              {{ t('virtualMedia.disconnect', 'Disconnect') }}
-            </n-tooltip>
-            <n-tooltip v-else-if="status?.available" to="body" :z-index="4000">
-              <template #trigger>
-                <n-button quaternary circle size="tiny" :loading="connecting" :aria-label="t('virtualMedia.connect', 'Connect')" @click="connectVirtualMedia">
-                  <template #icon><Plug /></template>
-                </n-button>
-              </template>
-              {{ t('virtualMedia.connect', 'Connect') }}
-            </n-tooltip>
             <n-tooltip to="body" :z-index="4000">
               <template #trigger>
                 <n-button quaternary circle size="tiny" :aria-label="t('virtualMedia.unpin', 'Unpin virtual media')" @click="unpinPanel">
@@ -1099,20 +1094,6 @@ onBeforeUnmount(() => {
         </header>
         <header v-else class="control-popover-header virtual-media-header">
           <span class="virtual-media-heading"><Disc3 :size="16" /><strong>{{ t('virtualMedia.title', 'Virtual Media') }}</strong></span>
-          <n-button v-if="status?.available && hostConnected" quaternary size="small" :loading="disconnecting" class="virtual-media-disconnect-button" @click="disconnectVirtualMedia">
-            <template #icon><Unplug /></template>{{ t('virtualMedia.disconnect', 'Disconnect') }}
-          </n-button>
-          <n-button v-else-if="status?.available" type="primary" size="small" :loading="connecting" class="virtual-media-disconnect-button" @click="connectVirtualMedia">
-            <template #icon><Plug /></template>{{ connecting ? t('virtualMedia.connecting', 'Connecting') : t('virtualMedia.connect', 'Connect') }}
-          </n-button>
-          <n-button
-            v-if="status?.mtp_available"
-            size="small"
-            :type="status.mtp ? 'primary' : 'default'"
-            :loading="mtpBusy"
-            class="virtual-media-disconnect-button"
-            @click="setMTP(!status.mtp)"
-          >{{ status.mtp ? t('virtualMedia.mtpOn', 'MTP on') : t('virtualMedia.mtpOff', 'Share as MTP') }}</n-button>
           <n-tabs v-if="status?.available" v-model:value="tab" type="segment" size="small" class="virtual-media-title-tabs">
             <n-tab name="iso">
               <span class="virtual-media-tab-label">
@@ -1140,6 +1121,19 @@ onBeforeUnmount(() => {
                 ><Pin :size="13" /></button>
               </span>
             </n-tab>
+            <n-tab v-if="status?.mtp_available" name="mtp">
+              <span class="virtual-media-tab-label">
+                <span>{{ t('virtualMedia.mtpTab', 'MTP') }}</span>
+                <button
+                  type="button"
+                  class="virtual-media-tab-pin"
+                  :title="t('virtualMedia.pin', 'Pin current virtual media tab')"
+                  :aria-label="t('virtualMedia.pin', 'Pin current virtual media tab')"
+                  @pointerdown.stop
+                  @click.stop="pinPanel('mtp', $event)"
+                ><Pin :size="13" /></button>
+              </span>
+            </n-tab>
           </n-tabs>
         </header>
 
@@ -1149,11 +1143,17 @@ onBeforeUnmount(() => {
             {{ t('virtualMedia.unavailableDescription', 'The virtual media service is not available on this device.') }}
           </n-alert>
           <template v-else-if="status?.available">
-            <n-alert v-if="!hostConnected" type="info" class="virtual-media-host-note">
-              {{ t('virtualMedia.manageOfflineHint', 'Upload and manage images here without connecting. Connect when you want the controlled host to see the virtual drive.') }}
-            </n-alert>
             <n-tabs v-model:value="tab" type="segment" class="virtual-media-content-tabs">
               <n-tab-pane name="iso">
+                <div class="virtual-media-tab-connect">
+                  <n-button v-if="hostConnected" size="small" :loading="disconnecting" @click="disconnectVirtualMedia">
+                    <template #icon><Unplug /></template>{{ t('virtualMedia.disconnect', 'Disconnect') }}
+                  </n-button>
+                  <n-button v-else type="primary" size="small" :loading="connecting" @click="connectVirtualMedia">
+                    <template #icon><Plug /></template>{{ connecting ? t('virtualMedia.connecting', 'Connecting') : t('virtualMedia.connect', 'Connect') }}
+                  </n-button>
+                  <span>{{ hostConnected ? t('virtualMedia.connected', 'Connected') : t('virtualMedia.disconnectedDescription', 'Connect when you want the controlled host to see mounted images and virtual USB drives. Uploading and managing files does not require a connection.') }}</span>
+                </div>
                 <section class="virtual-media-workspace iso-mode-grid">
               <section v-if="!status?.iso_mounted || status.iso_mounted === 'browser'" class="media-mode-panel">
                 <header class="media-mode-header">
@@ -1215,6 +1215,15 @@ onBeforeUnmount(() => {
               </n-tab-pane>
 
               <n-tab-pane name="drive">
+                <div class="virtual-media-tab-connect">
+                  <n-button v-if="hostConnected" size="small" :loading="disconnecting" @click="disconnectVirtualMedia">
+                    <template #icon><Unplug /></template>{{ t('virtualMedia.disconnect', 'Disconnect') }}
+                  </n-button>
+                  <n-button v-else type="primary" size="small" :loading="connecting" @click="connectVirtualMedia">
+                    <template #icon><Plug /></template>{{ connecting ? t('virtualMedia.connecting', 'Connecting') : t('virtualMedia.connect', 'Connect') }}
+                  </n-button>
+                  <span>{{ hostConnected ? t('virtualMedia.connected', 'Connected') : t('virtualMedia.disconnectedDescription', 'Connect when you want the controlled host to see mounted images and virtual USB drives. Uploading and managing files does not require a connection.') }}</span>
+                </div>
                 <section class="virtual-media-workspace">
                   <div class="virtual-drive-panel">
                     <div class="virtual-drive-toolbar">
@@ -1389,6 +1398,27 @@ onBeforeUnmount(() => {
                   </div>
                 </section>
               </n-tab-pane>
+              <n-tab-pane v-if="status?.mtp_available" name="mtp">
+                <section class="virtual-media-workspace">
+                  <section class="media-mode-panel">
+                    <header class="media-mode-header">
+                      <div class="media-mode-copy">
+                        <strong>{{ t('virtualMedia.mtpTab', 'MTP') }}</strong>
+                        <span>{{ t('virtualMedia.mtpDescription', 'Share the virtual-media folder with the controlled host over MTP.') }}</span>
+                      </div>
+                      <div class="media-mode-header-actions">
+                        <n-tag v-if="status.mtp" type="success" size="small">{{ t('virtualMedia.connected', 'Connected') }}</n-tag>
+                        <n-button v-if="status.mtp" size="small" :loading="mtpBusy" @click="setMTP(false)">
+                          <template #icon><Unplug /></template>{{ t('virtualMedia.disconnect', 'Disconnect') }}
+                        </n-button>
+                        <n-button v-else type="primary" size="small" :loading="mtpBusy" @click="setMTP(true)">
+                          <template #icon><Plug /></template>{{ t('virtualMedia.connect', 'Connect') }}
+                        </n-button>
+                      </div>
+                    </header>
+                  </section>
+                </section>
+              </n-tab-pane>
             </n-tabs>
           </template>
         </div>
@@ -1494,10 +1524,11 @@ onBeforeUnmount(() => {
 .virtual-media-panel { width: 100%; }
 .virtual-media-header { min-height: 40px; justify-content: space-between; gap: 12px; }
 .virtual-media-heading { display: inline-flex; align-items: center; gap: 8px; }
-.virtual-media-title-tabs { width: min(390px, calc(100% - 130px)); margin-left: auto; }
+.virtual-media-title-tabs { width: min(520px, calc(100% - 24px)); margin-left: auto; }
 .virtual-media-title-tabs :deep(.n-tabs-nav) { margin: 0; }
 .virtual-media-content { min-height: 120px; padding-top: 8px; }
-.virtual-media-host-note { margin-bottom: 12px; }
+.virtual-media-tab-connect { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+.virtual-media-tab-connect > span { min-width: 0; color: var(--n-text-color-3); font-size: 12px; line-height: 1.5; }
 .virtual-media-loading { display: grid; min-height: 112px; place-items: center; }
 .virtual-media-disconnected { display: grid; min-height: 150px; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 18px; border: 1px solid rgba(128, 128, 128, .2); border-radius: 8px; background: rgba(128, 128, 128, .045); }
 .virtual-media-disconnected > svg { color: var(--n-text-color-3); }

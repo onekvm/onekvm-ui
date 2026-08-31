@@ -34,7 +34,9 @@
     "src/i18n/languages.ts",
     "src/i18n/locales/**/*.ts",
     "src/input/**/*.ts",
-    "src/vite-env.d.ts"
+    "src/vite-env.d.ts",
+    "src/recovery/**/*.ts",
+    "src/recovery/**/*.vue"
   ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

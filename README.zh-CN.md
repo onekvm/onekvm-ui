@@ -20,6 +20,7 @@ OneKVM 的 Vue 3 Web 界面，将低延迟远程控制台、设备管理、扩�
   三种扩展页面
 - 基于权限的导航，以及面向品牌化构建的产品接口
 - 英文、简体中文和繁体中文界面
+- 独立的 Recovery UI 构建，提供固件刷写、重置默认用户和重启
 
 ## 运行架构
 
@@ -71,13 +72,18 @@ Vite 会代理 `/api` 和 `/plugins`，包括 SSE 响应和 WebSocket Upgrade。
 ## 常用命令
 
 ```sh
-pnpm dev       # 在 3001 端口启动开发服务器
-pnpm check     # 执行 Vue 和 TypeScript 类型检查
-pnpm build     # 类型检查并生成生产包
-pnpm preview   # 本地预览 dist/
+pnpm dev            # 在 3001 端口启动开发服务器
+pnpm dev:recovery   # 在 3002 端口启动 Recovery UI
+pnpm check          # 执行 Vue 和 TypeScript 类型检查
+pnpm build          # 类型检查并生成控制台和 Recovery 生产包
+pnpm build:recovery # 只生成 Recovery 生产包
+pnpm preview        # 本地预览 dist/
+pnpm test:recovery  # Recovery API 与语言包测试
 ```
 
-生产文件输出到 `dist/`。
+生产文件输出到 `dist/`。Recovery 是第二次 Vite 构建，把 JS/CSS 内联进
+`dist-recovery/index.html`，供 initramfs 网页服务器使用。该页面只提供固件
+刷写（`.fwup`）、重置默认 Web 用户和重启。
 
 ## 目录结构
 
@@ -90,7 +96,8 @@ src/
 ├── i18n/         语言检测、按需词典和翻译运行时
 ├── input/        HID 键盘映射和文字转换
 ├── lib/          传输、网络、视频、快捷键和通用模块
-└── product/      可选产品集成边界
+├── product/      可选产品集成边界
+└── recovery/     独立 Recovery UI（固件、重置用户、重启）
 ```
 
 `App.vue` 安装共享的 Naive UI Provider，`AuthGate.vue` 负责首次初始化和

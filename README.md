@@ -21,6 +21,7 @@ responsive application.
   recovery, and HTML/layout/Vue extension pages
 - Permission-aware navigation and product hooks for branded builds
 - English, Simplified Chinese, and Traditional Chinese UI catalogs
+- A separate Recovery UI build for firmware flash, default-user reset, and reboot
 
 ## Runtime architecture
 
@@ -74,13 +75,19 @@ To open the development UI from another computer on the LAN, run
 ## Commands
 
 ```sh
-pnpm dev       # start the development server on port 3001
-pnpm check     # run Vue and TypeScript type checking
-pnpm build     # type-check and create the production bundle
-pnpm preview   # serve dist/ locally for inspection
+pnpm dev            # start the development server on port 3001
+pnpm dev:recovery   # start the Recovery UI on port 3002
+pnpm check          # run Vue and TypeScript type checking
+pnpm build          # type-check and emit the console and Recovery production bundles
+pnpm build:recovery # emit only the Recovery production bundle
+pnpm preview        # serve dist/ locally for inspection
+pnpm test:recovery  # Recovery API and locale tests
 ```
 
-Production assets are written to `dist/`.
+Production assets are written to `dist/`. Recovery is a second Vite build that
+inlines JS and CSS into `dist-recovery/index.html` for the initramfs web
+server. That page only exposes firmware flash (`.fwup`), reset of the default
+Web user, and reboot.
 
 ## Project layout
 
@@ -93,7 +100,8 @@ src/
 ├── i18n/         Locale discovery, lazy catalogs, and translation runtime
 ├── input/        HID keyboard mapping and text conversion
 ├── lib/          Transport, network, video, shortcut, and utility modules
-└── product/      Optional product integration boundary
+├── product/      Optional product integration boundary
+└── recovery/     Standalone Recovery UI (firmware, reset user, reboot)
 ```
 
 `App.vue` installs the shared Naive UI providers. `AuthGate.vue` owns initial

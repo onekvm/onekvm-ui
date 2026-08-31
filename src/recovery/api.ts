@@ -69,6 +69,7 @@ export const FIRMWARE_PHASES = [
   'idle',
   'upload',
   'extract',
+  'verify',
   'write-rootfs',
   'write-boot',
   'switch',
@@ -83,6 +84,7 @@ export type FirmwareProgress = {
   received?: number
   total?: number
   message?: string
+  sha256?: string
 }
 
 function isFirmwarePhase(value: string): value is FirmwarePhase {
@@ -108,6 +110,7 @@ export function parseFirmwareProgress(body: string): FirmwareProgress {
     received?: unknown
     total?: unknown
     message?: unknown
+    sha256?: unknown
   }
   if (typeof record.phase !== 'string' || !isFirmwarePhase(record.phase)) {
     return { phase: 'idle' }
@@ -122,6 +125,9 @@ export function parseFirmwareProgress(body: string): FirmwareProgress {
   if (typeof record.message === 'string' && record.message) {
     progress.message = record.message
   }
+  if (typeof record.sha256 === 'string' && /^[0-9a-f]{64}$/.test(record.sha256)) {
+    progress.sha256 = record.sha256
+  }
   return progress
 }
 
@@ -133,6 +139,7 @@ export function firmwareProgressPercent(progress: FirmwareProgress) {
   if (progress.phase === 'idle' || progress.phase === 'error') return 0
   if (progress.phase === 'upload') return Math.round(ratio(progress.received, progress.total) * 55)
   if (progress.phase === 'extract') return 60
+  if (progress.phase === 'verify') return 63
   if (progress.phase === 'write-rootfs') return 65 + Math.round(ratio(progress.received, progress.total) * 25)
   if (progress.phase === 'write-boot') return 93
   if (progress.phase === 'switch') return 97
@@ -143,11 +150,12 @@ const phaseOrder: Record<FirmwarePhase, number> = {
   idle: 0,
   upload: 1,
   extract: 2,
-  'write-rootfs': 3,
-  'write-boot': 4,
-  switch: 5,
-  done: 6,
-  error: 6,
+  verify: 3,
+  'write-rootfs': 4,
+  'write-boot': 5,
+  switch: 6,
+  done: 7,
+  error: 7,
 }
 
 export function shouldApplyFirmwareProgress(
@@ -192,6 +200,7 @@ export function uploadFirmware(
     const emit = (progress: FirmwareProgress) => {
       if (stopped && progress.phase !== 'done' && progress.phase !== 'error') return
       if (!shouldApplyFirmwareProgress(current, progress, !stopped)) return
+      if (!progress.sha256 && current.sha256) progress = { ...progress, sha256: current.sha256 }
       current = progress
       onProgress(progress)
     }

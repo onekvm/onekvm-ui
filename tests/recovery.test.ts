@@ -46,6 +46,13 @@ assert.equal(formatBytes(512 * 1024), '512 KiB')
 
 assert.equal(parseFirmwareProgress('not-json').phase, 'idle')
 assert.equal(parseFirmwareProgress('{"phase":"upload","received":20,"total":80}').phase, 'upload')
+assert.equal(
+  parseFirmwareProgress(
+    '{"phase":"upload","received":80,"total":80,"sha256":"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"}',
+  ).sha256,
+  'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+)
+assert.equal(firmwareProgressPercent({ phase: 'verify' }), 63)
 assert.equal(bytesPercent(20, 80), 25)
 assert.equal(firmwareProgressPercent({ phase: 'upload', received: 40, total: 80 }), 28)
 assert.equal(firmwareProgressPercent({ phase: 'extract' }), 60)

@@ -96,6 +96,7 @@ function fillVars(key: RecoveryMessageKey, vars: Record<string, string>) {
 function labelFor(progress: FirmwareProgress) {
   if (progress.phase === 'upload') return fillPercent('uploading', bytesPercent(progress.received, progress.total))
   if (progress.phase === 'extract') return t('extracting')
+  if (progress.phase === 'verify') return t('verifying')
   if (progress.phase === 'write-rootfs') return fillPercent('writingRoot', bytesPercent(progress.received, progress.total))
   if (progress.phase === 'write-boot') return t('writingBoot')
   if (progress.phase === 'switch') return t('switching')
@@ -243,6 +244,7 @@ onUnmounted(() => {
       >
         <div class="progress-bar" :style="{ width: `${flashPercent}%` }"></div>
       </div>
+      <p v-if="flashProgress?.sha256" class="hash">SHA-256 {{ flashProgress.sha256 }}</p>
     </section>
 
     <section class="card">
@@ -394,6 +396,16 @@ h2 {
   height: 100%;
   background: #1677ff;
   transition: width 180ms linear;
+}
+
+.hash {
+  margin: .55rem 0 0;
+  overflow: hidden;
+  color: #8b949e;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 button {

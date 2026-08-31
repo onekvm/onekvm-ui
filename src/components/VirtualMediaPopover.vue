@@ -167,10 +167,9 @@ function tabLabel(name: MediaTab) {
   if (name === 'mtp') return t('virtualMedia.mtpTab', 'MTP')
   return t('virtualMedia.isoTab', 'ISO mounting')
 }
-const activeTabLabel = computed(() => tabLabel(pinnedTab.value || tab.value))
+const activeTabLabel = computed(() => tabLabel(tab.value))
 const pinnedConnectionLabel = computed(() => {
-  const current = pinnedTab.value || tab.value
-  if (current === 'mtp') {
+  if (tab.value === 'mtp') {
     return status.value?.mtp ? t('virtualMedia.connected', 'Connected') : t('virtualMedia.disconnected', 'Disconnected')
   }
   return hostConnected.value ? t('virtualMedia.connected', 'Connected') : t('virtualMedia.disconnected', 'Disconnected')
@@ -1094,7 +1093,8 @@ onBeforeUnmount(() => {
         </header>
         <header v-else class="control-popover-header virtual-media-header">
           <span class="virtual-media-heading"><Disc3 :size="16" /><strong>{{ t('virtualMedia.title', 'Virtual Media') }}</strong></span>
-          <n-tabs v-if="status?.available" v-model:value="tab" type="segment" size="small" class="virtual-media-title-tabs">
+        </header>
+        <n-tabs v-if="status?.available" v-model:value="tab" type="segment" size="small" class="virtual-media-title-tabs">
             <n-tab name="iso">
               <span class="virtual-media-tab-label">
                 <span>{{ t('virtualMedia.isoTab', 'Image mounting') }}</span>
@@ -1135,7 +1135,6 @@ onBeforeUnmount(() => {
               </span>
             </n-tab>
           </n-tabs>
-        </header>
 
         <div class="virtual-media-content">
           <div v-if="!status && loading" class="virtual-media-loading"><n-spin size="small" /></div>
@@ -1546,10 +1545,12 @@ onBeforeUnmount(() => {
   border-radius: 6px;
   background: #171b20ed;
   box-shadow: 0 14px 36px rgb(0 0 0 / 45%);
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   backdrop-filter: blur(10px);
 }
 .virtual-media-window .virtual-media-content { min-height: 0; overflow-y: auto; padding: 10px 12px 12px; scrollbar-width: thin; }
+.virtual-media-window .virtual-media-title-tabs { width: auto; margin: 0 12px 8px; }
+.virtual-media-window .virtual-media-tab-pin { display: none; }
 .virtual-media-content-tabs > :deep(.n-tabs-nav) { display: none; }
 .virtual-media-tab-label { display: inline-flex; min-width: 0; align-items: center; justify-content: center; gap: 7px; }
 .virtual-media-tab-pin { display: inline-grid; width: 21px; height: 21px; padding: 0; place-items: center; border: 0; border-radius: 4px; background: transparent; color: inherit; cursor: pointer; opacity: .66; }

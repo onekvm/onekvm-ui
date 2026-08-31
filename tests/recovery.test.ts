@@ -4,6 +4,7 @@ import {
   bytesPercent,
   errorMessage,
   firmwareProgressPercent,
+  formatBytes,
   isRecoveryPath,
   shouldApplyFirmwareProgress,
   parseFirmwareProgress,
@@ -34,12 +35,14 @@ assert.equal(recoveryErrorMessage(500, ' cannot reset user\n'), 'cannot reset us
 assert.equal(recoveryErrorMessage(404, '   '), '404')
 assert.equal(errorMessage(new Error('firmware install failed')), 'firmware install failed')
 assert.equal(errorMessage('boom'), 'boom')
-assert.deepEqual(parseRecoveryStatus('{"addresses":["10.100.99.107","10.0.0.5"]}'), [
-  '10.100.99.107',
-  '10.0.0.5',
-])
-assert.deepEqual(parseRecoveryStatus('{"addresses":[1,""]}'), [])
-assert.deepEqual(parseRecoveryStatus('not-json'), [])
+assert.deepEqual(parseRecoveryStatus('{"addresses":["10.100.99.107","10.0.0.5"],"firmwareMax":8388608}'), {
+  addresses: ['10.100.99.107', '10.0.0.5'],
+  firmwareMax: 8388608,
+})
+assert.deepEqual(parseRecoveryStatus('{"addresses":[1,""]}'), { addresses: [], firmwareMax: 0 })
+assert.deepEqual(parseRecoveryStatus('not-json'), { addresses: [], firmwareMax: 0 })
+assert.equal(formatBytes(8 * 1024 * 1024), '8 MiB')
+assert.equal(formatBytes(512 * 1024), '512 KiB')
 
 assert.equal(parseFirmwareProgress('not-json').phase, 'idle')
 assert.equal(parseFirmwareProgress('{"phase":"upload","received":20,"total":80}').phase, 'upload')

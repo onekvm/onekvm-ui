@@ -5,6 +5,7 @@ import {
   bytesPercent,
   errorMessage,
   firmwareProgressPercent,
+  formatBytes,
   loadRecoveryStatus,
   postRecovery,
   uploadFirmware,
@@ -39,6 +40,7 @@ const statusError = ref(false)
 const confirmKind = ref<ConfirmKind | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const addresses = ref<string[]>([])
+const firmwareMax = ref(0)
 const flashProgress = ref<FirmwareProgress | null>(null)
 let addressTimer = 0
 
@@ -85,6 +87,12 @@ function fillPercent(key: RecoveryMessageKey, percent: number) {
   return t(key).replace('{percent}', String(percent))
 }
 
+function fillVars(key: RecoveryMessageKey, vars: Record<string, string>) {
+  let text: string = t(key)
+  for (const name of Object.keys(vars)) text = text.replace(`{${name}}`, vars[name])
+  return text
+}
+
 function labelFor(progress: FirmwareProgress) {
   if (progress.phase === 'upload') return fillPercent('uploading', bytesPercent(progress.received, progress.total))
   if (progress.phase === 'extract') return t('extracting')
@@ -103,6 +111,10 @@ async function flashFirmware() {
   const file = firmwareFile.value
   if (!file) {
     setStatus(t('choose'), true)
+    return
+  }
+  if (firmwareMax.value > 0 && file.size > firmwareMax.value) {
+    setStatus(fillVars('fwTooBig', { size: formatBytes(file.size), max: formatBytes(firmwareMax.value) }), true)
     return
   }
   if (busy.value) return
@@ -158,7 +170,9 @@ const confirmCopy = computed(() => {
 
 async function refreshAddresses() {
   try {
-    addresses.value = await loadRecoveryStatus()
+    const status = await loadRecoveryStatus()
+    addresses.value = status.addresses
+    firmwareMax.value = status.firmwareMax
   } catch {
     /* keep the last known list */
   }
@@ -201,6 +215,7 @@ onUnmounted(() => {
     <section class="card">
       <h2>{{ t('fwTitle') }}</h2>
       <p>{{ t('fwHelp') }}</p>
+      <p v-if="firmwareMax > 0">{{ fillVars('fwLimit', { size: formatBytes(firmwareMax) }) }}</p>
       <input
         ref="fileInput"
         class="file-input"

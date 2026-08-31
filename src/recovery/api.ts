@@ -23,20 +23,42 @@ export function errorMessage(error: unknown) {
   return String(error)
 }
 
-export function parseRecoveryStatus(body: string): string[] {
+export type RecoveryStatus = {
+  addresses: string[]
+  firmwareMax: number
+}
+
+export function parseRecoveryStatus(body: string): RecoveryStatus {
   let parsed: unknown
   try {
     parsed = JSON.parse(body)
   } catch {
-    return []
+    return { addresses: [], firmwareMax: 0 }
   }
-  if (!parsed || typeof parsed !== 'object') return []
-  const addresses = (parsed as { addresses?: unknown }).addresses
-  if (!Array.isArray(addresses)) return []
-  return addresses.filter((item): item is string => typeof item === 'string' && item.length > 0)
+  if (!parsed || typeof parsed !== 'object') return { addresses: [], firmwareMax: 0 }
+  const record = parsed as { addresses?: unknown; firmwareMax?: unknown }
+  const addresses = Array.isArray(record.addresses)
+    ? record.addresses.filter((item): item is string => typeof item === 'string' && item.length > 0)
+    : []
+  const firmwareMax =
+    typeof record.firmwareMax === 'number' && Number.isFinite(record.firmwareMax) && record.firmwareMax > 0
+      ? Math.floor(record.firmwareMax)
+      : 0
+  return { addresses, firmwareMax }
 }
 
-export async function loadRecoveryStatus(): Promise<string[]> {
+export function formatBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
+  if (bytes >= 1024 * 1024) {
+    const mib = bytes / (1024 * 1024)
+    const text = mib >= 10 ? mib.toFixed(0) : mib.toFixed(1)
+    return `${text.replace(/\.0$/, '')} MiB`
+  }
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KiB`
+  return `${Math.round(bytes)} B`
+}
+
+export async function loadRecoveryStatus(): Promise<RecoveryStatus> {
   const response = await fetch('/status')
   const text = await response.text()
   if (!response.ok) throw new Error(recoveryErrorMessage(response.status, text))

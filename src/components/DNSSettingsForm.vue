@@ -17,10 +17,7 @@ function update(value: string) {
 <template>
   <section class="network-global-card">
     <header>
-      <div>
-        <h2>{{ t('network.dns.title', 'DNS servers') }}</h2>
-        <p class="dns-description">{{ t('network.dns.description', 'Applies to every network interface.\n1.1.1.1 — plain DNS\n1.1.1.1:5353 — plain DNS with a custom port\n[2606:4700:4700::1111]:53 — IPv6 with a port must be in brackets\nudp://1.1.1.1 — plain UDP\ntcp://1.1.1.1:53 — plain TCP\ntls://1.1.1.1 — DoT (IP required)\ntls://1.1.1.1:853#one.one.one.one — DoT with a custom port, name after # is the certificate name\nhttps://cloudflare-dns.com/dns-query — DoH\nhttps://cloudflare-dns.com:443/dns-query — DoH with a custom port\nquic://, h3:// and sdns:// are not supported') }}</p>
-      </div>
+      <h2>{{ t('network.dns.title', 'DNS servers') }}</h2>
     </header>
     <n-form label-placement="top" :show-feedback="false">
       <n-form-item :show-label="false">
@@ -36,11 +33,31 @@ function update(value: string) {
         />
       </n-form-item>
     </n-form>
+    <div class="dns-help">
+      <p class="dns-description">{{ t('network.dns.description', 'Applies to every network interface.\nquic://, h3:// and sdns:// are not supported.') }}</p>
+      <p class="dns-examples">{{ t('network.dns.examples', '1.1.1.1 — plain DNS\n1.1.1.1:5353 — plain DNS with a custom port\n[2606:4700:4700::1111]:53 — IPv6 with a port must be in brackets\nudp://1.1.1.1 — plain UDP\ntcp://1.1.1.1:53 — plain TCP\ntls://1.1.1.1 — DoT (IP required)\ntls://1.1.1.1:853#one.one.one.one — DoT with a custom port, name after # is the certificate name\nhttps://cloudflare-dns.com/dns-query — DoH\nhttps://cloudflare-dns.com:443/dns-query — DoH with a custom port') }}</p>
+    </div>
   </section>
 </template>
 
 <style scoped>
 .network-global-card { display: grid; gap: 14px; padding-top: 18px; border-top: 1px solid #30363d; }
 .network-global-card header h2 { margin: 0; font-size: 14px; }
-.dns-description { margin: 4px 0 0; color: #8f99a3; font-size: 11px; white-space: pre-line; line-height: 1.55; }
+.dns-help {
+  display: grid;
+  grid-template-columns: minmax(12em, 0.9fr) minmax(18em, 1.4fr);
+  gap: 8px 28px;
+  align-items: start;
+}
+.dns-description,
+.dns-examples {
+  margin: 0;
+  color: #8f99a3;
+  font-size: 11px;
+  white-space: pre-line;
+  line-height: 1.55;
+}
+@media (max-width: 720px) {
+  .dns-help { grid-template-columns: 1fr; }
+}
 </style>

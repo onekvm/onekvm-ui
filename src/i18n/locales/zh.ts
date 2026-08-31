@@ -1190,8 +1190,8 @@ const zh = {
       },
 	  dns: {
 		title: 'DNS 服务器',
-		description: [
-			'对所有网络接口生效。',
+		description: '对所有网络接口生效。\n不支持 quic://、h3://、sdns://。',
+		examples: [
 			'1.1.1.1 — 明文 DNS',
 			'1.1.1.1:5353 — 明文，自定义端口',
 			'[2606:4700:4700::1111]:53 — IPv6 带端口须写方括号',
@@ -1201,7 +1201,6 @@ const zh = {
 			'tls://1.1.1.1:853#one.one.one.one — DoT，自定义端口，# 后为证书名',
 			'https://cloudflare-dns.com/dns-query — DoH',
 			'https://cloudflare-dns.com:443/dns-query — DoH 自定义端口',
-			'不支持 quic://、h3://、sdns://',
 		].join('\n'),
 	  },
 	  mdns: {

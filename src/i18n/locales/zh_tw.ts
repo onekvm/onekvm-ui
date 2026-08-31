@@ -1195,8 +1195,8 @@ const zh_tw = {
       },
 	  dns: {
 		title: 'DNS 伺服器',
-		description: [
-			'對所有網路介面生效。',
+		description: '對所有網路介面生效。\n不支援 quic://、h3://、sdns://。',
+		examples: [
 			'1.1.1.1 — 明文 DNS',
 			'1.1.1.1:5353 — 明文，自訂連接埠',
 			'[2606:4700:4700::1111]:53 — IPv6 帶連接埠須寫方括號',
@@ -1206,7 +1206,6 @@ const zh_tw = {
 			'tls://1.1.1.1:853#one.one.one.one — DoT，自訂連接埠，# 後為憑證名',
 			'https://cloudflare-dns.com/dns-query — DoH',
 			'https://cloudflare-dns.com:443/dns-query — DoH 自訂連接埠',
-			'不支援 quic://、h3://、sdns://',
 		].join('\n'),
 	  },
 	  mdns: {

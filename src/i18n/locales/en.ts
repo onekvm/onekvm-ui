@@ -1191,8 +1191,8 @@ const en = {
       },
 	  dns: {
 		title: 'DNS servers',
-		description: [
-			'Applies to every network interface.',
+		description: 'Applies to every network interface.\nquic://, h3:// and sdns:// are not supported.',
+		examples: [
 			'1.1.1.1 — plain DNS',
 			'1.1.1.1:5353 — plain DNS with a custom port',
 			'[2606:4700:4700::1111]:53 — IPv6 with a port must be in brackets',
@@ -1202,7 +1202,6 @@ const en = {
 			'tls://1.1.1.1:853#one.one.one.one — DoT with a custom port, name after # is the certificate name',
 			'https://cloudflare-dns.com/dns-query — DoH',
 			'https://cloudflare-dns.com:443/dns-query — DoH with a custom port',
-			'quic://, h3:// and sdns:// are not supported',
 		].join('\n'),
 	  },
 	  mdns: {

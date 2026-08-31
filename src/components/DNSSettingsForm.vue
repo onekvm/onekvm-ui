@@ -4,8 +4,8 @@ import { computed } from 'vue'
 import { t } from '@/i18n/runtime'
 import { isDNSServer } from '@/lib/network'
 
-const props = defineProps<{ modelValue: string[]; disabled?: boolean }>()
-const emit = defineEmits<{ 'update:modelValue': [value: string[]] }>()
+const props = defineProps<{ modelValue: string[]; dnssec?: boolean; disabled?: boolean }>()
+const emit = defineEmits<{ 'update:modelValue': [value: string[]]; 'update:dnssec': [value: boolean] }>()
 
 const text = computed(() => (props.modelValue || []).join('\n'))
 
@@ -31,6 +31,16 @@ function update(value: string) {
           :status="modelValue.some((server) => !isDNSServer(server)) ? 'error' : undefined"
           @update:value="update"
         />
+      </n-form-item>
+      <n-form-item :label="t('network.dnssec.title', 'DNSSEC')" :show-feedback="true">
+        <n-switch
+          :value="Boolean(props.dnssec)"
+          :disabled="disabled"
+          @update:value="emit('update:dnssec', $event)"
+        />
+        <template #feedback>
+          {{ t('network.dnssec.hint', 'Validate DNS responses with DNSSEC. Leave this off unless your resolvers support it; failed signatures or stripped records will break lookups.') }}
+        </template>
       </n-form-item>
     </n-form>
     <div class="dns-help">

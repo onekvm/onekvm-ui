@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 
-import { isDNSServer } from '../src/lib/network.ts'
+import { defaultNetworkConfig, isDNSServer } from '../src/lib/network.ts'
 
 const accepted = [
   '1.1.1.1',
@@ -40,5 +40,7 @@ for (const server of accepted) {
 for (const server of rejected) {
   assert.equal(isDNSServer(server), false, `rejected ${server}`)
 }
+
+assert.equal(defaultNetworkConfig().dnssec, false, 'DNSSEC defaults to off')
 
 console.log('network-dns tests passed')

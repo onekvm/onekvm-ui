@@ -17,6 +17,7 @@ export function defaultNetworkConfig(): NetworkConfig {
     wifi_ssid: '',
     hostname: '',
     mdns: false,
+    dnssec: false,
     http_port: 80,
     https_port: 443,
     tls_enabled: true,

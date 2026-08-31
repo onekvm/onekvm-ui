@@ -1344,7 +1344,12 @@ watch(section, (value) => {
 				  :disabled="saving"
 				  @update:mdns="config.network.mdns = $event"
 				/>
-				<DNSSettingsForm v-model="config.network.dns" :disabled="saving" />
+				<DNSSettingsForm
+				  v-model="config.network.dns"
+				  :dnssec="config.network.dnssec"
+				  :disabled="saving"
+				  @update:dnssec="config.network.dnssec = $event"
+				/>
 				<ActiveRoutesPanel />
 				<StaticRoutesForm
 				  v-model="config.network.static_routes"

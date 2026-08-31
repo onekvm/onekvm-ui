@@ -19,7 +19,7 @@ function update(value: string) {
     <header>
       <div>
         <h2>{{ t('network.dns.title', 'DNS servers') }}</h2>
-        <p class="dns-description">{{ t('network.dns.description', 'System-wide name servers used by all network interfaces.\n1.1.1.1 — plain DNS\nudp://1.1.1.1 — plain UDP\ntcp://1.1.1.1 — plain TCP\ntls://1.1.1.1 — DoT (IP required)\ntls://1.1.1.1#one.one.one.one — DoT, name after # is the certificate name\nhttps://cloudflare-dns.com/dns-query — DoH\nquic://, h3:// and sdns:// are not supported') }}</p>
+        <p class="dns-description">{{ t('network.dns.description', 'System-wide name servers used by all network interfaces.\n1.1.1.1 — plain DNS\n1.1.1.1:5353 — plain DNS with a custom port\n[2606:4700:4700::1111]:53 — IPv6 with a port must be in brackets\nudp://1.1.1.1 — plain UDP\ntcp://1.1.1.1:53 — plain TCP\ntls://1.1.1.1 — DoT (IP required)\ntls://1.1.1.1:853#one.one.one.one — DoT with a custom port, name after # is the certificate name\nhttps://cloudflare-dns.com/dns-query — DoH\nhttps://cloudflare-dns.com:443/dns-query — DoH with a custom port\nquic://, h3:// and sdns:// are not supported') }}</p>
       </div>
     </header>
     <n-form label-placement="top" :show-feedback="false">
@@ -29,7 +29,7 @@ function update(value: string) {
           :disabled="disabled"
           type="textarea"
           :autosize="{ minRows: 2, maxRows: 5 }"
-          placeholder="tls://1.1.1.1&#10;https://cloudflare-dns.com/dns-query"
+          placeholder="tls://1.1.1.1:853&#10;https://cloudflare-dns.com/dns-query"
           :status="modelValue.some((server) => !isDNSServer(server)) ? 'error' : undefined"
           @update:value="update"
         />

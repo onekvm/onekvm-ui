@@ -5,6 +5,8 @@ import { isDNSServer } from '../src/lib/network.ts'
 const accepted = [
   '1.1.1.1',
   '1.1.1.1:53',
+  '1.1.1.1:5353',
+  'https://cloudflare-dns.com:443/dns-query',
   '1.1.1.1#one.one.one.one',
   'udp://1.1.1.1',
   'tcp://1.0.0.1:53',

@@ -123,6 +123,7 @@ export interface OneKVMConfig {
   }
   audio: {
     enabled: boolean
+    microphone?: boolean
     device: string
     encoder: string
     quality?: 'low' | 'medium' | 'high'
@@ -263,6 +264,7 @@ export interface OneKVMStatus {
   audio: {
     enabled: boolean
     microphone?: boolean
+    microphone_available?: boolean
     microphone_session?: string
     device: string
     encoder: string

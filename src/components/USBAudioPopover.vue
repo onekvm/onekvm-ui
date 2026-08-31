@@ -28,6 +28,7 @@ const levelSamples = new Uint8Array(256)
 
 const audioAvailable = computed(() => schema.value?.capabilities?.audio === true)
 const speakerOn = computed(() => Boolean(props.status?.audio.enabled))
+const microphoneAvailable = computed(() => Boolean(props.status?.audio.microphone_available))
 const microphoneOn = computed(() => Boolean(props.status?.audio.microphone && onekvm.microphoneGranted()))
 const microphoneBusy = computed(() => {
   const owner = props.status?.audio.microphone_session
@@ -129,6 +130,10 @@ function requestSpeaker(value: boolean) {
 
 function requestMicrophone(value: boolean) {
   if (value === microphoneOn.value || saving.value) return
+  if (value && !microphoneAvailable.value) {
+    message.warning(t('usbAudio.microphoneDisabled', 'Turn on USB microphone in USB settings first.'))
+    return
+  }
   if (value && microphoneBusy.value) {
     message.warning(t('usbAudio.microphoneBusy', 'Another session already owns the USB microphone.'))
     return
@@ -209,12 +214,19 @@ onBeforeUnmount(stopLevelMeter)
         </div>
         <div>
           <span>{{ t('usbAudio.microphone', 'Microphone') }}</span>
-          <n-switch
-            size="small"
-            :value="microphoneOn"
-            :disabled="saving || microphoneBusy"
-            @update:value="requestMicrophone"
-          />
+          <n-tooltip :disabled="microphoneAvailable" placement="left">
+            <template #trigger>
+              <span class="usb-function-switch">
+                <n-switch
+                  size="small"
+                  :value="microphoneOn"
+                  :disabled="saving || microphoneBusy || !microphoneAvailable"
+                  @update:value="requestMicrophone"
+                />
+              </span>
+            </template>
+            {{ t('usbAudio.microphoneDisabled', 'Turn on USB microphone in USB settings first.') }}
+          </n-tooltip>
         </div>
       </div>
       <div class="usb-audio-debug">
@@ -247,10 +259,16 @@ onBeforeUnmount(stopLevelMeter)
         </div>
       </div>
       <p class="usb-audio-hint">
-        {{ microphoneBusy
-          ? t('usbAudio.microphoneBusy', 'Another session already owns the USB microphone.')
-          : t('usbAudio.hint', 'Speaker lets you hear the target. Microphone is exclusive to this session.') }}
+        {{ !microphoneAvailable
+          ? t('usbAudio.microphoneDisabled', 'Turn on USB microphone in USB settings first.')
+          : microphoneBusy
+            ? t('usbAudio.microphoneBusy', 'Another session already owns the USB microphone.')
+            : t('usbAudio.hint', 'Speaker lets you hear the target. Microphone is exclusive to this session.') }}
       </p>
     </div>
   </n-popover>
 </template>
+
+<style scoped>
+.usb-function-switch { display: inline-flex; align-items: center; }
+</style>

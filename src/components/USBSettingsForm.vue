@@ -31,6 +31,7 @@ function setInterval(field: 'keyboard_interval' | 'mouse_interval', value: numbe
 if (usb.value.gamepad == null) usb.value.gamepad = false
 if (usb.value.mass_storage == null) usb.value.mass_storage = true
 if (usb.value.mtp == null) usb.value.mtp = true
+if (audio.value.microphone == null) audio.value.microphone = false
 if (!usb.value.keyboard_name) usb.value.keyboard_name = 'Keyboard'
 if (!usb.value.mouse_name) usb.value.mouse_name = 'Mouse'
 if (usb.value.keyboard_interval == null) usb.value.keyboard_interval = 0
@@ -41,8 +42,9 @@ const audioValid = ref(true)
 const gadget = computed(() => props.gadget)
 const hasBudget = computed(() => Boolean(gadget.value && (gadget.value.in_limit > 0 || gadget.value.out_limit > 0)))
 
-function endpointUse(options: { audio?: boolean; gamepad?: boolean; keyboardOut?: boolean; storage?: boolean; mtp?: boolean }) {
+function endpointUse(options: { audio?: boolean; microphone?: boolean; gamepad?: boolean; keyboardOut?: boolean; storage?: boolean; mtp?: boolean }) {
   const speaker = options.audio ?? Boolean(audio.value.enabled)
+  const microphoneOn = options.microphone ?? Boolean(audio.value.microphone)
   const gamepadOn = options.gamepad ?? Boolean(usb.value.gamepad)
   const keyboardOut = options.keyboardOut ?? !usb.value.keyboard_no_out
   const storageOn = options.storage ?? usb.value.mass_storage !== false
@@ -57,6 +59,7 @@ function endpointUse(options: { audio?: boolean; gamepad?: boolean; keyboardOut?
     inn += 1
     out += 1
   }
+  if (microphoneOn) inn += 1
   if (gamepadOn) inn += 1
   if ((gadget.value?.mtp_available ?? Boolean(gadget.value?.mtp)) && mtpOn) {
     inn += 2
@@ -71,13 +74,14 @@ const overBudget = computed(() => {
   return used.value.inn > gadget.value.in_limit || used.value.out > gadget.value.out_limit
 })
 
-function wouldFit(options: { audio?: boolean; gamepad?: boolean; storage?: boolean; mtp?: boolean }) {
+function wouldFit(options: { audio?: boolean; microphone?: boolean; gamepad?: boolean; storage?: boolean; mtp?: boolean }) {
   if (!hasBudget.value || !gadget.value) return true
   const next = endpointUse(options)
   return next.inn <= gadget.value.in_limit && next.out <= gadget.value.out_limit
 }
 
 const audioBlocked = computed(() => !audio.value.enabled && !wouldFit({ audio: true }))
+const microphoneBlocked = computed(() => !audio.value.microphone && !wouldFit({ microphone: true }))
 const gamepadBlocked = computed(() => !usb.value.gamepad && !wouldFit({ gamepad: true }))
 const storageBlocked = computed(() => usb.value.mass_storage === false && !wouldFit({ storage: true }))
 const mtpBlocked = computed(() => usb.value.mtp === false && !wouldFit({ mtp: true }))
@@ -88,6 +92,10 @@ const massStorageOn = computed({
 const mtpOn = computed({
   get: () => usb.value.mtp !== false,
   set: (value: boolean) => { usb.value.mtp = value },
+})
+const microphoneOn = computed({
+  get: () => Boolean(audio.value.microphone),
+  set: (value: boolean) => { audio.value.microphone = value },
 })
 const showMassStorage = computed(() => gadget.value?.mass_storage !== false)
 const showMTP = computed(() => Boolean(gadget.value?.mtp_available))
@@ -113,8 +121,8 @@ const valid = computed(() =>
 )
 
 watch(valid, (value) => emit('validity', value), { immediate: true })
-watch(() => audio.value.enabled, (enabled) => {
-  if (!enabled) audioValid.value = true
+watch(() => [audio.value.enabled, audio.value.microphone] as const, ([speaker, microphone]) => {
+  if (!speaker && !microphone) audioValid.value = true
 })
 
 const keyboardLeds = computed({
@@ -126,7 +134,7 @@ const keyboardLeds = computed({
 <template>
   <div class="usb-settings">
     <n-alert type="info" :bordered="false">
-      {{ t('settings.advancedSettings.usbPage.restartHint', 'Name changes apply after OneKVM restarts. Turning functions below on or off makes the controlled computer rediscover USB, so the keyboard and mouse disconnect briefly.') }}
+      {{ t('settings.advancedSettings.usbPage.restartHint', 'Turning functions on or off, or changing the names below, reconfigures USB immediately. The keyboard and mouse disconnect briefly.') }}
     </n-alert>
 
     <section v-if="hasBudget && gadget" class="usb-settings-card" :title="gadget.udc || undefined">
@@ -138,11 +146,11 @@ const keyboardLeds = computed({
       </header>
       <dl class="usb-endpoint-budget">
         <div>
-          <dt>{{ t('settings.advancedSettings.usbPage.endpointsIn', 'To the computer') }}</dt>
+          <dt>{{ t('settings.advancedSettings.usbPage.endpointsIn', 'Upstream') }}</dt>
           <dd>{{ used.inn }} / {{ gadget.in_limit }}</dd>
         </div>
         <div>
-          <dt>{{ t('settings.advancedSettings.usbPage.endpointsOut', 'From the computer') }}</dt>
+          <dt>{{ t('settings.advancedSettings.usbPage.endpointsOut', 'Downstream') }}</dt>
           <dd>{{ used.out }} / {{ gadget.out_limit }}</dd>
         </div>
       </dl>
@@ -181,39 +189,81 @@ const keyboardLeds = computed({
         <li>
           <div>
             <strong>{{ t('settings.advancedSettings.audioPage.title', 'USB audio') }}</strong>
-            <small>{{ audioBlocked ? t('settings.advancedSettings.usbPage.audioBlocked', 'Not enough USB capacity. Turn off the gamepad, virtual storage, or file transfer first.') : t('settings.advancedSettings.audioPage.hint', 'Lets the controlled computer use OneKVM as a speaker. The console Audio button appears after you turn this on.') }}</small>
+            <small>{{ t('settings.advancedSettings.audioPage.hint', 'Lets the controlled computer use OneKVM as a speaker. The console Audio button appears after you turn this on.') }}</small>
           </div>
-          <n-switch v-model:value="audio.enabled" :disabled="props.disabled || audioBlocked" />
+          <n-tooltip :disabled="!audioBlocked" placement="left">
+            <template #trigger>
+              <span class="usb-function-switch">
+                <n-switch v-model:value="audio.enabled" :disabled="props.disabled || audioBlocked" />
+              </span>
+            </template>
+            {{ t('settings.advancedSettings.usbPage.audioBlocked', 'Not enough USB capacity. Turn off the gamepad, microphone, virtual storage, or file transfer first.') }}
+          </n-tooltip>
+        </li>
+        <li>
+          <div>
+            <strong>{{ t('settings.advancedSettings.usbPage.microphone', 'USB microphone') }}</strong>
+            <small>{{ t('settings.advancedSettings.usbPage.microphoneHint', 'Lets the controlled computer use OneKVM as a microphone. Turn it off and that computer will not see a microphone.') }}</small>
+          </div>
+          <n-tooltip :disabled="!microphoneBlocked" placement="left">
+            <template #trigger>
+              <span class="usb-function-switch">
+                <n-switch v-model:value="microphoneOn" :disabled="props.disabled || microphoneBlocked" />
+              </span>
+            </template>
+            {{ t('settings.advancedSettings.usbPage.microphoneBlocked', 'Not enough USB capacity. Turn off the speaker, gamepad, virtual storage, or file transfer first.') }}
+          </n-tooltip>
         </li>
         <li>
           <div>
             <strong>{{ t('settings.advancedSettings.usbPage.gamepad', 'Gamepad') }}</strong>
-            <small>{{ gamepadBlocked ? t('settings.advancedSettings.usbPage.gamepadBlocked', 'Not enough USB capacity. Turn off audio, virtual storage, or file transfer first.') : t('settings.advancedSettings.usbPage.gamepadHint', 'Forwards a gamepad from this computer to the controlled computer through the browser. Turning it on or off makes that computer rediscover USB briefly.') }}</small>
+            <small>{{ t('settings.advancedSettings.usbPage.gamepadHint', 'Forwards a gamepad from this computer to the controlled computer through the browser. Turning it on or off makes that computer rediscover USB briefly.') }}</small>
           </div>
-          <n-switch v-model:value="usb.gamepad" :disabled="props.disabled || gamepadBlocked" />
+          <n-tooltip :disabled="!gamepadBlocked" placement="left">
+            <template #trigger>
+              <span class="usb-function-switch">
+                <n-switch v-model:value="usb.gamepad" :disabled="props.disabled || gamepadBlocked" />
+              </span>
+            </template>
+            {{ t('settings.advancedSettings.usbPage.gamepadBlocked', 'Not enough USB capacity. Turn off audio, the microphone, virtual storage, or file transfer first.') }}
+          </n-tooltip>
         </li>
         <li v-if="showMassStorage">
           <div>
             <strong>{{ t('settings.advancedSettings.usbPage.storage', 'Virtual storage') }}</strong>
-            <small>{{ storageBlocked ? t('settings.advancedSettings.usbPage.storageBlocked', 'Not enough USB capacity. Turn off audio, the gamepad, or file transfer first.') : t('settings.advancedSettings.usbPage.storageHint', 'Lets you mount a disc image or a virtual USB drive on the controlled computer. Turn it off and that computer will not see any storage.') }}</small>
+            <small>{{ t('settings.advancedSettings.usbPage.storageHint', 'Lets you mount a disc image or a virtual USB drive on the controlled computer. Turn it off and that computer will not see any storage.') }}</small>
           </div>
-          <n-switch v-model:value="massStorageOn" :disabled="props.disabled || storageBlocked" />
+          <n-tooltip :disabled="!storageBlocked" placement="left">
+            <template #trigger>
+              <span class="usb-function-switch">
+                <n-switch v-model:value="massStorageOn" :disabled="props.disabled || storageBlocked" />
+              </span>
+            </template>
+            {{ t('settings.advancedSettings.usbPage.storageBlocked', 'Not enough USB capacity. Turn off audio, the microphone, the gamepad, or file transfer first.') }}
+          </n-tooltip>
         </li>
         <li v-if="showMTP">
           <div>
             <strong>{{ t('virtualMedia.mtpTab', 'File transfer') }}</strong>
-            <small>{{ mtpBlocked ? t('settings.advancedSettings.usbPage.mtpBlocked', 'Not enough USB capacity. Turn off audio, the gamepad, or virtual storage first.') : t('settings.advancedSettings.usbPage.mtpHint', 'Share the virtual-media folder with the controlled computer, like plugging in a phone. Turn it off and that computer will not see this feature.') }}</small>
+            <small>{{ t('settings.advancedSettings.usbPage.mtpHint', 'Share the virtual-media folder with the controlled computer, like plugging in a phone. Turn it off and that computer will not see this feature.') }}</small>
           </div>
-          <n-switch v-model:value="mtpOn" :disabled="props.disabled || mtpBlocked" />
+          <n-tooltip :disabled="!mtpBlocked" placement="left">
+            <template #trigger>
+              <span class="usb-function-switch">
+                <n-switch v-model:value="mtpOn" :disabled="props.disabled || mtpBlocked" />
+              </span>
+            </template>
+            {{ t('settings.advancedSettings.usbPage.mtpBlocked', 'Not enough USB capacity. Turn off audio, the microphone, the gamepad, or virtual storage first.') }}
+          </n-tooltip>
         </li>
       </ul>
     </section>
 
     <AudioSettingsForm
-      v-if="audio.enabled"
+      v-if="audio.enabled || audio.microphone"
       v-model="audio"
       :show-enable="false"
-      :disabled="props.disabled || audioBlocked"
+      :disabled="props.disabled || audioBlocked || microphoneBlocked"
       @validity="audioValid = $event"
     />
 
@@ -315,4 +365,5 @@ const keyboardLeds = computed({
 .usb-function-list li:first-child { padding-top: 0; border-top: 0; }
 .usb-function-list strong { font-size: 13px; }
 .usb-function-list small { display: block; margin-top: 3px; color: #8f99a3; font-size: 11px; line-height: 1.45; }
+.usb-function-switch { display: inline-flex; align-items: center; }
 </style>

@@ -1190,9 +1190,17 @@ const zh = {
       },
 	  dns: {
 		title: 'DNS 服务器',
-		description: '供所有网络接口使用的系统级域名服务器。写法与 AdGuard Home 相同：tls://1.1.1.1 为 DoT，https://cloudflare-dns.com/dns-query 为 DoH。',
+		description: [
+			'供所有网络接口使用的系统级域名服务器。',
+			'1.1.1.1 — 明文 DNS',
+			'udp://1.1.1.1 — 明文 UDP',
+			'tcp://1.1.1.1 — 明文 TCP',
+			'tls://1.1.1.1 — DoT（需 IP）',
+			'tls://1.1.1.1#one.one.one.one — DoT，# 后为证书名',
+			'https://cloudflare-dns.com/dns-query — DoH',
+			'不支持 quic://、h3://、sdns://',
+		].join('\n'),
 		servers: '域名服务器',
-		dohDotHint: '明文：1.1.1.1 或 udp://1.1.1.1。DoT：tls://1.1.1.1 或 tls://1.1.1.1#one.one.one.one。DoH：https://cloudflare-dns.com/dns-query。不支持 quic://、h3://、sdns://。',
 	  },
 	  mdns: {
 		title: 'mDNS',

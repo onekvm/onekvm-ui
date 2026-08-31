@@ -1191,9 +1191,17 @@ const en = {
       },
 	  dns: {
 		title: 'DNS servers',
-		description: 'System-wide name servers used by all network interfaces. Write AdGuard-style prefixes: tls://1.1.1.1 for DoT, https://cloudflare-dns.com/dns-query for DoH.',
+		description: [
+			'System-wide name servers used by all network interfaces.',
+			'1.1.1.1 — plain DNS',
+			'udp://1.1.1.1 — plain UDP',
+			'tcp://1.1.1.1 — plain TCP',
+			'tls://1.1.1.1 — DoT (IP required)',
+			'tls://1.1.1.1#one.one.one.one — DoT, name after # is the certificate name',
+			'https://cloudflare-dns.com/dns-query — DoH',
+			'quic://, h3:// and sdns:// are not supported',
+		].join('\n'),
 		servers: 'Name servers',
-		dohDotHint: 'Plain: 1.1.1.1 or udp://1.1.1.1. DoT: tls://1.1.1.1 or tls://1.1.1.1#one.one.one.one. DoH: https://cloudflare-dns.com/dns-query. quic://, h3:// and sdns:// are not supported.',
 	  },
 	  mdns: {
 		title: 'mDNS',

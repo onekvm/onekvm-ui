@@ -19,7 +19,7 @@ function update(value: string) {
     <header>
       <div>
         <h2>{{ t('network.dns.title', 'DNS servers') }}</h2>
-        <p>{{ t('network.dns.description', 'System-wide name servers used by all network interfaces. Write AdGuard-style prefixes: tls://1.1.1.1 for DoT, https://cloudflare-dns.com/dns-query for DoH.') }}</p>
+        <p class="dns-description">{{ t('network.dns.description', 'System-wide name servers used by all network interfaces.\n1.1.1.1 — plain DNS\nudp://1.1.1.1 — plain UDP\ntcp://1.1.1.1 — plain TCP\ntls://1.1.1.1 — DoT (IP required)\ntls://1.1.1.1#one.one.one.one — DoT, name after # is the certificate name\nhttps://cloudflare-dns.com/dns-query — DoH\nquic://, h3:// and sdns:// are not supported') }}</p>
       </div>
     </header>
     <n-form label-placement="top" :show-feedback="false">
@@ -34,7 +34,6 @@ function update(value: string) {
           @update:value="update"
         />
       </n-form-item>
-      <p class="dns-hint">{{ t('network.dns.dohDotHint', 'Plain: 1.1.1.1 or udp://1.1.1.1. DoT: tls://1.1.1.1 or tls://1.1.1.1#one.one.one.one. DoH: https://cloudflare-dns.com/dns-query. quic://, h3:// and sdns:// are not supported.') }}</p>
     </n-form>
   </section>
 </template>
@@ -42,6 +41,5 @@ function update(value: string) {
 <style scoped>
 .network-global-card { display: grid; gap: 14px; padding-top: 18px; border-top: 1px solid #30363d; }
 .network-global-card header h2 { margin: 0; font-size: 14px; }
-.network-global-card header p { margin: 4px 0 0; color: #8f99a3; font-size: 11px; }
-.dns-hint { margin: -8px 0 0; color: #8f99a3; font-size: 11px; }
+.dns-description { margin: 4px 0 0; color: #8f99a3; font-size: 11px; white-space: pre-line; line-height: 1.55; }
 </style>

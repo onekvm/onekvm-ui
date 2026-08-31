@@ -1195,9 +1195,17 @@ const zh_tw = {
       },
 	  dns: {
 		title: 'DNS 伺服器',
-		description: '供所有網路介面使用的系統級名稱伺服器。寫法與 AdGuard Home 相同：tls://1.1.1.1 為 DoT，https://cloudflare-dns.com/dns-query 為 DoH。',
+		description: [
+			'供所有網路介面使用的系統級名稱伺服器。',
+			'1.1.1.1 — 明文 DNS',
+			'udp://1.1.1.1 — 明文 UDP',
+			'tcp://1.1.1.1 — 明文 TCP',
+			'tls://1.1.1.1 — DoT（需 IP）',
+			'tls://1.1.1.1#one.one.one.one — DoT，# 後為憑證名',
+			'https://cloudflare-dns.com/dns-query — DoH',
+			'不支援 quic://、h3://、sdns://',
+		].join('\n'),
 		servers: '名稱伺服器',
-		dohDotHint: '明文：1.1.1.1 或 udp://1.1.1.1。DoT：tls://1.1.1.1 或 tls://1.1.1.1#one.one.one.one。DoH：https://cloudflare-dns.com/dns-query。不支援 quic://、h3://、sdns://。',
 	  },
 	  mdns: {
 		title: 'mDNS',

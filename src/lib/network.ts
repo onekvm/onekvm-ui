@@ -71,22 +71,58 @@ export function withManagementVLAN(config: NetworkConfig, vlanID: number): Netwo
   }
 }
 
+const dnsServerNamePattern = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/
+
+function validDNSPort(value: string) {
+  return /^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 65535
+}
+
+function parseDNSEndpoint(value: string, allowSNI: boolean) {
+  const separator = value.indexOf('#')
+  let address = value
+  let name = ''
+  if (separator !== -1) {
+    if (!allowSNI) return false
+    address = value.slice(0, separator)
+    name = value.slice(separator + 1)
+    if (!name || !dnsServerNamePattern.test(name)) return false
+  }
+  if (!address) return false
+  if (address.startsWith('[')) {
+    const end = address.indexOf(']')
+    if (end < 0) return false
+    const ip = address.slice(1, end)
+    const rest = address.slice(end + 1)
+    if (!isIPv6(ip)) return false
+    return !rest || (rest.startsWith(':') && validDNSPort(rest.slice(1)))
+  }
+  if (isIPv4(address) || isIPv6(address)) return true
+  const colon = address.lastIndexOf(':')
+  if (colon < 0) return false
+  return isIPv4(address.slice(0, colon)) && validDNSPort(address.slice(colon + 1))
+}
+
 export function isDNSServer(value: string) {
   const server = value.trim()
   if (!server) return false
-  if (/^https:\/\//i.test(server)) {
-    try {
-      const parsed = new URL(server)
-      return parsed.protocol === 'https:' && Boolean(parsed.host)
-    } catch {
-      return false
+  const schemeEnd = server.indexOf('://')
+  if (schemeEnd !== -1) {
+    const scheme = server.slice(0, schemeEnd).toLowerCase()
+    if (scheme === 'https') {
+      try {
+        const parsed = new URL(server)
+        return parsed.protocol === 'https:' && Boolean(parsed.host)
+      } catch {
+        return false
+      }
     }
+    if (scheme === 'h3' || scheme === 'quic' || scheme === 'sdns') return false
+    const endpoint = server.slice(schemeEnd + 3).replace(/\/+$/, '')
+    if (scheme === 'tls') return parseDNSEndpoint(endpoint, true)
+    if (scheme === 'udp' || scheme === 'tcp') return parseDNSEndpoint(endpoint, false)
+    return false
   }
-  const separator = server.indexOf('#')
-  if (separator === -1) return isIPv4(server) || isIPv6(server)
-  const address = server.slice(0, separator)
-  const name = server.slice(separator + 1)
-  return (isIPv4(address) || isIPv6(address)) && /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/.test(name)
+  return parseDNSEndpoint(server, true)
 }
 
 export function isIPv4(value: string) {

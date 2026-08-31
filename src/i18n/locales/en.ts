@@ -1191,9 +1191,9 @@ const en = {
       },
 	  dns: {
 		title: 'DNS servers',
-		description: 'System-wide name servers used by all network interfaces. DoT uses address#name, for example 1.1.1.1#one.one.one.one. DoH uses an https:// URL.',
+		description: 'System-wide name servers used by all network interfaces. Write AdGuard-style prefixes: tls://1.1.1.1 for DoT, https://cloudflare-dns.com/dns-query for DoH.',
 		servers: 'Name servers',
-		dohDotHint: 'DoT: 1.1.1.1#one.one.one.one. DoH: https://cloudflare-dns.com/dns-query. Plain IP addresses stay unencrypted.',
+		dohDotHint: 'Plain: 1.1.1.1 or udp://1.1.1.1. DoT: tls://1.1.1.1 or tls://1.1.1.1#one.one.one.one. DoH: https://cloudflare-dns.com/dns-query. quic://, h3:// and sdns:// are not supported.',
 	  },
 	  mdns: {
 		title: 'mDNS',

@@ -1192,7 +1192,7 @@ const en = {
 	  dns: {
 		title: 'DNS servers',
 		description: [
-			'System-wide name servers used by all network interfaces.',
+			'Applies to every network interface.',
 			'1.1.1.1 — plain DNS',
 			'1.1.1.1:5353 — plain DNS with a custom port',
 			'[2606:4700:4700::1111]:53 — IPv6 with a port must be in brackets',
@@ -1204,7 +1204,6 @@ const en = {
 			'https://cloudflare-dns.com:443/dns-query — DoH with a custom port',
 			'quic://, h3:// and sdns:// are not supported',
 		].join('\n'),
-		servers: 'Name servers',
 	  },
 	  mdns: {
 		title: 'mDNS',

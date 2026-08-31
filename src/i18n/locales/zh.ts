@@ -1191,7 +1191,7 @@ const zh = {
 	  dns: {
 		title: 'DNS 服务器',
 		description: [
-			'供所有网络接口使用的系统级域名服务器。',
+			'对所有网络接口生效。',
 			'1.1.1.1 — 明文 DNS',
 			'1.1.1.1:5353 — 明文，自定义端口',
 			'[2606:4700:4700::1111]:53 — IPv6 带端口须写方括号',
@@ -1203,7 +1203,6 @@ const zh = {
 			'https://cloudflare-dns.com:443/dns-query — DoH 自定义端口',
 			'不支持 quic://、h3://、sdns://',
 		].join('\n'),
-		servers: '域名服务器',
 	  },
 	  mdns: {
 		title: 'mDNS',

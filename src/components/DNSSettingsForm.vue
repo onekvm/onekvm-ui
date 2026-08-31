@@ -19,16 +19,17 @@ function update(value: string) {
     <header>
       <div>
         <h2>{{ t('network.dns.title', 'DNS servers') }}</h2>
-        <p class="dns-description">{{ t('network.dns.description', 'System-wide name servers used by all network interfaces.\n1.1.1.1 — plain DNS\n1.1.1.1:5353 — plain DNS with a custom port\n[2606:4700:4700::1111]:53 — IPv6 with a port must be in brackets\nudp://1.1.1.1 — plain UDP\ntcp://1.1.1.1:53 — plain TCP\ntls://1.1.1.1 — DoT (IP required)\ntls://1.1.1.1:853#one.one.one.one — DoT with a custom port, name after # is the certificate name\nhttps://cloudflare-dns.com/dns-query — DoH\nhttps://cloudflare-dns.com:443/dns-query — DoH with a custom port\nquic://, h3:// and sdns:// are not supported') }}</p>
+        <p class="dns-description">{{ t('network.dns.description', 'Applies to every network interface.\n1.1.1.1 — plain DNS\n1.1.1.1:5353 — plain DNS with a custom port\n[2606:4700:4700::1111]:53 — IPv6 with a port must be in brackets\nudp://1.1.1.1 — plain UDP\ntcp://1.1.1.1:53 — plain TCP\ntls://1.1.1.1 — DoT (IP required)\ntls://1.1.1.1:853#one.one.one.one — DoT with a custom port, name after # is the certificate name\nhttps://cloudflare-dns.com/dns-query — DoH\nhttps://cloudflare-dns.com:443/dns-query — DoH with a custom port\nquic://, h3:// and sdns:// are not supported') }}</p>
       </div>
     </header>
     <n-form label-placement="top" :show-feedback="false">
-      <n-form-item :label="t('network.dns.servers', 'Name servers')">
+      <n-form-item :show-label="false">
         <n-input
           :value="text"
           :disabled="disabled"
           type="textarea"
           :autosize="{ minRows: 2, maxRows: 5 }"
+          :input-props="{ 'aria-label': t('network.dns.title', 'DNS servers') }"
           placeholder="tls://1.1.1.1:853&#10;https://cloudflare-dns.com/dns-query"
           :status="modelValue.some((server) => !isDNSServer(server)) ? 'error' : undefined"
           @update:value="update"

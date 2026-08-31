@@ -6,6 +6,7 @@ export const recoveryMessages = {
   en: {
     title: 'OneKVM Recovery',
     sub: 'The device is in recovery. This page can flash firmware, reset the default user, or reboot.',
+    waitingAddr: 'Waiting for a network address…',
     language: 'Language',
     fwTitle: 'Firmware',
     fwHelp: 'Upload an OneKVM .fwup bundle. It is written to the inactive A/B slot, then that slot is selected.',
@@ -31,6 +32,7 @@ export const recoveryMessages = {
   zh: {
     title: 'OneKVM Recovery',
     sub: '设备处于恢复模式。这里只提供固件刷写、重置默认用户和重启。',
+    waitingAddr: '正在获取网络地址…',
     language: '语言',
     fwTitle: '固件刷写',
     fwHelp: '上传 OneKVM 的 .fwup 包。会写入当前未启动的 A/B 槽，然后把启动切过去。',
@@ -56,6 +58,7 @@ export const recoveryMessages = {
   zh_tw: {
     title: 'OneKVM Recovery',
     sub: '裝置處於復原模式。這裡只提供韌體刷寫、重設預設使用者和重新啟動。',
+    waitingAddr: '正在取得網路位址…',
     language: '語言',
     fwTitle: '韌體刷寫',
     fwHelp: '上傳 OneKVM 的 .fwup 套件。會寫入目前未啟動的 A/B 槽，然後切換到該槽。',

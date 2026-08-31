@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   errorMessage,
   isRecoveryPath,
+  parseRecoveryStatus,
   postRecovery,
   RECOVERY_PATHS,
   recoveryErrorMessage,
@@ -29,6 +30,12 @@ assert.equal(recoveryErrorMessage(500, ' cannot reset user\n'), 'cannot reset us
 assert.equal(recoveryErrorMessage(404, '   '), '404')
 assert.equal(errorMessage(new Error('firmware install failed')), 'firmware install failed')
 assert.equal(errorMessage('boom'), 'boom')
+assert.deepEqual(parseRecoveryStatus('{"addresses":["10.100.99.107","10.0.0.5"]}'), [
+  '10.100.99.107',
+  '10.0.0.5',
+])
+assert.deepEqual(parseRecoveryStatus('{"addresses":[1,""]}'), [])
+assert.deepEqual(parseRecoveryStatus('not-json'), [])
 
 assert.equal(detectRecoveryLocale(['zh-CN', 'en']), 'zh')
 assert.equal(detectRecoveryLocale(['zh-TW']), 'zh_tw')

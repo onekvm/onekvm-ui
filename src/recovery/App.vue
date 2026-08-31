@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 
-import { errorMessage, postRecovery, RECOVERY_PATHS } from './api'
+import { errorMessage, loadRecoveryStatus, postRecovery, RECOVERY_PATHS } from './api'
 import {
   detectRecoveryLocale,
   isRecoveryLocale,
@@ -29,6 +29,8 @@ const statusText = ref('')
 const statusError = ref(false)
 const confirmKind = ref<ConfirmKind | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
+const addresses = ref<string[]>([])
+let addressTimer = 0
 
 document.documentElement.lang = recoveryDocumentLang(locale.value)
 
@@ -104,6 +106,25 @@ const confirmCopy = computed(() => {
   }
   return { title: t('userTitle'), body: t('confirmUser') }
 })
+
+async function refreshAddresses() {
+  try {
+    addresses.value = await loadRecoveryStatus()
+  } catch {
+    /* keep the last known list */
+  }
+}
+
+onMounted(() => {
+  void refreshAddresses()
+  addressTimer = window.setInterval(() => {
+    void refreshAddresses()
+  }, 4000)
+})
+
+onUnmounted(() => {
+  if (addressTimer) window.clearInterval(addressTimer)
+})
 </script>
 
 <template>
@@ -113,6 +134,12 @@ const confirmCopy = computed(() => {
         <p class="eyebrow">OneKVM</p>
         <h1>{{ t('title') }}</h1>
         <p class="sub">{{ t('sub') }}</p>
+        <ul v-if="addresses.length" class="addrs">
+          <li v-for="ip in addresses" :key="ip">
+            <a :href="`http://${ip}/`">{{ ip }}</a>
+          </li>
+        </ul>
+        <p v-else class="sub">{{ t('waitingAddr') }}</p>
       </div>
       <label class="language">
         <span>{{ t('language') }}</span>
@@ -212,6 +239,21 @@ h1 {
   margin: 0;
   color: #9aa4ae;
   line-height: 1.5;
+}
+
+.addrs {
+  display: grid;
+  gap: .25rem;
+  margin: .7rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.addrs a {
+  color: #7aa8ff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .95rem;
+  text-decoration: none;
 }
 
 .language {

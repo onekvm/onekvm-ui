@@ -23,6 +23,26 @@ export function errorMessage(error: unknown) {
   return String(error)
 }
 
+export function parseRecoveryStatus(body: string): string[] {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(body)
+  } catch {
+    return []
+  }
+  if (!parsed || typeof parsed !== 'object') return []
+  const addresses = (parsed as { addresses?: unknown }).addresses
+  if (!Array.isArray(addresses)) return []
+  return addresses.filter((item): item is string => typeof item === 'string' && item.length > 0)
+}
+
+export async function loadRecoveryStatus(): Promise<string[]> {
+  const response = await fetch('/status')
+  const text = await response.text()
+  if (!response.ok) throw new Error(recoveryErrorMessage(response.status, text))
+  return parseRecoveryStatus(text)
+}
+
 export async function postRecovery(path: string, body?: BodyInit): Promise<string> {
   if (!isRecoveryPath(path)) throw new Error('unknown recovery path')
   const response = await fetch(path, { method: 'POST', body })

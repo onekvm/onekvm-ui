@@ -475,7 +475,7 @@ async function setMTP(enabled: boolean) {
     status.value = nextStatus
     emit('status', nextStatus)
     message.success(enabled
-      ? t('virtualMedia.mtpEnabled', 'The virtual-media folder is now shared with the controlled computer')
+      ? t('virtualMedia.mtpEnabled', 'The virtual-media folder is now shared with the controlled device')
       : t('virtualMedia.mtpDisabled', 'File transfer stopped'))
   } catch (error) {
     message.error(`${t('virtualMedia.mtpFailed', 'File transfer failed')}: ${error instanceof Error ? error.message : String(error)}`)
@@ -1411,7 +1411,7 @@ onBeforeUnmount(() => {
                     <header class="media-mode-header">
                       <div class="media-mode-copy">
                         <strong>{{ t('virtualMedia.mtpTab', 'File transfer') }}</strong>
-                        <span>{{ t('virtualMedia.mtpDescription', 'Share the virtual-media folder with the controlled computer, like plugging in a phone.') }}</span>
+                        <span>{{ t('virtualMedia.mtpDescription', 'Share the virtual-media folder with the controlled device, like plugging in a phone.') }}</span>
                       </div>
                       <div class="media-mode-header-actions">
                         <n-tag v-if="status?.mtp" type="success" size="small">{{ t('virtualMedia.connected', 'Connected') }}</n-tag>

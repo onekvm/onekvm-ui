@@ -44,7 +44,7 @@ const channelOptions = computed(() => [
 <template>
   <div class="audio-settings">
     <n-alert v-if="props.showEnable !== false" type="info" :bordered="false">
-      {{ t('settings.advancedSettings.audioPage.restartHint', 'Turning USB audio on or changing channels makes the controlled computer rediscover this device. The keyboard and mouse disconnect briefly.') }}
+      {{ t('settings.advancedSettings.audioPage.restartHint', 'Turning USB audio on or changing channels makes the controlled device rediscover this USB gadget. The keyboard and mouse disconnect briefly.') }}
     </n-alert>
 
     <section class="audio-settings-card">

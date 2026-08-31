@@ -162,34 +162,34 @@ const keyboardLeds = computed({
     <section class="usb-settings-card">
       <header>
         <h2>{{ t('settings.advancedSettings.usbPage.functions', 'USB functions') }}</h2>
-        <p>{{ t('settings.advancedSettings.usbPage.functionsHint', 'Choose what the controlled computer can use. Keyboard and mouse stay on. Turn something off and that computer will not see it.') }}</p>
+        <p>{{ t('settings.advancedSettings.usbPage.functionsHint', 'Choose what the controlled device can use. Keyboard and mouse stay on. Turn something off and that device will not see it.') }}</p>
       </header>
       <ul class="usb-function-list">
         <li>
           <div>
             <strong>{{ t('settings.advancedSettings.usbPage.keyboard', 'USB keyboard') }}</strong>
-            <small>{{ t('settings.advancedSettings.usbPage.alwaysOnHint', 'Always available on the controlled computer.') }}</small>
+            <small>{{ t('settings.advancedSettings.usbPage.alwaysOnHint', 'Always on and cannot be turned off.') }}</small>
           </div>
           <n-switch :value="true" disabled />
         </li>
         <li>
           <div>
             <strong>{{ t('settings.advancedSettings.usbPage.mouse', 'USB mouse') }}</strong>
-            <small>{{ t('settings.advancedSettings.usbPage.alwaysOnHint', 'Always available on the controlled computer.') }}</small>
+            <small>{{ t('settings.advancedSettings.usbPage.alwaysOnHint', 'Always on and cannot be turned off.') }}</small>
           </div>
           <n-switch :value="true" disabled />
         </li>
         <li>
           <div>
             <strong>{{ t('settings.advancedSettings.usbPage.keyboardLeds', 'Keyboard lights') }}</strong>
-            <small>{{ t('settings.advancedSettings.usbPage.keyboardLedsHint', 'Shows Num Lock, Caps Lock, and Scroll Lock from the controlled computer.') }}</small>
+            <small>{{ t('settings.advancedSettings.usbPage.keyboardLedsHint', 'Shows Num Lock, Caps Lock, and Scroll Lock from the controlled device.') }}</small>
           </div>
           <n-switch v-model:value="keyboardLeds" :disabled="props.disabled" />
         </li>
         <li>
           <div>
             <strong>{{ t('settings.advancedSettings.audioPage.title', 'USB audio') }}</strong>
-            <small>{{ t('settings.advancedSettings.audioPage.hint', 'Lets the controlled computer use OneKVM as a speaker. The console Audio button appears after you turn this on.') }}</small>
+            <small>{{ t('settings.advancedSettings.audioPage.hint', 'The controlled device will see OneKVM as a speaker. The console Audio button appears after you turn this on.') }}</small>
           </div>
           <n-tooltip :disabled="!audioBlocked" placement="left">
             <template #trigger>
@@ -203,7 +203,7 @@ const keyboardLeds = computed({
         <li>
           <div>
             <strong>{{ t('settings.advancedSettings.usbPage.microphone', 'USB microphone') }}</strong>
-            <small>{{ t('settings.advancedSettings.usbPage.microphoneHint', 'Lets the controlled computer use OneKVM as a microphone. Turn it off and that computer will not see a microphone.') }}</small>
+            <small>{{ t('settings.advancedSettings.usbPage.microphoneHint', 'Forwards this browser’s microphone to the controlled device. Turn it off and that device will not see a microphone.') }}</small>
           </div>
           <n-tooltip :disabled="!microphoneBlocked" placement="left">
             <template #trigger>
@@ -217,7 +217,7 @@ const keyboardLeds = computed({
         <li>
           <div>
             <strong>{{ t('settings.advancedSettings.usbPage.gamepad', 'Gamepad') }}</strong>
-            <small>{{ t('settings.advancedSettings.usbPage.gamepadHint', 'Forwards a gamepad from this computer to the controlled computer through the browser. Turning it on or off makes that computer rediscover USB briefly.') }}</small>
+            <small>{{ t('settings.advancedSettings.usbPage.gamepadHint', 'Forwards a gamepad from this computer to the controlled device through the browser. Turning it on or off disconnects USB briefly.') }}</small>
           </div>
           <n-tooltip :disabled="!gamepadBlocked" placement="left">
             <template #trigger>
@@ -231,7 +231,7 @@ const keyboardLeds = computed({
         <li v-if="showMassStorage">
           <div>
             <strong>{{ t('settings.advancedSettings.usbPage.storage', 'Virtual storage') }}</strong>
-            <small>{{ t('settings.advancedSettings.usbPage.storageHint', 'Lets you mount a disc image or a virtual USB drive on the controlled computer. Turn it off and that computer will not see any storage.') }}</small>
+            <small>{{ t('settings.advancedSettings.usbPage.storageHint', 'Lets you mount a disc image or a virtual USB drive on the controlled device. Turn it off and that device will not see any storage.') }}</small>
           </div>
           <n-tooltip :disabled="!storageBlocked" placement="left">
             <template #trigger>
@@ -245,7 +245,7 @@ const keyboardLeds = computed({
         <li v-if="showMTP">
           <div>
             <strong>{{ t('virtualMedia.mtpTab', 'File transfer') }}</strong>
-            <small>{{ t('settings.advancedSettings.usbPage.mtpHint', 'Share the virtual-media folder with the controlled computer, like plugging in a phone. Turn it off and that computer will not see this feature.') }}</small>
+            <small>{{ t('settings.advancedSettings.usbPage.mtpHint', 'Share the virtual-media folder with the controlled device, like plugging in a phone. Turn it off and that device will not see this feature.') }}</small>
           </div>
           <n-tooltip :disabled="!mtpBlocked" placement="left">
             <template #trigger>
@@ -269,8 +269,8 @@ const keyboardLeds = computed({
 
     <section class="usb-settings-card">
       <header>
-        <h2>{{ t('settings.advancedSettings.usbPage.deviceIdentity', 'Name shown on the computer') }}</h2>
-        <p>{{ t('settings.advancedSettings.usbPage.deviceIdentityHint', 'The controlled computer shows these names in its device list. You can usually leave them as they are.') }}</p>
+        <h2>{{ t('settings.advancedSettings.usbPage.deviceIdentity', 'Name shown on the device') }}</h2>
+        <p>{{ t('settings.advancedSettings.usbPage.deviceIdentityHint', 'The controlled device shows these names in its system information. You can usually leave them as they are.') }}</p>
       </header>
       <n-form label-placement="top" :show-feedback="false" class="usb-settings-grid">
         <n-form-item label="VID">
@@ -297,7 +297,7 @@ const keyboardLeds = computed({
     <section class="usb-settings-card">
       <header>
         <h2>{{ t('settings.advancedSettings.usbPage.keyboard', 'USB keyboard') }}</h2>
-        <p>{{ t('settings.advancedSettings.usbPage.keyboardHint', 'The keyboard name shown on the controlled computer. Leave the refresh interval at 0 unless you have a reason to change it.') }}</p>
+        <p>{{ t('settings.advancedSettings.usbPage.keyboardHint', 'The keyboard name shown on the controlled device. Leave the refresh interval at 0 unless you have a reason to change it.') }}</p>
       </header>
       <n-form label-placement="top" :show-feedback="false" class="usb-settings-grid">
         <n-form-item :label="t('settings.advancedSettings.usbPage.interfaceName', 'Display name')">
@@ -312,7 +312,7 @@ const keyboardLeds = computed({
     <section class="usb-settings-card">
       <header>
         <h2>{{ t('settings.advancedSettings.usbPage.mouse', 'USB mouse') }}</h2>
-        <p>{{ t('settings.advancedSettings.usbPage.mouseHint', 'The mouse name shown on the controlled computer. Leave the refresh interval at 0 unless you have a reason to change it.') }}</p>
+        <p>{{ t('settings.advancedSettings.usbPage.mouseHint', 'The mouse name shown on the controlled device. Leave the refresh interval at 0 unless you have a reason to change it.') }}</p>
       </header>
       <n-form label-placement="top" :show-feedback="false" class="usb-settings-grid">
         <n-form-item :label="t('settings.advancedSettings.usbPage.interfaceName', 'Display name')">
@@ -327,7 +327,7 @@ const keyboardLeds = computed({
     <section v-if="massStorageOn" class="usb-settings-card">
       <header>
         <h2>{{ t('settings.advancedSettings.usbPage.storageIdentity', 'Virtual drive names') }}</h2>
-        <p>{{ t('settings.advancedSettings.usbPage.storageIdentityHint', 'Names the controlled computer shows for the virtual disc and USB drive. Vendor is up to 8 letters or numbers; product names up to 16.') }}</p>
+        <p>{{ t('settings.advancedSettings.usbPage.storageIdentityHint', 'Names the controlled device shows for the virtual disc and USB drive. Vendor is up to 8 letters or numbers; product names up to 16.') }}</p>
       </header>
       <n-form label-placement="top" :show-feedback="false" class="usb-settings-grid">
         <n-form-item :label="t('settings.advancedSettings.usbPage.storageVendor', 'Vendor name')">

@@ -412,7 +412,7 @@ const mediaStateLabel = computed(() => {
       ? t('virtualMedia.mounted', 'Virtual Media Mounted')
       : t('virtualMedia.noMountedFile', 'No mounted media')
   }
-  if (props.msdStatus.mtp) return t('virtualMedia.mtpOn', 'MTP on')
+  if (props.msdStatus.mtp) return t('virtualMedia.mtpOn', 'File transfer on')
   return t('virtualMedia.disconnected', 'Disconnected')
 })
 

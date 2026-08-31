@@ -44,7 +44,7 @@ const channelOptions = computed(() => [
 <template>
   <div class="audio-settings">
     <n-alert v-if="props.showEnable !== false" type="info" :bordered="false">
-      {{ t('settings.advancedSettings.audioPage.restartHint', 'Enabling USB audio or changing channels re-enumerates the gadget. Keyboard and mouse disconnect briefly. This is a UAC1 speaker presented to the target PC.') }}
+      {{ t('settings.advancedSettings.audioPage.restartHint', 'Turning USB audio on or changing channels makes the controlled computer rediscover this device. The keyboard and mouse disconnect briefly.') }}
     </n-alert>
 
     <section class="audio-settings-card">

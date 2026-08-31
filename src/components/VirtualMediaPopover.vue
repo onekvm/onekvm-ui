@@ -167,7 +167,7 @@ const uploadWindowStyle = computed(() => uploadPosition.value
   : undefined)
 function tabLabel(name: MediaTab) {
   if (name === 'drive') return t('virtualMedia.driveTab', 'Virtual USB drive')
-  if (name === 'mtp') return t('virtualMedia.mtpTab', 'MTP')
+  if (name === 'mtp') return t('virtualMedia.mtpTab', 'File transfer')
   return t('virtualMedia.isoTab', 'ISO mounting')
 }
 const activeTabLabel = computed(() => tabLabel(tab.value))
@@ -475,10 +475,10 @@ async function setMTP(enabled: boolean) {
     status.value = nextStatus
     emit('status', nextStatus)
     message.success(enabled
-      ? t('virtualMedia.mtpEnabled', 'Virtual media folder is shared over MTP')
-      : t('virtualMedia.mtpDisabled', 'MTP share stopped'))
+      ? t('virtualMedia.mtpEnabled', 'The virtual-media folder is now shared with the controlled computer')
+      : t('virtualMedia.mtpDisabled', 'File transfer stopped'))
   } catch (error) {
-    message.error(`${t('virtualMedia.mtpFailed', 'MTP failed')}: ${error instanceof Error ? error.message : String(error)}`)
+    message.error(`${t('virtualMedia.mtpFailed', 'File transfer failed')}: ${error instanceof Error ? error.message : String(error)}`)
     await refresh()
   } finally {
     mtpBusy.value = false
@@ -1131,7 +1131,7 @@ onBeforeUnmount(() => {
             </n-tab>
             <n-tab v-if="mtpAvailable" name="mtp">
               <span class="virtual-media-tab-label">
-                <span>{{ t('virtualMedia.mtpTab', 'MTP') }}</span>
+                <span>{{ t('virtualMedia.mtpTab', 'File transfer') }}</span>
                 <button
                   type="button"
                   class="virtual-media-tab-pin"
@@ -1410,8 +1410,8 @@ onBeforeUnmount(() => {
                   <section class="media-mode-panel">
                     <header class="media-mode-header">
                       <div class="media-mode-copy">
-                        <strong>{{ t('virtualMedia.mtpTab', 'MTP') }}</strong>
-                        <span>{{ t('virtualMedia.mtpDescription', 'Share the virtual-media folder with the controlled host over MTP.') }}</span>
+                        <strong>{{ t('virtualMedia.mtpTab', 'File transfer') }}</strong>
+                        <span>{{ t('virtualMedia.mtpDescription', 'Share the virtual-media folder with the controlled computer, like plugging in a phone.') }}</span>
                       </div>
                       <div class="media-mode-header-actions">
                         <n-tag v-if="status?.mtp" type="success" size="small">{{ t('virtualMedia.connected', 'Connected') }}</n-tag>

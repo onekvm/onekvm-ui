@@ -126,84 +126,83 @@ const keyboardLeds = computed({
 <template>
   <div class="usb-settings">
     <n-alert type="info" :bordered="false">
-      {{ t('settings.advancedSettings.usbPage.restartHint', 'USB identity and HID names take effect after OneKVM or the device is restarted. Changing audio, the gamepad, virtual storage, or MTP re-enumerates USB immediately.') }}
+      {{ t('settings.advancedSettings.usbPage.restartHint', 'Name changes apply after OneKVM restarts. Turning functions below on or off makes the controlled computer rediscover USB, so the keyboard and mouse disconnect briefly.') }}
     </n-alert>
 
-    <section v-if="hasBudget && gadget" class="usb-settings-card">
+    <section v-if="hasBudget && gadget" class="usb-settings-card" :title="gadget.udc || undefined">
       <header>
-        <h2>{{ t('settings.advancedSettings.usbPage.endpoints', 'UDC endpoints') }}</h2>
+        <h2>{{ t('settings.advancedSettings.usbPage.endpoints', 'USB capacity') }}</h2>
         <p>
-          {{ t('settings.advancedSettings.usbPage.endpointsHint', 'Each USB device controller has a fixed number of IN and OUT endpoints. Extra functions such as audio, a gamepad, mass storage, or MTP share this budget.') }}
-          <template v-if="gadget.udc"> {{ gadget.udc }}.</template>
+          {{ t('settings.advancedSettings.usbPage.endpointsHint', 'This USB port can only run so many extras at once. Audio, the gamepad, virtual storage, and file transfer all use capacity. If you run out, turn off what you are not using.') }}
         </p>
       </header>
       <dl class="usb-endpoint-budget">
         <div>
-          <dt>IN</dt>
+          <dt>{{ t('settings.advancedSettings.usbPage.endpointsIn', 'To the computer') }}</dt>
           <dd>{{ used.inn }} / {{ gadget.in_limit }}</dd>
         </div>
         <div>
-          <dt>OUT</dt>
+          <dt>{{ t('settings.advancedSettings.usbPage.endpointsOut', 'From the computer') }}</dt>
           <dd>{{ used.out }} / {{ gadget.out_limit }}</dd>
         </div>
       </dl>
       <n-alert v-if="overBudget" type="warning" :bordered="false">
-        {{ t('settings.advancedSettings.usbPage.endpointsExceeded', 'This combination uses more endpoints than the controller provides. Disable audio, the gamepad, virtual storage, MTP, or the keyboard LED endpoint.') }}
+        {{ t('settings.advancedSettings.usbPage.endpointsExceeded', 'Too many functions are on. Turn off audio, the gamepad, virtual storage, file transfer, or keyboard lights.') }}
       </n-alert>
     </section>
 
     <section class="usb-settings-card">
       <header>
         <h2>{{ t('settings.advancedSettings.usbPage.functions', 'USB functions') }}</h2>
-        <p>{{ t('settings.advancedSettings.usbPage.functionsHint', 'Turn gadget functions on or off. Keyboard and mouse stay on. Turning off virtual storage or MTP removes that function from the gadget.') }}</p>
+        <p>{{ t('settings.advancedSettings.usbPage.functionsHint', 'Choose what the controlled computer can use. Keyboard and mouse stay on. Turn something off and that computer will not see it.') }}</p>
       </header>
       <ul class="usb-function-list">
         <li>
           <div>
             <strong>{{ t('settings.advancedSettings.usbPage.keyboard', 'USB keyboard') }}</strong>
-            <small>{{ t('settings.advancedSettings.usbPage.alwaysOnHint', 'Always presented to the controlled host.') }}</small>
+            <small>{{ t('settings.advancedSettings.usbPage.alwaysOnHint', 'Always available on the controlled computer.') }}</small>
           </div>
           <n-switch :value="true" disabled />
         </li>
         <li>
           <div>
             <strong>{{ t('settings.advancedSettings.usbPage.mouse', 'USB mouse') }}</strong>
-            <small>{{ t('settings.advancedSettings.usbPage.alwaysOnHint', 'Always presented to the controlled host.') }}</small>
+            <small>{{ t('settings.advancedSettings.usbPage.alwaysOnHint', 'Always available on the controlled computer.') }}</small>
           </div>
           <n-switch :value="true" disabled />
         </li>
         <li>
           <div>
-            <strong>{{ t('settings.advancedSettings.usbPage.keyboardLeds', 'Keyboard LED endpoint') }}</strong>
-            <small>{{ t('settings.advancedSettings.usbPage.keyboardLedsHint', 'Required for Num Lock, Caps Lock, and Scroll Lock on the controlled host.') }}</small>
+            <strong>{{ t('settings.advancedSettings.usbPage.keyboardLeds', 'Keyboard lights') }}</strong>
+            <small>{{ t('settings.advancedSettings.usbPage.keyboardLedsHint', 'Shows Num Lock, Caps Lock, and Scroll Lock from the controlled computer.') }}</small>
           </div>
           <n-switch v-model:value="keyboardLeds" :disabled="props.disabled" />
         </li>
         <li>
           <div>
             <strong>{{ t('settings.advancedSettings.audioPage.title', 'USB audio') }}</strong>
-            <small>{{ audioBlocked ? t('settings.advancedSettings.usbPage.audioBlocked', 'USB audio needs one more IN and OUT endpoint than this controller has free.') : t('settings.advancedSettings.audioPage.hint', 'Presents a USB speaker to the target PC. The console Audio control appears after this is enabled.') }}</small>
+            <small>{{ audioBlocked ? t('settings.advancedSettings.usbPage.audioBlocked', 'Not enough USB capacity. Turn off the gamepad, virtual storage, or file transfer first.') : t('settings.advancedSettings.audioPage.hint', 'Lets the controlled computer use OneKVM as a speaker. The console Audio button appears after you turn this on.') }}</small>
           </div>
           <n-switch v-model:value="audio.enabled" :disabled="props.disabled || audioBlocked" />
         </li>
         <li>
           <div>
-            <strong>{{ t('settings.advancedSettings.usbPage.gamepad', 'WebHID gamepad') }}</strong>
-            <small>{{ gamepadBlocked ? t('settings.advancedSettings.usbPage.gamepadBlocked', 'The gamepad needs one more IN endpoint than this controller has free.') : t('settings.advancedSettings.usbPage.gamepadHint', 'Adds a USB game pad to the composite gadget so a local controller can be forwarded through the browser. Saving this option re-enumerates USB on the controlled host.') }}</small>
+            <strong>{{ t('settings.advancedSettings.usbPage.gamepad', 'Gamepad') }}</strong>
+            <small>{{ gamepadBlocked ? t('settings.advancedSettings.usbPage.gamepadBlocked', 'Not enough USB capacity. Turn off audio, virtual storage, or file transfer first.') : t('settings.advancedSettings.usbPage.gamepadHint', 'Forwards a gamepad from this computer to the controlled computer through the browser. Turning it on or off makes that computer rediscover USB briefly.') }}</small>
           </div>
           <n-switch v-model:value="usb.gamepad" :disabled="props.disabled || gamepadBlocked" />
         </li>
         <li v-if="showMassStorage">
           <div>
             <strong>{{ t('settings.advancedSettings.usbPage.storage', 'Virtual storage') }}</strong>
-            <small>{{ storageBlocked ? t('settings.advancedSettings.usbPage.storageBlocked', 'Virtual storage needs one more IN and OUT endpoint than this controller has free.') : t('settings.advancedSettings.usbPage.storageHint', 'ISO and virtual USB drive. Off removes the mass-storage function from the gadget.') }}</small>
+            <small>{{ storageBlocked ? t('settings.advancedSettings.usbPage.storageBlocked', 'Not enough USB capacity. Turn off audio, the gamepad, or file transfer first.') : t('settings.advancedSettings.usbPage.storageHint', 'Lets you mount a disc image or a virtual USB drive on the controlled computer. Turn it off and that computer will not see any storage.') }}</small>
           </div>
           <n-switch v-model:value="massStorageOn" :disabled="props.disabled || storageBlocked" />
         </li>
         <li v-if="showMTP">
           <div>
-            <strong>{{ t('virtualMedia.mtpTab', 'MTP') }}</strong>
-            <small>{{ mtpBlocked ? t('settings.advancedSettings.usbPage.mtpBlocked', 'MTP needs more endpoints than this controller has free.') : t('settings.advancedSettings.usbPage.mtpHint', 'Share the virtual-media folder over MTP. Off removes the MTP function from the gadget.') }}</small>
+            <strong>{{ t('virtualMedia.mtpTab', 'File transfer') }}</strong>
+            <small>{{ mtpBlocked ? t('settings.advancedSettings.usbPage.mtpBlocked', 'Not enough USB capacity. Turn off audio, the gamepad, or virtual storage first.') : t('settings.advancedSettings.usbPage.mtpHint', 'Share the virtual-media folder with the controlled computer, like plugging in a phone. Turn it off and that computer will not see this feature.') }}</small>
           </div>
           <n-switch v-model:value="mtpOn" :disabled="props.disabled || mtpBlocked" />
         </li>
@@ -220,8 +219,8 @@ const keyboardLeds = computed({
 
     <section class="usb-settings-card">
       <header>
-        <h2>{{ t('settings.advancedSettings.usbPage.deviceIdentity', 'USB device identity') }}</h2>
-        <p>{{ t('settings.advancedSettings.usbPage.deviceIdentityHint', 'These descriptors identify the composite KVM device on the controlled host.') }}</p>
+        <h2>{{ t('settings.advancedSettings.usbPage.deviceIdentity', 'Name shown on the computer') }}</h2>
+        <p>{{ t('settings.advancedSettings.usbPage.deviceIdentityHint', 'The controlled computer shows these names in its device list. You can usually leave them as they are.') }}</p>
       </header>
       <n-form label-placement="top" :show-feedback="false" class="usb-settings-grid">
         <n-form-item label="VID">
@@ -248,13 +247,13 @@ const keyboardLeds = computed({
     <section class="usb-settings-card">
       <header>
         <h2>{{ t('settings.advancedSettings.usbPage.keyboard', 'USB keyboard') }}</h2>
-        <p>{{ t('settings.advancedSettings.usbPage.keyboardHint', 'Interface name and polling interval for the HID keyboard. Interval 0 keeps the kernel default. The LED endpoint is required for Num/Caps/Scroll Lock.') }}</p>
+        <p>{{ t('settings.advancedSettings.usbPage.keyboardHint', 'The keyboard name shown on the controlled computer. Leave the refresh interval at 0 unless you have a reason to change it.') }}</p>
       </header>
       <n-form label-placement="top" :show-feedback="false" class="usb-settings-grid">
-        <n-form-item :label="t('settings.advancedSettings.usbPage.interfaceName', 'Interface name')">
+        <n-form-item :label="t('settings.advancedSettings.usbPage.interfaceName', 'Display name')">
           <n-input v-model:value="usb.keyboard_name" :disabled="props.disabled" maxlength="126" :status="usbStringValid(usb.keyboard_name || '') ? undefined : 'error'" />
         </n-form-item>
-        <n-form-item :label="t('settings.advancedSettings.usbPage.pollInterval', 'Polling interval (ms)')">
+        <n-form-item :label="t('settings.advancedSettings.usbPage.pollInterval', 'Refresh interval (ms)')">
           <n-input-number :value="usb.keyboard_interval ?? 0" :disabled="props.disabled" :min="0" :max="255" :show-button="false" @update:value="setInterval('keyboard_interval', $event)" />
         </n-form-item>
       </n-form>
@@ -263,13 +262,13 @@ const keyboardLeds = computed({
     <section class="usb-settings-card">
       <header>
         <h2>{{ t('settings.advancedSettings.usbPage.mouse', 'USB mouse') }}</h2>
-        <p>{{ t('settings.advancedSettings.usbPage.mouseHint', 'Shared interface name and polling interval for the relative and absolute mouse functions.') }}</p>
+        <p>{{ t('settings.advancedSettings.usbPage.mouseHint', 'The mouse name shown on the controlled computer. Leave the refresh interval at 0 unless you have a reason to change it.') }}</p>
       </header>
       <n-form label-placement="top" :show-feedback="false" class="usb-settings-grid">
-        <n-form-item :label="t('settings.advancedSettings.usbPage.interfaceName', 'Interface name')">
+        <n-form-item :label="t('settings.advancedSettings.usbPage.interfaceName', 'Display name')">
           <n-input v-model:value="usb.mouse_name" :disabled="props.disabled" maxlength="126" :status="usbStringValid(usb.mouse_name || '') ? undefined : 'error'" />
         </n-form-item>
-        <n-form-item :label="t('settings.advancedSettings.usbPage.pollInterval', 'Polling interval (ms)')">
+        <n-form-item :label="t('settings.advancedSettings.usbPage.pollInterval', 'Refresh interval (ms)')">
           <n-input-number :value="usb.mouse_interval ?? 0" :disabled="props.disabled" :min="0" :max="255" :show-button="false" @update:value="setInterval('mouse_interval', $event)" />
         </n-form-item>
       </n-form>
@@ -277,17 +276,17 @@ const keyboardLeds = computed({
 
     <section v-if="massStorageOn" class="usb-settings-card">
       <header>
-        <h2>{{ t('settings.advancedSettings.usbPage.storageIdentity', 'Mass Storage identity') }}</h2>
-        <p>{{ t('settings.advancedSettings.usbPage.storageIdentityHint', 'SCSI Vendor is limited to 8 ASCII characters and Product to 16. They are padded into separate fixed-width fields.') }}</p>
+        <h2>{{ t('settings.advancedSettings.usbPage.storageIdentity', 'Virtual drive names') }}</h2>
+        <p>{{ t('settings.advancedSettings.usbPage.storageIdentityHint', 'Names the controlled computer shows for the virtual disc and USB drive. Vendor is up to 8 letters or numbers; product names up to 16.') }}</p>
       </header>
       <n-form label-placement="top" :show-feedback="false" class="usb-settings-grid">
-        <n-form-item :label="t('settings.advancedSettings.usbPage.storageVendor', 'SCSI vendor')">
+        <n-form-item :label="t('settings.advancedSettings.usbPage.storageVendor', 'Vendor name')">
           <n-input v-model:value="usb.storage_vendor" :disabled="props.disabled" maxlength="8" :status="scsiStringValid(usb.storage_vendor, 8) ? undefined : 'error'" />
         </n-form-item>
-        <n-form-item :label="t('settings.advancedSettings.usbPage.isoProduct', 'Virtual ISO product')">
+        <n-form-item :label="t('settings.advancedSettings.usbPage.isoProduct', 'Virtual disc name')">
           <n-input v-model:value="usb.iso_product" :disabled="props.disabled" maxlength="16" :status="scsiStringValid(usb.iso_product, 16) ? undefined : 'error'" />
         </n-form-item>
-        <n-form-item :label="t('settings.advancedSettings.usbPage.driveProduct', 'Virtual storage product')">
+        <n-form-item :label="t('settings.advancedSettings.usbPage.driveProduct', 'Virtual USB drive name')">
           <n-input v-model:value="usb.drive_product" :disabled="props.disabled" maxlength="16" :status="scsiStringValid(usb.drive_product, 16) ? undefined : 'error'" />
         </n-form-item>
       </n-form>

@@ -95,6 +95,14 @@ const valid = computed(() =>
 )
 
 watch(valid, (value) => emit('validity', value), { immediate: true })
+watch(() => audio.value.enabled, (enabled) => {
+  if (!enabled) audioValid.value = true
+})
+
+const keyboardLeds = computed({
+  get: () => !usb.value.keyboard_no_out,
+  set: (value: boolean) => { usb.value.keyboard_no_out = !value },
+})
 </script>
 
 <template>
@@ -125,6 +133,58 @@ watch(valid, (value) => emit('validity', value), { immediate: true })
         {{ t('settings.advancedSettings.usbPage.endpointsExceeded', 'This combination uses more endpoints than the controller provides. Disable audio, the gamepad, MTP, or the keyboard LED endpoint.') }}
       </n-alert>
     </section>
+
+    <section class="usb-settings-card">
+      <header>
+        <h2>{{ t('settings.advancedSettings.usbPage.functions', 'USB functions') }}</h2>
+        <p>{{ t('settings.advancedSettings.usbPage.functionsHint', 'Turn gadget functions on or off. Keyboard and mouse stay on. Saving audio or the gamepad re-enumerates USB on the controlled host.') }}</p>
+      </header>
+      <ul class="usb-function-list">
+        <li>
+          <div>
+            <strong>{{ t('settings.advancedSettings.usbPage.keyboard', 'USB keyboard') }}</strong>
+            <small>{{ t('settings.advancedSettings.usbPage.alwaysOnHint', 'Always presented to the controlled host.') }}</small>
+          </div>
+          <n-switch :value="true" disabled />
+        </li>
+        <li>
+          <div>
+            <strong>{{ t('settings.advancedSettings.usbPage.mouse', 'USB mouse') }}</strong>
+            <small>{{ t('settings.advancedSettings.usbPage.alwaysOnHint', 'Always presented to the controlled host.') }}</small>
+          </div>
+          <n-switch :value="true" disabled />
+        </li>
+        <li>
+          <div>
+            <strong>{{ t('settings.advancedSettings.usbPage.keyboardLeds', 'Keyboard LED endpoint') }}</strong>
+            <small>{{ t('settings.advancedSettings.usbPage.keyboardLedsHint', 'Required for Num Lock, Caps Lock, and Scroll Lock on the controlled host.') }}</small>
+          </div>
+          <n-switch v-model:value="keyboardLeds" :disabled="props.disabled" />
+        </li>
+        <li>
+          <div>
+            <strong>{{ t('settings.advancedSettings.audioPage.title', 'USB audio') }}</strong>
+            <small>{{ audioBlocked ? t('settings.advancedSettings.usbPage.audioBlocked', 'USB audio needs one more IN and OUT endpoint than this controller has free.') : t('settings.advancedSettings.audioPage.hint', 'Presents a USB speaker to the target PC. The console Audio control appears after this is enabled.') }}</small>
+          </div>
+          <n-switch v-model:value="audio.enabled" :disabled="props.disabled || audioBlocked" />
+        </li>
+        <li>
+          <div>
+            <strong>{{ t('settings.advancedSettings.usbPage.gamepad', 'WebHID gamepad') }}</strong>
+            <small>{{ gamepadBlocked ? t('settings.advancedSettings.usbPage.gamepadBlocked', 'The gamepad needs one more IN endpoint than this controller has free.') : t('settings.advancedSettings.usbPage.gamepadHint', 'Adds a USB game pad to the composite gadget so a local controller can be forwarded through the browser. Saving this option re-enumerates USB on the controlled host.') }}</small>
+          </div>
+          <n-switch v-model:value="usb.gamepad" :disabled="props.disabled || gamepadBlocked" />
+        </li>
+      </ul>
+    </section>
+
+    <AudioSettingsForm
+      v-if="audio.enabled"
+      v-model="audio"
+      :show-enable="false"
+      :disabled="props.disabled || audioBlocked"
+      @validity="audioValid = $event"
+    />
 
     <section class="usb-settings-card">
       <header>
@@ -165,9 +225,6 @@ watch(valid, (value) => emit('validity', value), { immediate: true })
         <n-form-item :label="t('settings.advancedSettings.usbPage.pollInterval', 'Polling interval (ms)')">
           <n-input-number :value="usb.keyboard_interval ?? 0" :disabled="props.disabled" :min="0" :max="255" :show-button="false" @update:value="setInterval('keyboard_interval', $event)" />
         </n-form-item>
-        <n-form-item :label="t('settings.advancedSettings.usbPage.keyboardLeds', 'Keyboard LED endpoint')">
-          <n-switch :value="!usb.keyboard_no_out" :disabled="props.disabled" @update:value="usb.keyboard_no_out = !$event" />
-        </n-form-item>
       </n-form>
     </section>
 
@@ -184,26 +241,6 @@ watch(valid, (value) => emit('validity', value), { immediate: true })
           <n-input-number :value="usb.mouse_interval ?? 0" :disabled="props.disabled" :min="0" :max="255" :show-button="false" @update:value="setInterval('mouse_interval', $event)" />
         </n-form-item>
       </n-form>
-    </section>
-
-    <AudioSettingsForm v-model="audio" :disabled="props.disabled || audioBlocked" @validity="audioValid = $event" />
-    <n-alert v-if="audioBlocked" type="warning" :bordered="false">
-      {{ t('settings.advancedSettings.usbPage.audioBlocked', 'USB audio needs one more IN and OUT endpoint than this controller has free.') }}
-    </n-alert>
-
-    <section class="usb-settings-card">
-      <header>
-        <h2>{{ t('settings.advancedSettings.usbPage.gamepad', 'WebHID gamepad') }}</h2>
-        <p>{{ t('settings.advancedSettings.usbPage.gamepadHint', 'Adds a USB game pad to the composite gadget so a local controller can be forwarded through the browser. Saving this option re-enumerates USB on the controlled host.') }}</p>
-      </header>
-      <n-form label-placement="top" :show-feedback="false">
-        <n-form-item :label="t('settings.advancedSettings.usbPage.gamepadEnable', 'Enable USB gamepad')">
-          <n-switch v-model:value="usb.gamepad" :disabled="props.disabled || gamepadBlocked" />
-        </n-form-item>
-      </n-form>
-      <n-alert v-if="gamepadBlocked" type="warning" :bordered="false">
-        {{ t('settings.advancedSettings.usbPage.gamepadBlocked', 'The gamepad needs one more IN endpoint than this controller has free.') }}
-      </n-alert>
     </section>
 
     <section class="usb-settings-card">
@@ -235,4 +272,16 @@ watch(valid, (value) => emit('validity', value), { immediate: true })
 .usb-endpoint-budget { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; }
 .usb-endpoint-budget dt { color: #8f99a3; font-size: 11px; }
 .usb-endpoint-budget dd { margin: 2px 0 0; font-size: 18px; font-variant-numeric: tabular-nums; }
+.usb-function-list { display: grid; margin: 0; padding: 0; list-style: none; }
+.usb-function-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 11px 0;
+  border-top: 1px solid #30363d;
+}
+.usb-function-list li:first-child { padding-top: 0; border-top: 0; }
+.usb-function-list strong { font-size: 13px; }
+.usb-function-list small { display: block; margin-top: 3px; color: #8f99a3; font-size: 11px; line-height: 1.45; }
 </style>

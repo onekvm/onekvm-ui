@@ -4,7 +4,7 @@ import { computed, watch } from 'vue'
 import type { OneKVMConfig } from '@/api/client'
 import { t } from '@/i18n/runtime'
 
-const props = defineProps<{ disabled?: boolean }>()
+const props = defineProps<{ disabled?: boolean; showEnable?: boolean }>()
 const emit = defineEmits<{ validity: [valid: boolean] }>()
 const audio = defineModel<OneKVMConfig['audio']>({ required: true })
 
@@ -43,7 +43,7 @@ const channelOptions = computed(() => [
 
 <template>
   <div class="audio-settings">
-    <n-alert type="info" :bordered="false">
+    <n-alert v-if="props.showEnable !== false" type="info" :bordered="false">
       {{ t('settings.advancedSettings.audioPage.restartHint', 'Enabling USB audio or changing channels re-enumerates the gadget. Keyboard and mouse disconnect briefly. This is a UAC1 speaker presented to the target PC.') }}
     </n-alert>
 
@@ -53,7 +53,7 @@ const channelOptions = computed(() => [
         <p>{{ t('settings.advancedSettings.audioPage.hint', 'Presents a USB speaker to the target PC. The console Audio control appears after this is enabled.') }}</p>
       </header>
       <n-form label-placement="top" :show-feedback="false" class="audio-settings-grid">
-        <n-form-item :label="t('settings.advancedSettings.audioPage.enable', 'Enable USB audio')">
+        <n-form-item v-if="props.showEnable !== false" :label="t('settings.advancedSettings.audioPage.enable', 'Enable USB audio')">
           <n-switch v-model:value="enabled" :disabled="props.disabled" />
         </n-form-item>
         <n-form-item :label="t('settings.advancedSettings.audioPage.channels', 'Channels')">

@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict'
 
 import {
+  bytesPercent,
   errorMessage,
+  firmwareProgressPercent,
   isRecoveryPath,
+  shouldApplyFirmwareProgress,
+  parseFirmwareProgress,
   parseRecoveryStatus,
   postRecovery,
   RECOVERY_PATHS,
@@ -36,6 +40,30 @@ assert.deepEqual(parseRecoveryStatus('{"addresses":["10.100.99.107","10.0.0.5"]}
 ])
 assert.deepEqual(parseRecoveryStatus('{"addresses":[1,""]}'), [])
 assert.deepEqual(parseRecoveryStatus('not-json'), [])
+
+assert.equal(parseFirmwareProgress('not-json').phase, 'idle')
+assert.equal(parseFirmwareProgress('{"phase":"upload","received":20,"total":80}').phase, 'upload')
+assert.equal(bytesPercent(20, 80), 25)
+assert.equal(firmwareProgressPercent({ phase: 'upload', received: 40, total: 80 }), 28)
+assert.equal(firmwareProgressPercent({ phase: 'extract' }), 60)
+assert.equal(firmwareProgressPercent({ phase: 'write-rootfs', received: 50, total: 100 }), 78)
+assert.equal(firmwareProgressPercent({ phase: 'done' }), 100)
+assert.equal(
+  shouldApplyFirmwareProgress({ phase: 'upload' }, { phase: 'done' }, true),
+  false,
+)
+assert.equal(
+  shouldApplyFirmwareProgress({ phase: 'upload' }, { phase: 'extract' }, true),
+  true,
+)
+assert.equal(
+  shouldApplyFirmwareProgress({ phase: 'write-rootfs' }, { phase: 'upload' }, false),
+  false,
+)
+assert.equal(
+  shouldApplyFirmwareProgress({ phase: 'switch' }, { phase: 'done' }, false),
+  true,
+)
 
 assert.equal(detectRecoveryLocale(['zh-CN', 'en']), 'zh')
 assert.equal(detectRecoveryLocale(['zh-TW']), 'zh_tw')

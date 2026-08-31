@@ -1,7 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
-import { errorMessage, loadRecoveryStatus, postRecovery, RECOVERY_PATHS } from './api'
+import {
+  bytesPercent,
+  errorMessage,
+  firmwareProgressPercent,
+  loadRecoveryStatus,
+  postRecovery,
+  uploadFirmware,
+  type FirmwareProgress,
+  RECOVERY_PATHS,
+} from './api'
 import {
   detectRecoveryLocale,
   isRecoveryLocale,
@@ -30,6 +39,7 @@ const statusError = ref(false)
 const confirmKind = ref<ConfirmKind | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const addresses = ref<string[]>([])
+const flashProgress = ref<FirmwareProgress | null>(null)
 let addressTimer = 0
 
 document.documentElement.lang = recoveryDocumentLang(locale.value)
@@ -71,13 +81,52 @@ async function runAction(path: (typeof RECOVERY_PATHS)[keyof typeof RECOVERY_PAT
   }
 }
 
+function fillPercent(key: RecoveryMessageKey, percent: number) {
+  return t(key).replace('{percent}', String(percent))
+}
+
+function labelFor(progress: FirmwareProgress) {
+  if (progress.phase === 'upload') return fillPercent('uploading', bytesPercent(progress.received, progress.total))
+  if (progress.phase === 'extract') return t('extracting')
+  if (progress.phase === 'write-rootfs') return fillPercent('writingRoot', bytesPercent(progress.received, progress.total))
+  if (progress.phase === 'write-boot') return t('writingBoot')
+  if (progress.phase === 'switch') return t('switching')
+  if (progress.phase === 'done') return t('ok')
+  if (progress.phase === 'error') return t('fail') + (progress.message || '')
+  return ''
+}
+
+const flashPercent = computed(() => (flashProgress.value ? firmwareProgressPercent(flashProgress.value) : 0))
+const flashLabel = computed(() => (flashProgress.value ? labelFor(flashProgress.value) : ''))
+
 async function flashFirmware() {
   const file = firmwareFile.value
   if (!file) {
     setStatus(t('choose'), true)
     return
   }
-  await runAction(RECOVERY_PATHS.firmware, file, 'uploading')
+  if (busy.value) return
+  busy.value = true
+  flashProgress.value = { phase: 'upload', received: 0, total: file.size }
+  setStatus(fillPercent('uploading', 0), false)
+  try {
+    await uploadFirmware(file, (progress) => {
+      flashProgress.value = progress
+      if (progress.phase === 'error') {
+        setStatus(labelFor(progress), true)
+        return
+      }
+      setStatus(labelFor(progress), false)
+    })
+    flashProgress.value = { phase: 'done' }
+    setStatus(t('ok'), false)
+  } catch (error) {
+    const message = errorMessage(error)
+    flashProgress.value = { phase: 'error', message }
+    setStatus(t('fail') + message, true)
+  } finally {
+    busy.value = false
+  }
 }
 
 function requestResetUser() {
@@ -167,6 +216,17 @@ onUnmounted(() => {
         <button class="primary" type="button" :disabled="busy" @click="flashFirmware">
           {{ t('fwBtn') }}
         </button>
+      </div>
+      <div
+        v-if="flashProgress && flashProgress.phase !== 'idle'"
+        class="progress"
+        role="progressbar"
+        :aria-label="flashLabel"
+        :aria-valuenow="flashPercent"
+        aria-valuemin="0"
+        aria-valuemax="100"
+      >
+        <div class="progress-bar" :style="{ width: `${flashPercent}%` }"></div>
       </div>
     </section>
 
@@ -305,6 +365,20 @@ h2 {
   font-size: .85rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.progress {
+  margin-top: .85rem;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #30363d;
+}
+
+.progress-bar {
+  height: 100%;
+  background: #1677ff;
+  transition: width 180ms linear;
 }
 
 button {

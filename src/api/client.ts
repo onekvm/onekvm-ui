@@ -19,6 +19,7 @@ export interface NetworkConfig {
   wifi_psk?: string
   hostname: string
   mdns?: boolean
+  dnssec?: boolean
   http_port: number
   https_port: number
   tls_enabled: boolean
@@ -150,6 +151,8 @@ export interface USBConfig {
 	iso_product: string
 	drive_product: string
 	gamepad: boolean
+	mass_storage?: boolean
+	mtp?: boolean
 	keyboard_name?: string
 	keyboard_interval?: number
 	keyboard_no_out?: boolean
@@ -284,6 +287,7 @@ export interface OneKVMStatus {
       in_limit: number
       out_limit: number
       mass_storage: boolean
+      mtp_available?: boolean
       mtp: boolean
     }
   }

@@ -391,20 +391,29 @@ const audioStateLabel = computed(() => {
   return t('usbAudio.off', 'Off')
 })
 
+const mediaOpen = computed(() =>
+  Boolean(props.msdStatus?.available || props.msdStatus?.mtp_available))
+
 const mediaState = computed<DeviceState>(() => {
   if (!props.msdStatus) return 'waiting'
-  if (!props.msdStatus.available) return 'error'
-  if (!props.msdStatus.connected) return 'waiting'
-  return props.msdStatus.iso_mounted || props.msdStatus.drive_mounted ? 'ready' : 'waiting'
+  if (!mediaOpen.value) return 'error'
+  if (props.msdStatus.available && props.msdStatus.connected) {
+    return props.msdStatus.iso_mounted || props.msdStatus.drive_mounted ? 'ready' : 'waiting'
+  }
+  if (props.msdStatus.mtp) return 'ready'
+  return 'waiting'
 })
 
 const mediaStateLabel = computed(() => {
   if (!props.msdStatus) return t('virtualMedia.connectingStatus', 'Connecting...')
-  if (!props.msdStatus.available) return t('virtualMedia.unavailable', 'Virtual media is unavailable')
-  if (!props.msdStatus.connected) return t('virtualMedia.disconnected', 'Disconnected')
-  return props.msdStatus.iso_mounted || props.msdStatus.drive_mounted
-    ? t('virtualMedia.mounted', 'Virtual Media Mounted')
-    : t('virtualMedia.noMountedFile', 'No mounted media')
+  if (!mediaOpen.value) return t('virtualMedia.unavailable', 'Virtual media is unavailable')
+  if (props.msdStatus.available && props.msdStatus.connected) {
+    return props.msdStatus.iso_mounted || props.msdStatus.drive_mounted
+      ? t('virtualMedia.mounted', 'Virtual Media Mounted')
+      : t('virtualMedia.noMountedFile', 'No mounted media')
+  }
+  if (props.msdStatus.mtp) return t('virtualMedia.mtpOn', 'MTP on')
+  return t('virtualMedia.disconnected', 'Disconnected')
 })
 
 function formatBytes(value: number) {

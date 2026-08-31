@@ -29,6 +29,8 @@ function setInterval(field: 'keyboard_interval' | 'mouse_interval', value: numbe
 }
 
 if (usb.value.gamepad == null) usb.value.gamepad = false
+if (usb.value.mass_storage == null) usb.value.mass_storage = true
+if (usb.value.mtp == null) usb.value.mtp = true
 if (!usb.value.keyboard_name) usb.value.keyboard_name = 'Keyboard'
 if (!usb.value.mouse_name) usb.value.mouse_name = 'Mouse'
 if (usb.value.keyboard_interval == null) usb.value.keyboard_interval = 0
@@ -39,13 +41,15 @@ const audioValid = ref(true)
 const gadget = computed(() => props.gadget)
 const hasBudget = computed(() => Boolean(gadget.value && (gadget.value.in_limit > 0 || gadget.value.out_limit > 0)))
 
-function endpointUse(options: { audio?: boolean; gamepad?: boolean; keyboardOut?: boolean }) {
+function endpointUse(options: { audio?: boolean; gamepad?: boolean; keyboardOut?: boolean; storage?: boolean; mtp?: boolean }) {
   const speaker = options.audio ?? Boolean(audio.value.enabled)
   const gamepadOn = options.gamepad ?? Boolean(usb.value.gamepad)
   const keyboardOut = options.keyboardOut ?? !usb.value.keyboard_no_out
+  const storageOn = options.storage ?? usb.value.mass_storage !== false
+  const mtpOn = options.mtp ?? usb.value.mtp !== false
   let inn = 3
   let out = keyboardOut ? 1 : 0
-  if (gadget.value?.mass_storage) {
+  if ((gadget.value?.mass_storage ?? true) && storageOn) {
     inn += 1
     out += 1
   }
@@ -54,7 +58,7 @@ function endpointUse(options: { audio?: boolean; gamepad?: boolean; keyboardOut?
     out += 1
   }
   if (gamepadOn) inn += 1
-  if (gadget.value?.mtp) {
+  if ((gadget.value?.mtp_available ?? Boolean(gadget.value?.mtp)) && mtpOn) {
     inn += 2
     out += 1
   }
@@ -67,7 +71,7 @@ const overBudget = computed(() => {
   return used.value.inn > gadget.value.in_limit || used.value.out > gadget.value.out_limit
 })
 
-function wouldFit(options: { audio?: boolean; gamepad?: boolean }) {
+function wouldFit(options: { audio?: boolean; gamepad?: boolean; storage?: boolean; mtp?: boolean }) {
   if (!hasBudget.value || !gadget.value) return true
   const next = endpointUse(options)
   return next.inn <= gadget.value.in_limit && next.out <= gadget.value.out_limit
@@ -75,6 +79,18 @@ function wouldFit(options: { audio?: boolean; gamepad?: boolean }) {
 
 const audioBlocked = computed(() => !audio.value.enabled && !wouldFit({ audio: true }))
 const gamepadBlocked = computed(() => !usb.value.gamepad && !wouldFit({ gamepad: true }))
+const storageBlocked = computed(() => usb.value.mass_storage === false && !wouldFit({ storage: true }))
+const mtpBlocked = computed(() => usb.value.mtp === false && !wouldFit({ mtp: true }))
+const massStorageOn = computed({
+  get: () => usb.value.mass_storage !== false,
+  set: (value: boolean) => { usb.value.mass_storage = value },
+})
+const mtpOn = computed({
+  get: () => usb.value.mtp !== false,
+  set: (value: boolean) => { usb.value.mtp = value },
+})
+const showMassStorage = computed(() => gadget.value?.mass_storage !== false)
+const showMTP = computed(() => Boolean(gadget.value?.mtp_available))
 
 const valid = computed(() =>
   idValid(usb.value.vendor_id) &&
@@ -87,9 +103,11 @@ const valid = computed(() =>
   usbStringValid(usb.value.mouse_name || '') &&
   intervalValid(usb.value.keyboard_interval) &&
   intervalValid(usb.value.mouse_interval) &&
-  scsiStringValid(usb.value.storage_vendor, 8) &&
-  scsiStringValid(usb.value.iso_product, 16) &&
-  scsiStringValid(usb.value.drive_product, 16) &&
+  (usb.value.mass_storage === false || (
+    scsiStringValid(usb.value.storage_vendor, 8) &&
+    scsiStringValid(usb.value.iso_product, 16) &&
+    scsiStringValid(usb.value.drive_product, 16)
+  )) &&
   audioValid.value &&
   !overBudget.value,
 )
@@ -108,7 +126,7 @@ const keyboardLeds = computed({
 <template>
   <div class="usb-settings">
     <n-alert type="info" :bordered="false">
-      {{ t('settings.advancedSettings.usbPage.restartHint', 'USB identity and HID names take effect after OneKVM or the device is restarted. Enabling audio or the gamepad re-enumerates USB immediately.') }}
+      {{ t('settings.advancedSettings.usbPage.restartHint', 'USB identity and HID names take effect after OneKVM or the device is restarted. Changing audio, the gamepad, virtual storage, or MTP re-enumerates USB immediately.') }}
     </n-alert>
 
     <section v-if="hasBudget && gadget" class="usb-settings-card">
@@ -130,14 +148,14 @@ const keyboardLeds = computed({
         </div>
       </dl>
       <n-alert v-if="overBudget" type="warning" :bordered="false">
-        {{ t('settings.advancedSettings.usbPage.endpointsExceeded', 'This combination uses more endpoints than the controller provides. Disable audio, the gamepad, MTP, or the keyboard LED endpoint.') }}
+        {{ t('settings.advancedSettings.usbPage.endpointsExceeded', 'This combination uses more endpoints than the controller provides. Disable audio, the gamepad, virtual storage, MTP, or the keyboard LED endpoint.') }}
       </n-alert>
     </section>
 
     <section class="usb-settings-card">
       <header>
         <h2>{{ t('settings.advancedSettings.usbPage.functions', 'USB functions') }}</h2>
-        <p>{{ t('settings.advancedSettings.usbPage.functionsHint', 'Turn gadget functions on or off. Keyboard and mouse stay on. Saving audio or the gamepad re-enumerates USB on the controlled host.') }}</p>
+        <p>{{ t('settings.advancedSettings.usbPage.functionsHint', 'Turn gadget functions on or off. Keyboard and mouse stay on. Turning off virtual storage or MTP removes that function from the gadget.') }}</p>
       </header>
       <ul class="usb-function-list">
         <li>
@@ -174,6 +192,20 @@ const keyboardLeds = computed({
             <small>{{ gamepadBlocked ? t('settings.advancedSettings.usbPage.gamepadBlocked', 'The gamepad needs one more IN endpoint than this controller has free.') : t('settings.advancedSettings.usbPage.gamepadHint', 'Adds a USB game pad to the composite gadget so a local controller can be forwarded through the browser. Saving this option re-enumerates USB on the controlled host.') }}</small>
           </div>
           <n-switch v-model:value="usb.gamepad" :disabled="props.disabled || gamepadBlocked" />
+        </li>
+        <li v-if="showMassStorage">
+          <div>
+            <strong>{{ t('settings.advancedSettings.usbPage.storage', 'Virtual storage') }}</strong>
+            <small>{{ storageBlocked ? t('settings.advancedSettings.usbPage.storageBlocked', 'Virtual storage needs one more IN and OUT endpoint than this controller has free.') : t('settings.advancedSettings.usbPage.storageHint', 'ISO and virtual USB drive. Off removes the mass-storage function from the gadget.') }}</small>
+          </div>
+          <n-switch v-model:value="massStorageOn" :disabled="props.disabled || storageBlocked" />
+        </li>
+        <li v-if="showMTP">
+          <div>
+            <strong>{{ t('virtualMedia.mtpTab', 'MTP') }}</strong>
+            <small>{{ mtpBlocked ? t('settings.advancedSettings.usbPage.mtpBlocked', 'MTP needs more endpoints than this controller has free.') : t('settings.advancedSettings.usbPage.mtpHint', 'Share the virtual-media folder over MTP. Off removes the MTP function from the gadget.') }}</small>
+          </div>
+          <n-switch v-model:value="mtpOn" :disabled="props.disabled || mtpBlocked" />
         </li>
       </ul>
     </section>
@@ -243,7 +275,7 @@ const keyboardLeds = computed({
       </n-form>
     </section>
 
-    <section class="usb-settings-card">
+    <section v-if="massStorageOn" class="usb-settings-card">
       <header>
         <h2>{{ t('settings.advancedSettings.usbPage.storageIdentity', 'Mass Storage identity') }}</h2>
         <p>{{ t('settings.advancedSettings.usbPage.storageIdentityHint', 'SCSI Vendor is limited to 8 ASCII characters and Product to 16. They are padded into separate fixed-width fields.') }}</p>

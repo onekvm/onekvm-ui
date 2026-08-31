@@ -133,6 +133,9 @@ let fileTransferCloseTimer: number | null = null
 let uploadDragOffset = { x: 0, y: 0 }
 let uploadDragging = false
 
+const storageAvailable = computed(() => Boolean(status.value?.available))
+const mtpAvailable = computed(() => Boolean(status.value?.mtp_available))
+const mediaOpen = computed(() => storageAvailable.value || mtpAvailable.value)
 const isoMedia = computed(() => media.value.filter((item) => item.kind === 'iso'))
 const driveMedia = computed(() => media.value.filter((item) => item.kind === 'drive'))
 const driveSizeUnitOptions = [
@@ -207,6 +210,11 @@ watch(
   }),
   { immediate: true },
 )
+
+watch([storageAvailable, mtpAvailable], () => {
+  if (tab.value !== 'mtp' && !storageAvailable.value && mtpAvailable.value) tab.value = 'mtp'
+  if (tab.value === 'mtp' && !mtpAvailable.value && storageAvailable.value) tab.value = 'iso'
+})
 
 function updateShow(show: boolean) {
   if (!show && (pinned.value || folderCreateOpen.value || driveCreateOpen.value || fileDeletePopoverPath.value)) return
@@ -1094,8 +1102,8 @@ onBeforeUnmount(() => {
         <header v-else class="control-popover-header virtual-media-header">
           <span class="virtual-media-heading"><Disc3 :size="16" /><strong>{{ t('virtualMedia.title', 'Virtual Media') }}</strong></span>
         </header>
-        <n-tabs v-if="status?.available" v-model:value="tab" type="segment" size="small" class="virtual-media-title-tabs">
-            <n-tab name="iso">
+        <n-tabs v-if="mediaOpen" v-model:value="tab" type="segment" size="small" class="virtual-media-title-tabs">
+            <n-tab v-if="storageAvailable" name="iso">
               <span class="virtual-media-tab-label">
                 <span>{{ t('virtualMedia.isoTab', 'Image mounting') }}</span>
                 <button
@@ -1108,7 +1116,7 @@ onBeforeUnmount(() => {
                 ><Pin :size="13" /></button>
               </span>
             </n-tab>
-            <n-tab name="drive">
+            <n-tab v-if="storageAvailable" name="drive">
               <span class="virtual-media-tab-label">
                 <span>{{ t('virtualMedia.driveTab', 'Virtual USB drive') }}</span>
                 <button
@@ -1121,7 +1129,7 @@ onBeforeUnmount(() => {
                 ><Pin :size="13" /></button>
               </span>
             </n-tab>
-            <n-tab v-if="status?.mtp_available" name="mtp">
+            <n-tab v-if="mtpAvailable" name="mtp">
               <span class="virtual-media-tab-label">
                 <span>{{ t('virtualMedia.mtpTab', 'MTP') }}</span>
                 <button
@@ -1138,12 +1146,12 @@ onBeforeUnmount(() => {
 
         <div class="virtual-media-content">
           <div v-if="!status && loading" class="virtual-media-loading"><n-spin size="small" /></div>
-          <n-alert v-else-if="status && !status.available" type="warning" :title="t('virtualMedia.unavailable', 'Virtual media is unavailable')">
+          <n-alert v-else-if="status && !mediaOpen" type="warning" :title="t('virtualMedia.unavailable', 'Virtual media is unavailable')">
             {{ t('virtualMedia.unavailableDescription', 'The virtual media service is not available on this device.') }}
           </n-alert>
-          <template v-else-if="status?.available">
+          <template v-else-if="mediaOpen">
             <n-tabs v-model:value="tab" type="segment" class="virtual-media-content-tabs">
-              <n-tab-pane name="iso">
+              <n-tab-pane v-if="storageAvailable" name="iso">
                 <div class="virtual-media-tab-connect">
                   <n-button v-if="hostConnected" size="small" :loading="disconnecting" @click="disconnectVirtualMedia">
                     <template #icon><Unplug /></template>{{ t('virtualMedia.disconnect', 'Disconnect') }}
@@ -1213,7 +1221,7 @@ onBeforeUnmount(() => {
                 </section>
               </n-tab-pane>
 
-              <n-tab-pane name="drive">
+              <n-tab-pane v-if="storageAvailable" name="drive">
                 <div class="virtual-media-tab-connect">
                   <n-button v-if="hostConnected" size="small" :loading="disconnecting" @click="disconnectVirtualMedia">
                     <template #icon><Unplug /></template>{{ t('virtualMedia.disconnect', 'Disconnect') }}
@@ -1397,7 +1405,7 @@ onBeforeUnmount(() => {
                   </div>
                 </section>
               </n-tab-pane>
-              <n-tab-pane v-if="status?.mtp_available" name="mtp">
+              <n-tab-pane v-if="mtpAvailable" name="mtp">
                 <section class="virtual-media-workspace">
                   <section class="media-mode-panel">
                     <header class="media-mode-header">
@@ -1406,8 +1414,8 @@ onBeforeUnmount(() => {
                         <span>{{ t('virtualMedia.mtpDescription', 'Share the virtual-media folder with the controlled host over MTP.') }}</span>
                       </div>
                       <div class="media-mode-header-actions">
-                        <n-tag v-if="status.mtp" type="success" size="small">{{ t('virtualMedia.connected', 'Connected') }}</n-tag>
-                        <n-button v-if="status.mtp" size="small" :loading="mtpBusy" @click="setMTP(false)">
+                        <n-tag v-if="status?.mtp" type="success" size="small">{{ t('virtualMedia.connected', 'Connected') }}</n-tag>
+                        <n-button v-if="status?.mtp" size="small" :loading="mtpBusy" @click="setMTP(false)">
                           <template #icon><Unplug /></template>{{ t('virtualMedia.disconnect', 'Disconnect') }}
                         </n-button>
                         <n-button v-else type="primary" size="small" :loading="mtpBusy" @click="setMTP(true)">

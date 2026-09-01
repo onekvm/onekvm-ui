@@ -316,7 +316,6 @@ onUnmounted(() => {
     >
       <h2>{{ t('fwTitle') }}</h2>
       <p>{{ t('fwHelp') }}</p>
-      <p v-if="firmwareMax > 0">{{ fillVars('fwLimit', { size: formatBytes(firmwareMax) }) }}</p>
       <input
         ref="fileInput"
         class="file-input"
@@ -350,28 +349,36 @@ onUnmounted(() => {
       <p v-if="flashProgress?.sha256" class="hash">SHA-256 {{ flashProgress.sha256 }}</p>
     </section>
 
-    <section class="actions">
-      <article class="card">
-        <h2>{{ t('userTitle') }}</h2>
-        <p>{{ t('userHelp') }}</p>
-        <button class="danger" type="button" :disabled="busy" @click="requestAction('reset-user')">
-          {{ t('userBtn') }}
-        </button>
-      </article>
-      <article class="card">
-        <h2>{{ t('factoryTitle') }}</h2>
-        <p>{{ t('factoryHelp') }}</p>
-        <button class="danger" type="button" :disabled="busy" @click="requestAction('factory-reset')">
-          {{ t('factoryBtn') }}
-        </button>
-      </article>
-      <article class="card">
-        <h2>{{ t('rebootTitle') }}</h2>
-        <p>{{ t('rebootHelp') }}</p>
-        <button class="secondary" type="button" :disabled="busy" @click="requestAction('reboot')">
-          {{ t('rebootBtn') }}
-        </button>
-      </article>
+    <section class="card">
+      <ul class="action-list">
+        <li>
+          <div>
+            <h2>{{ t('userTitle') }}</h2>
+            <small>{{ t('userHelp') }}</small>
+          </div>
+          <button class="danger" type="button" :disabled="busy" @click="requestAction('reset-user')">
+            {{ t('userBtn') }}
+          </button>
+        </li>
+        <li>
+          <div>
+            <h2>{{ t('factoryTitle') }}</h2>
+            <small>{{ t('factoryHelp') }}</small>
+          </div>
+          <button class="danger" type="button" :disabled="busy" @click="requestAction('factory-reset')">
+            {{ t('factoryBtn') }}
+          </button>
+        </li>
+        <li>
+          <div>
+            <h2>{{ t('rebootTitle') }}</h2>
+            <small>{{ t('rebootHelp') }}</small>
+          </div>
+          <button class="secondary" type="button" :disabled="busy" @click="requestAction('reboot')">
+            {{ t('rebootBtn') }}
+          </button>
+        </li>
+      </ul>
     </section>
 
     <p class="status" :class="{ err: statusError }" role="status" aria-live="polite">{{ statusText }}</p>
@@ -436,7 +443,7 @@ h1 {
 }
 
 .sub,
-.card p {
+.card > p {
   margin: 0;
   color: var(--rec-muted);
   line-height: 1.55;
@@ -518,7 +525,7 @@ h2 {
   font-weight: 650;
 }
 
-.card p { margin-bottom: .85rem; }
+.card > p { margin-bottom: .85rem; }
 
 .file-input { display: none; }
 
@@ -551,25 +558,43 @@ h2 {
   gap: .6rem;
 }
 
-.actions {
+.action-list {
   display: grid;
-  gap: .9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-@media (min-width: 720px) {
-  .actions {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    align-items: stretch;
-  }
-
-  .actions .card {
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 0;
-  }
-
-  .actions button { margin-top: auto; }
+.action-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: .85rem 1rem;
+  align-items: center;
+  padding: .95rem 0;
+  border-top: 1px solid var(--rec-border);
 }
+
+.action-list li:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.action-list li:last-child { padding-bottom: 0; }
+
+.action-list h2 {
+  margin: 0;
+  font-size: .92rem;
+}
+
+.action-list small {
+  display: block;
+  margin-top: .28rem;
+  color: var(--rec-muted);
+  font-size: .8rem;
+  line-height: 1.5;
+}
+
+.action-list button { white-space: nowrap; }
 
 .progress {
   margin-top: .85rem;
@@ -656,5 +681,9 @@ button:disabled {
   .recovery-head { flex-direction: column; }
   .controls { grid-template-columns: 1fr 1fr; width: 100%; }
   .field select { min-width: 0; width: 100%; }
+  .action-list li {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
 }
 </style>

@@ -1,11 +1,21 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import {
+  EthernetPort,
+  HardDrive,
+  MemoryStick,
+  Power,
+  RotateCcw,
+  Upload,
+  UserRound,
+} from '@lucide/vue'
 
 import {
   bytesPercent,
   errorMessage,
   firmwareProgressPercent,
   formatBytes,
+  formatStorageCapacity,
   loadRecoveryStatus,
   postRecovery,
   recoveryStorageLabel,
@@ -165,6 +175,8 @@ function labelFor(progress: FirmwareProgress) {
 const flashPercent = computed(() => (flashProgress.value ? firmwareProgressPercent(flashProgress.value) : 0))
 const flashLabel = computed(() => (flashProgress.value ? labelFor(flashProgress.value) : ''))
 const storageText = computed(() => recoveryStorageLabel(storageType.value, storageBytes.value))
+const storageCapacity = computed(() => formatStorageCapacity(storageBytes.value))
+const storageIcon = computed(() => (storageType.value.toLowerCase().includes('sd') ? MemoryStick : HardDrive))
 
 async function flashFirmware() {
   const file = firmwareFile.value
@@ -292,18 +304,33 @@ onUnmounted(() => {
       </div>
     </header>
 
-    <div class="meta">
-      <ul v-if="addresses.length" class="addrs">
-        <li v-for="ip in addresses" :key="ip">
-          <a :href="`http://${ip}/`">{{ ip }}</a>
+    <section class="card">
+      <ul class="info-list">
+        <li v-if="storageText">
+          <component :is="storageIcon" class="row-icon" :size="18" aria-hidden="true" />
+          <div>
+            <h2>{{ t('storage') }}</h2>
+            <small>
+              <span v-if="storageType">{{ storageType }}</span>
+              <span v-if="storageType && storageCapacity"> · </span>
+              <span v-if="storageCapacity">{{ storageCapacity }}</span>
+            </small>
+          </div>
+        </li>
+        <li>
+          <EthernetPort class="row-icon" :size="18" aria-hidden="true" />
+          <div>
+            <h2>{{ t('network') }}</h2>
+            <ul v-if="addresses.length" class="addrs">
+              <li v-for="ip in addresses" :key="ip">
+                <a :href="`http://${ip}/`">{{ ip }}</a>
+              </li>
+            </ul>
+            <small v-else>{{ t('waitingAddr') }}</small>
+          </div>
         </li>
       </ul>
-      <p v-else class="sub waiting">{{ t('waitingAddr') }}</p>
-      <p v-if="storageText" class="storage">
-        <span>{{ t('storage') }}</span>
-        {{ storageText }}
-      </p>
-    </div>
+    </section>
 
     <section
       class="card firmware"
@@ -323,8 +350,11 @@ onUnmounted(() => {
         @change="onFirmwareChange"
       >
       <div class="dropzone" @click="fileInput?.click()">
-        <strong>{{ firmwareFile?.name || t('fwChoose') }}</strong>
-        <span>{{ t('fwDrop') }}</span>
+        <Upload class="row-icon" :size="18" aria-hidden="true" />
+        <div>
+          <strong>{{ firmwareFile?.name || t('fwChoose') }}</strong>
+          <span>{{ t('fwDrop') }}</span>
+        </div>
       </div>
       <div class="row">
         <button class="ghost" type="button" :disabled="busy" @click="fileInput?.click()">
@@ -351,6 +381,7 @@ onUnmounted(() => {
     <section class="card">
       <ul class="action-list">
         <li>
+          <UserRound class="row-icon" :size="18" aria-hidden="true" />
           <div>
             <h2>{{ t('userTitle') }}</h2>
             <small>{{ t('userHelp') }}</small>
@@ -360,6 +391,7 @@ onUnmounted(() => {
           </button>
         </li>
         <li>
+          <RotateCcw class="row-icon" :size="18" aria-hidden="true" />
           <div>
             <h2>{{ t('factoryTitle') }}</h2>
             <small>{{ t('factoryHelp') }}</small>
@@ -369,6 +401,7 @@ onUnmounted(() => {
           </button>
         </li>
         <li>
+          <Power class="row-icon" :size="18" aria-hidden="true" />
           <div>
             <h2>{{ t('rebootTitle') }}</h2>
             <small>{{ t('rebootHelp') }}</small>
@@ -406,7 +439,7 @@ onUnmounted(() => {
 
 .recovery-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1.15rem;
@@ -441,36 +474,17 @@ h1 {
   letter-spacing: -.03em;
 }
 
-.sub,
 .card > p {
   margin: 0;
   color: var(--rec-muted);
   line-height: 1.55;
 }
 
-.waiting { margin: 0; }
-
-.meta {
-  display: grid;
-  gap: .45rem;
-  margin: 0 0 1.1rem;
-}
-
-.storage {
-  margin: 0;
-  color: var(--rec-muted);
-  font-size: .88rem;
-}
-
-.storage span {
-  margin-right: .45rem;
-  color: var(--rec-text);
-  font-weight: 650;
-}
-
 .controls {
-  display: grid;
-  gap: .55rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .55rem .7rem;
+  align-items: end;
 }
 
 .field {
@@ -492,8 +506,8 @@ h1 {
 .addrs {
   display: flex;
   flex-wrap: wrap;
-  gap: .45rem .7rem;
-  margin: 0;
+  gap: .2rem .7rem;
+  margin: .28rem 0 0;
   padding: 0;
   list-style: none;
 }
@@ -501,7 +515,7 @@ h1 {
 .addrs a {
   color: var(--rec-link);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: .95rem;
+  font-size: .82rem;
   text-decoration: none;
 }
 
@@ -530,13 +544,18 @@ h2 {
 
 .dropzone {
   display: grid;
-  gap: .2rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: .75rem;
+  align-items: center;
   margin-bottom: .85rem;
   border: 1px dashed var(--rec-border);
   border-radius: 10px;
-  padding: .9rem 1rem;
+  padding: .85rem 1rem;
   cursor: pointer;
 }
+
+.dropzone strong,
+.dropzone span { display: block; }
 
 .dropzone strong {
   overflow: hidden;
@@ -546,6 +565,7 @@ h2 {
 }
 
 .dropzone span {
+  margin-top: .2rem;
   color: var(--rec-muted);
   font-size: .8rem;
 }
@@ -557,6 +577,7 @@ h2 {
   gap: .6rem;
 }
 
+.info-list,
 .action-list {
   display: grid;
   margin: 0;
@@ -564,27 +585,39 @@ h2 {
   list-style: none;
 }
 
+.info-list li,
 .action-list li {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
   gap: .85rem 1rem;
   align-items: center;
   padding: .95rem 0;
   border-top: 1px solid var(--rec-border);
 }
 
+.info-list li { grid-template-columns: auto minmax(0, 1fr); }
+.action-list li { grid-template-columns: auto minmax(0, 1fr) auto; }
+
+.info-list li:first-child,
 .action-list li:first-child {
   padding-top: 0;
   border-top: 0;
 }
 
+.info-list li:last-child,
 .action-list li:last-child { padding-bottom: 0; }
 
+.row-icon {
+  flex: 0 0 auto;
+  color: var(--rec-muted);
+}
+
+.info-list h2,
 .action-list h2 {
   margin: 0;
   font-size: .92rem;
 }
 
+.info-list small,
 .action-list small {
   display: block;
   margin-top: .28rem;
@@ -677,12 +710,10 @@ button:disabled {
 }
 
 @media (max-width: 640px) {
-  .recovery-head { flex-direction: column; }
-  .controls { grid-template-columns: 1fr 1fr; width: 100%; }
+  .recovery-head { flex-direction: column; align-items: stretch; }
+  .controls { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
   .field select { min-width: 0; width: 100%; }
-  .action-list li {
-    grid-template-columns: 1fr;
-    justify-items: start;
-  }
+  .action-list li { grid-template-columns: auto minmax(0, 1fr); }
+  .action-list button { grid-column: 2; justify-self: start; }
 }
 </style>

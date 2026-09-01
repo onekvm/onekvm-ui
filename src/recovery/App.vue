@@ -8,6 +8,7 @@ import {
   formatBytes,
   loadRecoveryStatus,
   postRecovery,
+  recoveryStorageLabel,
   uploadFirmware,
   type FirmwareProgress,
   RECOVERY_PATHS,
@@ -59,6 +60,8 @@ const confirmKind = ref<ConfirmKind | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const addresses = ref<string[]>([])
 const firmwareMax = ref(0)
+const storageType = ref('')
+const storageBytes = ref(0)
 const flashProgress = ref<FirmwareProgress | null>(null)
 const dragging = ref(false)
 let addressTimer = 0
@@ -161,6 +164,7 @@ function labelFor(progress: FirmwareProgress) {
 
 const flashPercent = computed(() => (flashProgress.value ? firmwareProgressPercent(flashProgress.value) : 0))
 const flashLabel = computed(() => (flashProgress.value ? labelFor(flashProgress.value) : ''))
+const storageText = computed(() => recoveryStorageLabel(storageType.value, storageBytes.value))
 
 async function flashFirmware() {
   const file = firmwareFile.value
@@ -230,6 +234,8 @@ async function refreshAddresses() {
     const status = await loadRecoveryStatus()
     addresses.value = status.addresses
     firmwareMax.value = status.firmwareMax
+    storageType.value = status.storageType
+    storageBytes.value = status.storageBytes
   } catch {
     /* keep the last known list */
   }
@@ -287,12 +293,18 @@ onUnmounted(() => {
       </div>
     </header>
 
-    <ul v-if="addresses.length" class="addrs">
-      <li v-for="ip in addresses" :key="ip">
-        <a :href="`http://${ip}/`">{{ ip }}</a>
-      </li>
-    </ul>
-    <p v-else class="sub waiting">{{ t('waitingAddr') }}</p>
+    <div class="meta">
+      <ul v-if="addresses.length" class="addrs">
+        <li v-for="ip in addresses" :key="ip">
+          <a :href="`http://${ip}/`">{{ ip }}</a>
+        </li>
+      </ul>
+      <p v-else class="sub waiting">{{ t('waitingAddr') }}</p>
+      <p v-if="storageText" class="storage">
+        <span>{{ t('storage') }}</span>
+        {{ storageText }}
+      </p>
+    </div>
 
     <section
       class="card firmware"
@@ -430,7 +442,25 @@ h1 {
   line-height: 1.55;
 }
 
-.waiting { margin: 0 0 1rem; }
+.waiting { margin: 0; }
+
+.meta {
+  display: grid;
+  gap: .45rem;
+  margin: 0 0 1.1rem;
+}
+
+.storage {
+  margin: 0;
+  color: var(--rec-muted);
+  font-size: .88rem;
+}
+
+.storage span {
+  margin-right: .45rem;
+  color: var(--rec-text);
+  font-weight: 650;
+}
 
 .controls {
   display: grid;
@@ -457,7 +487,7 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   gap: .45rem .7rem;
-  margin: 0 0 1.1rem;
+  margin: 0;
   padding: 0;
   list-style: none;
 }

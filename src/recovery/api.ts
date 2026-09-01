@@ -27,6 +27,12 @@ export function errorMessage(error: unknown) {
 export type RecoveryStatus = {
   addresses: string[]
   firmwareMax: number
+  storageType: string
+  storageBytes: number
+}
+
+function emptyRecoveryStatus(): RecoveryStatus {
+  return { addresses: [], firmwareMax: 0, storageType: '', storageBytes: 0 }
 }
 
 export function parseRecoveryStatus(body: string): RecoveryStatus {
@@ -34,10 +40,10 @@ export function parseRecoveryStatus(body: string): RecoveryStatus {
   try {
     parsed = JSON.parse(body)
   } catch {
-    return { addresses: [], firmwareMax: 0 }
+    return emptyRecoveryStatus()
   }
-  if (!parsed || typeof parsed !== 'object') return { addresses: [], firmwareMax: 0 }
-  const record = parsed as { addresses?: unknown; firmwareMax?: unknown }
+  if (!parsed || typeof parsed !== 'object') return emptyRecoveryStatus()
+  const record = parsed as { addresses?: unknown; firmwareMax?: unknown; storageType?: unknown; storageBytes?: unknown }
   const addresses = Array.isArray(record.addresses)
     ? record.addresses.filter((item): item is string => typeof item === 'string' && item.length > 0)
     : []
@@ -45,7 +51,13 @@ export function parseRecoveryStatus(body: string): RecoveryStatus {
     typeof record.firmwareMax === 'number' && Number.isFinite(record.firmwareMax) && record.firmwareMax > 0
       ? Math.floor(record.firmwareMax)
       : 0
-  return { addresses, firmwareMax }
+  const storageType =
+    typeof record.storageType === 'string' ? record.storageType.trim() : ''
+  const storageBytes =
+    typeof record.storageBytes === 'number' && Number.isFinite(record.storageBytes) && record.storageBytes > 0
+      ? Math.floor(record.storageBytes)
+      : 0
+  return { addresses, firmwareMax, storageType, storageBytes }
 }
 
 export function formatBytes(bytes: number) {
@@ -57,6 +69,19 @@ export function formatBytes(bytes: number) {
   }
   if (bytes >= 1024) return `${Math.round(bytes / 1024)} KiB`
   return `${Math.round(bytes)} B`
+}
+
+export function formatStorageCapacity(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return ''
+  const value = bytes / 1_000_000_000
+  const text = value.toFixed(value >= 100 ? 0 : 1).replace(/\.0$/, '')
+  return `${text} GB`
+}
+
+export function recoveryStorageLabel(type: string, bytes: number) {
+  const size = formatStorageCapacity(bytes)
+  if (type && size) return `${type} · ${size}`
+  return type || size
 }
 
 export async function loadRecoveryStatus(): Promise<RecoveryStatus> {

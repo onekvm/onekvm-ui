@@ -5,7 +5,9 @@ import {
   errorMessage,
   firmwareProgressPercent,
   formatBytes,
+  formatStorageCapacity,
   isRecoveryPath,
+  recoveryStorageLabel,
   shouldApplyFirmwareProgress,
   parseFirmwareProgress,
   parseRecoveryStatus,
@@ -46,11 +48,37 @@ assert.equal(errorMessage('boom'), 'boom')
 assert.deepEqual(parseRecoveryStatus('{"addresses":["10.100.99.107","10.0.0.5"],"firmwareMax":8388608}'), {
   addresses: ['10.100.99.107', '10.0.0.5'],
   firmwareMax: 8388608,
+  storageType: '',
+  storageBytes: 0,
 })
-assert.deepEqual(parseRecoveryStatus('{"addresses":[1,""]}'), { addresses: [], firmwareMax: 0 })
-assert.deepEqual(parseRecoveryStatus('not-json'), { addresses: [], firmwareMax: 0 })
+assert.deepEqual(
+  parseRecoveryStatus(
+    '{"addresses":["10.100.99.107"],"firmwareMax":1,"storageType":"SD Card","storageBytes":32010928128}',
+  ),
+  {
+    addresses: ['10.100.99.107'],
+    firmwareMax: 1,
+    storageType: 'SD Card',
+    storageBytes: 32010928128,
+  },
+)
+assert.deepEqual(parseRecoveryStatus('{"addresses":[1,""]}'), {
+  addresses: [],
+  firmwareMax: 0,
+  storageType: '',
+  storageBytes: 0,
+})
+assert.deepEqual(parseRecoveryStatus('not-json'), {
+  addresses: [],
+  firmwareMax: 0,
+  storageType: '',
+  storageBytes: 0,
+})
 assert.equal(formatBytes(8 * 1024 * 1024), '8 MiB')
 assert.equal(formatBytes(512 * 1024), '512 KiB')
+assert.equal(formatStorageCapacity(32010928128), '32 GB')
+assert.equal(recoveryStorageLabel('SD Card', 32010928128), 'SD Card · 32 GB')
+assert.equal(recoveryStorageLabel('', 0), '')
 
 assert.equal(parseFirmwareProgress('not-json').phase, 'idle')
 assert.equal(parseFirmwareProgress('{"phase":"upload","received":20,"total":80}').phase, 'upload')

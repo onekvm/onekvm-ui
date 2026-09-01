@@ -35,6 +35,8 @@ function recoveryDevMock(): Plugin {
           res.end(JSON.stringify({
             addresses: ['10.100.99.107'],
             firmwareMax: 120 * 1024 * 1024,
+            storageType: 'SD Card',
+            storageBytes: 32010928128,
           }))
           return
         }

@@ -1,9 +1,48 @@
-:root {
+:root,
+[data-theme="dark"] {
   color-scheme: dark;
+  --rec-bg: #090b0e;
+  --rec-bg-accent: rgb(22 119 255 / 14%);
+  --rec-text: #e7ebef;
+  --rec-muted: #8b949e;
+  --rec-card: #171b20;
+  --rec-border: #30363d;
+  --rec-primary: #1677ff;
+  --rec-primary-text: #fff;
+  --rec-danger: #8b1e1e;
+  --rec-ok: #7dcea0;
+  --rec-err: #ff8f8f;
+  --rec-link: #7aa8ff;
+  --rec-mask: rgb(4 7 9 / 78%);
+  --rec-input: #171b20;
+  --rec-drop: rgb(22 119 255 / 12%);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --rec-bg: #eef1f5;
+  --rec-bg-accent: rgb(22 119 255 / 10%);
+  --rec-text: #1b1f24;
+  --rec-muted: #5c6670;
+  --rec-card: #ffffff;
+  --rec-border: #d5dbe3;
+  --rec-primary: #1677ff;
+  --rec-primary-text: #fff;
+  --rec-danger: #b42318;
+  --rec-ok: #1f7a4d;
+  --rec-err: #b42318;
+  --rec-link: #0f5fd7;
+  --rec-mask: rgb(15 23 32 / 45%);
+  --rec-input: #ffffff;
+  --rec-drop: rgb(22 119 255 / 10%);
+}
+
+:root {
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #e7ebef;
-  background: #0d1013;
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Noto Sans SC", "Noto Sans TC", sans-serif;
+  color: var(--rec-text);
+  background: var(--rec-bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -21,8 +60,8 @@ body,
 body {
   min-height: 100dvh;
   background:
-    radial-gradient(1200px 480px at 12% -10%, rgb(22 119 255 / 14%), transparent 60%),
-    #090b0e;
+    radial-gradient(1100px 420px at 8% -12%, var(--rec-bg-accent), transparent 62%),
+    var(--rec-bg);
 }
 
 button,

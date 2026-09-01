@@ -20,6 +20,43 @@ function resolveBuiltAsset(href: string) {
   return path.join(outDir, relative)
 }
 
+function recoveryDevMock(): Plugin {
+  return {
+    name: 'onekvm-recovery-dev-mock',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = req.url?.split('?')[0] || ''
+        if (req.method === 'GET' && (url === '/' || url === '/index.html')) {
+          req.url = '/recovery.html'
+        }
+        if (req.method === 'GET' && url === '/status') {
+          res.setHeader('Content-Type', 'application/json; charset=utf-8')
+          res.end(JSON.stringify({
+            addresses: ['10.100.99.107'],
+            firmwareMax: 120 * 1024 * 1024,
+          }))
+          return
+        }
+        if (req.method === 'GET' && url === '/progress') {
+          res.setHeader('Content-Type', 'application/json; charset=utf-8')
+          res.end('{"phase":"idle"}\n')
+          return
+        }
+        if (req.method === 'POST' && (url === '/reset-user' || url === '/factory-reset' || url === '/reboot' || url === '/firmware')) {
+          req.resume()
+          req.on('end', () => {
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+            res.end('ok\n')
+          })
+          return
+        }
+        next()
+      })
+    },
+  }
+}
+
 function inlineRecoveryHtml(): Plugin {
   return {
     name: 'onekvm-inline-recovery-html',
@@ -59,8 +96,8 @@ function inlineRecoveryHtml(): Plugin {
       if (/src="\/assets\//.test(html) || /href="\/assets\//.test(html)) {
         throw new Error('recovery HTML still references hashed assets')
       }
-      if (!html.includes('/firmware') || !html.includes('/reset-user') || !html.includes('/reboot')) {
-        throw new Error('recovery HTML is missing firmware, reset-user, or reboot')
+      if (!html.includes('/firmware') || !html.includes('/reset-user') || !html.includes('/factory-reset') || !html.includes('/reboot')) {
+        throw new Error('recovery HTML is missing firmware, reset-user, factory-reset, or reboot')
       }
 
       fs.writeFileSync(path.join(outDir, 'index.html'), html)
@@ -75,7 +112,7 @@ function inlineRecoveryHtml(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [vue(), inlineRecoveryHtml()],
+  plugins: [vue(), recoveryDevMock(), inlineRecoveryHtml()],
   publicDir: false,
   resolve: {
     alias: {

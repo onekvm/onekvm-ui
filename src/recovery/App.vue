@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import {
   bytesPercent,
@@ -13,16 +13,24 @@ import {
   RECOVERY_PATHS,
 } from './api'
 import {
-  detectRecoveryLocale,
   isRecoveryLocale,
+  readRecoveryLocale,
   recoveryDocumentLang,
   recoveryLocales,
   recoveryMessages,
+  RECOVERY_LOCALE_KEY,
   type RecoveryLocale,
   type RecoveryMessageKey,
 } from './messages'
+import {
+  readRecoveryTheme,
+  recoveryThemes,
+  resolveRecoveryTheme,
+  RECOVERY_THEME_KEY,
+  type RecoveryTheme,
+} from './theme'
 
-type ConfirmKind = 'reset-user' | 'reboot'
+type ConfirmKind = 'reset-user' | 'factory-reset' | 'reboot'
 
 const LANGUAGE_LABELS: Record<RecoveryLocale, string> = {
   en: 'English',
@@ -30,9 +38,19 @@ const LANGUAGE_LABELS: Record<RecoveryLocale, string> = {
   zh_tw: '繁體中文',
 }
 
+const THEME_LABELS: Record<RecoveryTheme, RecoveryMessageKey> = {
+  system: 'themeSystem',
+  light: 'themeLight',
+  dark: 'themeDark',
+}
+
 const locale = ref<RecoveryLocale>(
-  detectRecoveryLocale(navigator.languages?.length ? navigator.languages : [navigator.language]),
+  readRecoveryLocale(
+    localStorage.getItem(RECOVERY_LOCALE_KEY),
+    navigator.languages?.length ? navigator.languages : [navigator.language],
+  ),
 )
+const themePref = ref<RecoveryTheme>(readRecoveryTheme(localStorage.getItem(RECOVERY_THEME_KEY)))
 const firmwareFile = ref<File | null>(null)
 const busy = ref(false)
 const statusText = ref('')
@@ -42,7 +60,13 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const addresses = ref<string[]>([])
 const firmwareMax = ref(0)
 const flashProgress = ref<FirmwareProgress | null>(null)
+const dragging = ref(false)
 let addressTimer = 0
+let themeMedia: MediaQueryList | null = null
+
+function onColorSchemeChange() {
+  if (themePref.value === 'system') applyTheme()
+}
 
 document.documentElement.lang = recoveryDocumentLang(locale.value)
 
@@ -52,10 +76,28 @@ function t(key: RecoveryMessageKey) {
   return copy.value[key]
 }
 
+function applyTheme() {
+  const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+  const resolved = resolveRecoveryTheme(themePref.value, systemDark)
+  document.documentElement.dataset.theme = resolved
+  const meta = document.querySelector('meta[name="theme-color"]')
+  if (meta) meta.setAttribute('content', resolved === 'dark' ? '#090b0e' : '#eef1f5')
+}
+
+applyTheme()
+
 function setLocale(next: string) {
   if (!isRecoveryLocale(next)) return
   locale.value = next
+  localStorage.setItem(RECOVERY_LOCALE_KEY, next)
   document.documentElement.lang = recoveryDocumentLang(next)
+}
+
+function setTheme(next: string) {
+  if (next !== 'system' && next !== 'light' && next !== 'dark') return
+  themePref.value = next
+  localStorage.setItem(RECOVERY_THEME_KEY, next)
+  applyTheme()
 }
 
 function setStatus(text: string, error: boolean) {
@@ -63,10 +105,22 @@ function setStatus(text: string, error: boolean) {
   statusError.value = error
 }
 
+function takeFirmwareFile(file: File | undefined | null) {
+  if (!file) return
+  firmwareFile.value = file
+}
+
 function onFirmwareChange(event: Event) {
   const input = event.target
   if (!(input instanceof HTMLInputElement)) return
-  firmwareFile.value = input.files?.[0] || null
+  takeFirmwareFile(input.files?.[0] || null)
+}
+
+function onDrop(event: DragEvent) {
+  event.preventDefault()
+  dragging.value = false
+  if (busy.value) return
+  takeFirmwareFile(event.dataTransfer?.files?.[0] || null)
 }
 
 async function runAction(path: (typeof RECOVERY_PATHS)[keyof typeof RECOVERY_PATHS], body?: BodyInit, pending?: RecoveryMessageKey) {
@@ -142,14 +196,9 @@ async function flashFirmware() {
   }
 }
 
-function requestResetUser() {
+function requestAction(kind: ConfirmKind) {
   if (busy.value) return
-  confirmKind.value = 'reset-user'
-}
-
-function requestReboot() {
-  if (busy.value) return
-  confirmKind.value = 'reboot'
+  confirmKind.value = kind
 }
 
 async function confirmAction() {
@@ -159,14 +208,21 @@ async function confirmAction() {
     await runAction(RECOVERY_PATHS.resetUser, undefined, 'resetting')
     return
   }
+  if (kind === 'factory-reset') {
+    await runAction(RECOVERY_PATHS.factoryReset, undefined, 'factoryResetting')
+    return
+  }
   if (kind === 'reboot') await runAction(RECOVERY_PATHS.reboot, undefined, 'rebooting')
 }
 
 const confirmCopy = computed(() => {
   if (confirmKind.value === 'reboot') {
-    return { title: t('rebootTitle'), body: t('confirmReboot') }
+    return { title: t('rebootTitle'), body: t('confirmReboot'), danger: false }
   }
-  return { title: t('userTitle'), body: t('confirmUser') }
+  if (confirmKind.value === 'factory-reset') {
+    return { title: t('factoryTitle'), body: t('confirmFactory'), danger: true }
+  }
+  return { title: t('userTitle'), body: t('confirmUser'), danger: true }
 })
 
 async function refreshAddresses() {
@@ -179,7 +235,15 @@ async function refreshAddresses() {
   }
 }
 
+watch(locale, () => {
+  document.title = `OneKVM ${t('title')}`
+})
+
 onMounted(() => {
+  applyTheme()
+  document.title = `OneKVM ${t('title')}`
+  themeMedia = window.matchMedia('(prefers-color-scheme: dark)')
+  themeMedia.addEventListener('change', onColorSchemeChange)
   void refreshAddresses()
   addressTimer = window.setInterval(() => {
     void refreshAddresses()
@@ -188,32 +252,56 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (addressTimer) window.clearInterval(addressTimer)
+  themeMedia?.removeEventListener('change', onColorSchemeChange)
 })
 </script>
 
 <template>
   <main class="recovery">
     <header class="recovery-head">
-      <div>
-        <p class="eyebrow">OneKVM</p>
-        <h1>{{ t('title') }}</h1>
-        <p class="sub">{{ t('sub') }}</p>
-        <ul v-if="addresses.length" class="addrs">
-          <li v-for="ip in addresses" :key="ip">
-            <a :href="`http://${ip}/`">{{ ip }}</a>
-          </li>
-        </ul>
-        <p v-else class="sub">{{ t('waitingAddr') }}</p>
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+          <rect width="64" height="64" rx="14" fill="#061A3A" />
+          <path fill="#fff" d="M14 28 L22 16 H28 V48 H21 V30 H14 Z" />
+          <path fill="#1677FF" d="M28 32 L40 16 H48 L36 32 L49 48 H40 Z" />
+        </svg>
+        <div>
+          <p class="eyebrow">OneKVM</p>
+          <h1>{{ t('title') }}</h1>
+          <p class="sub">{{ t('sub') }}</p>
+        </div>
       </div>
-      <label class="language">
-        <span>{{ t('language') }}</span>
-        <select :value="locale" :aria-label="t('language')" @change="setLocale(($event.target as HTMLSelectElement).value)">
-          <option v-for="item in recoveryLocales" :key="item" :value="item">{{ LANGUAGE_LABELS[item] }}</option>
-        </select>
-      </label>
+      <div class="controls">
+        <label class="field">
+          <span>{{ t('language') }}</span>
+          <select :value="locale" :aria-label="t('language')" @change="setLocale(($event.target as HTMLSelectElement).value)">
+            <option v-for="item in recoveryLocales" :key="item" :value="item">{{ LANGUAGE_LABELS[item] }}</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>{{ t('theme') }}</span>
+          <select :value="themePref" :aria-label="t('theme')" @change="setTheme(($event.target as HTMLSelectElement).value)">
+            <option v-for="item in recoveryThemes" :key="item" :value="item">{{ t(THEME_LABELS[item]) }}</option>
+          </select>
+        </label>
+      </div>
     </header>
 
-    <section class="card">
+    <ul v-if="addresses.length" class="addrs">
+      <li v-for="ip in addresses" :key="ip">
+        <a :href="`http://${ip}/`">{{ ip }}</a>
+      </li>
+    </ul>
+    <p v-else class="sub waiting">{{ t('waitingAddr') }}</p>
+
+    <section
+      class="card firmware"
+      :class="{ dragging }"
+      @dragenter.prevent="dragging = true"
+      @dragover.prevent="dragging = true"
+      @dragleave="dragging = false"
+      @drop="onDrop"
+    >
       <h2>{{ t('fwTitle') }}</h2>
       <p>{{ t('fwHelp') }}</p>
       <p v-if="firmwareMax > 0">{{ fillVars('fwLimit', { size: formatBytes(firmwareMax) }) }}</p>
@@ -221,14 +309,17 @@ onUnmounted(() => {
         ref="fileInput"
         class="file-input"
         type="file"
-        accept=".fwup,.raucb,application/octet-stream"
+        accept=".fwup,.img,.raucb,application/octet-stream"
         @change="onFirmwareChange"
       >
+      <div class="dropzone" @click="fileInput?.click()">
+        <strong>{{ firmwareFile?.name || t('fwChoose') }}</strong>
+        <span>{{ t('fwDrop') }}</span>
+      </div>
       <div class="row">
         <button class="ghost" type="button" :disabled="busy" @click="fileInput?.click()">
           {{ t('fwChoose') }}
         </button>
-        <span class="filename">{{ firmwareFile?.name || '—' }}</span>
         <button class="primary" type="button" :disabled="busy" @click="flashFirmware">
           {{ t('fwBtn') }}
         </button>
@@ -247,20 +338,28 @@ onUnmounted(() => {
       <p v-if="flashProgress?.sha256" class="hash">SHA-256 {{ flashProgress.sha256 }}</p>
     </section>
 
-    <section class="card">
-      <h2>{{ t('userTitle') }}</h2>
-      <p>{{ t('userHelp') }}</p>
-      <button class="danger" type="button" :disabled="busy" @click="requestResetUser">
-        {{ t('userBtn') }}
-      </button>
-    </section>
-
-    <section class="card">
-      <h2>{{ t('rebootTitle') }}</h2>
-      <p>{{ t('rebootHelp') }}</p>
-      <button class="secondary" type="button" :disabled="busy" @click="requestReboot">
-        {{ t('rebootBtn') }}
-      </button>
+    <section class="actions">
+      <article class="card">
+        <h2>{{ t('userTitle') }}</h2>
+        <p>{{ t('userHelp') }}</p>
+        <button class="danger" type="button" :disabled="busy" @click="requestAction('reset-user')">
+          {{ t('userBtn') }}
+        </button>
+      </article>
+      <article class="card">
+        <h2>{{ t('factoryTitle') }}</h2>
+        <p>{{ t('factoryHelp') }}</p>
+        <button class="danger" type="button" :disabled="busy" @click="requestAction('factory-reset')">
+          {{ t('factoryBtn') }}
+        </button>
+      </article>
+      <article class="card">
+        <h2>{{ t('rebootTitle') }}</h2>
+        <p>{{ t('rebootHelp') }}</p>
+        <button class="secondary" type="button" :disabled="busy" @click="requestAction('reboot')">
+          {{ t('rebootBtn') }}
+        </button>
+      </article>
     </section>
 
     <p class="status" :class="{ err: statusError }" role="status" aria-live="polite">{{ statusText }}</p>
@@ -272,7 +371,7 @@ onUnmounted(() => {
       <p>{{ confirmCopy.body }}</p>
       <div class="dialog-actions">
         <button class="ghost" type="button" @click="confirmKind = null">{{ t('cancel') }}</button>
-        <button :class="confirmKind === 'reboot' ? 'secondary' : 'danger'" type="button" @click="confirmAction">
+        <button :class="confirmCopy.danger ? 'danger' : 'secondary'" type="button" @click="confirmAction">
           {{ t('confirm') }}
         </button>
       </div>
@@ -282,9 +381,9 @@ onUnmounted(() => {
 
 <style scoped>
 .recovery {
-  max-width: 36rem;
+  max-width: 44rem;
   margin: 0 auto;
-  padding: 2.25rem 1.25rem 3.5rem;
+  padding: 2rem 1.25rem 3.5rem;
 }
 
 .recovery-head {
@@ -292,12 +391,25 @@ onUnmounted(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.15rem;
+}
+
+.brand {
+  display: flex;
+  gap: .85rem;
+  min-width: 0;
+}
+
+.mark {
+  flex: 0 0 auto;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 12px;
 }
 
 .eyebrow {
-  margin: 0 0 .35rem;
-  color: #7aa8ff;
+  margin: 0 0 .3rem;
+  color: var(--rec-link);
   font-size: .72rem;
   font-weight: 700;
   letter-spacing: .14em;
@@ -306,55 +418,68 @@ onUnmounted(() => {
 
 h1 {
   margin: 0 0 .4rem;
-  font-size: 1.45rem;
+  font-size: 1.5rem;
   font-weight: 650;
-  letter-spacing: -.02em;
+  letter-spacing: -.03em;
 }
 
 .sub,
 .card p {
   margin: 0;
-  color: #9aa4ae;
-  line-height: 1.5;
+  color: var(--rec-muted);
+  line-height: 1.55;
+}
+
+.waiting { margin: 0 0 1rem; }
+
+.controls {
+  display: grid;
+  gap: .55rem;
+}
+
+.field {
+  display: grid;
+  gap: .28rem;
+  color: var(--rec-muted);
+  font-size: .75rem;
+}
+
+.field select {
+  min-width: 8.5rem;
+  border: 1px solid var(--rec-border);
+  border-radius: 8px;
+  padding: .4rem .55rem;
+  background: var(--rec-input);
+  color: var(--rec-text);
 }
 
 .addrs {
-  display: grid;
-  gap: .25rem;
-  margin: .7rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem .7rem;
+  margin: 0 0 1.1rem;
   padding: 0;
   list-style: none;
 }
 
 .addrs a {
-  color: #7aa8ff;
+  color: var(--rec-link);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: .95rem;
   text-decoration: none;
 }
 
-.language {
-  display: grid;
-  gap: .3rem;
-  color: #8b949e;
-  font-size: .75rem;
-}
-
-.language select {
-  min-width: 8.5rem;
-  border: 1px solid #30363d;
-  border-radius: 6px;
-  padding: .4rem .55rem;
-  background: #171b20;
-  color: #e7ebef;
-}
-
 .card {
   margin-bottom: .9rem;
-  border: 1px solid #30363d;
-  border-radius: 8px;
-  padding: 1rem 1.05rem 1.1rem;
-  background: #171b20;
+  border: 1px solid var(--rec-border);
+  border-radius: 12px;
+  padding: 1.05rem 1.1rem 1.15rem;
+  background: var(--rec-card);
+}
+
+.firmware.dragging {
+  border-color: var(--rec-primary);
+  background: var(--rec-drop);
 }
 
 h2 {
@@ -363,9 +488,31 @@ h2 {
   font-weight: 650;
 }
 
-.card p { margin-bottom: .9rem; }
+.card p { margin-bottom: .85rem; }
 
 .file-input { display: none; }
+
+.dropzone {
+  display: grid;
+  gap: .2rem;
+  margin-bottom: .85rem;
+  border: 1px dashed var(--rec-border);
+  border-radius: 10px;
+  padding: .9rem 1rem;
+  cursor: pointer;
+}
+
+.dropzone strong {
+  overflow: hidden;
+  font-size: .9rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropzone span {
+  color: var(--rec-muted);
+  font-size: .8rem;
+}
 
 .row {
   display: flex;
@@ -374,14 +521,24 @@ h2 {
   gap: .6rem;
 }
 
-.filename {
-  flex: 1 1 8rem;
-  min-width: 0;
-  overflow: hidden;
-  color: #c5cdd6;
-  font-size: .85rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.actions {
+  display: grid;
+  gap: .9rem;
+}
+
+@media (min-width: 720px) {
+  .actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+  }
+
+  .actions .card {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
+  }
+
+  .actions button { margin-top: auto; }
 }
 
 .progress {
@@ -389,19 +546,19 @@ h2 {
   height: 6px;
   overflow: hidden;
   border-radius: 99px;
-  background: #30363d;
+  background: var(--rec-border);
 }
 
 .progress-bar {
   height: 100%;
-  background: #1677ff;
+  background: var(--rec-primary);
   transition: width 180ms linear;
 }
 
 .hash {
   margin: .55rem 0 0;
   overflow: hidden;
-  color: #8b949e;
+  color: var(--rec-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: .72rem;
   text-overflow: ellipsis;
@@ -410,7 +567,7 @@ h2 {
 
 button {
   border: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: .55rem .9rem;
   cursor: pointer;
 }
@@ -420,23 +577,23 @@ button:disabled {
   cursor: not-allowed;
 }
 
-.primary { background: #1677ff; color: #fff; }
-.danger { background: #8b1e1e; color: #fff; }
-.secondary { background: #30363d; color: #e7ebef; }
+.primary { background: var(--rec-primary); color: var(--rec-primary-text); }
+.danger { background: var(--rec-danger); color: #fff; }
+.secondary { background: var(--rec-border); color: var(--rec-text); }
 .ghost {
-  border: 1px solid #30363d;
+  border: 1px solid var(--rec-border);
   background: transparent;
-  color: #e7ebef;
+  color: var(--rec-text);
 }
 
 .status {
   min-height: 1.3em;
   margin: .4rem 2px 0;
-  color: #7dcea0;
+  color: var(--rec-ok);
   white-space: pre-wrap;
 }
 
-.status.err { color: #ff8f8f; }
+.status.err { color: var(--rec-err); }
 
 .mask {
   position: fixed;
@@ -445,19 +602,19 @@ button:disabled {
   display: grid;
   place-items: center;
   padding: 1.25rem;
-  background: rgb(4 7 9 / 78%);
+  background: var(--rec-mask);
 }
 
 .dialog {
   width: min(24rem, 100%);
-  border: 1px solid #30363d;
-  border-radius: 8px;
+  border: 1px solid var(--rec-border);
+  border-radius: 12px;
   padding: 1.15rem 1.2rem 1.05rem;
-  background: #171b20;
+  background: var(--rec-card);
 }
 
 .dialog h2 { margin-bottom: .5rem; }
-.dialog p { margin: 0 0 1rem; color: #9aa4ae; }
+.dialog p { margin: 0 0 1rem; color: var(--rec-muted); }
 
 .dialog-actions {
   display: flex;
@@ -467,8 +624,7 @@ button:disabled {
 
 @media (max-width: 640px) {
   .recovery-head { flex-direction: column; }
-  .row { align-items: stretch; }
-  .filename { flex-basis: 100%; }
-  button { width: max-content; }
+  .controls { grid-template-columns: 1fr 1fr; width: 100%; }
+  .field select { min-width: 0; width: 100%; }
 }
 </style>

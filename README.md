@@ -86,8 +86,9 @@ pnpm test:recovery  # Recovery API and locale tests
 
 Production assets are written to `dist/`. Recovery is a second Vite build that
 inlines JS and CSS into `dist-recovery/index.html` for the initramfs web
-server. That page only exposes firmware flash (`.fwup`), reset of the default
-Web user, and reboot.
+server. That page exposes firmware flash (`.fwup` updates or a complete
+`.img`), reset of the default Web user, factory reset, and reboot. Appearance
+follows the system, or can be locked to light or dark.
 
 ## Project layout
 
@@ -101,7 +102,7 @@ src/
 ├── input/        HID keyboard mapping and text conversion
 ├── lib/          Transport, network, video, shortcut, and utility modules
 ├── product/      Optional product integration boundary
-└── recovery/     Standalone Recovery UI (firmware, reset user, reboot)
+└── recovery/     Standalone Recovery UI (firmware, reset user, factory reset, reboot)
 ```
 
 `App.vue` installs the shared Naive UI providers. `AuthGate.vue` owns initial

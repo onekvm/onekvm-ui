@@ -16,18 +16,26 @@ import {
 import {
   detectRecoveryLocale,
   isRecoveryLocale,
+  readRecoveryLocale,
   recoveryDocumentLang,
   recoveryLocales,
   recoveryMessages,
 } from '../src/recovery/messages.ts'
+import {
+  isRecoveryTheme,
+  readRecoveryTheme,
+  resolveRecoveryTheme,
+} from '../src/recovery/theme.ts'
 
 assert.equal(isRecoveryPath('/firmware'), true)
 assert.equal(isRecoveryPath('/reset-user'), true)
+assert.equal(isRecoveryPath('/factory-reset'), true)
 assert.equal(isRecoveryPath('/reboot'), true)
 assert.equal(isRecoveryPath('/api/system/reboot'), false)
 assert.deepEqual(RECOVERY_PATHS, {
   firmware: '/firmware',
   resetUser: '/reset-user',
+  factoryReset: '/factory-reset',
   reboot: '/reboot',
 })
 
@@ -82,6 +90,15 @@ assert.equal(detectRecoveryLocale([]), 'en')
 assert.equal(recoveryDocumentLang('zh'), 'zh-CN')
 assert.equal(isRecoveryLocale('zh'), true)
 assert.equal(isRecoveryLocale('ja'), false)
+assert.equal(readRecoveryLocale('zh', ['en']), 'zh')
+assert.equal(readRecoveryLocale(null, ['zh-CN']), 'zh')
+assert.equal(isRecoveryTheme('system'), true)
+assert.equal(isRecoveryTheme('sepia'), false)
+assert.equal(readRecoveryTheme(null), 'system')
+assert.equal(readRecoveryTheme('light'), 'light')
+assert.equal(resolveRecoveryTheme('system', true), 'dark')
+assert.equal(resolveRecoveryTheme('system', false), 'light')
+assert.equal(resolveRecoveryTheme('light', true), 'light')
 
 for (const locale of recoveryLocales) {
   for (const key of Object.keys(recoveryMessages.en)) {
@@ -111,6 +128,20 @@ try {
 globalThis.fetch = (async () => new Response('cannot reset user\n', { status: 500 })) as typeof fetch
 try {
   await assert.rejects(() => postRecovery('/reset-user'), /cannot reset user/)
+} finally {
+  globalThis.fetch = originalFetch
+}
+
+globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  calls.length = 0
+  calls.push({ path: String(input), init: init || {} })
+  return new Response('factory reset complete\n', { status: 200 })
+}) as typeof fetch
+try {
+  const body = await postRecovery('/factory-reset')
+  assert.equal(body, 'factory reset complete\n')
+  assert.equal(calls[0].path, '/factory-reset')
+  assert.equal(calls[0].init.method, 'POST')
 } finally {
   globalThis.fetch = originalFetch
 }

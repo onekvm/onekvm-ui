@@ -82,8 +82,9 @@ pnpm test:recovery  # Recovery API 与语言包测试
 ```
 
 生产文件输出到 `dist/`。Recovery 是第二次 Vite 构建，把 JS/CSS 内联进
-`dist-recovery/index.html`，供 initramfs 网页服务器使用。该页面只提供固件
-刷写（`.fwup`）、重置默认 Web 用户和重启。
+`dist-recovery/index.html`，供 initramfs 网页服务器使用。该页面提供固件刷写
+（`.fwup` 更新包或完整 `.img`）、重置默认用户、恢复出厂设置和重启，并支持
+跟随系统 / 浅色 / 深色外观。
 
 ## 目录结构
 
@@ -97,7 +98,7 @@ src/
 ├── input/        HID 键盘映射和文字转换
 ├── lib/          传输、网络、视频、快捷键和通用模块
 ├── product/      可选产品集成边界
-└── recovery/     独立 Recovery UI（固件、重置用户、重启）
+└── recovery/     独立 Recovery UI（固件、重置用户、出厂设置、重启）
 ```
 
 `App.vue` 安装共享的 Naive UI Provider，`AuthGate.vue` 负责首次初始化和

@@ -1,6 +1,7 @@
 export const RECOVERY_PATHS = {
   firmware: '/firmware',
   resetUser: '/reset-user',
+  factoryReset: '/factory-reset',
   reboot: '/reboot',
 } as const
 

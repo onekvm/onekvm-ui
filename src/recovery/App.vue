@@ -274,7 +274,6 @@ onUnmounted(() => {
         <div>
           <p class="eyebrow">OneKVM</p>
           <h1>{{ t('title') }}</h1>
-          <p class="sub">{{ t('sub') }}</p>
         </div>
       </div>
       <div class="controls">
@@ -436,7 +435,7 @@ onUnmounted(() => {
 }
 
 h1 {
-  margin: 0 0 .4rem;
+  margin: 0;
   font-size: 1.5rem;
   font-weight: 650;
   letter-spacing: -.03em;

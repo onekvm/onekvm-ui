@@ -5,7 +5,6 @@ export type RecoveryLocale = (typeof recoveryLocales)[number]
 export const recoveryMessages = {
   en: {
     title: 'Recovery',
-    sub: 'Flash firmware, reset the login, restore factory defaults, or leave recovery.',
     waitingAddr: 'Waiting for a network address…',
     storage: 'Storage',
     language: 'Language',
@@ -48,7 +47,6 @@ export const recoveryMessages = {
   },
   zh: {
     title: '恢复模式',
-    sub: '可以刷写固件、重置登录、恢复出厂设置，或退出恢复模式。',
     waitingAddr: '正在获取网络地址…',
     storage: '存储',
     language: '语言',
@@ -91,7 +89,6 @@ export const recoveryMessages = {
   },
   zh_tw: {
     title: '復原模式',
-    sub: '可以刷寫韌體、重設登入、恢復原廠設定，或離開復原模式。',
     waitingAddr: '正在取得網路位址…',
     storage: '儲存',
     language: '語言',

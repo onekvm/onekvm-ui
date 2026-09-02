@@ -25,7 +25,7 @@ import {
   UserRound,
   Volume2,
 } from '@lucide/vue'
-import { NIcon, useDialog, useMessage, type DropdownOption } from 'naive-ui'
+import { NIcon, useDialog, useMessage, type DialogReactive, type DropdownOption } from 'naive-ui'
 
 import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type OneKVMStatus } from '@/api/client'
 import { type MouseMode } from '@/composables/useMouse'
@@ -545,20 +545,40 @@ function selectAccount(key: string | number) {
 }
 
 function selectPower(key: string | number) {
+  if (powerAction.value) return
   const action = key as PowerAction
+  let confirmation: DialogReactive
   const execute = async () => {
     powerAction.value = action
+    confirmation.loading = true
+    confirmation.positiveText = t('power.executing', 'Executing…')
+    confirmation.negativeButtonProps = { disabled: true }
+    confirmation.closable = false
+    confirmation.maskClosable = false
+    confirmation.closeOnEsc = false
     try {
       await api.power(action)
-      message.success(t('settings.success', 'Command sent'))
+      const successMessage = {
+        on: t('power.powerShortSent', 'Short power press sent'),
+        off: t('power.powerLongSent', 'Long power press sent'),
+        reset: t('power.resetSent', 'Reset command sent'),
+      }[action]
+      message.success(successMessage)
     } catch (error) {
       message.error(error instanceof Error ? error.message : String(error))
+      return false
     } finally {
       powerAction.value = null
+      confirmation.loading = false
+      confirmation.positiveText = t('power.okBtn')
+      confirmation.negativeButtonProps = undefined
+      confirmation.closable = true
+      confirmation.maskClosable = true
+      confirmation.closeOnEsc = true
     }
   }
 
-  dialog.warning({
+  confirmation = dialog.warning({
     title: t('power.title'),
     content: action === 'reset' ? t('power.resetConfirm') : t('power.powerConfirm'),
     positiveText: t('power.okBtn'),

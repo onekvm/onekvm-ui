@@ -4,6 +4,7 @@ import { useDialog, useMessage } from 'naive-ui'
 
 import { api, APIError, type EDIDApplyRequired, type EDIDStatus } from '@/api/client'
 import { t } from '@/i18n/runtime'
+import { edidSelectOptions, parseEdidSelection } from '@/lib/edid'
 
 defineProps<{ disabled?: boolean }>()
 
@@ -13,56 +14,11 @@ const status = ref<EDIDStatus | null>(null)
 const busy = ref(false)
 const selection = ref('')
 
-function machinePresetLabel(id: string) {
-  switch (id) {
-    case 'factory':
-      return t('settings.advancedSettings.displayPage.edidFactory', 'Factory')
-    case '1080p60':
-      return '1920×1080 @ 60 Hz'
-    case '1440p30':
-      return '2560×1440 @ 30 Hz'
-    case '720p90':
-      return '1280×720 @ 90 Hz'
-    case '720p120':
-      return '1280×720 @ 120 Hz'
-    default:
-      return id
-  }
-}
-
-const options = computed(() => {
-  const directories = status.value?.directories || []
-  const presets = directories.filter((directory) => directory.role === 'preset').flatMap((directory) =>
-    directory.files.map((file) => ({
-      label: machinePresetLabel(file.id),
-      value: `${directory.extension}\0${directory.id}\0${file.id}`,
-    })),
-  )
-  const custom = directories.filter((directory) => directory.role === 'custom').flatMap((directory) =>
-    directory.files.map((file) => ({
-      label: `${file.id}.edid.bin`,
-      value: `${directory.extension}\0${directory.id}\0${file.id}`,
-    })),
-  )
-  const groups = []
-  if (presets.length) {
-    groups.push({
-      type: 'group' as const,
-      label: t('settings.advancedSettings.displayPage.edidMachinePresets', 'Machine presets'),
-      key: 'machine',
-      children: presets,
-    })
-  }
-  if (custom.length) {
-    groups.push({
-      type: 'group' as const,
-      label: t('settings.advancedSettings.displayPage.edidCustomFiles', 'Custom files'),
-      key: 'custom',
-      children: custom,
-    })
-  }
-  return groups
-})
+const options = computed(() => edidSelectOptions(status.value, {
+  factory: t('settings.advancedSettings.displayPage.edidFactory', 'Factory'),
+  presets: t('settings.advancedSettings.displayPage.edidMachinePresets', 'Machine presets'),
+  custom: t('settings.advancedSettings.displayPage.edidCustomFiles', 'Custom files'),
+}))
 
 const applyPolicy = computed(() => status.value?.apply_policy || 'none')
 const applyPolicyText = computed(() => {
@@ -94,8 +50,9 @@ async function reload() {
 }
 
 async function applySelection() {
-  const [extension, directory, id] = selection.value.split('\0')
-  if (!extension || !directory || !id) return
+  const ref = parseEdidSelection(selection.value)
+  if (!ref) return
+  const { extension, directory, id } = ref
   busy.value = true
   try {
     const result = await api.applyVideoEDID({ library: { extension, directory, id } })

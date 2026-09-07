@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useMessage, type SelectOption } from 'naive-ui'
+import { useDialog, useMessage, type SelectOption } from 'naive-ui'
 
-import { api, type ConfigSchema, type OneKVMConfig } from '@/api/client'
+import { api, APIError, type ConfigSchema, type EDIDStatus, type OneKVMConfig } from '@/api/client'
 import { t } from '@/i18n/runtime'
+import {
+  edidCurrentSummary,
+  edidRequiresRestart,
+  edidSelectOptions,
+  parseEdidSelection,
+} from '@/lib/edid'
 import { onekvm } from '@/lib/onekvm'
 import type { VideoFit } from '@/lib/video-fit'
 import { qualityTier } from '@/lib/video-quality'
@@ -31,6 +37,7 @@ const emit = defineEmits<{
 }>()
 
 const message = useMessage()
+const dialog = useDialog()
 const popoverOpen = ref(false)
 const menuOpen = ref(false)
 const saving = ref(false)
@@ -38,6 +45,9 @@ const resolution = ref(props.videoResolution)
 const fps = ref(props.targetFps)
 const video = ref<OneKVMConfig['video'] | null>(null)
 const schema = ref<ConfigSchema | null>(null)
+const edid = ref<EDIDStatus | null>(null)
+const edidSelection = ref('')
+const edidBusy = ref(false)
 
 watch(() => props.videoResolution, (value) => { resolution.value = value })
 watch(() => props.targetFps, (value) => { fps.value = value })
@@ -66,6 +76,25 @@ const fpsOptions = [10, 15, 24, 30, 45, 60, 120].map((value) => ({
   value,
 }))
 const videoDisabled = computed(() => !props.canChangeVideo || saving.value)
+const edidOptions = computed(() => edidSelectOptions(edid.value, {
+  factory: t('settings.advancedSettings.displayPage.edidFactory', 'Factory'),
+  presets: t('settings.advancedSettings.displayPage.edidMachinePresets', 'Machine presets'),
+  custom: t('settings.advancedSettings.displayPage.edidCustomFiles', 'Custom files'),
+}))
+const edidDisabled = computed(() => saving.value || edidBusy.value || !edid.value?.writable)
+const edidPlaceholder = computed(() => edidCurrentSummary(
+  edid.value,
+  t('settings.advancedSettings.displayPage.edidSelect', 'Choose a machine preset or a custom file'),
+))
+const edidRestartHint = computed(() => {
+  if (edid.value?.apply_policy === 'power_cycle') {
+    return t('screen.edidPowerCycleHint', 'This board cannot hotplug HDMI. Applying EDID requires a power cycle.')
+  }
+  if (edidRequiresRestart(edid.value?.apply_policy) || edid.value?.hotplug === false) {
+    return t('screen.edidRebootHint', 'This board cannot hotplug HDMI. Applying EDID requires a restart.')
+  }
+  return ''
+})
 
 function qualityTierLabel(value: number) {
   const tier = qualityTier(value)
@@ -163,9 +192,15 @@ function updateShow(show: boolean) {
 }
 
 async function loadVideo() {
-  if (!props.canChangeVideo) return
   try {
-    const [loadedConfig, loadedSchema] = await Promise.all([api.getConfig(), api.getConfigSchema()])
+    const [loadedConfig, loadedSchema, loadedEdid] = await Promise.all([
+      api.getConfig(),
+      api.getConfigSchema(),
+      api.getVideoEDID().catch((error) => {
+        if (error instanceof APIError && error.status === 404) return null
+        throw error
+      }),
+    ])
     loadedConfig.video.frame_detect ??= false
     loadedConfig.video.bitrate_kbps ??= 0
     loadedConfig.video.initial_qp ??= 0
@@ -176,8 +211,47 @@ async function loadVideo() {
     schema.value = loadedSchema
     resolution.value = loadedConfig.video.resolution
     fps.value = loadedConfig.video.fps
+    edid.value = loadedEdid?.supported ? loadedEdid : null
+    if (!edid.value) edidSelection.value = ''
   } catch (reason) {
     message.error(reason instanceof Error ? reason.message : String(reason))
+  }
+}
+
+async function confirmEdidApply(required: string) {
+  if (required === 'reboot' || required === 'power_cycle') {
+    dialog.warning({
+      title: t('settings.advancedSettings.displayPage.edidRebootTitle', 'Restart required'),
+      content: required === 'power_cycle'
+        ? t('settings.advancedSettings.displayPage.edidPowerCycle', 'Power-cycle the device to advertise the new EDID.')
+        : t('settings.advancedSettings.displayPage.edidReboot', 'Restart the device to advertise the new EDID to the host.'),
+      positiveText: t('settings.advancedSettings.displayPage.edidRebootNow', 'Restart now'),
+      negativeText: t('common.later', 'Later'),
+      onPositiveClick: () => api.rebootSystem().catch((error: unknown) => {
+        message.error(error instanceof APIError ? error.message : String(error))
+      }),
+    })
+    return
+  }
+  message.success(t('settings.advancedSettings.displayPage.edidHotplug', 'EDID updated. Re-detect the display on the controlled host.'))
+}
+
+async function updateEdid(value: string | number | null) {
+  if (typeof value !== 'string' || value === edidSelection.value) return
+  const ref = parseEdidSelection(value)
+  if (!ref || !edid.value?.writable || edidDisabled.value) return
+  const previous = edidSelection.value
+  edidSelection.value = value
+  edidBusy.value = true
+  try {
+    const result = await api.applyVideoEDID({ library: ref })
+    await confirmEdidApply(result.apply_required)
+    edid.value = await api.getVideoEDID()
+  } catch (reason) {
+    edidSelection.value = previous
+    message.error(reason instanceof APIError ? reason.message : String(reason))
+  } finally {
+    edidBusy.value = false
   }
 }
 
@@ -192,7 +266,9 @@ async function patchVideo(
     : entries
   saving.value = true
   try {
-    for (const [key, next] of updates) await api.patchConfig(key, String(next))
+    for (const [key, next] of updates) {
+      await api.patchConfig(key, String(next), onekvm.sessionID())
+    }
     if (reconnect) await onekvm.reconnect()
   } catch (reason) {
     resolution.value = props.videoResolution
@@ -286,6 +362,9 @@ watch(popoverOpen, (open) => {
       <header class="control-popover-header">
         <strong>{{ t('settings.screen.title', 'Display') }}</strong>
       </header>
+      <n-alert v-if="!canChangeVideo" type="info" :bordered="false" :show-icon="false">
+        {{ t('screen.sharedStream', 'Shared from the primary WebRTC client') }}
+      </n-alert>
       <div class="display-status-values">
         <div>
           <span>{{ t('screen.fitMode', 'Display mode') }}</span>
@@ -330,6 +409,19 @@ watch(popoverOpen, (open) => {
             @update:show="menuOpen = $event"
           />
         </div>
+        <div v-if="edid">
+          <span>{{ t('screen.edid', 'EDID') }}</span>
+          <n-select
+            v-bind="selectProps"
+            :value="edidSelection || null"
+            :options="edidOptions"
+            :placeholder="edidPlaceholder"
+            :disabled="edidDisabled"
+            @update:value="updateEdid"
+            @update:show="menuOpen = $event"
+          />
+        </div>
+        <p v-if="edid && edidRestartHint" class="display-edid-hint">{{ edidRestartHint }}</p>
         <div>
           <span>{{ qualityBudgetLabel }}</span>
           <n-select

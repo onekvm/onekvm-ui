@@ -54,6 +54,7 @@ const zh = {
       hardwareConfirm: '请按下 NanoKVM 的 BOOT 键确认。取消可返回登录。',
       verify: '验证',
       cancelVerify: '取消验证',
+      passkeyHelp: '使用通行密钥。请用主机名走 HTTPS 打开设备，不要用 IP 地址。',
       tips: {
         reset1: '长按设备上的 BOOT 按键 10 秒钟来重置帐号。',
         reset2: '详细操作步骤可参考此文档：',

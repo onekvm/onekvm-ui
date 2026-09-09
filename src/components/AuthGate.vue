@@ -7,6 +7,8 @@ import { useAuth } from '@/composables/useAuth'
 import { uiProduct } from '@/product'
 import { currentLanguage, languageOptions, setLanguage, t } from '@/i18n/runtime'
 import { defaultNetworkConfig, isNetworkConfigValid, withManagementVLAN } from '@/lib/network'
+import { getPasskey } from '@/lib/webauthn'
+import { api } from '@/api/client'
 import { timezones } from '@/lib/timezones'
 
 import NetworkSettingsForm from './NetworkSettingsForm.vue'
@@ -176,6 +178,14 @@ async function submitMfa() {
       await completeMfa({ type: 'totp', code: totpCode.value.trim(), pending_token: auth.pending_token })
     } else if (factor.type === 'backup') {
       await completeMfa({ type: 'backup', code: backupCode.value.trim(), pending_token: auth.pending_token })
+    } else if (factor.type === 'passkey') {
+      const challenge = await api.authPasskeyLoginBegin(auth.pending_token)
+      const assertion = await getPasskey(challenge)
+      await completeMfa({
+        type: 'passkey',
+        pending_token: auth.pending_token,
+        response: assertion,
+      })
     } else if (factor.type === 'plugin') {
       await completeMfa({
         type: 'plugin',
@@ -431,6 +441,9 @@ function previousSetupStep() {
           <n-form-item v-else-if="selected?.type === 'backup'" :label="t('auth.backupCode', 'Backup code')">
             <n-input v-model:value="backupCode" maxlength="8" autocomplete="one-time-code" autofocus />
           </n-form-item>
+          <p v-else-if="selected?.type === 'passkey'" class="auth-mfa-help">
+            {{ t('auth.passkeyHelp', 'Use a passkey. The device hostname must be used over HTTPS, not an IP address.') }}
+          </p>
           <p v-else-if="selected?.type === 'plugin'" class="auth-mfa-help">
             {{ t('auth.hardwareConfirm', 'Press BOOT on the NanoKVM to confirm. Cancel to go back.') }}
           </p>

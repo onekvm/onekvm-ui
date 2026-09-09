@@ -5,6 +5,7 @@ import { useMessage } from 'naive-ui'
 import { api, type ExtensionSummary } from '@/api/client'
 import { useAuth } from '@/composables/useAuth'
 import { t } from '@/i18n/runtime'
+import { createPasskey } from '@/lib/webauthn'
 
 const props = defineProps<{
   show: boolean
@@ -23,6 +24,7 @@ const totpUrl = ref('')
 const totpCode = ref('')
 const backupCodes = ref<string[]>([])
 const pluginBusy = ref('')
+const passkeyBusy = ref(false)
 const authPlugins = ref<ExtensionSummary[]>([])
 const account = reactive({
   username: '',
@@ -153,6 +155,38 @@ function pluginEnrolled(id: string) {
   return Boolean(auth.mfa?.plugins?.some((plugin) => plugin.id === id))
 }
 
+async function addPasskey() {
+  passkeyBusy.value = true
+  try {
+    const challenge = await api.authPasskeyBegin()
+    const credential = await createPasskey(challenge)
+    await api.authPasskeyFinish(credential)
+    await refresh()
+    message.success(t('settings.account.passkeyAdded', 'Passkey added'))
+  } catch (reason) {
+    message.error(reason instanceof Error ? reason.message : String(reason))
+  } finally {
+    passkeyBusy.value = false
+  }
+}
+
+async function disablePasskey(id: string) {
+  if (!account.currentPassword) {
+    message.error(t('settings.account.currentPassword', 'Current password'))
+    return
+  }
+  passkeyBusy.value = true
+  try {
+    await api.authPasskeyDisable(id, account.currentPassword)
+    await refresh()
+    message.success(t('settings.account.passkeyRemoved', 'Passkey removed'))
+  } catch (reason) {
+    message.error(reason instanceof Error ? reason.message : String(reason))
+  } finally {
+    passkeyBusy.value = false
+  }
+}
+
 watch(
   () => props.show,
   (show) => {
@@ -210,6 +244,15 @@ watch(
         {{ t('settings.account.backupCodes', 'Store these backup codes. Each code works once.') }}
         <div>{{ backupCodes.join(' ') }}</div>
       </n-alert>
+      <div class="drawer-actions">
+        <n-button :loading="passkeyBusy" @click="addPasskey">{{ t('settings.account.addPasskey', 'Add passkey') }}</n-button>
+      </div>
+      <div v-for="key in auth.mfa?.passkeys || []" :key="key.id" class="drawer-actions">
+        <span>{{ key.label || key.id }}</span>
+        <n-button size="small" :loading="passkeyBusy" @click="disablePasskey(key.id)">
+          {{ t('settings.account.removePasskey', 'Remove') }}
+        </n-button>
+      </div>
       <div v-for="plugin in authPlugins" :key="plugin.id" class="drawer-actions">
         <span>{{ plugin.name }}</span>
         <n-button

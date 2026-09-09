@@ -54,6 +54,7 @@ const en = {
       hardwareConfirm: 'Press BOOT on the NanoKVM to confirm. Cancel to go back.',
       verify: 'Verify',
       cancelVerify: 'Cancel verification',
+      passkeyHelp: 'Use a passkey. Open the device over HTTPS using its hostname, not an IP address.',
       tips: {
         reset1:
           'To reset the passwords, press and hold the BOOT button on the device for 10 seconds.',

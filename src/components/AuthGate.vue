@@ -37,7 +37,7 @@ function readRememberedLogin() {
   }
 }
 
-const { auth, login, setup } = useAuth()
+const { auth, login, setup, completeMfa, cancelMfa } = useAuth()
 const rememberedLogin = readRememberedLogin()
 const username = ref(rememberedLogin?.username || '')
 const password = ref(rememberedLogin?.password || '')
@@ -57,6 +57,12 @@ const setupNTP = ref(true)
 const setupNTPServer = ref('')
 const busy = ref(false)
 const error = ref('')
+const totpCode = ref('')
+const backupCode = ref('')
+const selectedFactor = ref('')
+const mfaPending = computed(() => Boolean(auth.mfa_required && !auth.authenticated))
+const mfaFactors = computed(() => auth.factors || [])
+const selected = computed(() => mfaFactors.value.find((factor) => (factor.id || factor.type) === selectedFactor.value) || mfaFactors.value[0])
 const brandBadge = computed(() => uiProduct.badge(auth))
 const currentLanguageLabel = computed(
   () => languageOptions.find((option) => option.value === currentLanguage.value)?.label || 'English',
@@ -137,7 +143,13 @@ async function submit() {
   busy.value = true
   error.value = ''
   try {
-    await login(username.value, password.value)
+    const status = await login(username.value, password.value)
+    if (status.mfa_required) {
+      selectedFactor.value = (status.factors?.[0]?.id || status.factors?.[0]?.type || '')
+      totpCode.value = ''
+      backupCode.value = ''
+      return
+    }
     if (rememberPassword.value) {
       localStorage.setItem(REMEMBER_LOGIN_KEY, JSON.stringify({
         username: username.value,
@@ -147,6 +159,48 @@ async function submit() {
       localStorage.removeItem(REMEMBER_LOGIN_KEY)
     }
     password.value = ''
+  } catch (reason) {
+    error.value = reason instanceof Error ? reason.message : String(reason)
+  } finally {
+    busy.value = false
+  }
+}
+
+async function submitMfa() {
+  const factor = selected.value
+  if (busy.value || !factor) return
+  busy.value = true
+  error.value = ''
+  try {
+    if (factor.type === 'totp') {
+      await completeMfa({ type: 'totp', code: totpCode.value.trim(), pending_token: auth.pending_token })
+    } else if (factor.type === 'backup') {
+      await completeMfa({ type: 'backup', code: backupCode.value.trim(), pending_token: auth.pending_token })
+    } else if (factor.type === 'plugin') {
+      await completeMfa({
+        type: 'plugin',
+        plugin_id: factor.id,
+        pending_token: auth.pending_token,
+      })
+    }
+    totpCode.value = ''
+    backupCode.value = ''
+    password.value = ''
+  } catch (reason) {
+    error.value = reason instanceof Error ? reason.message : String(reason)
+  } finally {
+    busy.value = false
+  }
+}
+
+async function cancelChallenge() {
+  if (busy.value) return
+  busy.value = true
+  error.value = ''
+  try {
+    await cancelMfa(auth.pending_token)
+    totpCode.value = ''
+    backupCode.value = ''
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : String(reason)
   } finally {
@@ -352,7 +406,43 @@ function previousSetupStep() {
 
   <main v-else-if="auth.required && !auth.authenticated" class="auth-screen">
     <div class="auth-login">
-      <form class="auth-panel" @submit.prevent="submit">
+      <form v-if="mfaPending" class="auth-panel" @submit.prevent="submitMfa">
+        <div class="auth-panel-topline">
+          <div class="auth-brand">
+            <img class="auth-logo" src="/brand/onekvm-logo-inverse.svg" alt="OneKVM" />
+            <span v-if="brandBadge" class="brand-badge">{{ brandBadge }}</span>
+          </div>
+        </div>
+        <h1>{{ t('auth.mfaTitle', 'Verify sign-in') }}</h1>
+        <p class="auth-mfa-help">{{ t('auth.mfaHelp', 'Enter a second factor or confirm on the device.') }}</p>
+        <n-form label-placement="top" :show-feedback="false">
+          <n-form-item v-if="mfaFactors.length > 1" :label="t('auth.mfaMethod', 'Method')">
+            <n-select
+              v-model:value="selectedFactor"
+              :options="mfaFactors.map((factor) => ({
+                label: factor.name || factor.type,
+                value: factor.id || factor.type,
+              }))"
+            />
+          </n-form-item>
+          <n-form-item v-if="selected?.type === 'totp'" :label="t('auth.totpCode', 'Authenticator code')">
+            <n-input v-model:value="totpCode" maxlength="6" autocomplete="one-time-code" autofocus />
+          </n-form-item>
+          <n-form-item v-else-if="selected?.type === 'backup'" :label="t('auth.backupCode', 'Backup code')">
+            <n-input v-model:value="backupCode" maxlength="8" autocomplete="one-time-code" autofocus />
+          </n-form-item>
+          <p v-else-if="selected?.type === 'plugin'" class="auth-mfa-help">
+            {{ t('auth.hardwareConfirm', 'Press BOOT on the NanoKVM to confirm. Cancel to go back.') }}
+          </p>
+        </n-form>
+        <n-button type="primary" attr-type="submit" block :loading="busy">
+          {{ t('auth.verify', 'Verify') }}
+        </n-button>
+        <n-button class="auth-mfa-cancel" quaternary block :disabled="busy" @click="cancelChallenge">
+          {{ t('auth.cancelVerify', 'Cancel verification') }}
+        </n-button>
+      </form>
+      <form v-else class="auth-panel" @submit.prevent="submit">
         <div class="auth-panel-topline">
           <div class="auth-brand">
             <img class="auth-logo" src="/brand/onekvm-logo-inverse.svg" alt="OneKVM" />

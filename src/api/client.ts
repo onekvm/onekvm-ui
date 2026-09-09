@@ -428,6 +428,7 @@ export interface WebRTCAnswer {
   type: string
   session_id: string
   microphone?: boolean
+  is_primary?: boolean
 }
 
 export interface AuthStatus {
@@ -440,6 +441,27 @@ export interface AuthStatus {
   edition?: string
   role?: string
   permissions: string[]
+  mfa_required?: boolean
+  pending_token?: string
+  factors?: AuthFactor[]
+  mfa?: AuthMfaStatus
+}
+
+export interface AuthFactor {
+  type: 'totp' | 'passkey' | 'backup' | 'plugin'
+  id?: string
+  name?: string
+  version?: string
+  method?: string
+  login?: string
+  enroll?: string
+}
+
+export interface AuthMfaStatus {
+  totp: boolean
+  passkeys: Array<{ id: string; label: string }>
+  backup_codes: number
+  plugins: AuthFactor[]
 }
 
 export interface AuthUser {
@@ -503,6 +525,12 @@ export interface ExtensionSummary {
 	memory_budget_bytes?: number
 	memory_budget_used_bytes?: number
 	memory_budget_total_bytes?: number
+  auth_provider?: {
+    method: string
+    cancel_method?: string
+    login?: string
+    enroll?: string
+  }
 }
 
 export interface ExtensionPackagePreview extends ExtensionSummary {
@@ -552,6 +580,8 @@ export interface MSDMedia {
   size: number
   created_at: string
   mounted: boolean
+  external?: boolean
+  imported?: boolean
 }
 
 export interface MSDISOUpload {
@@ -560,6 +590,7 @@ export interface MSDISOUpload {
   size: number
   offset: number
   created_at: string
+  kind?: 'iso' | 'drive'
 }
 
 export interface MSDFileEntry {
@@ -567,6 +598,21 @@ export interface MSDFileEntry {
   size: number
   modified: string
   directory: boolean
+}
+
+export interface DeviceFileEntry {
+  name: string
+  size: number
+  modified: number
+  directory: boolean
+  mode: number
+  owner: string
+}
+
+export interface DeviceFileListing {
+  root: string
+  path: string
+  entries: DeviceFileEntry[]
 }
 
 export interface MSDDriveTransferProgress {
@@ -626,6 +672,12 @@ export interface ExtensionStatus extends ExtensionSummary {
     entrypoint: string
   }
   routes?: ExtensionRoute[]
+  auth_provider?: {
+    method: string
+    cancel_method?: string
+    login?: string
+    enroll?: string
+  }
   settings_schema: {
     type: 'object'
     additionalProperties: boolean
@@ -793,60 +845,6 @@ function stageLocalExtension(file: File, onProgress: (percentage: number) => voi
   })
 }
 
-function writeMSDISOUploadChunk(
-  id: string,
-  offset: number,
-  data: Blob,
-  onProgress?: (loaded: number, total: number) => void,
-  signal?: AbortSignal,
-) {
-  return new Promise<MSDISOUpload>((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-    const removeAbortListener = () => signal?.removeEventListener('abort', abortRequest)
-    const abortRequest = () => xhr.abort()
-    xhr.open('PATCH', `${serviceBaseUrl()}/api/msd/iso-uploads/${encodeURIComponent(id)}`)
-    xhr.withCredentials = import.meta.env.VITE_WITH_CREDENTIALS !== 'false'
-    xhr.setRequestHeader('Accept', 'application/json')
-    xhr.setRequestHeader('Content-Type', 'application/octet-stream')
-    xhr.setRequestHeader('Upload-Offset', String(offset))
-    xhr.upload.addEventListener('progress', (event) => {
-      onProgress?.(event.loaded, event.lengthComputable && event.total > 0 ? event.total : data.size)
-    })
-    xhr.addEventListener('load', () => {
-      let body: MSDISOUpload | { error?: string } | null = null
-      try {
-        body = xhr.responseText ? JSON.parse(xhr.responseText) as MSDISOUpload | { error?: string } : null
-      } catch {
-        // Preserve the HTTP status fallback when an intermediary returns HTML.
-      }
-      if (xhr.status >= 200 && xhr.status < 300 && body && 'id' in body) {
-        removeAbortListener()
-        onProgress?.(data.size, data.size)
-        resolve(body)
-        return
-      }
-      if (xhr.status === 401) window.dispatchEvent(new Event('onekvm:unauthorized'))
-      const detail = body && 'error' in body ? body.error : ''
-      removeAbortListener()
-      reject(new APIError(detail || `HTTP ${xhr.status || 0}`, xhr.status || 0))
-    })
-    xhr.addEventListener('error', () => {
-      removeAbortListener()
-      reject(new APIError('Network error', 0))
-    })
-    xhr.addEventListener('abort', () => {
-      removeAbortListener()
-      reject(new APIError('Upload cancelled', 0))
-    })
-    if (signal?.aborted) {
-      reject(new APIError('Upload cancelled', 0))
-      return
-    }
-    signal?.addEventListener('abort', abortRequest, { once: true })
-    xhr.send(data)
-  })
-}
-
 function putOctetStream(
   path: string,
   file: Blob,
@@ -897,6 +895,17 @@ function putOctetStream(
   })
 }
 
+function uploadDeviceFile(
+  path: string,
+  file: Blob,
+  overwrite: boolean,
+  onProgress?: (loaded: number, total: number) => void,
+  signal?: AbortSignal,
+) {
+  const query = new URLSearchParams({ path, overwrite: String(overwrite) })
+  return putOctetStream(`/api/files?${query}`, file, onProgress, signal)
+}
+
 function uploadMSDDriveFile(
   id: string,
   path: string,
@@ -912,6 +921,75 @@ function uploadMSDDriveFile(
     onProgress,
     signal,
   )
+}
+
+async function readDeviceFile(path: string, signal?: AbortSignal) {
+  const response = await fetch(`${serviceBaseUrl()}/api/files/download?path=${encodeURIComponent(path)}`, {
+    credentials: import.meta.env.VITE_WITH_CREDENTIALS === 'false' ? 'omit' : 'include',
+    headers: { Accept: 'application/octet-stream' },
+    signal,
+  })
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null
+    if (response.status === 401) window.dispatchEvent(new Event('onekvm:unauthorized'))
+    throw new APIError(body?.error || `HTTP ${response.status}`, response.status)
+  }
+  return new Uint8Array(await response.arrayBuffer())
+}
+
+function writeMSDISOUploadChunk(
+  id: string,
+  offset: number,
+  data: Blob,
+  onProgress?: (loaded: number, total: number) => void,
+  signal?: AbortSignal,
+  base = '/api/msd/iso-uploads',
+) {
+  return new Promise<MSDISOUpload>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    const removeAbortListener = () => signal?.removeEventListener('abort', abortRequest)
+    const abortRequest = () => xhr.abort()
+    xhr.open('PATCH', `${serviceBaseUrl()}${base}/${encodeURIComponent(id)}`)
+    xhr.withCredentials = import.meta.env.VITE_WITH_CREDENTIALS !== 'false'
+    xhr.setRequestHeader('Accept', 'application/json')
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream')
+    xhr.setRequestHeader('Upload-Offset', String(offset))
+    xhr.upload.addEventListener('progress', (event) => {
+      onProgress?.(event.loaded, event.lengthComputable && event.total > 0 ? event.total : data.size)
+    })
+    xhr.addEventListener('load', () => {
+      let body: MSDISOUpload | { error?: string } | null = null
+      try {
+        body = xhr.responseText ? JSON.parse(xhr.responseText) as MSDISOUpload | { error?: string } : null
+      } catch {
+        // Preserve the HTTP status fallback when an intermediary returns HTML.
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && body && 'id' in body) {
+        removeAbortListener()
+        onProgress?.(data.size, data.size)
+        resolve(body)
+        return
+      }
+      if (xhr.status === 401) window.dispatchEvent(new Event('onekvm:unauthorized'))
+      const detail = body && 'error' in body ? body.error : ''
+      removeAbortListener()
+      reject(new APIError(detail || `HTTP ${xhr.status || 0}`, xhr.status || 0))
+    })
+    xhr.addEventListener('error', () => {
+      removeAbortListener()
+      reject(new APIError('Network error', 0))
+    })
+    xhr.addEventListener('abort', () => {
+      removeAbortListener()
+      reject(new APIError('Upload cancelled', 0))
+    })
+    if (signal?.aborted) {
+      reject(new APIError('Upload cancelled', 0))
+      return
+    }
+    signal?.addEventListener('abort', abortRequest, { once: true })
+    xhr.send(data)
+  })
 }
 
 async function transferMSDDriveFile(
@@ -1005,6 +1083,40 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     }),
+  authMfaComplete: (body: {
+    pending_token?: string
+    type: string
+    code?: string
+    plugin_id?: string
+    response?: unknown
+  }) =>
+    request<AuthStatus>('/api/auth/mfa/complete', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  authMfaCancel: (pendingToken?: string) =>
+    request<void>('/api/auth/mfa/cancel', {
+      method: 'POST',
+      body: JSON.stringify({ pending_token: pendingToken || '' }),
+    }),
+  authTotpBegin: () => request<{ secret: string; otpauth_url: string }>('/api/auth/mfa/totp/begin', { method: 'POST' }),
+  authTotpConfirm: (code: string) =>
+    request<{ backup_codes: string[] }>('/api/auth/mfa/totp/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
+  authTotpDisable: (currentPassword: string) =>
+    request<void>('/api/auth/mfa/totp', {
+      method: 'DELETE',
+      body: JSON.stringify({ current_password: currentPassword }),
+    }),
+  authPluginEnroll: (id: string) =>
+    request<{ status: string; id: string }>(`/api/auth/mfa/plugin/${encodeURIComponent(id)}`, { method: 'POST' }),
+  authPluginDisable: (id: string, currentPassword: string) =>
+    request<void>(`/api/auth/mfa/plugin/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ current_password: currentPassword }),
+    }),
   authLogout: () => request<void>('/api/auth/logout', { method: 'POST' }),
   authUpdateAccount: (username: string, currentPassword: string, newPassword: string) =>
     request<AuthStatus>('/api/auth/account', {
@@ -1053,6 +1165,15 @@ export const api = {
     writeMSDISOUploadChunk(id, offset, data, onProgress, signal),
   completeMSDISOUpload: (id: string) => request<MSDMedia>(`/api/msd/iso-uploads/${encodeURIComponent(id)}/complete`, { method: 'POST' }),
   cancelMSDISOUpload: (id: string) => request<void>(`/api/msd/iso-uploads/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  beginMSDDriveUpload: (name: string, size: number) => request<MSDISOUpload>('/api/msd/drive-uploads', {
+    method: 'POST',
+    body: JSON.stringify({ name, size }),
+  }),
+  getMSDDriveUpload: (id: string) => request<MSDISOUpload>(`/api/msd/drive-uploads/${encodeURIComponent(id)}`),
+  writeMSDDriveUpload: (id: string, offset: number, data: Blob, onProgress?: (loaded: number, total: number) => void, signal?: AbortSignal) =>
+    writeMSDISOUploadChunk(id, offset, data, onProgress, signal, '/api/msd/drive-uploads'),
+  completeMSDDriveUpload: (id: string) => request<MSDMedia>(`/api/msd/drive-uploads/${encodeURIComponent(id)}/complete`, { method: 'POST' }),
+  cancelMSDDriveUpload: (id: string) => request<void>(`/api/msd/drive-uploads/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   createMSDDrive: (name: string, label: string, sizeMiB: number) => request<MSDMedia>('/api/msd/drives', {
     method: 'POST',
     body: JSON.stringify({ name, label, size_mib: sizeMiB }),
@@ -1070,6 +1191,19 @@ export const api = {
   transferMSDDriveFile,
   deleteMSDDriveFile: (id: string, path: string) => request<void>(`/api/msd/drives/${encodeURIComponent(id)}/files?path=${encodeURIComponent(path)}`, { method: 'DELETE' }),
   getMSDDriveFileURL: (id: string, path: string) => `${serviceBaseUrl()}/api/msd/drives/${encodeURIComponent(id)}/download?path=${encodeURIComponent(path)}`,
+  listDeviceFiles: (path = '') => request<DeviceFileListing>(`/api/files?path=${encodeURIComponent(path)}`, { cache: 'no-store' }),
+  readDeviceFile,
+  uploadDeviceFile,
+  createDeviceDirectory: (path: string) => request<void>('/api/files/directories', {
+    method: 'POST',
+    body: JSON.stringify({ path }),
+  }),
+  renameDeviceFile: (from: string, to: string) => request<void>('/api/files/rename', {
+    method: 'POST',
+    body: JSON.stringify({ from, to }),
+  }),
+  deleteDeviceFile: (path: string) => request<void>(`/api/files?path=${encodeURIComponent(path)}`, { method: 'DELETE' }),
+  getDeviceFileURL: (path: string) => `${serviceBaseUrl()}/api/files/download?path=${encodeURIComponent(path)}`,
   getKeyboardConfig: () => request<KeyboardConfig>('/api/config/keyboard'),
   sendKeyboardText: (text: string, layout?: KeyboardLayout, intervalMS?: number) =>
     request<KeyboardTextResponse>('/api/hid/keyboard/text', {
@@ -1086,15 +1220,17 @@ export const api = {
       body: JSON.stringify(keyboard),
     }),
   getConfigSchema: () => request<ConfigSchema>('/api/config/schema'),
-  saveConfig: (config: OneKVMConfig) =>
+  saveConfig: (config: OneKVMConfig, webRTCSessionId = '') =>
 		request<ConfigSaveResponse>('/api/config', {
       method: 'PUT',
       body: JSON.stringify(config),
+      headers: webRTCSessionId ? { 'X-OneKVM-WebRTC-Session': webRTCSessionId } : undefined,
     }),
-  patchConfig: (key: string, value: string) =>
+  patchConfig: (key: string, value: string, webRTCSessionId = '') =>
     request<ConfigSaveResponse>('/api/config', {
       method: 'PATCH',
       body: JSON.stringify({ key, value }),
+      headers: webRTCSessionId ? { 'X-OneKVM-WebRTC-Session': webRTCSessionId } : undefined,
     }),
   resetConfig: () => request<{ status: string }>('/api/config/reset', { method: 'POST', keepalive: true }),
   factoryReset: () => request<{ status: string }>('/api/system/factory-reset', { method: 'POST', keepalive: true }),

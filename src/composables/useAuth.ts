@@ -11,6 +11,9 @@ const state = reactive<AuthStatus & { loading: boolean }>({
   language: 'en',
   edition: '',
   permissions: [],
+  mfa_required: false,
+  pending_token: '',
+  factors: [],
   loading: true,
 })
 
@@ -56,7 +59,27 @@ async function refresh() {
 }
 
 async function login(username: string, password: string) {
-  assign(await api.authLogin(username, password))
+  const status = await api.authLogin(username, password)
+  assign(status)
+  return status
+}
+
+async function completeMfa(body: {
+  pending_token?: string
+  type: string
+  code?: string
+  plugin_id?: string
+  response?: unknown
+}) {
+  assign(await api.authMfaComplete(body))
+}
+
+async function cancelMfa(pendingToken?: string) {
+  await api.authMfaCancel(pendingToken)
+  state.authenticated = false
+  state.mfa_required = false
+  state.pending_token = ''
+  state.factors = []
 }
 
 async function setup(
@@ -94,6 +117,8 @@ export function useAuth() {
     auth: readonly(state),
     refresh,
     login,
+    completeMfa,
+    cancelMfa,
     logout,
     setup,
     updateAccount,

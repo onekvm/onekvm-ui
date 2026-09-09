@@ -31,7 +31,7 @@ const emit = defineEmits<{
   }]
 }>()
 
-const ISO_UPLOAD_CHUNK_SIZE = 4 << 20
+const ISO_UPLOAD_CHUNK_SIZE = 8 << 20
 const ISO_UPLOAD_MANIFEST_KEY = 'onekvm-msd-upload:pending'
 
 type PendingISOUpload = {
@@ -755,7 +755,7 @@ async function uploadStoredMedia(event: Event, kind: 'iso' | 'drive') {
       uploadRequestControllers.add(requestController)
       try {
         const writeChunk = kind === 'drive' ? api.writeMSDDriveUpload : api.writeMSDISOUpload
-        await writeChunk(
+        const written = await writeChunk(
           uploadID,
           chunkOffset,
           file.slice(chunkOffset, chunkEnd),
@@ -767,6 +767,11 @@ async function uploadStoredMedia(event: Event, kind: 'iso' | 'drive') {
           },
           requestController.signal,
         )
+        upload = written.offset > chunkOffset
+          ? written
+          : kind === 'drive'
+            ? await api.getMSDDriveUpload(uploadID)
+            : await api.getMSDISOUpload(uploadID)
       } finally {
         uploadRequestControllers.delete(requestController)
       }
@@ -774,9 +779,6 @@ async function uploadStoredMedia(event: Event, kind: 'iso' | 'drive') {
         message.info(t('virtualMedia.uploadPaused', 'Upload paused.'))
         return
       }
-      upload = kind === 'drive'
-        ? await api.getMSDDriveUpload(uploadID)
-        : await api.getMSDISOUpload(uploadID)
       updateUploadTelemetry(upload.offset, file.size)
       tracking.offset = upload.offset
       storePendingUpload(tracking)

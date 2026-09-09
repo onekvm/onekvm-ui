@@ -834,6 +834,7 @@ function updateDriveSizeUnit(unit: 'MiB' | 'GiB') {
 }
 
 async function openDrive(item: MSDMedia) {
+  if (item.imported) return
   browsingDrive.value = item
   currentPath.value = ''
   await refreshFiles()
@@ -1254,7 +1255,7 @@ onBeforeUnmount(() => {
                     <small class="storage-free"><Database :size="13" />{{ formatBytes(status?.storage_free || 0) }} {{ t('virtualMedia.free', 'free') }}</small>
                     <label class="file-picker">
                       <input type="file" accept=".iso,application/x-iso9660-image" :disabled="uploading" @change="uploadISO" />
-                      <n-button :disabled="uploading" tag="span"><template #icon><Upload /></template>{{ pendingUpload ? t('virtualMedia.resumeUpload', 'Resume upload') : t('virtualMedia.uploadISO', 'Upload ISO') }}</n-button>
+                      <n-button :disabled="uploading" tag="span"><template #icon><Upload /></template>{{ pendingUploadKind === 'iso' && pendingUpload ? t('virtualMedia.resumeUpload', 'Resume upload') : t('virtualMedia.uploadISO', 'Upload ISO') }}</n-button>
                     </label>
                     <n-button v-if="status?.iso_mounted && status.iso_mounted !== 'browser'" @click="eject('iso')"><template #icon><Unplug /></template>{{ t('virtualMedia.unmount', 'Eject') }}</n-button>
                   </div>
@@ -1517,13 +1518,17 @@ onBeforeUnmount(() => {
     </template>
     <template #hint>
       <div v-if="pendingUpload && !uploading" class="xp-resume-hint">
-        {{ t('virtualMedia.resumeHint', 'Select the same ISO again to resume from the saved position.') }}
+        {{ t('virtualMedia.resumeHint', 'Select the same file again to resume from the saved position.') }}
       </div>
     </template>
     <template #actions>
       <button v-if="uploading" @click="pauseUpload"><Pause :size="14" />{{ t('virtualMedia.pauseUpload', 'Pause') }}</button>
       <label v-else-if="pendingUpload" class="xp-upload-file-button">
-        <input type="file" accept=".iso,application/x-iso9660-image" @change="uploadISO" />
+        <input
+          type="file"
+          :accept="pendingUploadKind === 'drive' ? '.img,.raw,.bin,application/octet-stream' : '.iso,application/x-iso9660-image'"
+          @change="pendingUploadKind === 'drive' ? uploadDriveImage($event) : uploadISO($event)"
+        />
         <span>{{ t('virtualMedia.resumeUpload', 'Resume upload') }}</span>
       </label>
       <button :disabled="!activeUploadID" @click="cancelUpload">{{ t('virtualMedia.cancelUpload', 'Cancel upload') }}</button>

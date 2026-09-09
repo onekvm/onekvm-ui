@@ -1101,9 +1101,14 @@ export const api = {
     }),
   authTotpBegin: () => request<{ secret: string; otpauth_url: string }>('/api/auth/mfa/totp/begin', { method: 'POST' }),
   authTotpConfirm: (code: string) =>
-    request<{ backup_codes: string[] }>('/api/auth/mfa/totp/confirm', {
+    request<{ recovery_codes?: string[]; backup_codes?: string[] }>('/api/auth/mfa/totp/confirm', {
       method: 'POST',
       body: JSON.stringify({ code }),
+    }),
+  authTotpRecovery: (currentPassword: string) =>
+    request<{ recovery_codes?: string[]; backup_codes?: string[] }>('/api/auth/mfa/totp/recovery', {
+      method: 'POST',
+      body: JSON.stringify({ current_password: currentPassword }),
     }),
   authTotpDisable: (currentPassword: string) =>
     request<void>('/api/auth/mfa/totp', {

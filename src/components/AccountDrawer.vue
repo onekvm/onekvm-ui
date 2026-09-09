@@ -22,7 +22,7 @@ const totpBusy = ref(false)
 const totpSecret = ref('')
 const totpUrl = ref('')
 const totpCode = ref('')
-const backupCodes = ref<string[]>([])
+const recoveryCodes = ref<string[]>([])
 const pluginBusy = ref('')
 const passkeyBusy = ref(false)
 const authPlugins = ref<ExtensionSummary[]>([])
@@ -77,7 +77,7 @@ async function beginTotp() {
     totpSecret.value = started.secret
     totpUrl.value = started.otpauth_url
     totpCode.value = ''
-    backupCodes.value = []
+    recoveryCodes.value = []
   } catch (reason) {
     message.error(reason instanceof Error ? reason.message : String(reason))
   } finally {
@@ -89,7 +89,7 @@ async function confirmTotp() {
   totpBusy.value = true
   try {
     const confirmed = await api.authTotpConfirm(totpCode.value.trim())
-    backupCodes.value = confirmed.backup_codes
+    recoveryCodes.value = confirmed.recovery_codes || confirmed.backup_codes || []
     totpSecret.value = ''
     totpUrl.value = ''
     totpCode.value = ''
@@ -111,7 +111,8 @@ async function disableTotp() {
   try {
     await api.authTotpDisable(account.currentPassword)
     totpSecret.value = ''
-    backupCodes.value = []
+    totpUrl.value = ''
+    recoveryCodes.value = []
     await refresh()
     message.success(t('settings.account.totpDisabled', 'Authenticator disabled'))
   } catch (reason) {
@@ -148,6 +149,34 @@ async function disablePlugin(id: string) {
     message.error(reason instanceof Error ? reason.message : String(reason))
   } finally {
     pluginBusy.value = ''
+  }
+}
+
+async function regenerateRecovery() {
+  if (!account.currentPassword) {
+    message.error(t('settings.account.currentPassword', 'Current password'))
+    return
+  }
+  totpBusy.value = true
+  try {
+    const rotated = await api.authTotpRecovery(account.currentPassword)
+    recoveryCodes.value = rotated.recovery_codes || rotated.backup_codes || []
+    await refresh()
+    message.success(t('settings.account.recoveryGenerated', 'New recovery codes were created'))
+  } catch (reason) {
+    message.error(reason instanceof Error ? reason.message : String(reason))
+  } finally {
+    totpBusy.value = false
+  }
+}
+
+async function copyRecoveryCodes() {
+  if (!recoveryCodes.value.length) return
+  try {
+    await navigator.clipboard.writeText(recoveryCodes.value.join('\n'))
+    message.success(t('settings.account.recoveryCopied', 'Recovery codes copied'))
+  } catch (reason) {
+    message.error(reason instanceof Error ? reason.message : String(reason))
   }
 }
 
@@ -226,13 +255,17 @@ watch(
       <div class="drawer-actions"><n-button type="primary" :loading="saving" :disabled="!accountValid" @click="saveAccount">{{ t('common.save', 'Save') }}</n-button></div>
       <n-divider />
       <strong>{{ t('settings.account.mfa', 'Two-factor authentication') }}</strong>
-      <p class="auth-mfa-help">{{ t('settings.account.mfaHelp', 'TOTP, backup codes, and hardware confirmation are optional.') }}</p>
+      <p class="auth-mfa-help">{{ t('settings.account.mfaHelp', 'Authenticator, recovery codes, and hardware confirmation are optional.') }}</p>
       <div class="drawer-actions">
         <n-button v-if="!auth.mfa?.totp && !totpSecret" :loading="totpBusy" @click="beginTotp">{{ t('settings.account.enableTotp', 'Enable authenticator') }}</n-button>
         <n-button v-else-if="auth.mfa?.totp" :loading="totpBusy" @click="disableTotp">{{ t('settings.account.disableTotp', 'Disable authenticator') }}</n-button>
       </div>
       <n-form v-if="totpSecret" label-placement="top" :show-feedback="false" class="settings-form">
-        <n-form-item :label="t('settings.account.totpSecret', 'TOTP secret')">
+        <p class="auth-mfa-help">{{ t('settings.account.totpScan', 'Scan this QR code with an authenticator app, then enter a 6-digit code.') }}</p>
+        <div class="totp-qr">
+          <n-qr-code v-if="totpUrl" :value="totpUrl" :size="180" error-correction-level="M" type="canvas" />
+        </div>
+        <n-form-item :label="t('settings.account.totpSecret', 'Manual secret')">
           <n-input :value="totpSecret" readonly />
         </n-form-item>
         <n-form-item :label="t('auth.totpCode', 'Authenticator code')">
@@ -240,9 +273,18 @@ watch(
         </n-form-item>
         <n-button type="primary" :loading="totpBusy" :disabled="totpCode.trim().length !== 6" @click="confirmTotp">{{ t('settings.account.confirmTotp', 'Confirm authenticator') }}</n-button>
       </n-form>
-      <n-alert v-if="backupCodes.length" type="warning" :bordered="false">
-        {{ t('settings.account.backupCodes', 'Store these backup codes. Each code works once.') }}
-        <div>{{ backupCodes.join(' ') }}</div>
+      <p v-if="auth.mfa?.totp && !recoveryCodes.length" class="auth-mfa-help">
+        {{ t('settings.account.recoveryRemaining', '{n} recovery codes left').replace('{n}', String(auth.mfa.backup_codes || 0)) }}
+      </p>
+      <div v-if="auth.mfa?.totp" class="drawer-actions">
+        <n-button :loading="totpBusy" @click="regenerateRecovery">{{ t('settings.account.regenerateRecovery', 'Generate new recovery codes') }}</n-button>
+      </div>
+      <n-alert v-if="recoveryCodes.length" type="warning" :bordered="false">
+        {{ t('settings.account.recoveryCodes', 'Store these recovery codes. Each code works once.') }}
+        <ul class="recovery-codes">
+          <li v-for="code in recoveryCodes" :key="code">{{ code }}</li>
+        </ul>
+        <n-button size="small" @click="copyRecoveryCodes">{{ t('settings.account.copyRecovery', 'Copy codes') }}</n-button>
       </n-alert>
       <div class="drawer-actions">
         <n-button :loading="passkeyBusy" @click="addPasskey">{{ t('settings.account.addPasskey', 'Add passkey') }}</n-button>
@@ -275,3 +317,25 @@ watch(
     </n-drawer-content>
   </n-drawer>
 </template>
+
+<style scoped>
+.totp-qr {
+  display: grid;
+  justify-content: center;
+  margin: 0 auto 12px;
+  padding: 8px;
+  border-radius: 8px;
+  background: #fff;
+  width: fit-content;
+}
+.recovery-codes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 16px;
+  margin: 10px 0;
+  padding: 0;
+  list-style: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 14px;
+}
+</style>

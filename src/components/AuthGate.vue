@@ -65,6 +65,12 @@ const selectedFactor = ref('')
 const mfaPending = computed(() => Boolean(auth.mfa_required && !auth.authenticated))
 const mfaFactors = computed(() => auth.factors || [])
 const selected = computed(() => mfaFactors.value.find((factor) => (factor.id || factor.type) === selectedFactor.value) || mfaFactors.value[0])
+function factorLabel(factor: { type: string; name?: string }) {
+  if (factor.type === 'totp') return t('auth.totpMethod', 'Authenticator')
+  if (factor.type === 'backup') return t('auth.recoveryCode', 'Recovery code')
+  if (factor.type === 'passkey') return t('auth.passkey', 'Passkey')
+  return factor.name || factor.type
+}
 const brandBadge = computed(() => uiProduct.badge(auth))
 const currentLanguageLabel = computed(
   () => languageOptions.find((option) => option.value === currentLanguage.value)?.label || 'English',
@@ -430,7 +436,7 @@ function previousSetupStep() {
             <n-select
               v-model:value="selectedFactor"
               :options="mfaFactors.map((factor) => ({
-                label: factor.name || factor.type,
+                label: factorLabel(factor),
                 value: factor.id || factor.type,
               }))"
             />
@@ -438,7 +444,7 @@ function previousSetupStep() {
           <n-form-item v-if="selected?.type === 'totp'" :label="t('auth.totpCode', 'Authenticator code')">
             <n-input v-model:value="totpCode" maxlength="6" autocomplete="one-time-code" autofocus />
           </n-form-item>
-          <n-form-item v-else-if="selected?.type === 'backup'" :label="t('auth.backupCode', 'Backup code')">
+          <n-form-item v-else-if="selected?.type === 'backup'" :label="t('auth.recoveryCode', 'Recovery code')">
             <n-input v-model:value="backupCode" maxlength="8" autocomplete="one-time-code" autofocus />
           </n-form-item>
           <p v-else-if="selected?.type === 'passkey'" class="auth-mfa-help">

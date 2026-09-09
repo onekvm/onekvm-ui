@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
-import { ArrowLeft, Check, ClipboardPaste, Copy, Disc3, Download, File, Folder, FolderPlus, HardDrive, Pencil, Plug, Scissors, Smartphone, Trash2, Unplug, Upload, X } from '@lucide/vue'
+import { ArrowLeft, Ban, Check, CircleCheck, CirclePlus, ClipboardPaste, Copy, Database, Disc3, Download, File, Folder, FolderOpen, FolderPlus, House, Info, Laptop, LayoutGrid, Pause, Pencil, Plug, Scissors, Server, Smartphone, Trash2, Unplug, Upload, Usb, X } from '@lucide/vue'
 import { useDialog, useMessage } from 'naive-ui'
 
 import { api, APIError, type MSDFileEntry, type MSDISOUpload, type MSDMedia, type MSDStatus } from '@/api/client'
@@ -214,6 +214,12 @@ const featureTitle = computed(() => {
   if (feature.value === 'drive') return t('virtualMedia.driveTab', 'Virtual USB drive')
   if (feature.value === 'mtp') return t('virtualMedia.mtpTab', 'File transfer')
   return t('virtualMedia.title', 'Virtual Media')
+})
+const featureIcon = computed(() => {
+  if (feature.value === 'iso') return Disc3
+  if (feature.value === 'drive') return Usb
+  if (feature.value === 'mtp') return Smartphone
+  return Disc3
 })
 
 watch(isoSourceLocked, (locked) => {
@@ -1073,11 +1079,12 @@ onBeforeUnmount(() => {
             <n-button v-if="feature" quaternary circle size="small" :aria-label="t('virtualMedia.back', 'Back')" @click="backToHome">
               <template #icon><ArrowLeft /></template>
             </n-button>
-            <Disc3 :size="16" /><strong>{{ featureTitle }}</strong>
+            <component :is="featureIcon" :size="16" /><strong>{{ featureTitle }}</strong>
           </span>
         </template>
         <template #header-extra>
           <n-tag v-if="status && mediaOpen && feature" :type="activeConnection ? 'success' : 'default'" size="small" round>
+            <Plug v-if="activeConnection" :size="12" /><Unplug v-else :size="12" />
             {{ activeConnectionLabel }}
           </n-tag>
         </template>
@@ -1088,7 +1095,7 @@ onBeforeUnmount(() => {
             {{ t('virtualMedia.unavailableDescription', 'The virtual media service is not available on this device.') }}
           </n-alert>
           <div v-else-if="mediaOpen && !feature" class="virtual-media-home">
-            <p class="virtual-media-home-lead">{{ t('virtualMedia.chooseFeature', 'Choose a feature') }}</p>
+            <p class="virtual-media-home-lead"><LayoutGrid :size="16" />{{ t('virtualMedia.chooseFeature', 'Choose a feature') }}</p>
             <div class="virtual-media-home-grid">
               <button v-if="storageAvailable" type="button" class="virtual-media-home-card" @click="openFeature('iso')">
                 <Disc3 :size="32" />
@@ -1096,7 +1103,7 @@ onBeforeUnmount(() => {
                 <span>{{ t('virtualMedia.isoHomeDescription', 'Mount a disc image for the controlled device.') }}</span>
               </button>
               <button v-if="storageAvailable" type="button" class="virtual-media-home-card" @click="openFeature('drive')">
-                <HardDrive :size="32" />
+                <Usb :size="32" />
                 <strong>{{ t('virtualMedia.driveTab', 'Virtual USB drive') }}</strong>
                 <span>{{ t('virtualMedia.driveHomeDescription', 'Create and mount a virtual USB drive.') }}</span>
               </button>
@@ -1117,27 +1124,27 @@ onBeforeUnmount(() => {
                   <n-button v-else type="primary" size="small" :loading="connecting" @click="connectVirtualMedia">
                     <template #icon><Plug /></template>{{ connecting ? t('virtualMedia.connecting', 'Connecting') : t('virtualMedia.connect', 'Connect') }}
                   </n-button>
-                  <span>{{ hostConnected ? t('virtualMedia.connected', 'Connected') : t('virtualMedia.disconnectedDescription', 'Connect when you want the controlled host to see mounted images and virtual USB drives. Uploading and managing files does not require a connection.') }}</span>
+                  <span class="connect-hint"><Info :size="14" />{{ hostConnected ? t('virtualMedia.connected', 'Connected') : t('virtualMedia.disconnectedDescription', 'Connect when you want the controlled host to see mounted images and virtual USB drives. Uploading and managing files does not require a connection.') }}</span>
                 </div>
                 <section class="virtual-media-workspace">
               <n-radio-group v-model:value="isoSource" :disabled="Boolean(isoSourceLocked)" name="iso-source" class="iso-source-radios">
-                <n-radio value="local">{{ t('virtualMedia.isoSourceLocal', 'This computer') }}</n-radio>
-                <n-radio value="device">{{ t('virtualMedia.isoSourceDevice', 'Device files') }}</n-radio>
+                <n-radio value="local"><span class="iso-source-option"><Laptop :size="16" />{{ t('virtualMedia.isoSourceLocal', 'This computer') }}</span></n-radio>
+                <n-radio value="device"><span class="iso-source-option"><Server :size="16" />{{ t('virtualMedia.isoSourceDevice', 'Device files') }}</span></n-radio>
               </n-radio-group>
-              <p class="iso-source-hint">{{ t('virtualMedia.isoSourceHint', 'This computer mounts an ISO from the current browser without uploading. Device files are stored on the device and can be mounted later.') }}</p>
+              <p class="iso-source-hint"><Info :size="14" />{{ t('virtualMedia.isoSourceHint', 'This computer mounts an ISO from the current browser without uploading. Device files are stored on the device and can be mounted later.') }}</p>
               <section v-if="isoSource === 'local' && (!status?.iso_mounted || status.iso_mounted === 'browser')" class="media-mode-panel direct-mount-panel">
                 <header class="media-mode-header">
                   <div class="media-mode-copy">
-                    <strong>{{ t('virtualMedia.directMountMode', 'Direct mount') }}</strong>
+                    <strong class="media-title"><Laptop :size="16" />{{ t('virtualMedia.directMountMode', 'Direct mount') }}</strong>
                     <span>{{ t('virtualMedia.directMountDescription', 'Use an ISO from this browser without uploading it to the device.') }}</span>
                   </div>
                   <div class="media-mode-header-actions">
-                    <n-tag v-if="status?.iso_mounted === 'browser'" type="success" size="small">{{ t('virtualMedia.mountedStatus', 'Mounted') }}</n-tag>
+                    <n-tag v-if="status?.iso_mounted === 'browser'" type="success" size="small"><CircleCheck :size="12" />{{ t('virtualMedia.mountedStatus', 'Mounted') }}</n-tag>
                     <label v-if="status?.iso_mounted !== 'browser'" class="file-picker">
                       <input type="file" accept=".iso,application/x-iso9660-image" :disabled="hostMountBlocked || browserMounting || Boolean(status?.iso_mounted)" @change="mountBrowserISO" />
-                      <n-button type="primary" :loading="browserMounting" :disabled="hostMountBlocked || Boolean(status?.iso_mounted)" tag="span"><template #icon><HardDrive /></template>{{ t('virtualMedia.mountFromBrowser', 'Mount from browser') }}</n-button>
+                      <n-button type="primary" :loading="browserMounting" :disabled="hostMountBlocked || Boolean(status?.iso_mounted)" tag="span"><template #icon><Disc3 /></template>{{ t('virtualMedia.mountFromBrowser', 'Mount from browser') }}</n-button>
                     </label>
-                    <n-button v-else @click="eject('iso')">{{ t('virtualMedia.unmount', 'Eject') }}</n-button>
+                    <n-button v-else @click="eject('iso')"><template #icon><Unplug /></template>{{ t('virtualMedia.unmount', 'Eject') }}</n-button>
                   </div>
                 </header>
                 <n-alert v-if="status?.iso_mounted === 'browser'" type="info" class="browser-iso-note">
@@ -1145,7 +1152,7 @@ onBeforeUnmount(() => {
                 </n-alert>
                 <div v-if="status?.iso_mounted === 'browser'" class="media-list browser-media-list">
                   <div class="media-row">
-                    <File :size="24" />
+                    <Disc3 :size="24" />
                     <div class="media-copy">
                       <strong class="media-filename" :title="browserProgress?.name || t('virtualMedia.browserISO', 'Browser ISO')">{{ browserProgress?.name || t('virtualMedia.browserISO', 'Browser ISO') }}</strong>
                       <span v-if="browserProgress">{{ t('virtualMedia.totalRead', 'Total read:') }} {{ formatBytes(browserProgress.transferred) }} · {{ t('virtualMedia.readSpeed', 'Read speed:') }} {{ formatBytes(browserProgress.bytesPerSecond) }}/s</span>
@@ -1157,26 +1164,28 @@ onBeforeUnmount(() => {
               <section v-if="isoSource === 'device' && status?.iso_mounted !== 'browser'" class="media-mode-panel">
                 <header class="media-mode-header">
                   <div class="media-mode-copy">
-                    <strong>{{ t('virtualMedia.isoMode', 'ISO images') }}</strong>
+                    <strong class="media-title"><Server :size="16" />{{ t('virtualMedia.isoMode', 'ISO images') }}</strong>
                     <span>{{ t('virtualMedia.isoModeDescription', 'Upload resumable ISO images to the device and mount them later.') }}</span>
                   </div>
                   <div class="media-mode-header-actions">
-                    <small>{{ formatBytes(status?.storage_free || 0) }} {{ t('virtualMedia.free', 'free') }}</small>
+                    <small class="storage-free"><Database :size="13" />{{ formatBytes(status?.storage_free || 0) }} {{ t('virtualMedia.free', 'free') }}</small>
                     <label class="file-picker">
                       <input type="file" accept=".iso,application/x-iso9660-image" :disabled="uploading" @change="uploadISO" />
                       <n-button :disabled="uploading" tag="span"><template #icon><Upload /></template>{{ pendingUpload ? t('virtualMedia.resumeUpload', 'Resume upload') : t('virtualMedia.uploadISO', 'Upload ISO') }}</n-button>
                     </label>
-                    <n-button v-if="status?.iso_mounted && status.iso_mounted !== 'browser'" @click="eject('iso')">{{ t('virtualMedia.unmount', 'Eject') }}</n-button>
+                    <n-button v-if="status?.iso_mounted && status.iso_mounted !== 'browser'" @click="eject('iso')"><template #icon><Unplug /></template>{{ t('virtualMedia.unmount', 'Eject') }}</n-button>
                   </div>
                 </header>
-                <n-empty v-if="!isoMedia.length && !loading" :description="t('virtualMedia.noISO', 'No uploaded ISO images')" />
+                <n-empty v-if="!isoMedia.length && !loading" :description="t('virtualMedia.noISO', 'No uploaded ISO images')">
+                  <template #icon><Disc3 /></template>
+                </n-empty>
                 <div class="media-list">
                   <div v-for="item in isoMedia" :key="item.id" class="media-row">
-                    <File :size="24" />
+                    <Disc3 :size="24" />
                     <div class="media-copy"><strong class="media-filename" :title="item.name">{{ item.name }}</strong><span>{{ formatBytes(item.size) }}<template v-if="item.external && item.label"> · {{ item.label }}</template></span></div>
-                    <n-tag v-if="item.mounted" type="success" size="small">{{ t('virtualMedia.mountedStatus', 'Mounted') }}</n-tag>
-                    <n-button v-if="!item.mounted && !status?.iso_mounted" size="small" type="primary" :disabled="hostMountBlocked" @click="mount(item)">{{ t('virtualMedia.mount', 'Mount') }}</n-button>
-                    <n-button v-else-if="item.mounted" size="small" @click="eject('iso')">{{ t('virtualMedia.unmount', 'Eject') }}</n-button>
+                    <n-tag v-if="item.mounted" type="success" size="small"><CircleCheck :size="12" />{{ t('virtualMedia.mountedStatus', 'Mounted') }}</n-tag>
+                    <n-button v-if="!item.mounted && !status?.iso_mounted" size="small" type="primary" :disabled="hostMountBlocked" @click="mount(item)"><template #icon><Disc3 /></template>{{ t('virtualMedia.mount', 'Mount') }}</n-button>
+                    <n-button v-else-if="item.mounted" size="small" @click="eject('iso')"><template #icon><Unplug /></template>{{ t('virtualMedia.unmount', 'Eject') }}</n-button>
                     <n-button v-if="!item.external" quaternary circle size="small" :disabled="item.mounted" @click="confirmDelete(item)"><template #icon><Trash2 /></template></n-button>
                   </div>
                 </div>
@@ -1192,7 +1201,7 @@ onBeforeUnmount(() => {
                   <n-button v-else type="primary" size="small" :loading="connecting" @click="connectVirtualMedia">
                     <template #icon><Plug /></template>{{ connecting ? t('virtualMedia.connecting', 'Connecting') : t('virtualMedia.connect', 'Connect') }}
                   </n-button>
-                  <span>{{ hostConnected ? t('virtualMedia.connected', 'Connected') : t('virtualMedia.disconnectedDescription', 'Connect when you want the controlled host to see mounted images and virtual USB drives. Uploading and managing files does not require a connection.') }}</span>
+                  <span class="connect-hint"><Info :size="14" />{{ hostConnected ? t('virtualMedia.connected', 'Connected') : t('virtualMedia.disconnectedDescription', 'Connect when you want the controlled host to see mounted images and virtual USB drives. Uploading and managing files does not require a connection.') }}</span>
                 </div>
                 <section class="virtual-media-workspace">
                   <div class="virtual-drive-panel">
@@ -1207,11 +1216,11 @@ onBeforeUnmount(() => {
                         class="drive-create-popover"
                       >
                         <template #trigger>
-                          <n-button size="small" @click="browsingDrive = null"><template #icon><HardDrive /></template>{{ t('virtualMedia.createDriveTab', 'Create USB drive') }}</n-button>
+                          <n-button size="small" @click="browsingDrive = null"><template #icon><CirclePlus /></template>{{ t('virtualMedia.createDriveTab', 'Create USB drive') }}</n-button>
                         </template>
                         <section class="drive-create-card">
                           <header class="drive-create-header">
-                            <strong>{{ t('virtualMedia.createDriveTab', 'Create USB drive') }}</strong>
+                            <strong class="media-title"><Usb :size="16" />{{ t('virtualMedia.createDriveTab', 'Create USB drive') }}</strong>
                             <n-button text size="small" @click="driveCreateOpen = false">{{ t('common.cancel', 'Cancel') }}</n-button>
                           </header>
                           <n-form label-placement="top" class="drive-create-form">
@@ -1235,7 +1244,7 @@ onBeforeUnmount(() => {
                               </div>
                             </n-form-item>
                             <div class="drive-create-actions">
-                              <n-button type="primary" :loading="creatingDrive" :disabled="!driveName.trim() || !driveSize" @click="createDrive"><template #icon><HardDrive /></template>{{ t('virtualMedia.createDrive', 'Create') }}</n-button>
+                              <n-button type="primary" :loading="creatingDrive" :disabled="!driveName.trim() || !driveSize" @click="createDrive"><template #icon><CirclePlus /></template>{{ t('virtualMedia.createDrive', 'Create') }}</n-button>
                             </div>
                           </n-form>
                         </section>
@@ -1243,29 +1252,31 @@ onBeforeUnmount(() => {
                     </div>
                     <div class="media-list">
                       <div class="media-row no-virtual-drive-row" :class="{ selected: !status?.drive_mounted }">
-                        <X :size="24" />
+                        <Ban :size="24" />
                         <div class="media-copy">
                           <strong>{{ t('virtualMedia.noVirtualDrive', 'No virtual USB drive') }}</strong>
                           <span>{{ t('virtualMedia.noVirtualDriveDescription', 'Do not expose a virtual USB drive to the host.') }}</span>
                         </div>
-                        <n-tag v-if="!status?.drive_mounted" type="info" size="small">{{ t('virtualMedia.selected', 'Selected') }}</n-tag>
-                        <n-button v-else size="small" @click="eject('drive')">{{ t('virtualMedia.select', 'Select') }}</n-button>
+                        <n-tag v-if="!status?.drive_mounted" type="info" size="small"><CircleCheck :size="12" />{{ t('virtualMedia.selected', 'Selected') }}</n-tag>
+                        <n-button v-else size="small" @click="eject('drive')"><template #icon><Check /></template>{{ t('virtualMedia.select', 'Select') }}</n-button>
                       </div>
-                      <n-empty v-if="!driveMedia.length && !loading" :description="t('virtualMedia.noDrives', 'No virtual USB drives')" />
+                      <n-empty v-if="!driveMedia.length && !loading" :description="t('virtualMedia.noDrives', 'No virtual USB drives')">
+                        <template #icon><Usb /></template>
+                      </n-empty>
                         <div v-for="item in driveMedia" :key="item.id" class="media-row">
-                          <HardDrive :size="24" />
+                          <Usb :size="24" />
                           <div class="media-copy"><strong class="media-filename" :title="item.name">{{ item.name }}</strong><span>{{ item.label }} · {{ formatBytes(item.size) }}</span></div>
-                          <n-tag v-if="item.mounted" type="success" size="small">{{ t('virtualMedia.mountedStatus', 'Mounted') }}</n-tag>
-                          <n-button v-if="!item.mounted && !status?.drive_mounted" size="small" type="primary" :disabled="hostMountBlocked" @click="mount(item)">{{ t('virtualMedia.mount', 'Mount') }}</n-button>
-                          <n-button v-else-if="item.mounted" size="small" @click="eject('drive')">{{ t('virtualMedia.unmount', 'Eject') }}</n-button>
-                          <n-button size="small" :disabled="item.mounted" @click="openDrive(item)">{{ t('virtualMedia.files', 'Files') }}</n-button>
+                          <n-tag v-if="item.mounted" type="success" size="small"><CircleCheck :size="12" />{{ t('virtualMedia.mountedStatus', 'Mounted') }}</n-tag>
+                          <n-button v-if="!item.mounted && !status?.drive_mounted" size="small" type="primary" :disabled="hostMountBlocked" @click="mount(item)"><template #icon><Usb /></template>{{ t('virtualMedia.mount', 'Mount') }}</n-button>
+                          <n-button v-else-if="item.mounted" size="small" @click="eject('drive')"><template #icon><Unplug /></template>{{ t('virtualMedia.unmount', 'Eject') }}</n-button>
+                          <n-button size="small" :disabled="item.mounted" @click="openDrive(item)"><template #icon><FolderOpen /></template>{{ t('virtualMedia.files', 'Files') }}</n-button>
                           <n-button quaternary circle size="small" :disabled="item.mounted" @click="confirmDelete(item)"><template #icon><Trash2 /></template></n-button>
                         </div>
                     </div>
 
                     <section v-if="browsingDrive" class="file-manager">
                         <div class="file-manager-header">
-                          <strong class="media-filename" :title="browsingDrive.name">{{ browsingDrive.name }}</strong>
+                          <strong class="media-filename media-title" :title="browsingDrive.name"><Usb :size="16" />{{ browsingDrive.name }}</strong>
                           <div class="breadcrumbs" :class="{ 'has-nested-path': breadcrumbs.length > 0 }" :title="logicalPath">
                             <n-button
                               text
@@ -1274,7 +1285,7 @@ onBeforeUnmount(() => {
                               @dragover="markDropTarget($event, '')"
                               @dragleave="dragTargetPath === '' && (dragTargetPath = null)"
                               @drop="dropEntry($event, '')"
-                            >{{ t('virtualMedia.rootDirectory', 'Root') }}</n-button>
+                            ><template #icon><House /></template>{{ t('virtualMedia.rootDirectory', 'Root') }}</n-button>
                             <template v-for="(part, index) in breadcrumbs" :key="`${part}-${index}`">
                               <span>/</span><n-button
                                 text
@@ -1294,7 +1305,7 @@ onBeforeUnmount(() => {
                             <n-popover v-model:show="folderCreateOpen" trigger="click" placement="bottom-start" to="body" :z-index="4600" :show-arrow="false" class="folder-create-popover">
                               <template #trigger><n-button size="small"><template #icon><FolderPlus /></template>{{ t('virtualMedia.newFolder', 'New folder') }}</n-button></template>
                               <section class="folder-create-card">
-                                <strong>{{ t('virtualMedia.newFolder', 'New folder') }}</strong>
+                                <strong class="media-title"><FolderPlus :size="16" />{{ t('virtualMedia.newFolder', 'New folder') }}</strong>
                                 <n-input v-model:value="newFolderName" size="small" autofocus :placeholder="t('virtualMedia.folderName', 'Folder name')" @keyup.enter="createFolder" />
                                 <div class="folder-create-actions">
                                   <n-button size="small" @click="folderCreateOpen = false; newFolderName = ''">{{ t('common.cancel', 'Cancel') }}</n-button>
@@ -1306,7 +1317,7 @@ onBeforeUnmount(() => {
                               <template #icon><ClipboardPaste /></template>{{ driveClipboard.operation === 'copy' ? t('virtualMedia.pasteCopy', 'Paste copy') : t('virtualMedia.pasteMove', 'Move here') }}
                             </n-button>
                             <n-button v-if="driveClipboard?.driveID === browsingDrive.id" quaternary circle size="small" :title="t('virtualMedia.cancelSelection', 'Cancel copy or move')" @click="driveClipboard = null"><template #icon><X /></template></n-button>
-                            <small class="drag-hint">{{ t('virtualMedia.dragHint', 'Drag to a folder to move; hold Ctrl to copy.') }}</small>
+                            <small class="drag-hint"><Info :size="12" />{{ t('virtualMedia.dragHint', 'Drag to a folder to move; hold Ctrl to copy.') }}</small>
                           </div>
                           <n-spin :show="fileLoading">
                             <div class="file-list">
@@ -1373,11 +1384,11 @@ onBeforeUnmount(() => {
                   <section class="media-mode-panel">
                     <header class="media-mode-header">
                       <div class="media-mode-copy">
-                        <strong>{{ t('virtualMedia.mtpTab', 'File transfer') }}</strong>
+                        <strong class="media-title"><Smartphone :size="16" />{{ t('virtualMedia.mtpTab', 'File transfer') }}</strong>
                         <span>{{ t('virtualMedia.mtpDescription', 'Share the virtual-media folder with the controlled device, like plugging in a phone.') }}</span>
                       </div>
                       <div class="media-mode-header-actions">
-                        <n-tag v-if="status?.mtp" type="success" size="small">{{ t('virtualMedia.connected', 'Connected') }}</n-tag>
+                        <n-tag v-if="status?.mtp" type="success" size="small"><CircleCheck :size="12" />{{ t('virtualMedia.connected', 'Connected') }}</n-tag>
                         <n-button v-if="status?.mtp" size="small" :loading="mtpBusy" @click="setMTP(false)">
                           <template #icon><Unplug /></template>{{ t('virtualMedia.disconnect', 'Disconnect') }}
                         </n-button>
@@ -1420,7 +1431,7 @@ onBeforeUnmount(() => {
       </div>
     </template>
     <template #actions>
-      <button v-if="uploading" @click="pauseUpload">{{ t('virtualMedia.pauseUpload', 'Pause') }}</button>
+      <button v-if="uploading" @click="pauseUpload"><Pause :size="14" />{{ t('virtualMedia.pauseUpload', 'Pause') }}</button>
       <label v-else-if="pendingUpload" class="xp-upload-file-button">
         <input type="file" accept=".iso,application/x-iso9660-image" @change="uploadISO" />
         <span>{{ t('virtualMedia.resumeUpload', 'Resume upload') }}</span>
@@ -1490,7 +1501,9 @@ onBeforeUnmount(() => {
 }
 .virtual-media-heading { display: inline-flex; align-items: center; gap: 8px; }
 .virtual-media-home { display: grid; gap: 14px; padding: 6px 0 4px; }
-.virtual-media-home-lead { margin: 0; color: var(--n-text-color-3); font-size: 13px; line-height: 1.5; }
+.virtual-media-home-lead { display: flex; margin: 0; align-items: center; gap: 8px; color: var(--n-text-color-3); font-size: 13px; line-height: 1.5; }
+.media-title, .iso-source-option, .storage-free, .connect-hint, .drag-hint { display: inline-flex; align-items: center; gap: 6px; }
+.virtual-media-dialog :deep(.n-tag) { display: inline-flex; align-items: center; gap: 4px; }
 .virtual-media-home-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .virtual-media-home-card {
   display: grid;
@@ -1516,7 +1529,9 @@ onBeforeUnmount(() => {
 .virtual-media-home-card > strong { font-size: 15px; line-height: 1.3; }
 .virtual-media-home-card > span { color: var(--n-text-color-3); font-size: 12px; line-height: 1.45; }
 .iso-source-radios { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 8px; }
-.iso-source-hint { margin: 0 0 12px; color: var(--n-text-color-3); font-size: 12px; line-height: 1.5; }
+.iso-source-radios :deep(.n-radio) { align-items: center; }
+.iso-source-hint { display: flex; margin: 0 0 12px; align-items: flex-start; gap: 6px; color: var(--n-text-color-3); font-size: 12px; line-height: 1.5; }
+.iso-source-hint > svg, .connect-hint > svg { flex: 0 0 auto; margin-top: 2px; }
 .virtual-media-content { min-height: 120px; max-height: calc(100vh - 168px); overflow-y: auto; padding-right: 3px; scrollbar-width: thin; }
 .virtual-media-tab-connect { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
 .virtual-media-tab-connect > span { min-width: 0; color: var(--n-text-color-3); font-size: 12px; line-height: 1.5; }
@@ -1577,6 +1592,7 @@ onBeforeUnmount(() => {
 .breadcrumbs.has-nested-path { overflow-x: auto; overflow-y: hidden; }
 .breadcrumbs :deep(.n-button) { flex: 0 0 auto; }
 .drag-hint { margin-left: auto; color: var(--n-text-color-3); font-size: 11px; }
+.connect-hint { min-width: 0; color: var(--n-text-color-3); font-size: 12px; line-height: 1.5; }
 .file-list { display: grid; min-height: 64px; align-content: start; gap: 2px; }
 .file-row { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 5px 7px; border: 0; border-radius: 5px; background: transparent; color: inherit; text-align: left; }
 .file-row:hover { background: rgba(128, 128, 128, .1); }

@@ -80,6 +80,15 @@ type MediaTab = 'iso' | 'drive' | 'mtp'
 type IsoSource = 'local' | 'device'
 const tab = ref<MediaTab>('iso')
 const feature = ref<MediaTab | null>(null)
+type FeatureNavDirection = 'forward' | 'back'
+const featureNavDirection = ref<FeatureNavDirection>('forward')
+const featureNavAnimated = ref(false)
+const featureNavName = computed(() => featureNavDirection.value === 'back'
+  ? 'virtual-media-back'
+  : 'virtual-media-forward')
+const featureTitleNavName = computed(() => featureNavDirection.value === 'back'
+  ? 'virtual-media-title-back'
+  : 'virtual-media-title-forward')
 const isoSource = ref<IsoSource>('local')
 const driveCreateOpen = ref(false)
 const folderCreateOpen = ref(false)
@@ -234,7 +243,7 @@ const featureIcon = computed(() => {
   if (feature.value === 'iso') return Disc3
   if (feature.value === 'drive') return HardDrive
   if (feature.value === 'mtp') return Smartphone
-  return Disc3
+  return LayoutGrid
 })
 
 watch(isoSourceLocked, (locked) => {
@@ -248,13 +257,19 @@ watch([storageAvailable, mtpAvailable], () => {
   if ((feature.value === 'iso' || feature.value === 'drive') && !storageAvailable.value) feature.value = null
 })
 
+function navigateFeature(next: MediaTab | null, direction: FeatureNavDirection) {
+  featureNavAnimated.value = true
+  featureNavDirection.value = direction
+  if (next) tab.value = next
+  feature.value = next
+}
+
 function openFeature(name: MediaTab) {
-  tab.value = name
-  feature.value = name
+  navigateFeature(name, 'forward')
 }
 
 function backToHome() {
-  feature.value = null
+  navigateFeature(null, 'back')
 }
 
 function featureFromStatus(): MediaTab | null {
@@ -268,6 +283,7 @@ function updateShow(show: boolean) {
   if (!show && (folderCreateOpen.value || driveCreateOpen.value || fileDeletePopoverPath.value)) return
   popoverOpen.value = show
   emit('update:show', show)
+  featureNavAnimated.value = false
   if (show) {
     browserISO.value?.requestStatus()
     void refresh().then(() => {
@@ -1160,17 +1176,25 @@ onBeforeUnmount(() => {
       >
         <template #header>
           <span class="virtual-media-heading">
-            <n-button v-if="feature" quaternary circle size="small" :aria-label="t('virtualMedia.back', 'Back')" @click="backToHome">
-              <template #icon><ArrowLeft /></template>
-            </n-button>
-            <component :is="featureIcon" :size="16" /><strong>{{ featureTitle }}</strong>
+            <Transition name="virtual-media-chrome">
+              <n-button v-if="feature" key="back" quaternary circle size="small" :aria-label="t('virtualMedia.back', 'Back')" @click="backToHome">
+                <template #icon><ArrowLeft /></template>
+              </n-button>
+            </Transition>
+            <Transition :name="featureTitleNavName" mode="out-in" :css="featureNavAnimated">
+              <span :key="feature ?? 'home'" class="virtual-media-heading-label">
+                <component :is="featureIcon" :size="16" /><strong>{{ featureTitle }}</strong>
+              </span>
+            </Transition>
           </span>
         </template>
         <template #header-extra>
-          <n-tag v-if="status && mediaOpen && feature" :type="activeConnection ? 'success' : 'default'" size="small" round>
-            <Plug v-if="activeConnection" :size="12" /><Unplug v-else :size="12" />
-            {{ activeConnectionLabel }}
-          </n-tag>
+          <Transition name="virtual-media-chrome">
+            <n-tag v-if="status && mediaOpen && feature" key="connection" :type="activeConnection ? 'success' : 'default'" size="small" round>
+              <Plug v-if="activeConnection" :size="12" /><Unplug v-else :size="12" />
+              {{ activeConnectionLabel }}
+            </n-tag>
+          </Transition>
         </template>
 
         <div class="virtual-media-content">
@@ -1178,7 +1202,8 @@ onBeforeUnmount(() => {
           <n-alert v-else-if="status && !mediaOpen" type="warning" :title="t('virtualMedia.unavailable', 'Virtual media is unavailable')">
             {{ t('virtualMedia.unavailableDescription', 'The virtual media service is not available on this device.') }}
           </n-alert>
-          <div v-else-if="mediaOpen && !feature" class="virtual-media-home">
+          <Transition v-else-if="mediaOpen" :name="featureNavName" :css="featureNavAnimated">
+          <div v-if="!feature" key="home" class="virtual-media-pane virtual-media-home">
             <p class="virtual-media-home-lead"><LayoutGrid :size="16" />{{ t('virtualMedia.chooseFeature', 'Choose a feature') }}</p>
             <div class="virtual-media-home-grid">
               <button v-if="storageAvailable" type="button" class="virtual-media-home-card" @click="openFeature('iso')">
@@ -1198,7 +1223,7 @@ onBeforeUnmount(() => {
               </button>
             </div>
           </div>
-          <template v-else-if="mediaOpen && feature">
+          <div v-else key="feature" class="virtual-media-pane">
             <n-tabs v-model:value="tab" type="segment" class="virtual-media-content-tabs">
               <n-tab-pane v-if="storageAvailable" name="iso">
                 <div class="virtual-media-tab-connect">
@@ -1480,7 +1505,8 @@ onBeforeUnmount(() => {
                 </section>
               </n-tab-pane>
             </n-tabs>
-          </template>
+          </div>
+          </Transition>
         </div>
       </n-card>
   </n-modal>
@@ -1593,15 +1619,16 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 .virtual-media-dialog :deep(.n-card-header) { padding: 15px 18px 12px; }
-.virtual-media-dialog :deep(.n-card-header__main) { min-width: 0; }
-.virtual-media-dialog :deep(.n-card-header__extra) { display: flex; align-items: center; }
+.virtual-media-dialog :deep(.n-card-header__main) { min-width: 0; overflow: hidden; }
+.virtual-media-dialog :deep(.n-card-header__extra) { display: flex; align-items: center; overflow: hidden; }
 .virtual-media-dialog :deep(.n-card__content) {
   min-height: 0;
   max-height: calc(100vh - 96px);
   padding: 0 18px 18px;
   overflow: hidden;
 }
-.virtual-media-heading { display: inline-flex; align-items: center; gap: 8px; }
+.virtual-media-heading { display: inline-flex; min-width: 0; align-items: center; gap: 8px; }
+.virtual-media-heading-label { display: inline-flex; min-width: 0; align-items: center; gap: 8px; }
 .virtual-media-home { display: grid; gap: 14px; padding: 6px 0 4px; }
 .virtual-media-home-lead { display: flex; margin: 0; align-items: center; gap: 8px; color: var(--n-text-color-3); font-size: 13px; line-height: 1.5; }
 .media-title, .iso-source-option, .storage-free, .drag-hint { display: inline-flex; align-items: center; gap: 6px; }
@@ -1634,7 +1661,40 @@ onBeforeUnmount(() => {
 .iso-source-radios :deep(.n-radio) { align-items: center; }
 .iso-source-hint { display: flex; margin: 0 0 12px; align-items: flex-start; gap: 6px; color: var(--n-text-color-3); font-size: 12px; line-height: 1.5; }
 .iso-source-hint > svg { flex: 0 0 auto; margin-top: 2px; }
-.virtual-media-content { min-height: 120px; max-height: calc(100vh - 168px); overflow-y: auto; padding-right: 3px; scrollbar-width: thin; }
+.virtual-media-content { position: relative; min-height: 120px; max-height: calc(100vh - 168px); overflow: hidden; }
+.virtual-media-pane { width: 100%; max-height: calc(100vh - 168px); overflow-y: auto; padding-right: 3px; scrollbar-width: thin; }
+.virtual-media-forward-enter-active,
+.virtual-media-back-enter-active {
+  transition: transform var(--win11-enter) var(--win11-ease-out), opacity var(--win11-enter) var(--win11-ease-out);
+}
+.virtual-media-forward-leave-active,
+.virtual-media-back-leave-active {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  transition: transform var(--win11-exit) var(--win11-ease-in), opacity var(--win11-exit) var(--win11-ease-in);
+}
+.virtual-media-forward-enter-from { opacity: 0; transform: translateX(28px); }
+.virtual-media-forward-leave-to { opacity: 0; transform: translateX(-16px); }
+.virtual-media-back-enter-from { opacity: 0; transform: translateX(-28px); }
+.virtual-media-back-leave-to { opacity: 0; transform: translateX(16px); }
+.virtual-media-title-forward-enter-active,
+.virtual-media-title-back-enter-active {
+  transition: transform var(--win11-enter) var(--win11-ease-out), opacity var(--win11-enter) var(--win11-ease-out);
+}
+.virtual-media-title-forward-leave-active,
+.virtual-media-title-back-leave-active {
+  transition: transform var(--win11-exit) var(--win11-ease-in), opacity var(--win11-exit) var(--win11-ease-in);
+}
+.virtual-media-title-forward-enter-from { opacity: 0; transform: translateX(10px); }
+.virtual-media-title-forward-leave-to { opacity: 0; transform: translateX(-8px); }
+.virtual-media-title-back-enter-from { opacity: 0; transform: translateX(-10px); }
+.virtual-media-title-back-leave-to { opacity: 0; transform: translateX(8px); }
+.virtual-media-chrome-enter-active { transition: opacity var(--win11-enter) var(--win11-ease-out); }
+.virtual-media-chrome-leave-active { transition: opacity var(--win11-exit) var(--win11-ease-in); }
+.virtual-media-chrome-enter-from,
+.virtual-media-chrome-leave-to { opacity: 0; }
 .virtual-media-tab-connect { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .virtual-media-tab-connect > :deep(.n-button) { flex: 0 0 auto; }
 .virtual-media-loading { display: grid; min-height: 112px; place-items: center; }
@@ -1710,9 +1770,30 @@ onBeforeUnmount(() => {
   .virtual-media-dialog { width: calc(100vw - 16px); max-height: calc(100vh - 16px); }
   .virtual-media-dialog :deep(.n-card-header) { padding: 12px 14px 10px; }
   .virtual-media-dialog :deep(.n-card__content) { max-height: calc(100vh - 74px); padding: 0 12px 12px; }
-  .virtual-media-content { max-height: calc(100vh - 138px); }
+  .virtual-media-content,
+  .virtual-media-pane { max-height: calc(100vh - 138px); }
   .virtual-media-home-grid { grid-template-columns: 1fr; }
   .iso-mode-grid { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .virtual-media-forward-enter-active,
+  .virtual-media-forward-leave-active,
+  .virtual-media-back-enter-active,
+  .virtual-media-back-leave-active,
+  .virtual-media-title-forward-enter-active,
+  .virtual-media-title-forward-leave-active,
+  .virtual-media-title-back-enter-active,
+  .virtual-media-title-back-leave-active,
+  .virtual-media-chrome-enter-active,
+  .virtual-media-chrome-leave-active { transition: none; }
+  .virtual-media-forward-enter-from,
+  .virtual-media-forward-leave-to,
+  .virtual-media-back-enter-from,
+  .virtual-media-back-leave-to,
+  .virtual-media-title-forward-enter-from,
+  .virtual-media-title-forward-leave-to,
+  .virtual-media-title-back-enter-from,
+  .virtual-media-title-back-leave-to { opacity: 1; transform: none; }
 }
 @media (max-width: 620px) { .media-mode-header { flex-direction: column; align-items: stretch; } .media-mode-header-actions { width: 100%; } .media-row { flex-wrap: wrap; } .media-copy { flex-basis: calc(100% - 44px); } }
 @media (max-width: 620px) { .virtual-media-disconnected { grid-template-columns: auto minmax(0, 1fr); } .virtual-media-disconnected :deep(.n-button) { grid-column: 1 / -1; justify-self: stretch; } .virtual-media-disconnect-button { padding-inline: 8px; } }

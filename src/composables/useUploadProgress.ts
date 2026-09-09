@@ -1,4 +1,4 @@
-import { computed, readonly, shallowRef } from 'vue'
+import { computed, onScopeDispose, readonly, shallowRef } from 'vue'
 
 import { nextUploadSpeed, uploadPercentage, uploadRemainingSeconds } from '@/lib/upload-speed'
 
@@ -21,6 +21,7 @@ export function useUploadProgress() {
   ))
 
   function begin(fileName: string, size: number) {
+    controller.value?.abort()
     const next = new AbortController()
     controller.value = next
     name.value = fileName
@@ -50,6 +51,8 @@ export function useUploadProgress() {
   function cancel() {
     controller.value?.abort()
   }
+
+  onScopeDispose(cancel)
 
   return {
     name: readonly(name),

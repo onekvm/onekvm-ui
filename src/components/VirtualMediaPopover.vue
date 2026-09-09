@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
-import { ArrowLeft, Check, CircleCheck, CirclePlus, ClipboardPaste, Copy, Database, Disc3, Download, File, Folder, FolderOpen, FolderPlus, HardDrive, House, Info, Laptop, LayoutGrid, Pause, Pencil, Plug, Scissors, Server, Smartphone, Trash2, Unplug, Upload, X } from '@lucide/vue'
+import { ArrowLeft, Check, CircleCheck, CirclePlus, ClipboardPaste, Copy, Database, Disc3, Download, File, Folder, FolderOpen, FolderPlus, HardDrive, House, Info, Laptop, LayoutGrid, LoaderCircle, Pause, Pencil, Plug, Scissors, Server, Smartphone, Trash2, Unplug, Upload, X } from '@lucide/vue'
 import { useDialog, useMessage } from 'naive-ui'
 
 import { api, APIError, type MSDFileEntry, type MSDISOUpload, type MSDMedia, type MSDStatus } from '@/api/client'
@@ -117,6 +117,7 @@ const fileLoading = ref(false)
 const newFolderName = ref('')
 const browserISO = shallowRef<BrowserISO | null>(null)
 const browserMounting = ref(false)
+const mountingID = ref<string | null>(null)
 const browserProgress = ref<BrowserISOProgress | null>(null)
 const renamingPath = ref('')
 const renameValue = ref('')
@@ -578,12 +579,16 @@ async function mount(item: MSDMedia) {
     message.warning(t('virtualMedia.mountBlockedByUpload', 'Mounting is unavailable while an ISO is uploading.'))
     return
   }
+  if (mountingID.value || browserMounting.value) return
+  mountingID.value = item.id
   try {
     await api.mountMSDMedia(item.id)
     message.success(t('virtualMedia.mountSuccess', 'Media mounted'))
     await refresh()
   } catch (error) {
     message.error(`${t('virtualMedia.mountFailed', 'Mount failed')}: ${error instanceof Error ? error.message : String(error)}`)
+  } finally {
+    if (mountingID.value === item.id) mountingID.value = null
   }
 }
 
@@ -611,7 +616,7 @@ async function mountBrowserISO(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
-  if (!file || browserISO.value) return
+  if (!file || browserISO.value || browserMounting.value || mountingID.value) return
   if (!hostConnected.value) {
     message.warning(t('virtualMedia.pleaseConnect', 'Connect virtual media before exposing it to the host.'))
     return
@@ -620,33 +625,35 @@ async function mountBrowserISO(event: Event) {
     message.warning(t('virtualMedia.mountBlockedByUpload', 'Mounting is unavailable while an ISO is uploading.'))
     return
   }
-  if (!await validISOFile(file)) {
-    message.error(t('virtualMedia.invalidISO', 'The selected file is not a valid ISO image.'))
-    return
-  }
   browserMounting.value = true
-  const session = new BrowserISO(api.getMSDWebSocketURL(), {
-    progress: (progress) => { browserProgress.value = progress },
-    disconnected: (detail) => {
-      if (browserISO.value === session) {
-        browserISO.value = null
-        browserProgress.value = null
-        message.error(detail)
-        void refresh()
-      }
-    },
-  })
-  browserISO.value = session
   try {
-    await session.mount(file)
-    message.success(t('virtualMedia.mountSuccess', 'Media mounted'))
-    await refresh()
-  } catch (error) {
-    if (browserISO.value === session) browserISO.value = null
-    session.destroy()
-    browserProgress.value = null
-    message.error(`${t('virtualMedia.mountFailed', 'Mount failed')}: ${error instanceof Error ? error.message : String(error)}`)
-    await refresh()
+    if (!await validISOFile(file)) {
+      message.error(t('virtualMedia.invalidISO', 'The selected file is not a valid ISO image.'))
+      return
+    }
+    const session = new BrowserISO(api.getMSDWebSocketURL(), {
+      progress: (progress) => { browserProgress.value = progress },
+      disconnected: (detail) => {
+        if (browserISO.value === session) {
+          browserISO.value = null
+          browserProgress.value = null
+          message.error(detail)
+          void refresh()
+        }
+      },
+    })
+    browserISO.value = session
+    try {
+      await session.mount(file)
+      message.success(t('virtualMedia.mountSuccess', 'Media mounted'))
+      await refresh()
+    } catch (error) {
+      if (browserISO.value === session) browserISO.value = null
+      session.destroy()
+      browserProgress.value = null
+      message.error(`${t('virtualMedia.mountFailed', 'Mount failed')}: ${error instanceof Error ? error.message : String(error)}`)
+      await refresh()
+    }
   } finally {
     browserMounting.value = false
   }
@@ -1251,11 +1258,18 @@ onBeforeUnmount(() => {
                     <n-tag v-if="status?.iso_mounted === 'browser'" type="success" size="small"><CircleCheck :size="12" />{{ t('virtualMedia.mountedStatus', 'Mounted') }}</n-tag>
                     <label v-if="status?.iso_mounted !== 'browser'" class="file-picker">
                       <input type="file" accept=".iso,application/x-iso9660-image" :disabled="hostMountBlocked || browserMounting || Boolean(status?.iso_mounted)" @change="mountBrowserISO" />
-                      <n-button type="primary" :loading="browserMounting" :disabled="hostMountBlocked || Boolean(status?.iso_mounted)" tag="span"><template #icon><Disc3 /></template>{{ t('virtualMedia.mount', 'Mount') }}</n-button>
+                      <n-button type="primary" :loading="browserMounting" :disabled="hostMountBlocked || Boolean(status?.iso_mounted)" tag="span">
+                        <template #icon><Disc3 /></template>
+                        {{ browserMounting ? t('virtualMedia.mounting', 'Mounting') : t('virtualMedia.mount', 'Mount') }}
+                      </n-button>
                     </label>
                     <n-button v-else @click="eject('iso')"><template #icon><Unplug /></template>{{ t('virtualMedia.unmount', 'Eject') }}</n-button>
                   </div>
                 </header>
+                <div v-if="browserMounting" class="iso-list-status" role="status">
+                  <LoaderCircle class="spin" :size="18" />
+                  <span>{{ t('virtualMedia.mountingStatus', 'Mounting...') }}</span>
+                </div>
                 <n-alert v-if="status?.iso_mounted === 'browser'" type="info" class="browser-iso-note">
                   {{ t('virtualMedia.keepPageOpen', 'Keep this page open while a browser ISO is mounted.') }}
                 </n-alert>
@@ -1285,17 +1299,32 @@ onBeforeUnmount(() => {
                     <n-button v-if="status?.iso_mounted && status.iso_mounted !== 'browser'" @click="eject('iso')"><template #icon><Unplug /></template>{{ t('virtualMedia.unmount', 'Eject') }}</n-button>
                   </div>
                 </header>
-                <n-empty v-if="!isoMedia.length && !loading" :description="t('virtualMedia.noISO', 'No uploaded ISO images')">
+                <div v-if="loading && !isoMedia.length" class="iso-list-status" role="status">
+                  <LoaderCircle class="spin" :size="18" />
+                  <span>{{ t('virtualMedia.loadingImages', 'Loading ISO images…') }}</span>
+                </div>
+                <n-empty v-else-if="!isoMedia.length" :description="t('virtualMedia.noISO', 'No uploaded ISO images')">
                   <template #icon><Disc3 /></template>
                 </n-empty>
-                <div class="media-list">
+                <div v-else class="media-list">
                   <div v-for="item in isoMedia" :key="item.id" class="media-row">
-                    <Disc3 :size="24" />
+                    <LoaderCircle v-if="mountingID === item.id" class="spin" :size="24" />
+                    <Disc3 v-else :size="24" />
                     <div class="media-copy"><strong class="media-filename" :title="item.name">{{ item.name }}</strong><span>{{ formatBytes(item.size) }}<template v-if="item.external && item.label"> · {{ item.label }}</template></span></div>
                     <n-tag v-if="item.mounted" type="success" size="small"><CircleCheck :size="12" />{{ t('virtualMedia.mountedStatus', 'Mounted') }}</n-tag>
-                    <n-button v-if="!item.mounted && !status?.iso_mounted" size="small" type="primary" :disabled="hostMountBlocked" @click="mount(item)"><template #icon><Disc3 /></template>{{ t('virtualMedia.mount', 'Mount') }}</n-button>
+                    <n-button
+                      v-if="!item.mounted && !status?.iso_mounted"
+                      size="small"
+                      type="primary"
+                      :loading="mountingID === item.id"
+                      :disabled="hostMountBlocked || Boolean(mountingID && mountingID !== item.id)"
+                      @click="mount(item)"
+                    >
+                      <template #icon><Disc3 /></template>
+                      {{ mountingID === item.id ? t('virtualMedia.mounting', 'Mounting') : t('virtualMedia.mount', 'Mount') }}
+                    </n-button>
                     <n-button v-else-if="item.mounted" size="small" @click="eject('iso')"><template #icon><Unplug /></template>{{ t('virtualMedia.unmount', 'Eject') }}</n-button>
-                    <n-button v-if="!item.external" quaternary circle size="small" :disabled="item.mounted" @click="confirmDelete(item)"><template #icon><Trash2 /></template></n-button>
+                    <n-button v-if="!item.external" quaternary circle size="small" :disabled="item.mounted || Boolean(mountingID)" @click="confirmDelete(item)"><template #icon><Trash2 /></template></n-button>
                   </div>
                 </div>
               </section>
@@ -1371,7 +1400,7 @@ onBeforeUnmount(() => {
                           <HardDrive :size="24" />
                           <div class="media-copy"><strong class="media-filename" :title="item.name">{{ item.name }}</strong><span>{{ item.label }} · {{ formatBytes(item.size) }}</span></div>
                           <n-tag v-if="item.mounted" type="success" size="small"><CircleCheck :size="12" />{{ t('virtualMedia.mountedStatus', 'Mounted') }}</n-tag>
-                          <n-button v-if="!item.mounted && !status?.drive_mounted" size="small" type="primary" :disabled="hostMountBlocked" @click="mount(item)"><template #icon><HardDrive /></template>{{ t('virtualMedia.mount', 'Mount') }}</n-button>
+                          <n-button v-if="!item.mounted && !status?.drive_mounted" size="small" type="primary" :loading="mountingID === item.id" :disabled="hostMountBlocked || Boolean(mountingID && mountingID !== item.id)" @click="mount(item)"><template #icon><HardDrive /></template>{{ mountingID === item.id ? t('virtualMedia.mounting', 'Mounting') : t('virtualMedia.mount', 'Mount') }}</n-button>
                           <n-button v-else-if="item.mounted" size="small" @click="eject('drive')"><template #icon><Unplug /></template>{{ t('virtualMedia.unmount', 'Eject') }}</n-button>
                           <n-button v-if="!item.imported" size="small" :disabled="item.mounted" @click="openDrive(item)"><template #icon><FolderOpen /></template>{{ t('virtualMedia.files', 'Files') }}</n-button>
                           <n-button quaternary circle size="small" :disabled="item.mounted" @click="confirmDelete(item)"><template #icon><Trash2 /></template></n-button>
@@ -1694,6 +1723,15 @@ onBeforeUnmount(() => {
 .virtual-media-tab-connect { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .virtual-media-tab-connect > :deep(.n-button) { flex: 0 0 auto; }
 .virtual-media-loading { display: grid; min-height: 112px; place-items: center; }
+.iso-list-status {
+  display: flex;
+  min-height: 80px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--n-text-color-3);
+  font-size: 13px;
+}
 .virtual-media-disconnected { display: grid; min-height: 150px; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 18px; border: 1px solid rgba(128, 128, 128, .2); border-radius: 8px; background: rgba(128, 128, 128, .045); }
 .virtual-media-disconnected > svg { color: var(--n-text-color-3); }
 .virtual-media-disconnected > div { display: grid; min-width: 0; gap: 4px; }
@@ -1780,6 +1818,8 @@ onBeforeUnmount(() => {
   .virtual-media-forward-leave-to,
   .virtual-media-back-enter-from,
   .virtual-media-back-leave-to { opacity: 1; transform: none; }
+  .iso-list-status .spin,
+  .media-row .spin { animation: none; }
 }
 @media (max-width: 620px) { .media-mode-header { flex-direction: column; align-items: stretch; } .media-mode-header-actions { width: 100%; } .media-row { flex-wrap: wrap; } .media-copy { flex-basis: calc(100% - 44px); } }
 @media (max-width: 620px) { .virtual-media-disconnected { grid-template-columns: auto minmax(0, 1fr); } .virtual-media-disconnected :deep(.n-button) { grid-column: 1 / -1; justify-self: stretch; } .virtual-media-disconnect-button { padding-inline: 8px; } }

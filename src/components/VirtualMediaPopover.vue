@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
-import { ArrowLeft, Ban, Check, CircleCheck, CirclePlus, ClipboardPaste, Copy, Database, Disc3, Download, File, Folder, FolderOpen, FolderPlus, HardDrive, House, Info, Laptop, LayoutGrid, Pause, Pencil, Plug, Scissors, Server, Smartphone, Trash2, Unplug, Upload, X } from '@lucide/vue'
+import { ArrowLeft, Check, CircleCheck, CirclePlus, ClipboardPaste, Copy, Database, Disc3, Download, File, Folder, FolderOpen, FolderPlus, HardDrive, House, Info, Laptop, LayoutGrid, Pause, Pencil, Plug, Scissors, Server, Smartphone, Trash2, Unplug, Upload, X } from '@lucide/vue'
 import { useDialog, useMessage } from 'naive-ui'
 
 import { api, APIError, type MSDFileEntry, type MSDISOUpload, type MSDMedia, type MSDStatus } from '@/api/client'
@@ -1341,19 +1341,7 @@ onBeforeUnmount(() => {
                         </n-button>
                       </label>
                     </div>
-                    <div class="media-list">
-                      <div class="media-row no-virtual-drive-row" :class="{ selected: !status?.drive_mounted }">
-                        <Ban :size="24" />
-                        <div class="media-copy">
-                          <strong>{{ t('virtualMedia.noVirtualDrive', 'No virtual disk') }}</strong>
-                          <span>{{ t('virtualMedia.noVirtualDriveDescription', 'Do not expose a virtual disk to the host.') }}</span>
-                        </div>
-                        <n-tag v-if="!status?.drive_mounted" type="info" size="small"><CircleCheck :size="12" />{{ t('virtualMedia.selected', 'Selected') }}</n-tag>
-                        <n-button v-else size="small" @click="eject('drive')"><template #icon><Check /></template>{{ t('virtualMedia.select', 'Select') }}</n-button>
-                      </div>
-                      <n-empty v-if="!driveMedia.length && !loading" :description="t('virtualMedia.noDrives', 'No virtual disks')">
-                        <template #icon><HardDrive /></template>
-                      </n-empty>
+                    <div v-if="driveMedia.length" class="media-list">
                         <div v-for="item in driveMedia" :key="item.id" class="media-row">
                           <HardDrive :size="24" />
                           <div class="media-copy"><strong class="media-filename" :title="item.name">{{ item.name }}</strong><span>{{ item.label }} · {{ formatBytes(item.size) }}</span></div>
@@ -1683,7 +1671,7 @@ onBeforeUnmount(() => {
 .drive-create-actions { display: flex; justify-content: flex-end; }
 .folder-create-card { display: grid; width: min(320px, calc(100vw - 48px)); gap: 10px; padding: 4px; }
 .folder-create-actions { display: flex; justify-content: flex-end; gap: 8px; }
-.no-virtual-drive-row.selected { border-color: rgba(32, 128, 240, .45); background: rgba(32, 128, 240, .08); }
+
 .file-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
 .file-picker input { display: none; }
 .storage-summary { margin-left: auto; color: var(--n-text-color-3); font-size: 12px; }

@@ -445,7 +445,7 @@ function previousSetupStep() {
             {{ t('auth.passkeyHelp', 'Use a passkey. The device hostname must be used over HTTPS, not an IP address.') }}
           </p>
           <p v-else-if="selected?.type === 'plugin'" class="auth-mfa-help">
-            {{ t('auth.hardwareConfirm', 'Press BOOT on the NanoKVM to confirm. Cancel to go back.') }}
+            {{ t('auth.hardwareConfirm', 'Confirm on the NanoKVM Cube/PCIe. Cancel to go back.') }}
           </p>
         </n-form>
         <n-button type="primary" attr-type="submit" block :loading="busy">

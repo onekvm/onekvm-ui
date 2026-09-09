@@ -51,7 +51,7 @@ const zh = {
       mfaMethod: '验证方式',
       totpCode: '验证器代码',
       backupCode: '备份码',
-      hardwareConfirm: '请按下 NanoKVM 的 BOOT 键确认。取消可返回登录。',
+      hardwareConfirm: '请在 NanoKVM Cube/PCIe 上完成物理确认。取消可返回登录。',
       verify: '验证',
       cancelVerify: '取消验证',
       passkeyHelp: '使用通行密钥。请用主机名走 HTTPS 打开设备，不要用 IP 地址。',

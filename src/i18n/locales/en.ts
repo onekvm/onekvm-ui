@@ -51,7 +51,7 @@ const en = {
       mfaMethod: 'Method',
       totpCode: 'Authenticator code',
       backupCode: 'Backup code',
-      hardwareConfirm: 'Press BOOT on the NanoKVM to confirm. Cancel to go back.',
+      hardwareConfirm: 'Confirm on the NanoKVM Cube/PCIe. Cancel to go back.',
       verify: 'Verify',
       cancelVerify: 'Cancel verification',
       passkeyHelp: 'Use a passkey. Open the device over HTTPS using its hostname, not an IP address.',

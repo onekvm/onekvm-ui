@@ -4,8 +4,10 @@ import { ArrowLeft, Ban, Check, CircleCheck, CirclePlus, ClipboardPaste, Copy, D
 import { useDialog, useMessage } from 'naive-ui'
 
 import { api, APIError, type MSDFileEntry, type MSDISOUpload, type MSDMedia, type MSDStatus } from '@/api/client'
+import { useUploadProgress } from '@/composables/useUploadProgress'
 import { t } from '@/i18n/runtime'
 import { BrowserISO, type BrowserISOProgress } from '@/lib/browser-iso'
+import { nextUploadSpeed, uploadPercentage, uploadRemainingSeconds } from '@/lib/upload-speed'
 
 import XpTransferDialog from './XpTransferDialog.vue'
 
@@ -58,10 +60,6 @@ function readPendingUpload(): PendingISOUpload | null {
   } catch {
     return null
   }
-}
-
-function uploadPercentage(offset: number, size: number) {
-  return size > 0 ? Math.min(100, Math.round(offset * 1000 / size) / 10) : 0
 }
 
 function uploadResumeKey(fingerprint: string) {
@@ -127,8 +125,12 @@ const fileTransferTotal = ref(0)
 const fileTransferDone = ref(false)
 const fileTransferError = ref('')
 const fileTransferActive = ref(false)
+const fileTransferSpeed = ref(0)
+let fileTransferSampleAt = 0
+let fileTransferSampleBytes = 0
 let fileTransferController: AbortController | null = null
 let fileTransferCloseTimer: number | null = null
+const driveUpload = useUploadProgress()
 let uploadDragOffset = { x: 0, y: 0 }
 let uploadDragging = false
 
@@ -170,11 +172,12 @@ const activeConnection = computed(() => {
 const activeConnectionLabel = computed(() => activeConnection.value
   ? t('virtualMedia.connected', 'Connected')
   : t('virtualMedia.disconnected', 'Disconnected'))
-const uploadRemainingSeconds = computed(() => {
-  const total = pendingUpload.value?.size || uploadFileSize.value
-  if (!uploading.value || uploadSpeed.value <= 0 || total <= uploadTransferred.value) return 0
-  return Math.max(1, Math.ceil((total - uploadTransferred.value) / uploadSpeed.value))
-})
+const isoUploadRemainingSeconds = computed(() => uploadRemainingSeconds(
+  pendingUpload.value?.size || uploadFileSize.value,
+  uploadTransferred.value,
+  uploadSpeed.value,
+  uploading.value,
+))
 
 function formatUploadRemaining(seconds: number) {
   if (seconds <= 0) return t('virtualMedia.remainingCalculating', 'Calculating time remaining…')
@@ -183,7 +186,12 @@ function formatUploadRemaining(seconds: number) {
     .replace('{count}', String(Math.ceil(seconds / 60)))
 }
 
-const uploadRemainingLabel = computed(() => formatUploadRemaining(uploadRemainingSeconds.value))
+const uploadRemainingLabel = computed(() => formatUploadRemaining(isoUploadRemainingSeconds.value))
+const driveUploadStatus = computed(() => t('virtualMedia.uploadingFile', 'Uploading {name}…')
+  .replace('{name}', driveUpload.name.value))
+const driveUploadRemainingLabel = computed(() => driveUpload.uploading.value
+  ? formatUploadRemaining(driveUpload.remainingSeconds.value)
+  : '')
 const uploadStatusLabel = computed(() => t(
   uploading.value ? 'virtualMedia.uploadingFile' : 'virtualMedia.uploadPausedFile',
   uploading.value ? 'Uploading {name}…' : 'Paused: {name}',
@@ -199,7 +207,7 @@ watch(
     transferred: uploadTransferred.value,
     total: pendingUpload.value?.size || uploadFileSize.value,
     speed: uploadSpeed.value,
-    remainingSeconds: uploadRemainingSeconds.value,
+    remainingSeconds: isoUploadRemainingSeconds.value,
   }),
   { immediate: true },
 )
@@ -321,13 +329,9 @@ function updateUploadTelemetry(transferred: number, size: number) {
   uploadTransferred.value = transferred
   uploadProgress.value = uploadPercentage(transferred, size)
   const now = performance.now()
-  const elapsed = now - uploadSampleAt
-  const byteDelta = transferred - uploadSampleBytes
-  if (elapsed < 100 || byteDelta < 0) return
-  const instantSpeed = byteDelta * 1000 / elapsed
-  uploadSpeed.value = uploadSpeed.value > 0
-    ? uploadSpeed.value * .7 + instantSpeed * .3
-    : instantSpeed
+  const sampled = nextUploadSpeed(uploadSpeed.value, transferred, uploadSampleBytes, now - uploadSampleAt)
+  if (sampled === null) return
+  uploadSpeed.value = sampled
   uploadSampleAt = now
   uploadSampleBytes = transferred
 }
@@ -820,15 +824,23 @@ async function uploadDriveFile(event: Event) {
 }
 
 async function writeDriveFile(selected: File, overwrite: boolean) {
-  if (!browsingDrive.value) return
-  fileLoading.value = true
+  if (!browsingDrive.value || driveUpload.uploading.value || fileTransferActive.value) return
+  const controller = driveUpload.begin(selected.name, selected.size)
   try {
-    await api.uploadMSDDriveFile(browsingDrive.value.id, childPath(selected.name), selected, overwrite)
+    await api.uploadMSDDriveFile(
+      browsingDrive.value.id,
+      childPath(selected.name),
+      selected,
+      overwrite,
+      driveUpload.progress,
+      controller.signal,
+    )
     await refreshFiles()
   } catch (error) {
+    if (controller.signal.aborted) return
     message.error(error instanceof Error ? error.message : String(error))
   } finally {
-    fileLoading.value = false
+    driveUpload.finish(controller)
   }
 }
 
@@ -928,7 +940,7 @@ function copyNameInCurrentDirectory(name: string) {
 
 async function performDriveTransfer(source: DriveClipboard, targetDirectory: string, operation = source.operation) {
   const drive = browsingDrive.value
-  if (!drive || drive.id !== source.driveID || fileTransferActive.value) return
+  if (!drive || drive.id !== source.driveID || fileTransferActive.value || driveUpload.uploading.value) return
   let targetName = source.name
   if (operation === 'copy' && targetDirectory === currentPath.value && pathDirectory(source.path) === targetDirectory) {
     targetName = copyNameInCurrentDirectory(source.name)
@@ -943,6 +955,9 @@ async function performDriveTransfer(source: DriveClipboard, targetDirectory: str
   fileTransferCurrent.value = target
   fileTransferTransferred.value = 0
   fileTransferTotal.value = 0
+  fileTransferSpeed.value = 0
+  fileTransferSampleAt = performance.now()
+  fileTransferSampleBytes = 0
   fileTransferDone.value = false
   fileTransferError.value = ''
   fileTransferDialogOpen.value = true
@@ -959,6 +974,17 @@ async function performDriveTransfer(source: DriveClipboard, targetDirectory: str
       fileTransferTotal.value = progress.total
       fileTransferCurrent.value = progress.current || target
       fileTransferDone.value = Boolean(progress.done)
+      const now = performance.now()
+      const sampled = nextUploadSpeed(
+        fileTransferSpeed.value,
+        progress.transferred,
+        fileTransferSampleBytes,
+        now - fileTransferSampleAt,
+      )
+      if (sampled === null) return
+      fileTransferSpeed.value = sampled
+      fileTransferSampleAt = now
+      fileTransferSampleBytes = progress.transferred
     }, controller.signal)
     fileTransferDone.value = true
     if (driveClipboard.value?.path === source.path && driveClipboard.value.operation === operation) {
@@ -1049,6 +1075,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   uploadStopRequested.value = true
   abortActiveUploadRequests()
+  driveUpload.cancel()
   fileTransferController?.abort()
   window.removeEventListener('resize', clampUploadPosition)
   window.removeEventListener('pointermove', dragUploadWindow)
@@ -1301,7 +1328,7 @@ onBeforeUnmount(() => {
                         <n-alert v-if="browsingDrive.mounted" type="warning">{{ t('virtualMedia.ejectToManage', 'Eject the drive before managing files.') }}</n-alert>
                         <template v-else>
                           <div class="file-actions">
-                            <label class="file-picker"><input type="file" @change="uploadDriveFile" /><n-button tag="span" size="small"><template #icon><Upload /></template>{{ t('virtualMedia.uploadFile', 'Upload file') }}</n-button></label>
+                            <label class="file-picker"><input type="file" :disabled="driveUpload.uploading.value" @change="uploadDriveFile" /><n-button tag="span" size="small" :disabled="driveUpload.uploading.value"><template #icon><Upload /></template>{{ t('virtualMedia.uploadFile', 'Upload file') }}</n-button></label>
                             <n-popover v-model:show="folderCreateOpen" trigger="click" placement="bottom-start" to="body" :z-index="4600" :show-arrow="false" class="folder-create-popover">
                               <template #trigger><n-button size="small"><template #icon><FolderPlus /></template>{{ t('virtualMedia.newFolder', 'New folder') }}</n-button></template>
                               <section class="folder-create-card">
@@ -1441,6 +1468,24 @@ onBeforeUnmount(() => {
   </XpTransferDialog>
 
   <XpTransferDialog
+    :show="driveUpload.uploading.value"
+    :dialog-label="t('virtualMedia.uploadFile', 'Upload file')"
+    :status="driveUploadStatus"
+    :transferred="driveUpload.transferred.value"
+    :total="driveUpload.total.value"
+    :percentage="driveUpload.percentage.value"
+    :speed="driveUpload.speed.value"
+    :remaining-label="driveUploadRemainingLabel"
+  >
+    <template #title>
+      <Upload :size="15" />{{ t('virtualMedia.uploadFile', 'Upload file') }}
+    </template>
+    <template #actions>
+      <button @click="driveUpload.cancel">{{ t('virtualMedia.cancelUpload', 'Cancel upload') }}</button>
+    </template>
+  </XpTransferDialog>
+
+  <XpTransferDialog
     :show="fileTransferDialogOpen"
     layer-class="xp-file-transfer-layer"
     :dialog-label="fileTransferOperation === 'copy' ? t('virtualMedia.copying', 'Copying') : t('virtualMedia.moving', 'Moving')"
@@ -1473,6 +1518,7 @@ onBeforeUnmount(() => {
       </div>
       <div class="xp-upload-stats">
         <span>{{ formatBytes(fileTransferTransferred) }} / {{ formatBytes(fileTransferTotal) }}</span>
+        <span>{{ fileTransferSpeed > 0 ? `${formatBytes(fileTransferSpeed)}/s` : '—' }}</span>
         <strong>{{ fileTransferPercentage }}%</strong>
       </div>
       <footer class="xp-upload-actions">

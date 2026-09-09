@@ -847,6 +847,73 @@ function writeMSDISOUploadChunk(
   })
 }
 
+function putOctetStream(
+  path: string,
+  file: Blob,
+  onProgress?: (loaded: number, total: number) => void,
+  signal?: AbortSignal,
+) {
+  return new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    const abortRequest = () => xhr.abort()
+    const removeAbortListener = () => signal?.removeEventListener('abort', abortRequest)
+    xhr.open('PUT', `${serviceBaseUrl()}${path}`)
+    xhr.withCredentials = import.meta.env.VITE_WITH_CREDENTIALS !== 'false'
+    xhr.setRequestHeader('Accept', 'application/json')
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream')
+    xhr.upload.addEventListener('progress', (event) => {
+      onProgress?.(event.loaded, event.lengthComputable && event.total > 0 ? event.total : file.size)
+    })
+    xhr.addEventListener('load', () => {
+      removeAbortListener()
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress?.(file.size, file.size)
+        resolve()
+        return
+      }
+      let detail = ''
+      try {
+        detail = (JSON.parse(xhr.responseText) as { error?: string }).error || ''
+      } catch {
+        // Preserve the HTTP status fallback when an intermediary returns HTML.
+      }
+      if (xhr.status === 401) window.dispatchEvent(new Event('onekvm:unauthorized'))
+      reject(new APIError(detail || `HTTP ${xhr.status || 0}`, xhr.status || 0))
+    })
+    xhr.addEventListener('error', () => {
+      removeAbortListener()
+      reject(new APIError('Network error', 0))
+    })
+    xhr.addEventListener('abort', () => {
+      removeAbortListener()
+      reject(new APIError('Upload cancelled', 0))
+    })
+    if (signal?.aborted) {
+      reject(new APIError('Upload cancelled', 0))
+      return
+    }
+    signal?.addEventListener('abort', abortRequest, { once: true })
+    xhr.send(file)
+  })
+}
+
+function uploadMSDDriveFile(
+  id: string,
+  path: string,
+  file: File,
+  overwrite = false,
+  onProgress?: (loaded: number, total: number) => void,
+  signal?: AbortSignal,
+) {
+  const query = new URLSearchParams({ path, overwrite: String(overwrite) })
+  return putOctetStream(
+    `/api/msd/drives/${encodeURIComponent(id)}/files?${query}`,
+    file,
+    onProgress,
+    signal,
+  )
+}
+
 async function transferMSDDriveFile(
   id: string,
   from: string,
@@ -991,11 +1058,7 @@ export const api = {
     body: JSON.stringify({ name, label, size_mib: sizeMiB }),
   }),
   listMSDDriveFiles: (id: string, path = '') => request<MSDFileEntry[]>(`/api/msd/drives/${encodeURIComponent(id)}/files?path=${encodeURIComponent(path)}`),
-  uploadMSDDriveFile: (id: string, path: string, file: File, overwrite = false) => request<void>(`/api/msd/drives/${encodeURIComponent(id)}/files?path=${encodeURIComponent(path)}&overwrite=${overwrite}`, {
-    method: 'PUT',
-    body: file,
-    headers: { 'Content-Type': 'application/octet-stream' },
-  }),
+  uploadMSDDriveFile,
   createMSDDriveDirectory: (id: string, path: string) => request<void>(`/api/msd/drives/${encodeURIComponent(id)}/directories`, {
     method: 'POST',
     body: JSON.stringify({ path }),

@@ -1,10 +1,8 @@
-import type { Component } from 'vue'
+import type { Component, DeepReadonly } from 'vue'
 
 import type { AuthStatus, AuthUser, AuthUserUpdate } from '@/api/client'
 
-export type ProductAuthStatus = Readonly<Omit<AuthStatus, 'permissions'>> & {
-  readonly permissions: readonly string[]
-}
+export type ProductAuthStatus = DeepReadonly<AuthStatus>
 
 export interface ProductUserAssignment {
   label: string

@@ -21,11 +21,11 @@ function reviveCreation(publicKey: Record<string, unknown>): PublicKeyCredential
     ...(publicKey as unknown as PublicKeyCredentialCreationOptions),
     challenge: b64urlToBuf(String(publicKey.challenge)),
     user: {
-      ...(user as PublicKeyCredentialUserEntity),
+      ...(user as unknown as PublicKeyCredentialUserEntity),
       id: b64urlToBuf(String(user.id)),
     },
     excludeCredentials: exclude.map((credential) => ({
-      ...(credential as PublicKeyCredentialDescriptor),
+      ...(credential as unknown as PublicKeyCredentialDescriptor),
       id: b64urlToBuf(String(credential.id)),
     })),
   }
@@ -37,7 +37,7 @@ function reviveRequest(publicKey: Record<string, unknown>): PublicKeyCredentialR
     ...(publicKey as unknown as PublicKeyCredentialRequestOptions),
     challenge: b64urlToBuf(String(publicKey.challenge)),
     allowCredentials: allow.map((credential) => ({
-      ...(credential as PublicKeyCredentialDescriptor),
+      ...(credential as unknown as PublicKeyCredentialDescriptor),
       id: b64urlToBuf(String(credential.id)),
     })),
   }

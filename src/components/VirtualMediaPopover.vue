@@ -1661,18 +1661,31 @@ onBeforeUnmount(() => {
 .iso-source-radios :deep(.n-radio) { align-items: center; }
 .iso-source-hint { display: flex; margin: 0 0 12px; align-items: flex-start; gap: 6px; color: var(--n-text-color-3); font-size: 12px; line-height: 1.5; }
 .iso-source-hint > svg { flex: 0 0 auto; margin-top: 2px; }
-.virtual-media-content { position: relative; min-height: 120px; max-height: calc(100vh - 168px); overflow: hidden; }
-.virtual-media-pane { width: 100%; max-height: calc(100vh - 168px); overflow-y: auto; padding-right: 3px; scrollbar-width: thin; }
+.virtual-media-content {
+  display: grid;
+  grid-template-areas: "pane";
+  position: relative;
+  min-height: 120px;
+  max-height: calc(100vh - 168px);
+  overflow: hidden;
+}
+.virtual-media-pane {
+  grid-area: pane;
+  width: 100%;
+  min-height: 0;
+  max-height: calc(100vh - 168px);
+  overflow-y: auto;
+  padding-right: 3px;
+  scrollbar-width: thin;
+}
 .virtual-media-forward-enter-active,
 .virtual-media-back-enter-active {
   transition: transform var(--win11-enter) var(--win11-ease-out), opacity var(--win11-enter) var(--win11-ease-out);
 }
 .virtual-media-forward-leave-active,
 .virtual-media-back-leave-active {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
+  z-index: 1;
+  pointer-events: none;
   transition: transform var(--win11-exit) var(--win11-ease-in), opacity var(--win11-exit) var(--win11-ease-in);
 }
 .virtual-media-forward-enter-from { opacity: 0; transform: translateX(28px); }

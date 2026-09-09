@@ -12,6 +12,7 @@ import {
   Download,
   ExternalLink,
   FileUp,
+  FolderOpen,
   Keyboard,
   LaptopMinimalCheck,
   LifeBuoy,
@@ -82,6 +83,7 @@ import KeyboardShortcutEditor from './KeyboardShortcutEditor.vue'
 import UserManagement from './UserManagement.vue'
 import USBSettingsForm from './USBSettingsForm.vue'
 import AdvancedSettingsLoading from './AdvancedSettingsLoading.vue'
+import FileManagerPage from './file-manager/FileManagerPage.vue'
 
 type Section = string
 type SystemAction = 'factory-reset' | 'reboot' | 'recovery'
@@ -106,7 +108,7 @@ function sectionFromRoute(route: string): Section {
   }
   if (uiProduct.settingsSections?.some((item) => item.key === normalized)) return normalized
   if (normalized === 'audio') return 'usb'
-  return ['display', 'network', 'keyboard', 'usb', 'plugins', 'services', 'logs', 'resources', 'sessions', 'system', 'users', 'time', 'update'].includes(normalized) ? normalized : 'system'
+  return ['display', 'network', 'keyboard', 'usb', 'plugins', 'services', 'logs', 'resources', 'sessions', 'system', 'files', 'users', 'time', 'update'].includes(normalized) ? normalized : 'system'
 }
 
 function routeFromSection(value: Section) {
@@ -130,6 +132,7 @@ const dialog = useDialog()
 const message = useMessage()
 const { auth, logout, refresh: refreshAuth } = useAuth()
 const canManageUsers = computed(() => hasPermission(auth, 'users.manage'))
+const canManageSettings = computed(() => hasPermission(auth, 'settings.manage'))
 const accountOpen = ref(false)
 const section = ref<Section>(sectionFromRoute(props.route))
 const config = ref<OneKVMConfig | null>(null)
@@ -368,6 +371,9 @@ const sections = computed<SidebarSection[]>(() => {
     })
   return [
     { key: 'system', label: t('settings.advancedSettings.system', 'System'), icon: ServerCog },
+    ...(canManageSettings.value
+      ? [{ key: 'files', label: t('settings.advancedSettings.files', 'Files'), icon: FolderOpen }]
+      : []),
     { key: 'display', label: t('settings.advancedSettings.display', 'Display'), icon: MonitorUp },
 		{ key: 'keyboard', label: t('settings.advancedSettings.keyboard', 'Keyboard'), icon: Keyboard },
 	{ key: 'usb', label: t('settings.advancedSettings.usb', 'USB'), icon: Usb },
@@ -1417,6 +1423,10 @@ watch(section, (value) => {
 
               <section v-else-if="section === 'logs'" class="advanced-settings-section">
                 <LogsPage />
+              </section>
+
+              <section v-else-if="section === 'files' && canManageSettings" class="advanced-settings-section">
+                <FileManagerPage />
               </section>
 
               <section v-else-if="section === 'users' && canManageUsers" class="advanced-settings-section">

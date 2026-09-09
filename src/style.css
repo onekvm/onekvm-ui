@@ -1867,8 +1867,8 @@ select { font: inherit; }
 
 .advanced-settings-sidebar {
   padding: 14px 10px;
-  border-right: 1px solid var(--border);
-  background: var(--card);
+  border-right: 1px solid #292f36;
+  background: #11151a;
 }
 
 .advanced-settings-sidebar nav { display: grid; gap: 3px; }
@@ -3328,20 +3328,6 @@ body {
 .performance-compact-chart-bitrate { stroke: var(--onekvm-chart-bitrate); }
 .performance-compact-sep { background: var(--border-strong); }
 
-.advanced-settings-sidebar button {
-  border-radius: var(--radius);
-  color: var(--onekvm-text-secondary);
-}
-.advanced-settings-sidebar button:hover {
-  color: var(--accent-foreground);
-  background: var(--accent);
-}
-.advanced-settings-sidebar button.active {
-  border-left-color: var(--primary);
-  color: var(--primary-foreground);
-  background: color-mix(in srgb, var(--primary) 20%, var(--card));
-}
-.advanced-settings-sidebar button.group-active { color: var(--foreground); }
 .advanced-settings-main { background: var(--background); }
 .onekvm-page-loading {
   color: var(--foreground);
@@ -3486,15 +3472,6 @@ body {
 .n-input.n-input--focus,
 .n-base-selection.n-base-selection--active {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 24%, transparent);
-}
-
-@media (max-width: 760px) {
-  .advanced-settings-sidebar { border-bottom-color: var(--border); }
-  .advanced-settings-sidebar button.active {
-    border-right-color: transparent;
-    border-bottom-color: var(--primary);
-    border-left-color: transparent;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

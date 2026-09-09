@@ -1131,18 +1131,18 @@ onBeforeUnmount(() => {
                 <n-radio value="local"><span class="iso-source-option"><Laptop :size="16" />{{ t('virtualMedia.isoSourceLocal', 'This computer') }}</span></n-radio>
                 <n-radio value="device"><span class="iso-source-option"><Server :size="16" />{{ t('virtualMedia.isoSourceDevice', 'Device files') }}</span></n-radio>
               </n-radio-group>
-              <p class="iso-source-hint"><Info :size="14" />{{ t('virtualMedia.isoSourceHint', 'This computer mounts an ISO from the current browser without uploading. Device files are stored on the device and can be mounted later.') }}</p>
+              <p class="iso-source-hint"><Info :size="14" />{{ t('virtualMedia.isoSourceHint', 'This computer mounts an ISO without uploading. Device files are stored on the device and can be mounted later.') }}</p>
               <section v-if="isoSource === 'local' && (!status?.iso_mounted || status.iso_mounted === 'browser')" class="media-mode-panel direct-mount-panel">
                 <header class="media-mode-header">
                   <div class="media-mode-copy">
                     <strong class="media-title"><Laptop :size="16" />{{ t('virtualMedia.directMountMode', 'Direct mount') }}</strong>
-                    <span>{{ t('virtualMedia.directMountDescription', 'Use an ISO from this browser without uploading it to the device.') }}</span>
+                    <span>{{ t('virtualMedia.directMountDescription', 'Use an ISO from this computer without uploading it to the device.') }}</span>
                   </div>
                   <div class="media-mode-header-actions">
                     <n-tag v-if="status?.iso_mounted === 'browser'" type="success" size="small"><CircleCheck :size="12" />{{ t('virtualMedia.mountedStatus', 'Mounted') }}</n-tag>
                     <label v-if="status?.iso_mounted !== 'browser'" class="file-picker">
                       <input type="file" accept=".iso,application/x-iso9660-image" :disabled="hostMountBlocked || browserMounting || Boolean(status?.iso_mounted)" @change="mountBrowserISO" />
-                      <n-button type="primary" :loading="browserMounting" :disabled="hostMountBlocked || Boolean(status?.iso_mounted)" tag="span"><template #icon><Disc3 /></template>{{ t('virtualMedia.mountFromBrowser', 'Mount from browser') }}</n-button>
+                      <n-button type="primary" :loading="browserMounting" :disabled="hostMountBlocked || Boolean(status?.iso_mounted)" tag="span"><template #icon><Disc3 /></template>{{ t('virtualMedia.mount', 'Mount') }}</n-button>
                     </label>
                     <n-button v-else @click="eject('iso')"><template #icon><Unplug /></template>{{ t('virtualMedia.unmount', 'Eject') }}</n-button>
                   </div>
@@ -1502,7 +1502,7 @@ onBeforeUnmount(() => {
 .virtual-media-heading { display: inline-flex; align-items: center; gap: 8px; }
 .virtual-media-home { display: grid; gap: 14px; padding: 6px 0 4px; }
 .virtual-media-home-lead { display: flex; margin: 0; align-items: center; gap: 8px; color: var(--n-text-color-3); font-size: 13px; line-height: 1.5; }
-.media-title, .iso-source-option, .storage-free, .connect-hint, .drag-hint { display: inline-flex; align-items: center; gap: 6px; }
+.media-title, .iso-source-option, .storage-free, .drag-hint { display: inline-flex; align-items: center; gap: 6px; }
 .virtual-media-dialog :deep(.n-tag) { display: inline-flex; align-items: center; gap: 4px; }
 .virtual-media-home-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .virtual-media-home-card {
@@ -1531,10 +1531,10 @@ onBeforeUnmount(() => {
 .iso-source-radios { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 8px; }
 .iso-source-radios :deep(.n-radio) { align-items: center; }
 .iso-source-hint { display: flex; margin: 0 0 12px; align-items: flex-start; gap: 6px; color: var(--n-text-color-3); font-size: 12px; line-height: 1.5; }
-.iso-source-hint > svg, .connect-hint > svg { flex: 0 0 auto; margin-top: 2px; }
+.iso-source-hint > svg { flex: 0 0 auto; margin-top: 2px; }
 .virtual-media-content { min-height: 120px; max-height: calc(100vh - 168px); overflow-y: auto; padding-right: 3px; scrollbar-width: thin; }
-.virtual-media-tab-connect { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
-.virtual-media-tab-connect > span { min-width: 0; color: var(--n-text-color-3); font-size: 12px; line-height: 1.5; }
+.virtual-media-tab-connect { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.virtual-media-tab-connect > :deep(.n-button) { flex: 0 0 auto; }
 .virtual-media-loading { display: grid; min-height: 112px; place-items: center; }
 .virtual-media-disconnected { display: grid; min-height: 150px; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 18px; border: 1px solid rgba(128, 128, 128, .2); border-radius: 8px; background: rgba(128, 128, 128, .045); }
 .virtual-media-disconnected > svg { color: var(--n-text-color-3); }
@@ -1547,13 +1547,13 @@ onBeforeUnmount(() => {
 .virtual-media-workspace { margin-top: 8px; }
 .iso-mode-grid { display: grid; grid-template-columns: minmax(240px, .85fr) minmax(0, 1.25fr); align-items: start; gap: 10px; }
 .media-mode-panel { min-width: 0; padding: 10px; border: 1px solid rgba(128, 128, 128, .2); border-radius: 8px; background: rgba(128, 128, 128, .045); }
-.media-mode-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
+.media-mode-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
 .media-mode-copy { display: grid; min-width: 0; gap: 3px; }
 .media-mode-header-actions { display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-end; gap: 8px; }
 .media-mode-header strong { font-size: 13px; }
 .media-mode-copy > span, .media-mode-header small { color: var(--n-text-color-3); font-size: 11px; line-height: 1.45; }
 .media-mode-header small { flex: 0 0 auto; white-space: nowrap; }
-.direct-mount-panel .media-mode-header { flex-direction: column; }
+.direct-mount-panel .media-mode-header { flex-direction: column; align-items: stretch; }
 .direct-mount-panel .media-mode-header-actions { width: 100%; }
 .direct-mount-panel .media-mode-header-actions > .file-picker,
 .direct-mount-panel .media-mode-header-actions > :deep(.n-button) { width: 100%; }
@@ -1592,7 +1592,8 @@ onBeforeUnmount(() => {
 .breadcrumbs.has-nested-path { overflow-x: auto; overflow-y: hidden; }
 .breadcrumbs :deep(.n-button) { flex: 0 0 auto; }
 .drag-hint { margin-left: auto; color: var(--n-text-color-3); font-size: 11px; }
-.connect-hint { min-width: 0; color: var(--n-text-color-3); font-size: 12px; line-height: 1.5; }
+.connect-hint { display: flex; min-width: 0; align-items: flex-start; gap: 6px; color: var(--n-text-color-3); font-size: 12px; line-height: 1.5; }
+.connect-hint > svg { flex: 0 0 auto; margin-top: 2px; }
 .file-list { display: grid; min-height: 64px; align-content: start; gap: 2px; }
 .file-row { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 5px 7px; border: 0; border-radius: 5px; background: transparent; color: inherit; text-align: left; }
 .file-row:hover { background: rgba(128, 128, 128, .1); }
@@ -1611,6 +1612,6 @@ onBeforeUnmount(() => {
   .virtual-media-home-grid { grid-template-columns: 1fr; }
   .iso-mode-grid { grid-template-columns: 1fr; }
 }
-@media (max-width: 620px) { .media-mode-header { flex-direction: column; } .media-mode-header-actions { width: 100%; } .media-row { flex-wrap: wrap; } .media-copy { flex-basis: calc(100% - 44px); } }
+@media (max-width: 620px) { .media-mode-header { flex-direction: column; align-items: stretch; } .media-mode-header-actions { width: 100%; } .media-row { flex-wrap: wrap; } .media-copy { flex-basis: calc(100% - 44px); } }
 @media (max-width: 620px) { .virtual-media-disconnected { grid-template-columns: auto minmax(0, 1fr); } .virtual-media-disconnected :deep(.n-button) { grid-column: 1 / -1; justify-self: stretch; } .virtual-media-disconnect-button { padding-inline: 8px; } }
 </style>

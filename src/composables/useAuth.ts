@@ -23,6 +23,9 @@ let refreshRetryTimer: number | null = null
 let statusKnown = false
 
 function assign(status: AuthStatus) {
+  state.mfa_required = false
+  state.pending_token = ''
+  state.factors = []
   Object.assign(state, status, { loading: false })
 }
 
@@ -100,6 +103,9 @@ async function logout() {
   await api.authLogout()
   state.authenticated = false
   state.required = true
+  state.mfa_required = false
+  state.pending_token = ''
+  state.factors = []
 }
 
 export function useAuth() {
@@ -108,6 +114,9 @@ export function useAuth() {
     window.addEventListener('onekvm:unauthorized', () => {
       state.authenticated = false
       state.required = true
+      state.mfa_required = false
+      state.pending_token = ''
+      state.factors = []
       state.loading = false
     })
     void refresh()

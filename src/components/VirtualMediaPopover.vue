@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
-import { Check, ClipboardPaste, Copy, Disc3, Download, File, Folder, FolderPlus, GripHorizontal, HardDrive, Pencil, Pin, PinOff, Plug, Scissors, Trash2, Unplug, Upload, X } from '@lucide/vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { ArrowLeft, Check, ClipboardPaste, Copy, Disc3, Download, File, Folder, FolderPlus, HardDrive, Pencil, Plug, Scissors, Smartphone, Trash2, Unplug, Upload, X } from '@lucide/vue'
 import { useDialog, useMessage } from 'naive-ui'
 
 import { api, APIError, type MSDFileEntry, type MSDISOUpload, type MSDMedia, type MSDStatus } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { BrowserISO, type BrowserISOProgress } from '@/lib/browser-iso'
 
-const props = defineProps<{
+import XpTransferDialog from './XpTransferDialog.vue'
+
+defineProps<{
   placement?: 'top-end' | 'bottom-end' | 'right-start' | 'left-start'
 }>()
 
@@ -75,16 +77,13 @@ const mtpBusy = ref(false)
 const status = ref<MSDStatus | null>(null)
 const media = ref<MSDMedia[]>([])
 type MediaTab = 'iso' | 'drive' | 'mtp'
+type IsoSource = 'local' | 'device'
 const tab = ref<MediaTab>('iso')
+const feature = ref<MediaTab | null>(null)
+const isoSource = ref<IsoSource>('local')
 const driveCreateOpen = ref(false)
 const folderCreateOpen = ref(false)
 const popoverOpen = ref(false)
-const pinned = ref(false)
-const pinnedTab = ref<MediaTab | null>(null)
-const panel = ref<HTMLElement | null>(null)
-const position = ref({ x: 24, y: 58 })
-let dragOffset = { x: 0, y: 0 }
-let dragging = false
 let uploadSampleAt = 0
 let uploadSampleBytes = 0
 const uploadRequestControllers = new Set<AbortController>()
@@ -97,7 +96,7 @@ const uploading = ref(false)
 const uploadStopRequested = ref(false)
 const activeUploadID = ref(initialPendingUpload?.id || '')
 const uploadDialogOpen = ref(false)
-const uploadWindow = ref<HTMLElement | null>(null)
+const uploadWindow = ref<InstanceType<typeof XpTransferDialog> | null>(null)
 const uploadPosition = ref<{ x: number; y: number } | null>(null)
 const uploadFileName = ref(initialPendingUpload?.name || '')
 const uploadFileSize = ref(initialPendingUpload?.size || 0)
@@ -159,24 +158,18 @@ const folderNameValid = computed(() => {
 const mountBlocked = computed(() => uploading.value || Boolean(pendingUpload.value) || Boolean(status.value?.iso_uploading))
 const hostConnected = computed(() => Boolean(status.value?.connected))
 const hostMountBlocked = computed(() => mountBlocked.value || !hostConnected.value)
-const panelStyle = computed(() => pinned.value
-  ? { left: `${position.value.x}px`, top: `${position.value.y}px` }
-  : undefined)
 const uploadWindowStyle = computed(() => uploadPosition.value
   ? { position: 'fixed' as const, left: `${uploadPosition.value.x}px`, top: `${uploadPosition.value.y}px` }
   : undefined)
-function tabLabel(name: MediaTab) {
-  if (name === 'drive') return t('virtualMedia.driveTab', 'Virtual USB drive')
-  if (name === 'mtp') return t('virtualMedia.mtpTab', 'File transfer')
-  return t('virtualMedia.isoTab', 'ISO mounting')
-}
-const activeTabLabel = computed(() => tabLabel(tab.value))
-const pinnedConnectionLabel = computed(() => {
+const activeConnection = computed(() => {
   if (tab.value === 'mtp') {
-    return status.value?.mtp ? t('virtualMedia.connected', 'Connected') : t('virtualMedia.disconnected', 'Disconnected')
+    return Boolean(status.value?.mtp)
   }
-  return hostConnected.value ? t('virtualMedia.connected', 'Connected') : t('virtualMedia.disconnected', 'Disconnected')
+  return hostConnected.value
 })
+const activeConnectionLabel = computed(() => activeConnection.value
+  ? t('virtualMedia.connected', 'Connected')
+  : t('virtualMedia.disconnected', 'Disconnected'))
 const uploadRemainingSeconds = computed(() => {
   const total = pendingUpload.value?.size || uploadFileSize.value
   if (!uploading.value || uploadSpeed.value <= 0 || total <= uploadTransferred.value) return 0
@@ -211,72 +204,66 @@ watch(
   { immediate: true },
 )
 
+const isoSourceLocked = computed<IsoSource | null>(() => {
+  if (status.value?.iso_mounted === 'browser') return 'local'
+  if (status.value?.iso_mounted) return 'device'
+  return null
+})
+const featureTitle = computed(() => {
+  if (feature.value === 'iso') return t('virtualMedia.isoTab', 'ISO mounting')
+  if (feature.value === 'drive') return t('virtualMedia.driveTab', 'Virtual USB drive')
+  if (feature.value === 'mtp') return t('virtualMedia.mtpTab', 'File transfer')
+  return t('virtualMedia.title', 'Virtual Media')
+})
+
+watch(isoSourceLocked, (locked) => {
+  if (locked) isoSource.value = locked
+})
+
 watch([storageAvailable, mtpAvailable], () => {
   if (tab.value !== 'mtp' && !storageAvailable.value && mtpAvailable.value) tab.value = 'mtp'
   if (tab.value === 'mtp' && !mtpAvailable.value && storageAvailable.value) tab.value = 'iso'
+  if (feature.value === 'mtp' && !mtpAvailable.value) feature.value = null
+  if ((feature.value === 'iso' || feature.value === 'drive') && !storageAvailable.value) feature.value = null
 })
 
+function openFeature(name: MediaTab) {
+  tab.value = name
+  feature.value = name
+}
+
+function backToHome() {
+  feature.value = null
+}
+
+function featureFromStatus(): MediaTab | null {
+  if (status.value?.iso_mounted && storageAvailable.value) return 'iso'
+  if (status.value?.drive_mounted && storageAvailable.value) return 'drive'
+  if (status.value?.mtp && mtpAvailable.value) return 'mtp'
+  return null
+}
+
 function updateShow(show: boolean) {
-  if (!show && (pinned.value || folderCreateOpen.value || driveCreateOpen.value || fileDeletePopoverPath.value)) return
+  if (!show && (folderCreateOpen.value || driveCreateOpen.value || fileDeletePopoverPath.value)) return
   popoverOpen.value = show
   emit('update:show', show)
   if (show) {
     browserISO.value?.requestStatus()
-    void refresh()
+    void refresh().then(() => {
+      if (!feature.value) feature.value = featureFromStatus()
+      if (status.value?.iso_mounted === 'browser') isoSource.value = 'local'
+      else if (status.value?.iso_mounted) isoSource.value = 'device'
+    })
     void restorePendingUpload()
+  } else {
+    feature.value = null
   }
-}
-
-function clampPosition() {
-  if (!panel.value || !pinned.value) return
-  const rect = panel.value.getBoundingClientRect()
-  position.value = {
-    x: Math.max(8, Math.min(window.innerWidth - rect.width - 8, position.value.x)),
-    y: Math.max(50, Math.min(window.innerHeight - rect.height - 8, position.value.y)),
-  }
-}
-
-async function pinPanel(targetTab: MediaTab, event?: MouseEvent) {
-  tab.value = targetTab
-  pinnedTab.value = targetTab
-  pinned.value = true
-  await nextTick()
-  if (!panel.value) return
-  const rect = panel.value.getBoundingClientRect()
-  position.value = event
-    ? { x: event.clientX, y: event.clientY }
-    : { x: Math.max(8, window.innerWidth - rect.width - 18), y: 58 }
-  clampPosition()
-}
-
-function unpinPanel() {
-  pinned.value = false
-  pinnedTab.value = null
-}
-
-function startDrag(event: PointerEvent) {
-  if (event.button !== 0 || !panel.value || window.innerWidth < 768) return
-  const rect = panel.value.getBoundingClientRect()
-  dragOffset = { x: event.clientX - rect.left, y: event.clientY - rect.top }
-  dragging = true
-  window.addEventListener('pointermove', drag)
-  window.addEventListener('pointerup', stopDrag, { once: true })
-}
-
-function drag(event: PointerEvent) {
-  if (!dragging) return
-  position.value = { x: event.clientX - dragOffset.x, y: event.clientY - dragOffset.y }
-  clampPosition()
-}
-
-function stopDrag() {
-  dragging = false
-  window.removeEventListener('pointermove', drag)
 }
 
 function clampUploadPosition() {
-  if (!uploadWindow.value || !uploadPosition.value) return
-  const rect = uploadWindow.value.getBoundingClientRect()
+  const windowElement = uploadWindow.value?.windowElement
+  if (!windowElement || !uploadPosition.value) return
+  const rect = windowElement.getBoundingClientRect()
   uploadPosition.value = {
     x: Math.max(8, Math.min(window.innerWidth - rect.width - 8, uploadPosition.value.x)),
     y: Math.max(8, Math.min(window.innerHeight - rect.height - 8, uploadPosition.value.y)),
@@ -284,8 +271,9 @@ function clampUploadPosition() {
 }
 
 function startUploadDrag(event: PointerEvent) {
-  if (event.button !== 0 || !uploadWindow.value || (event.target as Element).closest('button')) return
-  const rect = uploadWindow.value.getBoundingClientRect()
+  const windowElement = uploadWindow.value?.windowElement
+  if (event.button !== 0 || !windowElement || (event.target as Element).closest('button')) return
+  const rect = windowElement.getBoundingClientRect()
   uploadPosition.value = { x: rect.left, y: rect.top }
   uploadDragOffset = { x: event.clientX - rect.left, y: event.clientY - rect.top }
   uploadDragging = true
@@ -761,6 +749,7 @@ async function createDrive() {
     await refresh()
     driveCreateOpen.value = false
     tab.value = 'drive'
+    feature.value = 'drive'
   } catch (error) {
     message.error(`${t('virtualMedia.createDriveFailed', 'Drive creation failed')}: ${error instanceof Error ? error.message : String(error)}`)
   } finally {
@@ -1048,7 +1037,6 @@ function closeFileTransferDialog() {
 }
 
 onMounted(() => {
-  window.addEventListener('resize', clampPosition)
   window.addEventListener('resize', clampUploadPosition)
 })
 
@@ -1056,100 +1044,70 @@ onBeforeUnmount(() => {
   uploadStopRequested.value = true
   abortActiveUploadRequests()
   fileTransferController?.abort()
-  window.removeEventListener('resize', clampPosition)
   window.removeEventListener('resize', clampUploadPosition)
-  window.removeEventListener('pointermove', drag)
   window.removeEventListener('pointermove', dragUploadWindow)
   browserISO.value?.destroy()
 })
 </script>
 
 <template>
-  <n-popover
+  <span class="virtual-media-trigger" @click="updateShow(true)"><slot /></span>
+
+  <n-modal
     :show="popoverOpen"
-    trigger="click"
-    :placement="props.placement || 'bottom-end'"
-    :show-arrow="false"
-    :class="['control-popover', 'virtual-media-control-popover', { 'is-pinned': pinned }]"
+    :mask-closable="!folderCreateOpen && !driveCreateOpen && !fileDeletePopoverPath"
+    :close-on-esc="!folderCreateOpen && !driveCreateOpen && !fileDeletePopoverPath"
     @update:show="updateShow"
   >
-    <template #trigger><slot /></template>
-
-    <Teleport to="body" :disabled="!pinned">
-      <section
-        ref="panel"
-        :class="pinned ? 'virtual-media-window' : 'virtual-media-panel'"
-        :style="panelStyle"
+      <n-card
+        class="virtual-media-dialog"
+        :bordered="false"
+        closable
         role="dialog"
+        aria-modal="true"
         :aria-label="t('virtualMedia.title', 'Virtual Media')"
+        @close="updateShow(false)"
       >
-        <header v-if="pinned" class="display-status-titlebar" @pointerdown="startDrag">
-          <GripHorizontal :size="15" class="floating-window-grip" />
-          <Disc3 :size="15" />
-          <strong>{{ t('virtualMedia.title', 'Virtual Media') }}</strong>
-          <span class="display-status-pinned-label">{{ activeTabLabel }} · {{ pinnedConnectionLabel }} · {{ t('virtualMedia.pinned', 'Pinned') }}</span>
-          <div class="control-popover-header-actions" @pointerdown.stop>
-            <n-tooltip to="body" :z-index="4000">
-              <template #trigger>
-                <n-button quaternary circle size="tiny" :aria-label="t('virtualMedia.unpin', 'Unpin virtual media')" @click="unpinPanel">
-                  <template #icon><PinOff /></template>
-                </n-button>
-              </template>
-              {{ t('virtualMedia.unpin', 'Unpin virtual media') }}
-            </n-tooltip>
-          </div>
-        </header>
-        <header v-else class="control-popover-header virtual-media-header">
-          <span class="virtual-media-heading"><Disc3 :size="16" /><strong>{{ t('virtualMedia.title', 'Virtual Media') }}</strong></span>
-        </header>
-        <n-tabs v-if="mediaOpen" v-model:value="tab" type="segment" size="small" class="virtual-media-title-tabs">
-            <n-tab v-if="storageAvailable" name="iso">
-              <span class="virtual-media-tab-label">
-                <span>{{ t('virtualMedia.isoTab', 'Image mounting') }}</span>
-                <button
-                  type="button"
-                  class="virtual-media-tab-pin"
-                  :title="t('virtualMedia.pin', 'Pin current virtual media tab')"
-                  :aria-label="t('virtualMedia.pin', 'Pin current virtual media tab')"
-                  @pointerdown.stop
-                  @click.stop="pinPanel('iso', $event)"
-                ><Pin :size="13" /></button>
-              </span>
-            </n-tab>
-            <n-tab v-if="storageAvailable" name="drive">
-              <span class="virtual-media-tab-label">
-                <span>{{ t('virtualMedia.driveTab', 'Virtual USB drive') }}</span>
-                <button
-                  type="button"
-                  class="virtual-media-tab-pin"
-                  :title="t('virtualMedia.pin', 'Pin current virtual media tab')"
-                  :aria-label="t('virtualMedia.pin', 'Pin current virtual media tab')"
-                  @pointerdown.stop
-                  @click.stop="pinPanel('drive', $event)"
-                ><Pin :size="13" /></button>
-              </span>
-            </n-tab>
-            <n-tab v-if="mtpAvailable" name="mtp">
-              <span class="virtual-media-tab-label">
-                <span>{{ t('virtualMedia.mtpTab', 'File transfer') }}</span>
-                <button
-                  type="button"
-                  class="virtual-media-tab-pin"
-                  :title="t('virtualMedia.pin', 'Pin current virtual media tab')"
-                  :aria-label="t('virtualMedia.pin', 'Pin current virtual media tab')"
-                  @pointerdown.stop
-                  @click.stop="pinPanel('mtp', $event)"
-                ><Pin :size="13" /></button>
-              </span>
-            </n-tab>
-          </n-tabs>
+        <template #header>
+          <span class="virtual-media-heading">
+            <n-button v-if="feature" quaternary circle size="small" :aria-label="t('virtualMedia.back', 'Back')" @click="backToHome">
+              <template #icon><ArrowLeft /></template>
+            </n-button>
+            <Disc3 :size="16" /><strong>{{ featureTitle }}</strong>
+          </span>
+        </template>
+        <template #header-extra>
+          <n-tag v-if="status && mediaOpen && feature" :type="activeConnection ? 'success' : 'default'" size="small" round>
+            {{ activeConnectionLabel }}
+          </n-tag>
+        </template>
 
         <div class="virtual-media-content">
           <div v-if="!status && loading" class="virtual-media-loading"><n-spin size="small" /></div>
           <n-alert v-else-if="status && !mediaOpen" type="warning" :title="t('virtualMedia.unavailable', 'Virtual media is unavailable')">
             {{ t('virtualMedia.unavailableDescription', 'The virtual media service is not available on this device.') }}
           </n-alert>
-          <template v-else-if="mediaOpen">
+          <div v-else-if="mediaOpen && !feature" class="virtual-media-home">
+            <p class="virtual-media-home-lead">{{ t('virtualMedia.chooseFeature', 'Choose a feature') }}</p>
+            <div class="virtual-media-home-grid">
+              <button v-if="storageAvailable" type="button" class="virtual-media-home-card" @click="openFeature('iso')">
+                <Disc3 :size="32" />
+                <strong>{{ t('virtualMedia.isoTab', 'ISO mounting') }}</strong>
+                <span>{{ t('virtualMedia.isoHomeDescription', 'Mount a disc image for the controlled device.') }}</span>
+              </button>
+              <button v-if="storageAvailable" type="button" class="virtual-media-home-card" @click="openFeature('drive')">
+                <HardDrive :size="32" />
+                <strong>{{ t('virtualMedia.driveTab', 'Virtual USB drive') }}</strong>
+                <span>{{ t('virtualMedia.driveHomeDescription', 'Create and mount a virtual USB drive.') }}</span>
+              </button>
+              <button v-if="mtpAvailable" type="button" class="virtual-media-home-card" @click="openFeature('mtp')">
+                <Smartphone :size="32" />
+                <strong>{{ t('virtualMedia.mtpTab', 'File transfer') }}</strong>
+                <span>{{ t('virtualMedia.mtpDescription', 'Share the virtual-media folder with the controlled device, like plugging in a phone.') }}</span>
+              </button>
+            </div>
+          </div>
+          <template v-else-if="mediaOpen && feature">
             <n-tabs v-model:value="tab" type="segment" class="virtual-media-content-tabs">
               <n-tab-pane v-if="storageAvailable" name="iso">
                 <div class="virtual-media-tab-connect">
@@ -1161,8 +1119,13 @@ onBeforeUnmount(() => {
                   </n-button>
                   <span>{{ hostConnected ? t('virtualMedia.connected', 'Connected') : t('virtualMedia.disconnectedDescription', 'Connect when you want the controlled host to see mounted images and virtual USB drives. Uploading and managing files does not require a connection.') }}</span>
                 </div>
-                <section class="virtual-media-workspace iso-mode-grid">
-              <section v-if="!status?.iso_mounted || status.iso_mounted === 'browser'" class="media-mode-panel">
+                <section class="virtual-media-workspace">
+              <n-radio-group v-model:value="isoSource" :disabled="Boolean(isoSourceLocked)" name="iso-source" class="iso-source-radios">
+                <n-radio value="local">{{ t('virtualMedia.isoSourceLocal', 'This computer') }}</n-radio>
+                <n-radio value="device">{{ t('virtualMedia.isoSourceDevice', 'Device files') }}</n-radio>
+              </n-radio-group>
+              <p class="iso-source-hint">{{ t('virtualMedia.isoSourceHint', 'This computer mounts an ISO from the current browser without uploading. Device files are stored on the device and can be mounted later.') }}</p>
+              <section v-if="isoSource === 'local' && (!status?.iso_mounted || status.iso_mounted === 'browser')" class="media-mode-panel direct-mount-panel">
                 <header class="media-mode-header">
                   <div class="media-mode-copy">
                     <strong>{{ t('virtualMedia.directMountMode', 'Direct mount') }}</strong>
@@ -1191,7 +1154,7 @@ onBeforeUnmount(() => {
                 </div>
               </section>
 
-              <section v-if="status?.iso_mounted !== 'browser'" class="media-mode-panel">
+              <section v-if="isoSource === 'device' && status?.iso_mounted !== 'browser'" class="media-mode-panel">
                 <header class="media-mode-header">
                   <div class="media-mode-copy">
                     <strong>{{ t('virtualMedia.isoMode', 'ISO images') }}</strong>
@@ -1210,11 +1173,11 @@ onBeforeUnmount(() => {
                 <div class="media-list">
                   <div v-for="item in isoMedia" :key="item.id" class="media-row">
                     <File :size="24" />
-                    <div class="media-copy"><strong class="media-filename" :title="item.name">{{ item.name }}</strong><span>{{ formatBytes(item.size) }}</span></div>
+                    <div class="media-copy"><strong class="media-filename" :title="item.name">{{ item.name }}</strong><span>{{ formatBytes(item.size) }}<template v-if="item.external && item.label"> · {{ item.label }}</template></span></div>
                     <n-tag v-if="item.mounted" type="success" size="small">{{ t('virtualMedia.mountedStatus', 'Mounted') }}</n-tag>
                     <n-button v-if="!item.mounted && !status?.iso_mounted" size="small" type="primary" :disabled="hostMountBlocked" @click="mount(item)">{{ t('virtualMedia.mount', 'Mount') }}</n-button>
                     <n-button v-else-if="item.mounted" size="small" @click="eject('iso')">{{ t('virtualMedia.unmount', 'Eject') }}</n-button>
-                    <n-button quaternary circle size="small" :disabled="item.mounted" @click="confirmDelete(item)"><template #icon><Trash2 /></template></n-button>
+                    <n-button v-if="!item.external" quaternary circle size="small" :disabled="item.mounted" @click="confirmDelete(item)"><template #icon><Trash2 /></template></n-button>
                   </div>
                 </div>
               </section>
@@ -1429,111 +1392,132 @@ onBeforeUnmount(() => {
             </n-tabs>
           </template>
         </div>
-      </section>
-    </Teleport>
-  </n-popover>
+      </n-card>
+  </n-modal>
 
-  <Teleport to="body">
-    <Transition name="xp-upload-fade" appear>
-      <div v-if="uploadDialogOpen" class="xp-upload-modal-layer">
-        <section ref="uploadWindow" class="xp-upload-window" :style="uploadWindowStyle" role="dialog" aria-modal="false" :aria-label="t('virtualMedia.uploadProgressTitle', 'ISO upload')">
-          <header class="xp-upload-titlebar" @pointerdown="startUploadDrag">
-            <span><Upload :size="15" />{{ t('virtualMedia.uploadProgressTitle', 'ISO upload') }}</span>
-            <button class="xp-title-minimize" :aria-label="t('virtualMedia.minimizeUpload', 'Minimize upload window')" @click="minimizeUploadDialog" />
-          </header>
-          <div class="xp-upload-body">
-            <div class="xp-transfer-animation" aria-hidden="true">
-              <span class="xp-transfer-folder xp-transfer-folder-source" />
-              <span class="xp-transfer-paper xp-transfer-paper-one" />
-              <span class="xp-transfer-paper xp-transfer-paper-two" />
-              <span class="xp-transfer-paper xp-transfer-paper-three" />
-              <span class="xp-transfer-folder xp-transfer-folder-target" />
-            </div>
-            <p class="xp-upload-status" :title="uploadStatusLabel">{{ uploadStatusLabel }}</p>
-            <div class="xp-upload-stats">
-              <span>{{ formatBytes(uploadTransferred) }} / {{ formatBytes(pendingUpload?.size || uploadFileSize) }}</span>
-              <span>{{ uploading ? `${formatBytes(uploadSpeed)}/s` : '—' }}</span>
-              <strong>{{ uploadProgress }}%</strong>
-            </div>
-            <div v-if="pendingUpload && !uploading" class="xp-resume-hint">
-              {{ t('virtualMedia.resumeHint', 'Select the same ISO again to resume from the saved position.') }}
-            </div>
-            <footer class="xp-upload-control-row">
-              <div class="xp-upload-progress-area">
-                <div v-if="uploading" class="xp-upload-eta">{{ uploadRemainingLabel }}</div>
-                <div class="xp-progress-track" role="progressbar" :aria-valuenow="uploadProgress" aria-valuemin="0" aria-valuemax="100">
-                  <div class="xp-progress-value" :style="{ width: `${uploadProgress}%` }" />
-                </div>
-              </div>
-              <div class="xp-upload-actions">
-                <button v-if="uploading" @click="pauseUpload">{{ t('virtualMedia.pauseUpload', 'Pause') }}</button>
-                <label v-else-if="pendingUpload" class="xp-upload-file-button">
-                  <input type="file" accept=".iso,application/x-iso9660-image" @change="uploadISO" />
-                  <span>{{ t('virtualMedia.resumeUpload', 'Resume upload') }}</span>
-                </label>
-                <button :disabled="!activeUploadID" @click="cancelUpload">{{ t('virtualMedia.cancelUpload', 'Cancel upload') }}</button>
-              </div>
-            </footer>
-          </div>
-        </section>
+  <XpTransferDialog
+    ref="uploadWindow"
+    :show="uploadDialogOpen"
+    :dialog-label="t('virtualMedia.uploadProgressTitle', 'ISO upload')"
+    :window-style="uploadWindowStyle"
+    :status="uploadStatusLabel"
+    :transferred="uploadTransferred"
+    :total="pendingUpload?.size || uploadFileSize"
+    :percentage="uploadProgress"
+    :speed="uploadSpeed"
+    :remaining-label="uploading ? uploadRemainingLabel : ''"
+    @title-pointerdown="startUploadDrag"
+  >
+    <template #title>
+      <Upload :size="15" />{{ t('virtualMedia.uploadProgressTitle', 'ISO upload') }}
+    </template>
+    <template #title-actions>
+      <button class="xp-title-minimize" :aria-label="t('virtualMedia.minimizeUpload', 'Minimize upload window')" @click="minimizeUploadDialog" />
+    </template>
+    <template #hint>
+      <div v-if="pendingUpload && !uploading" class="xp-resume-hint">
+        {{ t('virtualMedia.resumeHint', 'Select the same ISO again to resume from the saved position.') }}
       </div>
-    </Transition>
-  </Teleport>
+    </template>
+    <template #actions>
+      <button v-if="uploading" @click="pauseUpload">{{ t('virtualMedia.pauseUpload', 'Pause') }}</button>
+      <label v-else-if="pendingUpload" class="xp-upload-file-button">
+        <input type="file" accept=".iso,application/x-iso9660-image" @change="uploadISO" />
+        <span>{{ t('virtualMedia.resumeUpload', 'Resume upload') }}</span>
+      </label>
+      <button :disabled="!activeUploadID" @click="cancelUpload">{{ t('virtualMedia.cancelUpload', 'Cancel upload') }}</button>
+    </template>
+  </XpTransferDialog>
 
-  <Teleport to="body">
-    <Transition name="xp-upload-fade" appear>
-      <div v-if="fileTransferDialogOpen" class="xp-upload-modal-layer xp-file-transfer-layer">
-        <section class="xp-upload-window" role="dialog" aria-modal="false" :aria-label="fileTransferOperation === 'copy' ? t('virtualMedia.copying', 'Copying') : t('virtualMedia.moving', 'Moving')">
-          <header class="xp-upload-titlebar">
-            <span>
-              <Copy v-if="fileTransferOperation === 'copy'" :size="15" />
-              <Scissors v-else :size="15" />
-              {{ fileTransferOperation === 'copy' ? t('virtualMedia.copying', 'Copying') : t('virtualMedia.moving', 'Moving') }}
-            </span>
-          </header>
-          <div class="xp-upload-body">
-            <div v-if="fileTransferActive" class="xp-transfer-animation" aria-hidden="true">
-              <span class="xp-transfer-folder xp-transfer-folder-source" />
-              <span class="xp-transfer-paper xp-transfer-paper-one" />
-              <span class="xp-transfer-paper xp-transfer-paper-two" />
-              <span class="xp-transfer-paper xp-transfer-paper-three" />
-              <span class="xp-transfer-folder xp-transfer-folder-target" />
-            </div>
-            <div class="xp-upload-file">
-              <File :size="30" />
-              <span>
-                <strong :title="fileTransferName">{{ fileTransferName }}</strong>
-                <small :title="fileTransferCurrent">{{ fileTransferCurrent ? `/${fileTransferCurrent}` : '/' }}</small>
-              </span>
-            </div>
-            <p v-if="fileTransferError" class="xp-transfer-error">{{ fileTransferError }}</p>
-            <p v-else-if="fileTransferDone">{{ t('virtualMedia.transferComplete', 'Transfer complete') }}</p>
-            <p v-else>{{ fileTransferOperation === 'copy' ? t('virtualMedia.copyingFiles', 'Copying files…') : t('virtualMedia.movingFiles', 'Moving files…') }}</p>
-            <div class="xp-progress-track" role="progressbar" :aria-valuenow="fileTransferPercentage" aria-valuemin="0" aria-valuemax="100">
-              <div class="xp-progress-value" :style="{ width: `${fileTransferPercentage}%` }" />
-            </div>
-            <div class="xp-upload-stats">
-              <span>{{ formatBytes(fileTransferTransferred) }} / {{ formatBytes(fileTransferTotal) }}</span>
-              <strong>{{ fileTransferPercentage }}%</strong>
-            </div>
-            <footer class="xp-upload-actions">
-              <button v-if="fileTransferActive" @click="cancelFileTransfer">{{ t('common.cancel', 'Cancel') }}</button>
-              <button v-else @click="closeFileTransferDialog">{{ t('common.close', 'Close') }}</button>
-            </footer>
-          </div>
-        </section>
+  <XpTransferDialog
+    :show="fileTransferDialogOpen"
+    layer-class="xp-file-transfer-layer"
+    :dialog-label="fileTransferOperation === 'copy' ? t('virtualMedia.copying', 'Copying') : t('virtualMedia.moving', 'Moving')"
+  >
+    <template #title>
+      <Copy v-if="fileTransferOperation === 'copy'" :size="15" />
+      <Scissors v-else :size="15" />
+      {{ fileTransferOperation === 'copy' ? t('virtualMedia.copying', 'Copying') : t('virtualMedia.moving', 'Moving') }}
+    </template>
+    <template #default>
+      <div v-if="fileTransferActive" class="xp-transfer-animation" aria-hidden="true">
+        <span class="xp-transfer-folder xp-transfer-folder-source" />
+        <span class="xp-transfer-paper xp-transfer-paper-one" />
+        <span class="xp-transfer-paper xp-transfer-paper-two" />
+        <span class="xp-transfer-paper xp-transfer-paper-three" />
+        <span class="xp-transfer-folder xp-transfer-folder-target" />
       </div>
-    </Transition>
-  </Teleport>
+      <div class="xp-upload-file">
+        <File :size="30" />
+        <span>
+          <strong :title="fileTransferName">{{ fileTransferName }}</strong>
+          <small :title="fileTransferCurrent">{{ fileTransferCurrent ? `/${fileTransferCurrent}` : '/' }}</small>
+        </span>
+      </div>
+      <p v-if="fileTransferError" class="xp-transfer-error">{{ fileTransferError }}</p>
+      <p v-else-if="fileTransferDone">{{ t('virtualMedia.transferComplete', 'Transfer complete') }}</p>
+      <p v-else>{{ fileTransferOperation === 'copy' ? t('virtualMedia.copyingFiles', 'Copying files…') : t('virtualMedia.movingFiles', 'Moving files…') }}</p>
+      <div class="xp-progress-track" role="progressbar" :aria-valuenow="fileTransferPercentage" aria-valuemin="0" aria-valuemax="100">
+        <div class="xp-progress-value" :style="{ width: `${fileTransferPercentage}%` }" />
+      </div>
+      <div class="xp-upload-stats">
+        <span>{{ formatBytes(fileTransferTransferred) }} / {{ formatBytes(fileTransferTotal) }}</span>
+        <strong>{{ fileTransferPercentage }}%</strong>
+      </div>
+      <footer class="xp-upload-actions">
+        <button v-if="fileTransferActive" @click="cancelFileTransfer">{{ t('common.cancel', 'Cancel') }}</button>
+        <button v-else @click="closeFileTransferDialog">{{ t('common.close', 'Close') }}</button>
+      </footer>
+    </template>
+  </XpTransferDialog>
 </template>
 
 <style scoped>
-.virtual-media-panel { width: 100%; }
-.virtual-media-header { min-height: 40px; justify-content: space-between; gap: 12px; }
+.virtual-media-trigger { display: inline-flex; }
+.virtual-media-dialog {
+  width: min(820px, calc(100vw - 24px));
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+}
+.virtual-media-dialog :deep(.n-card-header) { padding: 15px 18px 12px; }
+.virtual-media-dialog :deep(.n-card-header__main) { min-width: 0; }
+.virtual-media-dialog :deep(.n-card-header__extra) { display: flex; align-items: center; }
+.virtual-media-dialog :deep(.n-card__content) {
+  min-height: 0;
+  max-height: calc(100vh - 96px);
+  padding: 0 18px 18px;
+  overflow: hidden;
+}
 .virtual-media-heading { display: inline-flex; align-items: center; gap: 8px; }
-.virtual-media-title-tabs { width: min(520px, calc(100% - 24px)); margin-left: auto; }
-.virtual-media-title-tabs :deep(.n-tabs-nav) { margin: 0; }
-.virtual-media-content { min-height: 120px; padding-top: 8px; }
+.virtual-media-home { display: grid; gap: 14px; padding: 6px 0 4px; }
+.virtual-media-home-lead { margin: 0; color: var(--n-text-color-3); font-size: 13px; line-height: 1.5; }
+.virtual-media-home-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.virtual-media-home-card {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-height: 168px;
+  margin: 0;
+  padding: 22px 16px 18px;
+  border: 1px solid rgba(128, 128, 128, .22);
+  border-radius: 12px;
+  background: rgba(128, 128, 128, .05);
+  color: inherit;
+  cursor: pointer;
+  text-align: center;
+}
+.virtual-media-home-card:hover,
+.virtual-media-home-card:focus-visible {
+  border-color: rgba(32, 128, 240, .55);
+  background: rgba(32, 128, 240, .1);
+  outline: none;
+}
+.virtual-media-home-card > svg { color: var(--n-text-color-2); }
+.virtual-media-home-card > strong { font-size: 15px; line-height: 1.3; }
+.virtual-media-home-card > span { color: var(--n-text-color-3); font-size: 12px; line-height: 1.45; }
+.iso-source-radios { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 8px; }
+.iso-source-hint { margin: 0 0 12px; color: var(--n-text-color-3); font-size: 12px; line-height: 1.5; }
+.virtual-media-content { min-height: 120px; max-height: calc(100vh - 168px); overflow-y: auto; padding-right: 3px; scrollbar-width: thin; }
 .virtual-media-tab-connect { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
 .virtual-media-tab-connect > span { min-width: 0; color: var(--n-text-color-3); font-size: 12px; line-height: 1.5; }
 .virtual-media-loading { display: grid; min-height: 112px; place-items: center; }
@@ -1542,30 +1526,11 @@ onBeforeUnmount(() => {
 .virtual-media-disconnected > div { display: grid; min-width: 0; gap: 4px; }
 .virtual-media-disconnected > div > span { color: var(--n-text-color-3); font-size: 12px; line-height: 1.5; }
 .virtual-media-disconnect-button { flex: 0 0 auto; }
-.virtual-media-window {
-  position: fixed;
-  z-index: 2500;
-  display: grid;
-  width: min(640px, calc(100vw - 16px));
-  max-height: calc(100vh - 66px);
-  overflow: hidden;
-  border: 1px solid rgb(69 79 89 / 88%);
-  border-radius: 6px;
-  background: #171b20ed;
-  box-shadow: 0 14px 36px rgb(0 0 0 / 45%);
-  grid-template-rows: auto auto minmax(0, 1fr);
-  backdrop-filter: blur(10px);
-}
-.virtual-media-window .virtual-media-content { min-height: 0; overflow-y: auto; padding: 10px 12px 12px; scrollbar-width: thin; }
-.virtual-media-window .virtual-media-title-tabs { width: auto; margin: 0 12px 8px; }
-.virtual-media-window .virtual-media-tab-pin { display: none; }
 .virtual-media-content-tabs > :deep(.n-tabs-nav) { display: none; }
-.virtual-media-tab-label { display: inline-flex; min-width: 0; align-items: center; justify-content: center; gap: 7px; }
-.virtual-media-tab-pin { display: inline-grid; width: 21px; height: 21px; padding: 0; place-items: center; border: 0; border-radius: 4px; background: transparent; color: inherit; cursor: pointer; opacity: .66; }
-.virtual-media-tab-pin:hover, .virtual-media-tab-pin:focus-visible { background: rgba(255, 255, 255, .13); outline: none; opacity: 1; }
-.virtual-media-tab-pin:active { background: rgba(0, 0, 0, .18); }
+.virtual-media-tab-label { display: inline-flex; width: 100%; min-width: 0; align-items: center; justify-content: center; gap: 7px; }
+.virtual-media-tab-label > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .virtual-media-workspace { margin-top: 8px; }
-.iso-mode-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.iso-mode-grid { display: grid; grid-template-columns: minmax(240px, .85fr) minmax(0, 1.25fr); align-items: start; gap: 10px; }
 .media-mode-panel { min-width: 0; padding: 10px; border: 1px solid rgba(128, 128, 128, .2); border-radius: 8px; background: rgba(128, 128, 128, .045); }
 .media-mode-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
 .media-mode-copy { display: grid; min-width: 0; gap: 3px; }
@@ -1573,6 +1538,11 @@ onBeforeUnmount(() => {
 .media-mode-header strong { font-size: 13px; }
 .media-mode-copy > span, .media-mode-header small { color: var(--n-text-color-3); font-size: 11px; line-height: 1.45; }
 .media-mode-header small { flex: 0 0 auto; white-space: nowrap; }
+.direct-mount-panel .media-mode-header { flex-direction: column; }
+.direct-mount-panel .media-mode-header-actions { width: 100%; }
+.direct-mount-panel .media-mode-header-actions > .file-picker,
+.direct-mount-panel .media-mode-header-actions > :deep(.n-button) { width: 100%; }
+.direct-mount-panel .file-picker :deep(.n-button) { width: 100%; }
 .virtual-drive-panel { margin-top: 2px; }
 .virtual-drive-toolbar { display: flex; justify-content: flex-start; margin-bottom: 10px; }
 .drive-create-card { width: min(360px, calc(100vw - 48px)); padding: 4px; }
@@ -1585,56 +1555,6 @@ onBeforeUnmount(() => {
 .folder-create-card { display: grid; width: min(320px, calc(100vw - 48px)); gap: 10px; padding: 4px; }
 .folder-create-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .no-virtual-drive-row.selected { border-color: rgba(32, 128, 240, .45); background: rgba(32, 128, 240, .08); }
-.xp-upload-modal-layer { position: fixed; z-index: 5000; display: grid; inset: 0; padding: 16px; place-items: center; pointer-events: none; }
-.xp-upload-window { width: min(440px, calc(100vw - 24px)); max-width: calc(100vw - 32px); overflow: hidden; border-radius: 8px 8px 0 0; background: #ece9d8; box-shadow: 4px 4px 10px rgba(0, 0, 0, .5); color: #000; font-family: "Noto Sans SC", Tahoma, "MS UI Gothic", Arial, sans-serif; font-size: 11px; pointer-events: auto; user-select: none; }
-.xp-upload-titlebar { display: flex; height: 28px; align-items: center; justify-content: space-between; gap: 4px; padding: 3px 5px; background: linear-gradient(180deg, #0997ff 0%, #0053ee 8%, #0050ee 40%, #0066ff 88%, #0066ff 93%, #005bff 95%, #003dd7 96%, #003dd7 100%); color: #fff; cursor: move; font-family: "Trebuchet MS", "Noto Sans SC", Arial, sans-serif; text-shadow: 1px 1px #0f1089; touch-action: none; }
-.xp-upload-titlebar > span { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; }
-.xp-upload-titlebar button { display: block; width: 21px; min-width: 21px; height: 21px; min-height: 21px; padding: 0; border: 0; outline: 0; background-color: #0050ee; background-position: center; background-repeat: no-repeat; background-size: 21px 21px; box-shadow: none; cursor: pointer; }
-.xp-upload-titlebar .xp-title-minimize { background-image: url('/xp-icons/minimize.svg'); }
-.xp-upload-titlebar .xp-title-minimize:hover { background-image: url('/xp-icons/minimize-hover.svg'); }
-.xp-upload-titlebar .xp-title-minimize:active { background-image: url('/xp-icons/minimize-active.svg'); }
-.xp-upload-body { display: grid; gap: 10px; padding: 12px 15px 14px; border-right: 3px solid #0050ee; border-bottom: 3px solid #0050ee; border-left: 3px solid #0050ee; background: #ece9d8; }
-.xp-transfer-animation { position: relative; height: 64px; overflow: hidden; border: 1px solid #aaa; background: linear-gradient(180deg, #fff, #f2f3ed); box-shadow: inset 1px 1px #d2d2d2, inset -1px -1px #fff; }
-.xp-transfer-folder { position: absolute; bottom: 11px; width: 50px; height: 32px; border: 1px solid #a56c05; border-radius: 2px; background: linear-gradient(180deg, #ffe67a 0 12%, #efb72f 14% 100%); box-shadow: inset 1px 1px #fff3a8, 1px 1px 1px rgba(0, 0, 0, .22); }
-.xp-transfer-folder::before { position: absolute; top: -8px; left: 4px; width: 22px; height: 9px; border: 1px solid #a56c05; border-bottom: 0; border-radius: 2px 3px 0 0; background: #f6ca4b; content: ""; }
-.xp-transfer-folder-source { left: 38px; }
-.xp-transfer-folder-target { right: 38px; }
-.xp-transfer-paper { position: absolute; z-index: 2; top: 25px; left: 78px; width: 17px; height: 22px; border: 1px solid #748aa5; background: repeating-linear-gradient(180deg, #fff 0 4px, #b8cceb 4px 5px); box-shadow: 1px 1px 2px rgba(0, 0, 0, .25); opacity: 0; animation: xp-transfer-paper 1.8s linear infinite; }
-.xp-transfer-paper-two { animation-delay: .6s; }
-.xp-transfer-paper-three { animation-delay: 1.2s; }
-@keyframes xp-transfer-paper {
-  0% { opacity: 0; transform: translate(0, 6px) rotate(-8deg) scale(.92); }
-  10% { opacity: 1; }
-  48% { opacity: 1; transform: translate(114px, -16px) rotate(4deg) scale(1); }
-  88% { opacity: 1; transform: translate(224px, 5px) rotate(9deg) scale(.94); }
-  100% { opacity: 0; transform: translate(238px, 11px) rotate(11deg) scale(.86); }
-}
-.xp-upload-file { display: flex; min-width: 0; align-items: center; gap: 10px; }
-.xp-upload-file > span { display: grid; min-width: 0; gap: 2px; }
-.xp-upload-file strong { min-width: 0; color: #0b2d64; font-size: 13px; overflow-wrap: anywhere; word-break: break-word; }
-.xp-upload-file small { color: #555; font-size: 11px; line-height: 1.45; }
-.xp-upload-body > p { margin: 2px 0 0; font-size: 12px; }
-.xp-progress-track { box-sizing: border-box; height: 14px; padding: 1px 2px 1px 0; overflow: hidden; border: 1px solid #686868; border-radius: 4px; background: #fff; box-shadow: inset 0 0 1px #686868; }
-.xp-progress-value { height: 100%; min-width: 0; border-radius: 2px; background: repeating-linear-gradient(90deg, #fff 0, #fff 2px, transparent 2px, transparent 10px), linear-gradient(180deg, #acedad 0%, #7be47d 14%, #4cda50 28%, #2ed330 42%, #42d845 57%, #76e275 71%, #8fe791 85%, #fff 100%); transition: width 120ms linear; }
-.xp-upload-stats { display: flex; justify-content: space-between; color: #333; font-size: 11px; }
-.xp-upload-control-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; padding-top: 3px; }
-.xp-upload-progress-area { display: grid; min-width: 0; gap: 4px; }
-.xp-upload-eta { color: #333; font-size: 11px; }
-.xp-upload-status { min-width: 0; overflow: hidden; margin: 0; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.xp-resume-hint { padding: 7px 8px; border: 1px solid #d6c67b; background: #fffbd7; color: #554b19; font-size: 11px; }
-.xp-upload-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 3px; }
-.xp-upload-control-row .xp-upload-actions { padding-top: 0; }
-.xp-upload-actions button, .xp-upload-file-button > span { display: inline-flex; min-width: 82px; min-height: 23px; align-items: center; justify-content: center; padding: 0 12px; border: 1px solid #003c74; border-radius: 3px; outline: none; background: linear-gradient(#fff, #ecebe5 86%, #d8d0c4); color: #222; font: 11px Tahoma, "Noto Sans SC", Arial, sans-serif; cursor: pointer; }
-.xp-upload-actions button:not(:disabled):hover, .xp-upload-file-button:hover > span { box-shadow: #fff0cf -1px 1px inset, #fdd889 1px 2px inset, #fbc761 -2px 2px inset, #e5a01a 2px -2px inset; }
-.xp-upload-actions button:not(:disabled):active, .xp-upload-file-button:active > span { background: linear-gradient(#cdcac3, #e3e3db 8%, #e5e5de 94%, #f2f2f1); box-shadow: none; }
-.xp-upload-actions button:focus-visible, .xp-upload-file-button:focus-within > span { box-shadow: #cee7ff -1px 1px inset, #98b8ea 1px 2px inset, #bcd4f6 -2px 2px inset, #89ade4 1px -1px inset, #89ade4 2px -2px inset; }
-.xp-upload-actions button:disabled { cursor: not-allowed; opacity: .55; }
-.xp-upload-file-button input { display: none; }
-.xp-upload-fade-enter-active { transition: opacity .1s ease; }
-.xp-upload-fade-leave-active { transition: opacity .15s ease; }
-.xp-upload-fade-enter-from, .xp-upload-fade-leave-to { opacity: 0; }
-.xp-upload-fade-enter-active .xp-upload-window { animation: xp-upload-window-in .16s ease-out; }
-@keyframes xp-upload-window-in { from { transform: translateY(12px) scale(.96); } to { transform: translateY(0) scale(1); } }
 .file-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
 .file-picker input { display: none; }
 .storage-summary { margin-left: auto; color: var(--n-text-color-3); font-size: 12px; }
@@ -1667,10 +1587,14 @@ onBeforeUnmount(() => {
 .file-open span { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
 .file-open small { margin-left: auto; color: var(--n-text-color-3); }
 .file-icon-action { display: inline-flex; color: inherit; }
-.xp-transfer-error { color: #a40000; }
-.xp-file-transfer-layer { z-index: 5100; }
-@media (max-width: 760px) { .iso-mode-grid { grid-template-columns: 1fr; } }
-@media (prefers-reduced-motion: reduce) { .xp-transfer-paper, .xp-upload-fade-enter-active .xp-upload-window { animation: none; } }
+@media (max-width: 760px) {
+  .virtual-media-dialog { width: calc(100vw - 16px); max-height: calc(100vh - 16px); }
+  .virtual-media-dialog :deep(.n-card-header) { padding: 12px 14px 10px; }
+  .virtual-media-dialog :deep(.n-card__content) { max-height: calc(100vh - 74px); padding: 0 12px 12px; }
+  .virtual-media-content { max-height: calc(100vh - 138px); }
+  .virtual-media-home-grid { grid-template-columns: 1fr; }
+  .iso-mode-grid { grid-template-columns: 1fr; }
+}
 @media (max-width: 620px) { .media-mode-header { flex-direction: column; } .media-mode-header-actions { width: 100%; } .media-row { flex-wrap: wrap; } .media-copy { flex-basis: calc(100% - 44px); } }
 @media (max-width: 620px) { .virtual-media-disconnected { grid-template-columns: auto minmax(0, 1fr); } .virtual-media-disconnected :deep(.n-button) { grid-column: 1 / -1; justify-self: stretch; } .virtual-media-disconnect-button { padding-inline: 8px; } }
 </style>

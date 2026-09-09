@@ -748,7 +748,7 @@ async function uploadStoredMedia(event: Event, kind: 'iso' | 'drive') {
         message.info(t('virtualMedia.uploadPaused', 'Upload paused.'))
         return
       }
-      const chunkOffset = upload.offset
+      const chunkOffset: number = upload.offset
       const chunkEnd = Math.min(file.size, chunkOffset + ISO_UPLOAD_CHUNK_SIZE)
       const uploadID: string = upload.id
       const requestController = new AbortController()

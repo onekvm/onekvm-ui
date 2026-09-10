@@ -309,7 +309,10 @@ watch(totpUrl, async (url) => {
           {{ t('settings.account.removePasskey', 'Remove') }}
         </n-button>
       </div>
-      <div v-for="plugin in authPlugins" :key="plugin.id" class="drawer-actions">
+      <n-alert v-if="pluginBusy" type="info" class="plugin-enroll-hint">
+        {{ t('settings.account.pluginEnrollHint', 'Press the BOOT button on the device. The OLED will show a confirmation prompt.') }}
+      </n-alert>
+      <div v-for="plugin in authPlugins" :key="plugin.id" class="drawer-actions plugin-row">
         <span>{{ plugin.name }}</span>
         <n-button
           v-if="!pluginEnrolled(plugin.id)"
@@ -317,7 +320,7 @@ watch(totpUrl, async (url) => {
           :loading="pluginBusy === plugin.id"
           @click="enrollPlugin(plugin.id)"
         >
-          {{ t('settings.account.enablePlugin', 'Enable') }}
+          {{ pluginBusy === plugin.id ? t('settings.account.pluginEnrolling', 'Waiting for BOOT') : t('settings.account.enablePlugin', 'Enable') }}
         </n-button>
         <n-button
           v-else
@@ -352,6 +355,10 @@ watch(totpUrl, async (url) => {
 .totp-qr :deep(canvas) {
   display: block;
 }
+.plugin-enroll-hint { margin: 10px 0 12px; }
+.plugin-enroll-hint :deep(.n-alert-body__content) { white-space: normal; overflow-wrap: anywhere; }
+.plugin-row { justify-content: space-between; align-items: center; }
+.plugin-row > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .recovery-codes {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -1037,7 +1037,13 @@ const zh_tw = {
         regenerateRecovery: '重新產生恢復代碼',
         recoveryGenerated: '已產生新的恢復代碼',
         copyRecovery: '複製代碼',
-        recoveryCopied: '恢復代碼已複製'
+        recoveryCopied: '恢復代碼已複製',
+        enablePlugin: '啟用',
+        disablePlugin: '關閉',
+        pluginEnabled: '已開啟硬體確認',
+        pluginDisabled: '已關閉硬體確認',
+        pluginEnrolling: '等待 BOOT',
+        pluginEnrollHint: '請在機身按下 BOOT 鍵確認。OLED 會顯示提示，按一下即可，不必長按。',
       },
       factoryReset: {
         title: '恢復原廠設定',

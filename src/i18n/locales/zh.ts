@@ -1029,7 +1029,13 @@ const zh = {
         regenerateRecovery: '重新生成恢复代码',
         recoveryGenerated: '已生成新的恢复代码',
         copyRecovery: '复制代码',
-        recoveryCopied: '恢复代码已复制'
+        recoveryCopied: '恢复代码已复制',
+        enablePlugin: '启用',
+        disablePlugin: '关闭',
+        pluginEnabled: '已开启硬件确认',
+        pluginDisabled: '已关闭硬件确认',
+        pluginEnrolling: '等待 BOOT',
+        pluginEnrollHint: '请在机身按下 BOOT 键确认。OLED 会显示提示，按一下即可，不用长按。',
       },
       appearance: {
         language: '语言'

@@ -1030,7 +1030,13 @@ const en = {
         regenerateRecovery: 'Generate new recovery codes',
         recoveryGenerated: 'New recovery codes were created',
         copyRecovery: 'Copy codes',
-        recoveryCopied: 'Recovery codes copied'
+        recoveryCopied: 'Recovery codes copied',
+        enablePlugin: 'Enable',
+        disablePlugin: 'Disable',
+        pluginEnabled: 'Hardware confirmation enabled',
+        pluginDisabled: 'Hardware confirmation disabled',
+        pluginEnrolling: 'Waiting for BOOT',
+        pluginEnrollHint: 'Press the BOOT button on the device. The OLED will show a prompt; tap once, do not hold.',
       },
       appearance: {
         language: 'Language'

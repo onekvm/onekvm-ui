@@ -1268,10 +1268,6 @@ onBeforeUnmount(() => {
                     <n-button v-else @click="eject('iso')"><template #icon><Unplug /></template>{{ t('virtualMedia.unmount', 'Eject') }}</n-button>
                   </div>
                 </header>
-                <div v-if="browserMounting" class="iso-list-status" role="status">
-                  <LoaderCircle class="spin" :size="18" />
-                  <span>{{ t('virtualMedia.mountingStatus', 'Mounting...') }}</span>
-                </div>
                 <n-alert v-if="status?.iso_mounted === 'browser'" type="info" class="browser-iso-note">
                   {{ t('virtualMedia.keepPageOpen', 'Keep this page open while a browser ISO is mounted.') }}
                 </n-alert>
@@ -1305,13 +1301,13 @@ onBeforeUnmount(() => {
                   <LoaderCircle class="spin" :size="18" />
                   <span>{{ t('virtualMedia.loadingImages', 'Loading ISO images…') }}</span>
                 </div>
-                <n-empty v-else-if="!isoMedia.length" :description="t('virtualMedia.noISO', 'No uploaded ISO images')">
-                  <template #icon><Disc3 /></template>
-                </n-empty>
+                <div v-else-if="!isoMedia.length" class="iso-list-status">
+                  <Disc3 :size="18" />
+                  <span>{{ t('virtualMedia.noISO', 'No uploaded ISO images') }}</span>
+                </div>
                 <div v-else class="media-list">
                   <div v-for="item in isoMedia" :key="item.id" class="media-row">
-                    <LoaderCircle v-if="mountingID === item.id" class="spin" :size="24" />
-                    <Disc3 v-else :size="24" />
+                    <Disc3 :size="24" />
                     <div class="media-copy"><strong class="media-filename" :title="item.name">{{ item.name }}</strong><span>{{ formatBytes(item.size) }}<template v-if="item.external && item.label"> · {{ item.label }}</template></span></div>
                     <n-tag v-if="item.mounted" type="success" size="small"><CircleCheck :size="12" />{{ t('virtualMedia.mountedStatus', 'Mounted') }}</n-tag>
                     <n-button
@@ -1727,12 +1723,17 @@ onBeforeUnmount(() => {
 .virtual-media-loading { display: grid; min-height: 112px; place-items: center; }
 .iso-list-status {
   display: flex;
+  width: 100%;
   min-height: 80px;
   align-items: center;
   justify-content: center;
   gap: 8px;
   color: var(--n-text-color-3);
   font-size: 13px;
+  text-align: center;
+}
+.iso-list-status > svg {
+  flex: 0 0 auto;
 }
 .virtual-media-disconnected { display: grid; min-height: 150px; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 18px; border: 1px solid rgba(128, 128, 128, .2); border-radius: 8px; background: rgba(128, 128, 128, .045); }
 .virtual-media-disconnected > svg { color: var(--n-text-color-3); }
@@ -1769,7 +1770,17 @@ onBeforeUnmount(() => {
 .folder-create-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
 .file-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.file-picker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 .file-picker input { display: none; }
+.file-picker :deep(.n-button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 .storage-summary { margin-left: auto; color: var(--n-text-color-3); font-size: 12px; }
 .upload-progress { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .resume-upload-note { margin-bottom: 12px; }
@@ -1820,8 +1831,7 @@ onBeforeUnmount(() => {
   .virtual-media-forward-leave-to,
   .virtual-media-back-enter-from,
   .virtual-media-back-leave-to { opacity: 1; transform: none; }
-  .iso-list-status .spin,
-  .media-row .spin { animation: none; }
+  .iso-list-status .spin { animation: none; }
 }
 @media (max-width: 620px) { .media-mode-header { flex-direction: column; align-items: stretch; } .media-mode-header-actions { width: 100%; } .media-row { flex-wrap: wrap; } .media-copy { flex-basis: calc(100% - 44px); } }
 @media (max-width: 620px) { .virtual-media-disconnected { grid-template-columns: auto minmax(0, 1fr); } .virtual-media-disconnected :deep(.n-button) { grid-column: 1 / -1; justify-self: stretch; } .virtual-media-disconnect-button { padding-inline: 8px; } }

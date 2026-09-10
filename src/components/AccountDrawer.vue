@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 
 import { api, type ExtensionSummary } from '@/api/client'
@@ -25,6 +25,7 @@ const totpCode = ref('')
 const recoveryCodes = ref<string[]>([])
 const pluginBusy = ref('')
 const passkeyBusy = ref(false)
+const totpQr = ref<HTMLElement | null>(null)
 const authPlugins = ref<ExtensionSummary[]>([])
 const account = reactive({
   username: '',
@@ -236,6 +237,12 @@ watch(
     if (props.show) account.username = username || 'admin'
   },
 )
+
+watch(totpUrl, async (url) => {
+  if (!url) return
+  await nextTick()
+  totpQr.value?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+})
 </script>
 
 <template>
@@ -255,15 +262,22 @@ watch(
       <div class="drawer-actions"><n-button type="primary" :loading="saving" :disabled="!accountValid" @click="saveAccount">{{ t('common.save', 'Save') }}</n-button></div>
       <n-divider />
       <strong>{{ t('settings.account.mfa', 'Two-factor authentication') }}</strong>
-      <p class="auth-mfa-help">{{ t('settings.account.mfaHelp', 'Authenticator, recovery codes, and hardware confirmation are optional.') }}</p>
+      <p class="auth-mfa-help">{{ t('settings.account.mfaHelp', 'A password is enough to sign in. An authenticator, recovery codes, and BOOT-button confirmation can be turned on when you need them.') }}</p>
       <div class="drawer-actions">
         <n-button v-if="!auth.mfa?.totp && !totpSecret" :loading="totpBusy" @click="beginTotp">{{ t('settings.account.enableTotp', 'Enable authenticator') }}</n-button>
         <n-button v-else-if="auth.mfa?.totp" :loading="totpBusy" @click="disableTotp">{{ t('settings.account.disableTotp', 'Disable authenticator') }}</n-button>
       </div>
       <n-form v-if="totpSecret" label-placement="top" :show-feedback="false" class="settings-form">
         <p class="auth-mfa-help">{{ t('settings.account.totpScan', 'Scan this QR code with an authenticator app, then enter a 6-digit code.') }}</p>
-        <div class="totp-qr">
-          <n-qr-code v-if="totpUrl" :value="totpUrl" :size="180" error-correction-level="M" type="canvas" />
+        <div ref="totpQr" class="totp-qr">
+          <n-qr-code
+            v-if="totpUrl"
+            :value="totpUrl"
+            :size="200"
+            :padding="0"
+            error-correction-level="M"
+            type="canvas"
+          />
         </div>
         <n-form-item :label="t('settings.account.totpSecret', 'Manual secret')">
           <n-input :value="totpSecret" readonly />
@@ -320,13 +334,23 @@ watch(
 
 <style scoped>
 .totp-qr {
-  display: grid;
+  display: flex;
   justify-content: center;
   margin: 0 auto 12px;
-  padding: 8px;
+  padding: 16px;
   border-radius: 8px;
   background: #fff;
   width: fit-content;
+  overflow: visible;
+}
+.totp-qr :deep(.n-qr-code) {
+  width: auto !important;
+  height: auto !important;
+  padding: 0 !important;
+  overflow: visible;
+}
+.totp-qr :deep(canvas) {
+  display: block;
 }
 .recovery-codes {
   display: grid;

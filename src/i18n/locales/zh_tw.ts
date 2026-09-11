@@ -54,7 +54,7 @@ const zh_tw = {
       backupCode: '恢復代碼',
       recoveryCode: '恢復代碼',
       passkey: '通行金鑰',
-      hardwareConfirm: '請在 NanoKVM Cube/PCIe 上完成實體確認。取消可返回登入。',
+      hardwareConfirm: '請在機身按下 BOOT 鍵確認。OLED 會顯示提示，按一下即可，不用長按。',
       verify: '驗證',
       cancelVerify: '取消驗證',
       passkeyHelp: '使用通行金鑰。請用主機名走 HTTPS 開啟裝置，不要用 IP 位址。',

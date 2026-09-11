@@ -54,7 +54,7 @@ const en = {
       backupCode: 'Recovery code',
       recoveryCode: 'Recovery code',
       passkey: 'Passkey',
-      hardwareConfirm: 'Confirm on the NanoKVM Cube/PCIe. Cancel to go back.',
+      hardwareConfirm: 'Press the BOOT button on the device. The OLED will show a prompt; tap once, do not hold.',
       verify: 'Verify',
       cancelVerify: 'Cancel verification',
       passkeyHelp: 'Use a passkey. Open the device over HTTPS using its hostname, not an IP address.',

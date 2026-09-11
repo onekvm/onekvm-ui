@@ -310,7 +310,7 @@ watch(totpUrl, async (url) => {
         </n-button>
       </div>
       <n-alert v-if="pluginBusy" type="info" class="plugin-enroll-hint">
-        {{ t('settings.account.pluginEnrollHint', 'Press the BOOT button on the device. The OLED will show a confirmation prompt.') }}
+        {{ t('settings.account.pluginEnrollHint', 'Press the BOOT button on the device. The OLED will show a prompt; tap once, do not hold.') }}
       </n-alert>
       <div v-for="plugin in authPlugins" :key="plugin.id" class="drawer-actions plugin-row">
         <span>{{ plugin.name }}</span>

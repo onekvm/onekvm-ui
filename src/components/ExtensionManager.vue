@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch, type Component } from 'vue'
-import { Box, CheckCircle2, Download, FileUp, Info, PackageCheck, Power, PowerOff, Save, Trash2, Upload, X, icons } from '@lucide/vue'
+import { Box, CheckCircle2, FileUp, Info, PackageCheck, Power, PowerOff, Save, Trash2, Upload, X } from '@lucide/vue'
 import { useMessage } from 'naive-ui'
 
 import {
   api,
-  extensionAssetURL,
   extensionLocalizedText,
   extensionRouteURL,
   extensionTranslation,
@@ -16,7 +15,9 @@ import {
   type ExtensionStatus,
   type ExtensionUpload,
 } from '@/api/client'
+import { uninstallDialog, uninstallExtension } from '@/composables/useUninstallExtension'
 import { currentLanguage, t } from '@/i18n/runtime'
+import { pluginIcon } from '@/lib/plugin-icons'
 
 const props = defineProps<{ active: boolean; catalog?: ExtensionSummary[]; catalogLoading?: boolean }>()
 const emit = defineEmits<{ catalog: [value: ExtensionSummary[]] }>()
@@ -326,6 +327,7 @@ function extensionDescription(status: ExtensionSummary) {
 function extensionKind(status: ExtensionSummary) {
   if (status.kind === 'protocol') return t('settings.plugins.kindProtocol', 'Protocol')
   if (status.kind === 'service') return t('settings.plugins.kindService', 'Service')
+  if (status.kind === 'cloud-provider') return t('settings.plugins.kindCloudProvider', 'Cloud service')
   return status.kind
 }
 
@@ -351,13 +353,7 @@ function extensionErrorMessage(error: unknown) {
 }
 
 function extensionIcon(status: ExtensionSummary): { component: Component; url: string } {
-  const icon = status.icon
-  if (icon?.source === 'custom') return { component: Box, url: extensionAssetURL(status, icon.path) }
-  if (icon?.source === 'lucide') {
-    const name = icon.name.split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join('')
-    return { component: (icons as Record<string, Component>)[name] || Box, url: '' }
-  }
-  return { component: Box, url: '' }
+  return pluginIcon(status)
 }
 
 function packageIconComponent(status: ExtensionSummary) {
@@ -447,12 +443,16 @@ function pluginCount() {
   return replace(t('settings.plugins.count', '{count} plugins'), { count: String(extensions.value.length) })
 }
 
-function uninstallPrompt(status: ExtensionSummary) {
-  return replace(t('settings.plugins.uninstallConfirm', 'Uninstall {name}?'), { name: extensionName(status) })
-}
-
 function uninstallLabel(status: ExtensionSummary) {
   return replace(t('settings.plugins.uninstallLabel', 'Uninstall {name}'), { name: extensionName(status) })
+}
+
+async function requestUninstall(status: ExtensionSummary) {
+  const uninstalled = await uninstallExtension({
+    id: status.id,
+    name: extensionName(status),
+  })
+  if (uninstalled) await load(false)
 }
 
 watch(() => props.catalog, (catalog) => {
@@ -524,18 +524,7 @@ watch(() => props.active, (active) => {
               {{ statusText(status) }}
             </n-tag>
             <div class="extension-actions">
-              <n-button
-                v-if="!status.installed"
-                size="small"
-                type="primary"
-                :loading="busy === `${status.id}:install`"
-                :disabled="busy !== ''"
-                @click="execute(`${status.id}:install`, () => api.installExtension(status.id), t('settings.plugins.installed', 'Plugin installed'))"
-              >
-                <template #icon><Download /></template>
-                {{ t('settings.plugins.install', 'Install') }}
-              </n-button>
-              <template v-else-if="!status.system">
+              <template v-if="status.installed && !status.system">
                 <n-button
                   size="small"
                   :type="status.enabled ? 'warning' : 'primary'"
@@ -671,26 +660,18 @@ watch(() => props.active, (active) => {
               </template>
 
               <footer v-if="status.installed && !status.system" class="extension-danger-actions">
-                <n-popconfirm
-                  :positive-text="t('settings.plugins.uninstall', 'Uninstall')"
-                  :negative-text="t('settings.plugins.cancel', 'Cancel')"
-                  @positive-click="execute(`${status.id}:remove`, () => api.removeExtension(status.id), t('settings.plugins.uninstalled', 'Plugin uninstalled'))"
+                <n-button
+                  size="small"
+                  type="error"
+                  secondary
+                  :loading="uninstallDialog.loading && uninstallDialog.id === status.id"
+                  :disabled="busy !== '' || uninstallDialog.show"
+                  :aria-label="uninstallLabel(status)"
+                  @click="requestUninstall(status)"
                 >
-                  <template #trigger>
-                    <n-button
-                      size="small"
-                      type="error"
-                      secondary
-                      :loading="busy === `${status.id}:remove`"
-                      :disabled="busy !== ''"
-                      :aria-label="uninstallLabel(status)"
-                    >
-                      <template #icon><Trash2 /></template>
-                      {{ t('settings.plugins.uninstall', 'Uninstall') }}
-                    </n-button>
-                  </template>
-                  {{ uninstallPrompt(status) }}
-                </n-popconfirm>
+                  <template #icon><Trash2 /></template>
+                  {{ t('settings.plugins.uninstall', 'Uninstall') }}
+                </n-button>
               </footer>
             </n-spin>
           </div>
@@ -831,8 +812,8 @@ watch(() => props.active, (active) => {
 </template>
 
 <style scoped>
-.extension-manager { display: grid; gap: 10px; }
-.extension-manager-heading { display: flex; min-height: 28px; align-items: center; justify-content: space-between; gap: 8px; color: #929ca5; font-size: 12px; }
+.extension-manager { display: grid; gap: 14px; }
+.extension-manager-heading { display: flex; min-height: 28px; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted-foreground); font-size: 12px; }
 .extension-memory-budget { display: grid; width: min(240px, 32vw); margin-left: auto; gap: 4px; padding: 0 10px; font-variant-numeric: tabular-nums; }
 .extension-memory-budget .n-progress { width: 100%; }
 .extension-catalog-spin { min-height: 84px; }
@@ -843,10 +824,10 @@ watch(() => props.active, (active) => {
 .installer-intro { display: flex; align-items: center; gap: 14px; }
 .installer-intro > div { display: grid; min-width: 0; gap: 4px; }
 .installer-intro strong,
-.installer-centered > strong { color: #eef2f5; font-size: 16px; }
+.installer-centered > strong { color: var(--foreground); font-size: 16px; }
 .installer-intro p,
 .package-preview-description,
-.installer-confirm-copy { margin: 0; color: #929ca5; font-size: 12px; line-height: 1.55; }
+.installer-confirm-copy { margin: 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.55; }
 .installer-hero-icon,
 .installer-package-icon {
   display: grid;
@@ -856,52 +837,52 @@ watch(() => props.active, (active) => {
   place-items: center;
   border-radius: 16px;
   background: rgba(24, 160, 88, .12);
-  color: #63d89a;
+  color: var(--success);
 }
-.installer-success { background: rgba(24, 160, 88, .16); color: #63e6a2; }
+.installer-success { background: rgba(24, 160, 88, .16); color: var(--success); }
 .plugin-drop-zone {
   display: grid;
   min-height: 134px;
   place-items: center;
   align-content: center;
   gap: 7px;
-  border: 1px dashed #3c4955;
+  border: 1px dashed var(--border-strong);
   border-radius: 10px;
-  background: #11161b;
-  color: #aeb8c1;
+  background: var(--onekvm-surface-inset);
+  color: var(--muted-foreground);
   cursor: pointer;
   transition: border-color .15s ease, background .15s ease;
 }
 .plugin-drop-zone:hover,
-.plugin-drop-zone.dragging { border-color: #18a058; background: rgba(24, 160, 88, .07); }
-.plugin-drop-zone strong { color: #e5e9ed; font-size: 13px; }
+.plugin-drop-zone.dragging { border-color: var(--success); background: color-mix(in srgb, var(--success) 8%, transparent); }
+.plugin-drop-zone strong { color: var(--foreground); font-size: 13px; }
 .plugin-drop-zone span,
 .installer-centered > span,
-.installer-file-name { color: #8f99a3; font-size: 12px; }
+.installer-file-name { color: var(--muted-foreground); font-size: 12px; }
 .installer-centered { min-height: 250px; place-items: center; align-content: center; text-align: center; }
 .installer-centered .n-progress { width: min(360px, 100%); }
 .installer-file-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .package-preview { display: flex; align-items: center; gap: 14px; }
 .installer-package-icon img { width: 32px; height: 32px; object-fit: contain; }
 .package-preview-identity { display: grid; min-width: 0; gap: 4px; }
-.package-preview-identity strong { overflow: hidden; color: #eef2f5; font-size: 18px; text-overflow: ellipsis; white-space: nowrap; }
-.package-preview-identity span { color: #8f99a3; font-size: 12px; }
-.package-metadata { display: grid; margin: 0; border: 1px solid #30363d; border-radius: 8px; overflow: hidden; }
+.package-preview-identity strong { overflow: hidden; color: var(--foreground); font-size: 18px; text-overflow: ellipsis; white-space: nowrap; }
+.package-preview-identity span { color: var(--muted-foreground); font-size: 12px; }
+.package-metadata { display: grid; margin: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .package-metadata > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 12px; padding: 9px 12px; }
-.package-metadata > div + div { border-top: 1px solid #2a3037; }
-.package-metadata dt { color: #87919b; font-size: 11px; }
-.package-metadata dd { min-width: 0; margin: 0; overflow-wrap: anywhere; color: #cbd2d8; font-size: 12px; }
+.package-metadata > div + div { border-top: 1px solid var(--border); }
+.package-metadata dt { color: var(--muted-foreground); font-size: 11px; }
+.package-metadata dd { min-width: 0; margin: 0; overflow-wrap: anywhere; color: var(--onekvm-text-secondary); font-size: 12px; }
 .bundle-contents { display: grid; gap: 8px; }
-.bundle-contents > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #d6dce1; font-size: 12px; }
-.bundle-contents > header span { color: #7f8a94; font-size: 11px; }
-.bundle-contents ul { display: grid; max-height: 220px; margin: 0; padding: 0; overflow: auto; border: 1px solid #30363d; border-radius: 8px; list-style: none; }
+.bundle-contents > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--foreground); font-size: 12px; }
+.bundle-contents > header span { color: var(--muted-foreground); font-size: 11px; }
+.bundle-contents ul { display: grid; max-height: 220px; margin: 0; padding: 0; overflow: auto; border: 1px solid var(--border); border-radius: 8px; list-style: none; }
 .bundle-contents li { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(108px, auto); align-items: center; gap: 10px; padding: 9px 12px; }
-.bundle-contents li + li { border-top: 1px solid #2a3037; }
+.bundle-contents li + li { border-top: 1px solid var(--border); }
 .bundle-package-identity { display: grid; min-width: 0; gap: 2px; }
-.bundle-package-identity strong { overflow: hidden; color: #cbd2d8; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.bundle-package-identity span { color: #7f8a94; font-size: 10px; }
-.bundle-package-status { display: inline-flex; align-items: center; justify-content: flex-end; gap: 5px; color: #8d98a2; font-size: 11px; white-space: nowrap; }
-.bundle-package-status.installed { color: #63d89a; }
+.bundle-package-identity strong { overflow: hidden; color: var(--onekvm-text-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.bundle-package-identity span { color: var(--muted-foreground); font-size: 10px; }
+.bundle-package-status { display: inline-flex; align-items: center; justify-content: flex-end; gap: 5px; color: var(--muted-foreground); font-size: 11px; white-space: nowrap; }
+.bundle-package-status.installed { color: var(--success); }
 .installer-actions { display: flex; width: 100%; align-items: center; justify-content: flex-end; gap: 8px; }
 .installer-action-spacer { flex: 1; }
 .installer-indeterminate {
@@ -910,7 +891,7 @@ watch(() => props.active, (active) => {
   height: 4px;
   overflow: hidden;
   border-radius: 999px;
-  background: #283039;
+  background: var(--muted);
 }
 .installer-indeterminate > span {
   position: absolute;
@@ -918,7 +899,7 @@ watch(() => props.active, (active) => {
   bottom: 0;
   width: 42%;
   border-radius: inherit;
-  background: #18a058;
+  background: var(--primary);
   animation: installer-progress 1.15s ease-in-out infinite;
 }
 @keyframes installer-progress {
@@ -929,45 +910,45 @@ watch(() => props.active, (active) => {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  border: 1px solid #30363d;
+  border: 1px solid var(--border);
   border-radius: 6px;
   list-style: none;
 }
-.extension-item + .extension-item { border-top: 1px solid #30363d; }
+.extension-item + .extension-item { border-top: 1px solid var(--border); }
 .extension-row {
   display: flex;
-  min-height: 54px;
+  min-height: 56px;
   align-items: center;
-  gap: 9px;
-  padding: 7px 12px;
-  background: #15191e;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--card);
 }
 .extension-row:hover,
-.extension-row:focus-visible { background: #1b2026; outline: none; }
-.extension-icon { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; color: #a9b4be; }
+.extension-row:focus-visible { background: var(--accent); outline: none; }
+.extension-icon { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; color: var(--muted-foreground); }
 .extension-icon img { width: 24px; height: 24px; object-fit: contain; }
 .extension-identity { display: grid; min-width: 0; flex: 1; gap: 2px; }
 .extension-identity > div { display: flex; min-width: 0; align-items: center; gap: 7px; }
 .extension-identity strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.extension-identity p { margin: 0; color: #8f99a3; font-size: 11px; line-height: 1.35; }
+.extension-identity p { margin: 0; color: var(--muted-foreground); font-size: 11px; line-height: 1.35; }
 .extension-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 3px; }
-.extension-detail { display: grid; gap: 14px; padding: 14px 16px 16px 53px; background: #11151a; }
+.extension-detail { display: grid; gap: 14px; padding: 14px 16px 16px 53px; background: var(--onekvm-surface-inset); }
 .extension-detail-spin { min-height: 72px; }
 .extension-detail-spin :deep(.n-spin-content) { display: grid; gap: 14px; }
-.extension-metadata { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; overflow: hidden; border: 1px solid #2d343c; border-radius: 7px; }
+.extension-metadata { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 7px; background: var(--card); }
 .extension-metadata > div { display: grid; min-width: 0; gap: 4px; padding: 9px 12px; }
-.extension-metadata > div:nth-child(even) { border-left: 1px solid #2d343c; }
-.extension-metadata > div:nth-child(n + 3) { border-top: 1px solid #2d343c; }
-.extension-metadata dt { color: #87919b; font-size: 11px; }
-.extension-metadata dd { min-width: 0; margin: 0; color: #d3d9de; font-size: 12px; overflow-wrap: anywhere; }
-.extension-metadata a { color: #63d89a; text-decoration: none; }
+.extension-metadata > div:nth-child(even) { border-left: 1px solid var(--border); }
+.extension-metadata > div:nth-child(n + 3) { border-top: 1px solid var(--border); }
+.extension-metadata dt { color: var(--muted-foreground); font-size: 11px; }
+.extension-metadata dd { min-width: 0; margin: 0; color: var(--foreground); font-size: 12px; overflow-wrap: anywhere; }
+.extension-metadata a { color: var(--success); text-decoration: none; }
 .extension-metadata a:hover { text-decoration: underline; }
 .extension-metadata .extension-homepage { grid-column: 1 / -1; border-left: 0; }
 .extension-metadata .extension-routes { grid-column: 1 / -1; border-left: 0; }
 .extension-route-list { display: grid; gap: 3px; }
 .extension-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, .45fr); gap: 9px; }
 .extension-fields label { display: grid; min-width: 0; gap: 5px; }
-.extension-fields label > span { color: #9da7b1; font-size: 11px; }
+.extension-fields label > span { color: var(--muted-foreground); font-size: 11px; }
 .secret-field { display: grid; grid-template-columns: minmax(0, 1fr) 28px; align-items: center; gap: 4px; }
 .extension-fields .boolean-field {
   display: flex;
@@ -976,9 +957,9 @@ watch(() => props.active, (active) => {
   grid-column: 1 / -1;
 }
 .extension-detail footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
-.extension-danger-actions { padding-top: 12px; border-top: 1px solid #2d343c; }
-@media (max-width: 520px) {
-  .extension-manager-heading { flex-wrap: wrap; }
+.extension-danger-actions { padding-top: 12px; border-top: 1px solid var(--border); }
+@media (max-width: 760px) {
+  .extension-manager-heading { flex-wrap: wrap; gap: 10px; }
   .extension-memory-budget { order: 3; width: 100%; margin-left: 0; padding: 0; }
   .plugin-installer-card { width: calc(100vw - 16px); }
   .package-metadata > div { grid-template-columns: 86px minmax(0, 1fr); }
@@ -986,18 +967,19 @@ watch(() => props.active, (active) => {
   .bundle-package-status { grid-column: 1 / -1; justify-content: flex-start; }
   .installer-actions { flex-wrap: wrap; }
   .installer-action-spacer { display: none; }
-  .extension-row { flex-wrap: wrap; padding: 9px; }
+  .extension-row { flex-wrap: wrap; padding: 12px; }
   .extension-identity { min-width: calc(100% - 50px); }
   .extension-row > .n-tag { margin-left: 41px; }
   .extension-actions { margin-left: auto; }
-  .extension-detail { padding: 14px 10px 16px; }
+  .extension-detail { padding: 16px 12px 18px; }
   .extension-metadata { grid-template-columns: 1fr; }
-  .extension-metadata > div:nth-child(n + 2) { border-top: 1px solid #2d343c; }
+  .extension-metadata > div:nth-child(n + 2) { border-top: 1px solid var(--border); }
   .extension-metadata > div:nth-child(even) { border-left: 0; }
   .extension-metadata .extension-homepage { grid-column: 1; }
   .extension-metadata .extension-routes { grid-column: 1; }
-  .extension-fields { grid-template-columns: 1fr; }
+  .extension-fields { grid-template-columns: 1fr; gap: 12px; }
   .extension-fields label { grid-column: 1 !important; }
   .extension-detail > footer { flex-wrap: wrap; }
+  .extension-detail > footer .n-button { flex: 1; }
 }
 </style>

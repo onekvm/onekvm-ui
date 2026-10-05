@@ -38,7 +38,7 @@ const initialDraft = ref<Record<string, ExtensionSettingValue>>({})
 type VideoQpMode = 'auto' | QpPresetKey | 'custom'
 type QualityBudgetSelection = number | 'custom'
 const qualityBudgetCustomEnabled = ref(false)
-const videoQpMode = ref<VideoQpMode>('auto')
+const videoQpMode = ref<VideoQpMode>('balanced')
 
 function defaultValue(property: ExtensionSettingProperty): ExtensionSettingValue {
   if (property.default !== undefined) return property.default
@@ -58,7 +58,7 @@ function syncDraft(status: ExtensionStatus = props.extension) {
   qualityBudgetCustomEnabled.value = Math.round((numericDraft('quality_factor', 1)) * 100) % 10 !== 0
   videoQpMode.value = hasQpOverride(draft)
     ? (matchingQpPreset(draft)?.value ?? 'custom')
-    : 'auto'
+    : 'balanced'
   initialDraft.value = { ...draft }
 }
 
@@ -169,7 +169,6 @@ const qualityDescription = computed(() => {
   return t(tier.key, tier.fallback)
 })
 const videoQpOptions = computed(() => [
-  { label: t('settings.advancedSettings.displayPage.qpAutomatic', 'Automatic'), value: 'auto' },
   ...qpPresets.map((preset) => ({
     label: t(preset.labelKey, preset.labelFallback),
     value: preset.value,
@@ -208,7 +207,10 @@ function setNumberValue(name: string, value: number | null) {
   draft[name] = value
   if (hasIndependentVideoSettings.value && name === 'bitrate_kbps' && (value ?? 0) > 0) {
     clearQpOverride(draft)
-    videoQpMode.value = 'auto'
+    // A bitrate ceiling clears explicit QP values internally. Keep the
+    // user-facing preset selector on the balanced preset instead of exposing
+    // the removed automatic option.
+    videoQpMode.value = 'balanced'
   }
 }
 
@@ -329,7 +331,12 @@ watch(() => props.extension.settings, () => syncDraft())
           :key="section.title"
           class="extension-layout-section"
         >
-          <h2>{{ extensionLocalizedText(section.i18n, currentLanguage, section.title) }}</h2>
+          <div class="extension-layout-heading">
+            <h2>{{ extensionLocalizedText(section.i18n, currentLanguage, section.title) }}</h2>
+            <p v-if="section.description || section.description_i18n" class="extension-layout-copy">
+              {{ extensionLocalizedText(section.description_i18n, currentLanguage, section.description || '') }}
+            </p>
+          </div>
           <div class="extension-layout-fields" :style="{ '--section-columns': section.columns }">
             <label
               v-for="name in visibleSettingNames(section.settings)"
@@ -482,16 +489,15 @@ watch(() => props.extension.settings, () => syncDraft())
   justify-content: space-between;
   gap: 24px;
   padding: 0 2px;
-  border-top: 1px solid #30363d;
-  border-bottom: 1px solid #30363d;
+  border-bottom: 1px solid var(--border);
 }
 .extension-runtime-state { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 600; }
-.extension-runtime-dot { width: 8px; height: 8px; border-radius: 50%; background: #68727c; }
-.extension-runtime-dot.running { background: #2fbf9f; box-shadow: 0 0 0 3px rgb(47 191 159 / 12%); }
+.extension-runtime-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted-foreground); }
+.extension-runtime-dot.running { background: var(--success); box-shadow: 0 0 0 3px rgb(47 191 159 / 12%); }
 .extension-runtime-summary dl { display: flex; gap: 28px; margin: 0; }
 .extension-runtime-summary dl > div { display: flex; align-items: baseline; gap: 8px; }
-.extension-runtime-summary dt { color: #87919b; font-size: 11px; }
-.extension-runtime-summary dd { margin: 0; color: #d5dbe0; font-size: 12px; text-transform: capitalize; }
+.extension-runtime-summary dt { color: var(--muted-foreground); font-size: 11px; }
+.extension-runtime-summary dd { margin: 0; color: var(--foreground); font-size: 12px; text-transform: capitalize; }
 .extension-layout {
   display: grid;
   grid-template-columns: repeat(var(--layout-columns), minmax(0, 1fr));
@@ -503,25 +509,27 @@ watch(() => props.extension.settings, () => syncDraft())
   grid-template-columns: minmax(120px, 160px) minmax(0, 1fr);
   gap: 28px;
   padding: 24px 2px;
-  border-bottom: 1px solid #30363d;
+  border-bottom: 1px solid var(--border);
 }
 .extension-layout.multi-column .extension-layout-section { grid-template-columns: 1fr; gap: 14px; }
+.extension-layout-heading { display: grid; align-content: start; gap: 6px; }
 .extension-layout-section h2 { margin: 0; font-size: 13px; font-weight: 600; }
+.extension-layout-copy { margin: 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
 .extension-layout-fields {
   display: grid;
   grid-template-columns: repeat(var(--section-columns), minmax(0, 1fr));
   gap: 14px 18px;
 }
 .extension-layout-fields label { display: grid; min-width: 0; align-content: start; gap: 6px; }
-.extension-layout-fields label > span { color: #9da7b1; font-size: 11px; }
-.required-mark { color: #ef6b73; font-weight: 600; }
+.extension-layout-fields label > span { color: var(--muted-foreground); font-size: 11px; }
+.required-mark { color: var(--destructive); font-weight: 600; }
 .extension-layout-fields .boolean-field { display: flex; align-items: center; justify-content: space-between; }
 .video-setting-stack { display: grid; width: 100%; gap: 7px; }
-.video-setting-hint { display: block; color: #87919b !important; font-size: 12px !important; line-height: 1.6; }
+.video-setting-hint { display: block; color: var(--muted-foreground) !important; font-size: 12px !important; line-height: 1.6; }
 .quality-custom-field { display: grid; grid-template-columns: minmax(0, 1fr) 108px; align-items: center; gap: 12px; width: 100%; }
 .video-custom-qp-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding-top: 4px; }
 .video-custom-qp-grid > div { display: grid; gap: 6px; min-width: 0; }
-.video-custom-qp-grid span { color: #9da7b1; font-size: 11px; }
+.video-custom-qp-grid span { color: var(--muted-foreground); font-size: 11px; }
 .secret-field { display: grid; grid-template-columns: minmax(0, 1fr) 34px; align-items: center; gap: 4px; }
 .extension-layout > footer { display: flex; grid-column: 1 / -1; justify-content: flex-end; gap: 8px; padding-top: 18px; }
 @media (max-width: 720px) {

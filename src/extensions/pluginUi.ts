@@ -50,17 +50,23 @@ import {
   NUpload,
   NUploadDragger,
 } from 'naive-ui'
+import { icons as lucideIcons } from '@lucide/vue'
 
 import {
+  api,
   extensionAssetURL,
   extensionLocalizedText,
   type ExtensionSettingValue,
   type ExtensionStatus,
   type ExtensionSummary,
   type OneKVMStatus,
+  type RemoveExtensionOptions,
 } from '@/api/client'
 import { currentLanguage } from '@/i18n/runtime'
 import { assertToolbarRegistrationId, isToolbarSlot, sortToolbarItems, type ToolbarSlot } from '@/lib/toolbar-extensions'
+import { assertShellMethods, assertShellRegistrationId } from '@/lib/extension-shell'
+import XpStorageDirectoryPicker from '@/components/XpStorageDirectoryPicker.vue'
+import { registerTool } from './toolboxRuntime'
 
 export interface ExtensionPageSettingsAdapterV1 {
   dirty: Readonly<Ref<boolean>>
@@ -76,6 +82,8 @@ export interface ExtensionPageHostV1 {
   readonly getStatus: () => Promise<OneKVMStatus>
   readonly assetURL: (path: string) => string
   readonly invoke: <T = unknown>(method: string, payload?: unknown) => Promise<T>
+  readonly removeExtension: (id: string, options?: RemoveExtensionOptions) => Promise<{ status: string }>
+  readonly uninstallExtension: (target: { id: string; name: string }) => Promise<boolean>
   readonly saveSettings: () => Promise<boolean>
   readonly registerSettings: (adapter: ExtensionPageSettingsAdapterV1) => () => void
 }
@@ -99,6 +107,22 @@ export interface ToolbarRegistrationV1 {
   items: ToolbarItemDefinitionV1[]
 }
 
+export interface ExtensionShellHostV1 {
+  readonly apiVersion: 1
+  readonly extension: Readonly<ExtensionSummary>
+  readonly invoke: <T = unknown>(method: string, payload?: unknown) => Promise<T>
+}
+
+export type ExtensionShellMethodV1 = (
+  host: ExtensionShellHostV1,
+  payload?: unknown,
+) => unknown | Promise<unknown>
+
+export interface ExtensionShellRegistrationV1 {
+  apiVersion: 1
+  methods: Record<string, ExtensionShellMethodV1>
+}
+
 export interface LoadedToolbarItem {
   extensionId: string
   slot: ToolbarSlotV1
@@ -115,9 +139,14 @@ interface PluginUIRuntimeV1 {
   vue: Record<string, unknown>
   naive: Record<string, unknown>
   i18n: PluginUII18nV1
+  icons: Record<string, Component>
+  language: () => string
   xterm: { load: () => Promise<PluginUIXtermV1> }
+  dialogs: { StorageDirectoryPicker: Component }
   register: (id: string, definition: VueExtensionPageDefinitionV1) => void
   toolbar: { register: (id: string, definition: ToolbarRegistrationV1) => void }
+  shell: { register: (id: string, definition: ExtensionShellRegistrationV1) => void }
+  toolbox: { register: (extensionId: string, toolId: string, definition: VueExtensionPageDefinitionV1) => void }
 }
 
 type PluginMessageValuesV1 = Record<string, string | number>
@@ -136,9 +165,12 @@ declare global {
 
 const registrations = new Map<string, VueExtensionPageDefinitionV1>()
 const toolbarRegistrations = new Map<string, ToolbarRegistrationV1>()
+const shellRegistrations = new Map<string, ExtensionShellRegistrationV1>()
+const shellExtensions = new Map<string, ExtensionSummary>()
 const toolbarItemsState = shallowRef<LoadedToolbarItem[]>([])
 let loadingToolbarId: string | null = null
 let loadingPageId: string | null = null
+let loadingShellId: string | null = null
 
 function publishToolbarItems() {
   const items: LoadedToolbarItem[] = []
@@ -164,6 +196,37 @@ function registerToolbar(id: string, definition: ToolbarRegistrationV1) {
   }
   toolbarRegistrations.set(id, definition)
   publishToolbarItems()
+}
+
+function registerShell(id: string, definition: ExtensionShellRegistrationV1) {
+  if (!/^[a-z0-9][a-z0-9-]{1,62}$/.test(id)) throw new Error('Invalid extension shell ID')
+  assertShellRegistrationId(id, loadingShellId)
+  if (definition?.apiVersion !== 1 || !definition.methods || typeof definition.methods !== 'object') {
+    throw new Error(`Extension ${id} does not provide a compatible shell contribution`)
+  }
+  assertShellMethods(definition.methods)
+  shellRegistrations.set(id, markRaw(definition))
+}
+
+export function extensionShellAvailable(id: string, method?: string) {
+  const definition = shellRegistrations.get(id)
+  return Boolean(definition && (!method || typeof definition.methods[method] === 'function'))
+}
+
+export async function invokeExtensionShell<T = unknown>(id: string, method: string, payload: unknown = null): Promise<T> {
+  const definition = shellRegistrations.get(id)
+  const extension = shellExtensions.get(id)
+  if (!definition || !extension) throw new Error(`Extension shell ${id} is unavailable`)
+  const handler = definition.methods[method]
+  if (typeof handler !== 'function') throw new Error(`Extension shell ${id} does not register method ${method}`)
+  const host: ExtensionShellHostV1 = Object.freeze({
+    apiVersion: 1,
+    extension: Object.freeze({ ...extension }),
+    invoke: <T = unknown>(backendMethod: string, backendPayload: unknown = null) => (
+      api.invokeExtension<T>(id, backendMethod, backendPayload)
+    ),
+  })
+  return await handler(host, payload) as T
 }
 
 export function toolbarItemsFor(slot: ToolbarSlotV1) {
@@ -284,9 +347,14 @@ window.OneKVMPluginUI = {
     vue: vueRuntime,
     naive: naiveRuntime,
     i18n: Object.freeze({ createTranslator, createMessages }),
+    icons: Object.freeze(lucideIcons as Record<string, Component>),
+    language: () => currentLanguage.value,
     xterm: Object.freeze({ load: loadHostXterm }),
+    dialogs: Object.freeze({ StorageDirectoryPicker: markRaw(XpStorageDirectoryPicker) }),
     register,
     toolbar: Object.freeze({ register: registerToolbar }),
+    shell: Object.freeze({ register: registerShell }),
+    toolbox: Object.freeze({ register: registerTool }),
   }),
 }
 
@@ -296,6 +364,83 @@ export interface LoadedVueExtensionPage {
 }
 
 const loadedToolbarScripts = new Map<string, HTMLScriptElement>()
+const loadedShellScripts = new Map<string, HTMLScriptElement>()
+const pendingShellLoads = new Map<string, Promise<void>>()
+let shellLoadQueue: Promise<void> = Promise.resolve()
+
+async function loadExtensionShell(extension: ExtensionSummary) {
+  if (!extension.version || !extension.shell?.entrypoint) {
+    throw new Error(`Extension ${extension.id} does not register shell methods`)
+  }
+  const key = `${extension.id}@${extension.version}`
+  if (loadedShellScripts.has(key) && shellRegistrations.has(extension.id)) {
+    shellExtensions.set(extension.id, extension)
+    return
+  }
+  shellRegistrations.delete(extension.id)
+  const script = document.createElement('script')
+  script.async = true
+  script.dataset.onekvmShell = key
+  script.src = extensionAssetURL(extension, extension.shell.entrypoint)
+  const loaded = new Promise<void>((resolve, reject) => {
+    script.addEventListener('load', () => resolve(), { once: true })
+    script.addEventListener('error', () => reject(new Error(`Failed to load ${extension.name} shell methods`)), { once: true })
+  })
+  loadingShellId = extension.id
+  document.head.append(script)
+  try {
+    await loaded
+    if (!shellRegistrations.has(extension.id)) {
+      throw new Error(`Extension ${extension.id} did not register its shell methods`)
+    }
+    loadedShellScripts.set(key, script)
+    shellExtensions.set(extension.id, extension)
+  } catch (reason) {
+    script.remove()
+    shellRegistrations.delete(extension.id)
+    shellExtensions.delete(extension.id)
+    throw reason
+  } finally {
+    loadingShellId = null
+  }
+}
+
+export function ensureExtensionShell(extension: ExtensionSummary): Promise<void> {
+  const key = `${extension.id}@${extension.version || ''}`
+  const pending = pendingShellLoads.get(key)
+  if (pending) return pending
+  const load = shellLoadQueue.then(() => loadExtensionShell(extension))
+  shellLoadQueue = load.catch(() => undefined)
+  pendingShellLoads.set(key, load)
+  void load.then(
+    () => pendingShellLoads.delete(key),
+    () => pendingShellLoads.delete(key),
+  )
+  return load
+}
+
+export async function loadExtensionShells(extensions: ExtensionSummary[]) {
+  const wanted = extensions.filter((extension) => extension.installed && extension.version && extension.shell?.entrypoint)
+  const wantedIds = new Set(wanted.map((extension) => extension.id))
+  const wantedKeys = new Set(wanted.map((extension) => `${extension.id}@${extension.version}`))
+  for (const extension of wanted) {
+    try {
+      await ensureExtensionShell(extension)
+    } catch (error) {
+      console.warn(error)
+    }
+  }
+  for (const [key, script] of loadedShellScripts) {
+    if (wantedKeys.has(key)) continue
+    script.remove()
+    loadedShellScripts.delete(key)
+  }
+  for (const id of [...shellRegistrations.keys()]) {
+    if (wantedIds.has(id)) continue
+    shellRegistrations.delete(id)
+    shellExtensions.delete(id)
+  }
+}
 
 export async function loadExtensionToolbars(extensions: ExtensionSummary[]) {
   const wantedIds = new Set<string>()

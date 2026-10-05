@@ -92,6 +92,12 @@ always supplies the current extension ID, so a page cannot invoke another
 extension. Method availability and enabled-state policy are enforced by the
 extension host.
 
+Toolbox components receive a separate host. For a floating `window` tool,
+`host.resizeWindow({ width, height })` changes its size while keeping its center
+in place and clamping it to the viewport. Full-screen mobile presentation
+ignores the requested dimensions. The tool can use this when switching between
+a list, editor, and compact recording controls.
+
 ## Console toolbar hooks
 
 Enabled extensions can add buttons to the remote-console toolbar without opening
@@ -129,6 +135,44 @@ The register ID must match the extension currently being loaded, and
 not pass `invoke`; toolbar items receive `compact`, `placement`, `status`, and
 `state`. Keep the control small: an `n-button` or popover trigger that matches
 the existing toolbar density. Do not bundle Vue or Naive UI.
+
+## Shell methods
+
+An installed extension can expose browser-side methods to the OneKVM Shell
+without requiring its settings page to be open. Declare a separate compiled
+JavaScript entrypoint:
+
+```json
+{
+  "shell": {
+    "entrypoint": "web/shell.js"
+  }
+}
+```
+
+The entrypoint registers named functions while the Shell loads that extension:
+
+```js
+window.OneKVMPluginUI.v1.shell.register('example', {
+  apiVersion: 1,
+  methods: {
+    listItems: (host) => host.invoke('list_items'),
+    installItem: (host, payload) => host.invoke('install_item', payload),
+  },
+})
+```
+
+The registration ID must match the extension being loaded. Method names use
+lower camel case and each value must be a function. The Shell passes a scoped
+host with the current extension summary and `invoke`; it cannot invoke methods
+belonging to a different extension. Shell contributions are loaded for
+installed extensions even when their resident service is disabled, while the
+backend still enforces each manifest method's `available_when_disabled` policy.
+
+Use Shell methods for cross-feature services owned by a plugin. For example,
+the Cloud Services page calls the Plugin Marketplace's registered listing and
+installation methods instead of duplicating package-manager access in the main
+UI.
 
 ## Settings adapter
 

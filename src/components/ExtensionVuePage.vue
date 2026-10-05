@@ -7,6 +7,7 @@ import {
   extensionAssetURL,
   type ExtensionStatus,
 } from '@/api/client'
+import { uninstallExtension } from '@/composables/useUninstallExtension'
 import { t } from '@/i18n/runtime'
 import {
   loadVueExtensionPage,
@@ -37,6 +38,8 @@ const pageHost = markRaw<ExtensionPageHostV1>({
   getStatus: api.getStatus,
   assetURL: (path: string) => extensionAssetURL(props.extension, path),
   invoke: (method, payload = null) => api.invokeExtension(props.extension.id, method, payload),
+  removeExtension: (id, options) => api.removeExtension(id, options),
+  uninstallExtension,
   saveSettings: () => save(),
   registerSettings: (adapter) => {
     settingsAdapter.value = markRaw(adapter)

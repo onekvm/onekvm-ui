@@ -62,9 +62,9 @@ async function start(service: ExtensionService) {
   display: grid;
   overflow: hidden;
   margin-bottom: 10px;
-  border: 1px solid #3a4148;
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
-  background: #171b20;
+  background: var(--card);
 }
 .extension-service-recovery-row {
   display: flex;
@@ -74,22 +74,22 @@ async function start(service: ExtensionService) {
   gap: 16px;
   padding: 4px 12px;
 }
-.extension-service-recovery-row + .extension-service-recovery-row { border-top: 1px solid #30363d; }
+.extension-service-recovery-row + .extension-service-recovery-row { border-top: 1px solid var(--border); }
 .extension-service-recovery-state { display: flex; min-width: 0; align-items: center; gap: 9px; }
 .extension-service-recovery-state strong {
   overflow: hidden;
-  color: #e2e7eb;
+  color: var(--foreground);
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.extension-service-recovery-state > span:last-child { color: #a4adb5; font-size: 12px; }
+.extension-service-recovery-state > span:last-child { color: var(--muted-foreground); font-size: 12px; }
 .extension-service-recovery-dot {
   width: 8px;
   height: 8px;
   flex: 0 0 8px;
   border-radius: 50%;
-  background: #d79a45;
+  background: var(--warning);
   box-shadow: 0 0 0 3px rgb(215 154 69 / 12%);
 }
 

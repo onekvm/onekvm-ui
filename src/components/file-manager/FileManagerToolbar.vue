@@ -152,9 +152,11 @@ function selectFile(event: Event) {
 .file-upload-button { display: inline-flex; cursor: pointer; }
 .file-upload-button input { display: none; }
 
-@media (max-width: 640px) {
-  .file-toolbar { align-items: stretch; flex-direction: column; }
-  .file-toolbar-actions { justify-content: flex-end; }
+@media (max-width: 760px) {
+  .file-toolbar { align-items: stretch; flex-direction: column; gap: 10px; }
+  .file-toolbar-actions { width: 100%; justify-content: stretch; }
+  .file-toolbar-actions :deep(.n-button),
+  .file-upload-button { flex: 1; }
 }
 
 @media (max-width: 420px) {

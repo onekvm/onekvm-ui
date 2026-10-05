@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
-import { ArrowLeft, Check, CircleCheck, CirclePlus, ClipboardPaste, Copy, Database, Disc3, Download, File, Folder, FolderOpen, FolderPlus, HardDrive, House, Info, Laptop, LayoutGrid, LoaderCircle, Pause, Pencil, Plug, Scissors, Server, Smartphone, Trash2, Unplug, Upload, X } from '@lucide/vue'
+import { ArrowLeft, Check, CircleCheck, CirclePlus, ClipboardPaste, Copy, Database, Disc3, Download, File, Folder, FolderOpen, FolderPlus, HardDrive, House, Info, Laptop, LayoutGrid, LoaderCircle, Pencil, Plug, Scissors, Server, Smartphone, Trash2, Unplug, Upload, X } from '@lucide/vue'
 import { useDialog, useMessage } from 'naive-ui'
 
-import { api, APIError, type MSDFileEntry, type MSDISOUpload, type MSDMedia, type MSDStatus } from '@/api/client'
+import { api, APIError, type MSDFileEntry, type MSDMedia, type MSDStatus } from '@/api/client'
 import { useUploadProgress } from '@/composables/useUploadProgress'
+import { useOverlayMount } from '@/composables/useOverlayMount'
 import { t } from '@/i18n/runtime'
 import { BrowserISO, type BrowserISOProgress } from '@/lib/browser-iso'
 import { nextUploadSpeed, uploadPercentage, uploadRemainingSeconds } from '@/lib/upload-speed'
@@ -13,6 +14,7 @@ import XpTransferDialog from './XpTransferDialog.vue'
 
 defineProps<{
   placement?: 'top-end' | 'bottom-end' | 'right-start' | 'left-start'
+  sheet?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -31,19 +33,6 @@ const emit = defineEmits<{
   }]
 }>()
 
-const ISO_UPLOAD_CHUNK_SIZE = 8 << 20
-const ISO_UPLOAD_MANIFEST_KEY = 'onekvm-msd-upload:pending'
-
-type PendingISOUpload = {
-  id: string
-  name: string
-  size: number
-  lastModified: number
-  fingerprint: string
-  offset: number
-  kind: 'iso' | 'drive'
-}
-
 type DriveClipboard = {
   driveID: string
   operation: 'copy' | 'move'
@@ -52,24 +41,22 @@ type DriveClipboard = {
   directory: boolean
 }
 
-function readPendingUpload(): PendingISOUpload | null {
+function clearLegacyUploadResume() {
   try {
-    const raw = localStorage.getItem(ISO_UPLOAD_MANIFEST_KEY)
-    if (!raw) return null
-    const value = JSON.parse(raw) as Partial<PendingISOUpload>
-    if (!value.id || !value.name || typeof value.fingerprint !== 'string' || !Number.isFinite(value.size) || !Number.isFinite(value.offset) || !Number.isFinite(value.lastModified)) return null
-    return { ...value, kind: value.kind === 'drive' ? 'drive' : 'iso' } as PendingISOUpload
+    const keys: string[] = []
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index)
+      if (key?.startsWith('onekvm-msd-upload:')) keys.push(key)
+    }
+    for (const key of keys) localStorage.removeItem(key)
   } catch {
-    return null
+    // Private mode can reject storage access. The upload no longer reads it.
   }
-}
-
-function uploadResumeKey(fingerprint: string) {
-  return `onekvm-msd-upload:file:${fingerprint}`
 }
 
 const message = useMessage()
 const dialog = useDialog()
+const overlayTo = useOverlayMount()
 const loading = ref(false)
 const connecting = ref(false)
 const disconnecting = ref(false)
@@ -93,22 +80,21 @@ const popoverOpen = ref(false)
 let uploadSampleAt = 0
 let uploadSampleBytes = 0
 const uploadRequestControllers = new Set<AbortController>()
-const initialPendingUpload = readPendingUpload()
-const pendingUpload = ref<PendingISOUpload | null>(initialPendingUpload)
-const uploadProgress = ref(initialPendingUpload ? uploadPercentage(initialPendingUpload.offset, initialPendingUpload.size) : 0)
-const uploadTransferred = ref(initialPendingUpload?.offset || 0)
+const uploadProgress = ref(0)
+const uploadTransferred = ref(0)
 const uploadSpeed = ref(0)
 const uploading = ref(false)
 const uploadStopRequested = ref(false)
-const activeUploadID = ref(initialPendingUpload?.id || '')
+const uploadKind = ref<'iso' | 'drive'>('iso')
 const uploadDialogOpen = ref(false)
 const uploadWindow = ref<InstanceType<typeof XpTransferDialog> | null>(null)
 const uploadPosition = ref<{ x: number; y: number } | null>(null)
-const uploadFileName = ref(initialPendingUpload?.name || '')
-const uploadFileSize = ref(initialPendingUpload?.size || 0)
+const uploadFileName = ref('')
+const uploadFileSize = ref(0)
 const driveName = ref('OneKVM Disk')
 const driveSize = ref<number | null>(1024)
 const driveSizeUnit = ref<'MiB' | 'GiB'>('MiB')
+const driveFilesystem = ref('exfat')
 const creatingDrive = ref(false)
 const browsingDrive = ref<MSDMedia | null>(null)
 const currentPath = ref('')
@@ -118,6 +104,7 @@ const newFolderName = ref('')
 const browserISO = shallowRef<BrowserISO | null>(null)
 const browserMounting = ref(false)
 const mountingID = ref<string | null>(null)
+const deletingID = ref<string | null>(null)
 const browserProgress = ref<BrowserISOProgress | null>(null)
 const renamingPath = ref('')
 const renameValue = ref('')
@@ -153,6 +140,27 @@ const driveSizeUnitOptions = [
   { label: 'GiB', value: 'GiB' }
 ] as const
 const driveSizeDivisor = computed(() => driveSizeUnit.value === 'GiB' ? 1024 : 1)
+const driveFormatCatalog = computed(() => [
+  { label: t('virtualMedia.formatFat32', 'FAT32'), value: 'fat32', hint: t('virtualMedia.formatFat32Hint', 'Works with the most operating systems. Individual files cannot exceed 4 GiB.') },
+  { label: t('virtualMedia.formatExfat', 'exFAT'), value: 'exfat', hint: t('virtualMedia.formatExfatHint', 'Best for large files. The controlled system must support exFAT.') },
+  { label: t('virtualMedia.formatNtfs', 'NTFS'), value: 'ntfs', hint: t('virtualMedia.formatNtfsHint', 'Best for Windows. Supports large files.') },
+  { label: t('virtualMedia.formatExt4', 'EXT4'), value: 'ext4', hint: t('virtualMedia.formatExt4Hint', 'Best for Linux. The controlled system must support EXT4.') },
+  { label: t('virtualMedia.formatXfs', 'XFS'), value: 'xfs', hint: t('virtualMedia.formatXfsHint', 'Linux XFS. Suited for large disks and files.') },
+])
+const driveFormatOptions = computed(() => {
+  const available = status.value?.drive_filesystems
+  const options = driveFormatCatalog.value.map(({ label, value }) => ({ label, value }))
+  if (!available?.length) return options.filter((option) => option.value === 'fat32' || option.value === 'exfat')
+  return options.filter((option) => available.includes(option.value))
+})
+const driveFormatHint = computed(() =>
+  driveFormatCatalog.value.find((option) => option.value === driveFilesystem.value)?.hint
+  || t('virtualMedia.formatExfatHint', 'Best for large files. The controlled system must support exFAT.'))
+watch(driveFormatOptions, (options) => {
+  if (!options.some((option) => option.value === driveFilesystem.value) && options[0]) {
+    driveFilesystem.value = options[0].value
+  }
+})
 const minimumDriveSize = computed(() => (status.value?.minimum_drive_mib || 64) / driveSizeDivisor.value)
 const maximumDriveSize = computed(() => status.value?.maximum_drive_mib
   ? status.value.maximum_drive_mib / driveSizeDivisor.value
@@ -166,7 +174,7 @@ const folderNameValid = computed(() => {
   const name = newFolderName.value.trim()
   return Boolean(name && name !== '.' && name !== '..' && !name.includes('/') && !name.includes('\\'))
 })
-const mountBlocked = computed(() => uploading.value || Boolean(pendingUpload.value) || Boolean(status.value?.iso_uploading))
+const mountBlocked = computed(() => uploading.value || Boolean(status.value?.iso_uploading))
 const hostConnected = computed(() => Boolean(status.value?.connected))
 const hostMountBlocked = computed(() => mountBlocked.value || !hostConnected.value)
 const uploadWindowStyle = computed(() => uploadPosition.value
@@ -182,7 +190,7 @@ const activeConnectionLabel = computed(() => activeConnection.value
   ? t('virtualMedia.connected', 'Connected')
   : t('virtualMedia.disconnected', 'Disconnected'))
 const isoUploadRemainingSeconds = computed(() => uploadRemainingSeconds(
-  pendingUpload.value?.size || uploadFileSize.value,
+  uploadFileSize.value,
   uploadTransferred.value,
   uploadSpeed.value,
   uploading.value,
@@ -201,24 +209,21 @@ const driveUploadStatus = computed(() => t('virtualMedia.uploadingFile', 'Upload
 const driveUploadRemainingLabel = computed(() => driveUpload.uploading.value
   ? formatUploadRemaining(driveUpload.remainingSeconds.value)
   : '')
-const uploadStatusLabel = computed(() => t(
-  uploading.value ? 'virtualMedia.uploadingFile' : 'virtualMedia.uploadPausedFile',
-  uploading.value ? 'Uploading {name}…' : 'Paused: {name}',
-).replace('{name}', pendingUpload.value?.name || uploadFileName.value))
-const pendingUploadKind = computed<'iso' | 'drive'>(() => pendingUpload.value?.kind === 'drive' ? 'drive' : 'iso')
-const uploadProgressTitle = computed(() => pendingUploadKind.value === 'drive'
+const uploadStatusLabel = computed(() => t('virtualMedia.uploadingFile', 'Uploading {name}…')
+  .replace('{name}', uploadFileName.value))
+const uploadProgressTitle = computed(() => uploadKind.value === 'drive'
   ? t('virtualMedia.driveUploadTitle', 'Disk upload')
   : t('virtualMedia.uploadProgressTitle', 'ISO upload'))
 
 watch(
-  [uploadDialogOpen, uploading, uploadProgress, uploadTransferred, uploadSpeed, pendingUpload, uploadProgressTitle],
+  [uploadDialogOpen, uploading, uploadProgress, uploadTransferred, uploadSpeed, uploadFileName, uploadFileSize, uploadProgressTitle],
   () => emit('upload-state', {
-    minimized: Boolean(pendingUpload.value) && !uploadDialogOpen.value,
+    minimized: uploading.value && !uploadDialogOpen.value,
     uploading: uploading.value,
-    name: pendingUpload.value?.name || uploadFileName.value,
+    name: uploadFileName.value,
     progress: uploadProgress.value,
     transferred: uploadTransferred.value,
-    total: pendingUpload.value?.size || uploadFileSize.value,
+    total: uploadFileSize.value,
     speed: uploadSpeed.value,
     remainingSeconds: isoUploadRemainingSeconds.value,
     title: uploadProgressTitle.value,
@@ -232,7 +237,7 @@ const isoSourceLocked = computed<IsoSource | null>(() => {
   return null
 })
 const featureTitle = computed(() => {
-  if (feature.value === 'iso') return t('virtualMedia.isoTab', 'ISO mounting')
+  if (feature.value === 'iso') return t('virtualMedia.isoTab', 'Image mount')
   if (feature.value === 'drive') return t('virtualMedia.driveTab', 'Virtual disk')
   if (feature.value === 'mtp') return t('virtualMedia.mtpTab', 'File transfer')
   return t('virtualMedia.title', 'Virtual Media')
@@ -255,9 +260,20 @@ watch([storageAvailable, mtpAvailable], () => {
   if ((feature.value === 'iso' || feature.value === 'drive') && !storageAvailable.value) feature.value = null
 })
 
+function closeDrive() {
+  browsingDrive.value = null
+  currentPath.value = ''
+  files.value = []
+  folderCreateOpen.value = false
+  fileDeletePopoverPath.value = ''
+  renamingPath.value = ''
+  renameValue.value = ''
+}
+
 function navigateFeature(next: MediaTab | null, direction: FeatureNavDirection) {
   featureNavAnimated.value = true
   featureNavDirection.value = direction
+  if (next !== 'drive') closeDrive()
   if (next) tab.value = next
   feature.value = next
 }
@@ -286,6 +302,11 @@ function resetFeatureView() {
   fileDeletePopoverPath.value = ''
 }
 
+function openCreateDrive() {
+  closeDrive()
+  driveCreateOpen.value = true
+}
+
 function updateShow(show: boolean) {
   if (!show) {
     driveCreateOpen.value = false
@@ -302,7 +323,6 @@ function updateShow(show: boolean) {
     if (status.value?.iso_mounted === 'browser') isoSource.value = 'local'
     else if (status.value?.iso_mounted) isoSource.value = 'device'
   })
-  void restorePendingUpload()
 }
 
 function clampUploadPosition() {
@@ -348,6 +368,20 @@ function formatBytes(value: number) {
   return `${(value / 1024 ** index).toFixed(index > 1 ? 1 : 0)} ${units[index]}`
 }
 
+function driveFilesystemLabel(item: MSDMedia) {
+  if (item.imported && !item.filesystem) return ''
+  switch (item.filesystem) {
+    case 'fat32': return t('virtualMedia.formatFat32', 'FAT32')
+    case 'ntfs': return t('virtualMedia.formatNtfs', 'NTFS')
+    case 'ext4': return t('virtualMedia.formatExt4', 'EXT4')
+    case 'xfs': return t('virtualMedia.formatXfs', 'XFS')
+    case 'exfat':
+    case undefined:
+      return t('virtualMedia.formatExfat', 'exFAT')
+    default: return item.filesystem
+  }
+}
+
 function resetUploadTelemetry(transferred: number, size: number) {
   uploadTransferred.value = transferred
   uploadProgress.value = uploadPercentage(transferred, size)
@@ -369,107 +403,6 @@ function updateUploadTelemetry(transferred: number, size: number) {
 
 function abortActiveUploadRequests() {
   for (const controller of uploadRequestControllers) controller.abort()
-}
-
-async function isoFingerprint(file: File) {
-  const sampleSize = 64 << 10
-  const first = new Uint8Array(await file.slice(0, sampleSize).arrayBuffer())
-  const last = new Uint8Array(await file.slice(Math.max(0, file.size - sampleSize)).arrayBuffer())
-  const metadata = new TextEncoder().encode(`${file.name}\n${file.size}\n${file.lastModified}\n`)
-  const sample = new Uint8Array(metadata.length + first.length + last.length)
-  sample.set(metadata)
-  sample.set(first, metadata.length)
-  sample.set(last, metadata.length + first.length)
-  let firstHash = 0x811c9dc5
-  let secondHash = 0x9e3779b9
-  for (const byte of sample) {
-    firstHash = Math.imul(firstHash ^ byte, 0x01000193)
-    secondHash = Math.imul(secondHash ^ byte, 0x85ebca6b)
-  }
-  return `${(firstHash >>> 0).toString(16).padStart(8, '0')}${(secondHash >>> 0).toString(16).padStart(8, '0')}`
-}
-
-function storePendingUpload(upload: PendingISOUpload) {
-  pendingUpload.value = upload
-  activeUploadID.value = upload.id
-  uploadProgress.value = uploadPercentage(upload.offset, upload.size)
-  if (!uploading.value) {
-    uploadTransferred.value = upload.offset
-    uploadSpeed.value = 0
-  }
-  try {
-    localStorage.setItem(ISO_UPLOAD_MANIFEST_KEY, JSON.stringify(upload))
-    if (upload.fingerprint) localStorage.setItem(uploadResumeKey(upload.fingerprint), upload.id)
-  } catch {
-    // The active page can still resume while it remains open.
-  }
-}
-
-function clearPendingUpload(upload = pendingUpload.value) {
-  try {
-    if (upload?.fingerprint) localStorage.removeItem(uploadResumeKey(upload.fingerprint))
-    localStorage.removeItem(ISO_UPLOAD_MANIFEST_KEY)
-  } catch {
-    // Ref state below remains authoritative for the active page.
-  }
-  pendingUpload.value = null
-  activeUploadID.value = ''
-  uploadProgress.value = 0
-  uploadTransferred.value = 0
-  uploadSpeed.value = 0
-}
-
-function syncPendingUploadFromStatus(upload: MSDISOUpload | undefined) {
-  if (!upload || uploading.value) return
-  const current = pendingUpload.value
-  if (current?.id === upload.id) {
-    storePendingUpload({
-      ...current,
-      name: upload.name,
-      size: upload.size,
-      offset: upload.offset,
-      kind: upload.kind === 'drive' ? 'drive' : current.kind,
-    })
-    return
-  }
-  if (current) clearPendingUpload(current)
-  storePendingUpload({
-    id: upload.id,
-    name: upload.name,
-    size: upload.size,
-    lastModified: 0,
-    fingerprint: '',
-    offset: upload.offset,
-    kind: upload.kind === 'drive' ? 'drive' : 'iso',
-  })
-}
-
-async function restorePendingUpload() {
-  const remembered = pendingUpload.value
-  if (!remembered || uploading.value) return
-  const drive = remembered.kind === 'drive'
-  try {
-    const upload = drive
-      ? await api.getMSDDriveUpload(remembered.id)
-      : await api.getMSDISOUpload(remembered.id)
-    if (upload.name !== remembered.name || upload.size !== remembered.size) {
-      clearPendingUpload(remembered)
-      return
-    }
-    storePendingUpload({ ...remembered, offset: upload.offset })
-    if (upload.offset === upload.size) {
-      if (drive) await api.completeMSDDriveUpload(upload.id)
-      else await api.completeMSDISOUpload(upload.id)
-      clearPendingUpload(remembered)
-      uploadDialogOpen.value = false
-      message.success(drive
-        ? t('virtualMedia.driveUploadSuccess', 'Disk image uploaded')
-        : t('virtualMedia.uploadSuccess', 'ISO uploaded'))
-      await refresh()
-    }
-  } catch (error) {
-    if (error instanceof APIError && error.status === 404) clearPendingUpload(remembered)
-  }
 }
 
 async function validISOFile(file: File) {
@@ -495,7 +428,6 @@ async function refresh() {
     const nextStatus = await api.getMSDStatus()
     status.value = nextStatus
     emit('status', nextStatus)
-    syncPendingUploadFromStatus(nextStatus.iso_upload)
     if (!nextStatus.available) {
       media.value = []
       browsingDrive.value = null
@@ -660,15 +592,25 @@ async function mountBrowserISO(event: Event) {
 }
 
 function confirmDelete(item: MSDMedia) {
-  dialog.warning({
+  const prompt = dialog.warning({
     title: t('virtualMedia.deleteMedia', 'Delete media'),
     content: t('virtualMedia.deleteMediaConfirm', 'The stored image and all of its contents will be permanently deleted.'),
     positiveText: t('common.delete', 'Delete'),
     negativeText: t('common.cancel', 'Cancel'),
     onPositiveClick: async () => {
-      await api.deleteMSDMedia(item.id)
-      if (browsingDrive.value?.id === item.id) browsingDrive.value = null
-      await refresh()
+      prompt.loading = true
+      deletingID.value = item.id
+      try {
+        await api.deleteMSDMedia(item.id)
+        if (browsingDrive.value?.id === item.id) browsingDrive.value = null
+        await refresh()
+      } catch (error) {
+        prompt.loading = false
+        message.error(`${t('virtualMedia.deleteFailed', 'Delete failed')}: ${error instanceof Error ? error.message : String(error)}`)
+        return false
+      } finally {
+        if (deletingID.value === item.id) deletingID.value = null
+      }
     },
   })
 }
@@ -685,7 +627,7 @@ async function uploadStoredMedia(event: Event, kind: 'iso' | 'drive') {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
-  if (!file) return
+  if (!file || uploading.value) return
   if (kind === 'iso' && !await validISOFile(file)) {
     message.error(t('virtualMedia.invalidISO', 'The selected file is not a valid ISO image.'))
     return
@@ -694,17 +636,8 @@ async function uploadStoredMedia(event: Event, kind: 'iso' | 'drive') {
     message.error(t('virtualMedia.invalidDriveImage', 'The selected file is not a valid disk image.'))
     return
   }
-  const fingerprint = await isoFingerprint(file)
-  if (pendingUpload.value && (
-    pendingUpload.value.kind !== kind
-    || pendingUpload.value.name !== file.name
-    || pendingUpload.value.size !== file.size
-    || (pendingUpload.value.fingerprint && pendingUpload.value.fingerprint !== fingerprint)
-  )) {
-    message.warning(t('virtualMedia.resumeDifferentFile', 'Another ISO upload is paused. Resume it with the same file or cancel it first.'))
-    return
-  }
 
+  uploadKind.value = kind
   uploadFileName.value = file.name
   uploadFileSize.value = file.size
   uploadPosition.value = null
@@ -712,105 +645,34 @@ async function uploadStoredMedia(event: Event, kind: 'iso' | 'drive') {
   updateShow(false)
   uploading.value = true
   uploadStopRequested.value = false
-  const resumeKey = uploadResumeKey(fingerprint)
+  resetUploadTelemetry(0, file.size)
+  const requestController = new AbortController()
+  uploadRequestControllers.add(requestController)
   try {
-    let upload: MSDISOUpload | null = null
-    const remembered = pendingUpload.value?.fingerprint === fingerprint
-      ? pendingUpload.value.id
-      : localStorage.getItem(resumeKey)
-    if (remembered) {
-      upload = kind === 'drive'
-        ? await api.getMSDDriveUpload(remembered).catch(() => null)
-        : await api.getMSDISOUpload(remembered).catch(() => null)
-    }
-    if (!upload || upload.name !== file.name || upload.size !== file.size) {
-      localStorage.removeItem(resumeKey)
-      upload = kind === 'drive'
-        ? await api.beginMSDDriveUpload(file.name, file.size)
-        : await api.beginMSDISOUpload(file.name, file.size)
-    }
-    const tracking: PendingISOUpload = {
-      id: upload.id,
-      name: file.name,
-      size: file.size,
-      lastModified: file.lastModified,
-      fingerprint,
-      offset: upload.offset,
-      kind,
-    }
-    storePendingUpload(tracking)
-    resetUploadTelemetry(upload.offset, file.size)
-    if (upload.offset > 0) {
-      message.info(`${t('virtualMedia.resumingUpload', 'Resuming upload from')} ${formatBytes(upload.offset)}`)
-    }
-    while (upload.offset < file.size) {
-      if (uploadStopRequested.value) {
-        message.info(t('virtualMedia.uploadPaused', 'Upload paused.'))
-        return
-      }
-      const chunkOffset: number = upload.offset
-      const chunkEnd = Math.min(file.size, chunkOffset + ISO_UPLOAD_CHUNK_SIZE)
-      const uploadID: string = upload.id
-      const requestController = new AbortController()
-      uploadRequestControllers.add(requestController)
-      try {
-        const writeChunk = kind === 'drive' ? api.writeMSDDriveUpload : api.writeMSDISOUpload
-        const written = await writeChunk(
-          uploadID,
-          chunkOffset,
-          file.slice(chunkOffset, chunkEnd),
-          (loaded, total) => {
-            updateUploadTelemetry(
-              chunkOffset + Math.min(loaded, total, chunkEnd - chunkOffset),
-              file.size,
-            )
-          },
-          requestController.signal,
-        )
-        upload = written.offset > chunkOffset
-          ? written
-          : kind === 'drive'
-            ? await api.getMSDDriveUpload(uploadID)
-            : await api.getMSDISOUpload(uploadID)
-      } finally {
-        uploadRequestControllers.delete(requestController)
-      }
-      if (uploadStopRequested.value) {
-        message.info(t('virtualMedia.uploadPaused', 'Upload paused.'))
-        return
-      }
-      updateUploadTelemetry(upload.offset, file.size)
-      tracking.offset = upload.offset
-      storePendingUpload(tracking)
-    }
-    if (uploadStopRequested.value) {
-      message.info(t('virtualMedia.uploadPaused', 'Upload paused.'))
-      return
-    }
-    if (kind === 'drive') await api.completeMSDDriveUpload(upload.id)
-    else await api.completeMSDISOUpload(upload.id)
-    clearPendingUpload(tracking)
-    uploadDialogOpen.value = false
+    const upload = kind === 'drive' ? api.uploadMSDDriveImage : api.uploadMSDISO
+    await upload(
+      file,
+      (loaded) => updateUploadTelemetry(Math.min(loaded, file.size), file.size),
+      requestController.signal,
+    )
     message.success(kind === 'drive'
       ? t('virtualMedia.driveUploadSuccess', 'Disk image uploaded')
       : t('virtualMedia.uploadSuccess', 'ISO uploaded'))
     await refresh()
   } catch (error) {
-    if (error instanceof APIError && error.status === 409) await refresh()
-    if (!pendingUpload.value) uploadDialogOpen.value = false
     if (!uploadStopRequested.value) {
+      if (error instanceof APIError && error.status === 409) await refresh()
       message.error(`${t('virtualMedia.uploadFailed', 'Upload failed')}: ${error instanceof Error ? error.message : String(error)}`)
     }
   } finally {
+    uploadRequestControllers.delete(requestController)
+    uploadDialogOpen.value = false
     uploading.value = false
     uploadStopRequested.value = false
     uploadSpeed.value = 0
+    uploadProgress.value = 0
+    uploadTransferred.value = 0
   }
-}
-
-function pauseUpload() {
-  uploadStopRequested.value = true
-  abortActiveUploadRequests()
 }
 
 function minimizeUploadDialog() {
@@ -823,18 +685,11 @@ function restoreUploadDialog() {
 
 defineExpose({ restoreUploadDialog })
 
-async function cancelUpload() {
-  const upload = pendingUpload.value
+function cancelUpload() {
+  if (!uploading.value || uploadStopRequested.value) return
   uploadStopRequested.value = true
   abortActiveUploadRequests()
-  if (upload?.id) {
-    if (upload.kind === 'drive') await api.cancelMSDDriveUpload(upload.id).catch(() => undefined)
-    else await api.cancelMSDISOUpload(upload.id).catch(() => undefined)
-  }
-  clearPendingUpload(upload)
-  uploadDialogOpen.value = false
   message.info(t('virtualMedia.uploadCancelled', 'Upload cancelled'))
-  await refresh()
 }
 
 async function createDrive() {
@@ -842,7 +697,7 @@ async function createDrive() {
   creatingDrive.value = true
   try {
     const sizeMiB = driveSize.value * driveSizeDivisor.value
-    await api.createMSDDrive(driveName.value.trim(), 'ONEKVM', Math.round(sizeMiB))
+    await api.createMSDDrive(driveName.value.trim(), 'ONEKVM', Math.round(sizeMiB), driveFilesystem.value)
     message.success(t('virtualMedia.driveCreated', 'Virtual disk created'))
     await refresh()
     driveCreateOpen.value = false
@@ -867,6 +722,10 @@ function updateDriveSizeUnit(unit: 'MiB' | 'GiB') {
 
 async function openDrive(item: MSDMedia) {
   if (item.imported) return
+  if (browsingDrive.value?.id === item.id) {
+    closeDrive()
+    return
+  }
   browsingDrive.value = item
   currentPath.value = ''
   await refreshFiles()
@@ -1158,6 +1017,7 @@ function closeFileTransferDialog() {
 }
 
 onMounted(() => {
+  clearLegacyUploadResume()
   window.addEventListener('resize', clampUploadPosition)
 })
 
@@ -1177,6 +1037,7 @@ onBeforeUnmount(() => {
 
   <n-modal
     :show="popoverOpen"
+    :to="overlayTo"
     mask-closable
     close-on-esc
     @update:show="updateShow"
@@ -1184,6 +1045,7 @@ onBeforeUnmount(() => {
   >
       <n-card
         class="virtual-media-dialog"
+        :class="{ 'is-sheet': sheet }"
         :bordered="false"
         closable
         role="dialog"
@@ -1217,13 +1079,13 @@ onBeforeUnmount(() => {
             <div class="virtual-media-home-grid">
               <button v-if="storageAvailable" type="button" class="virtual-media-home-card" @click="openFeature('iso')">
                 <Disc3 :size="32" />
-                <strong>{{ t('virtualMedia.isoTab', 'ISO mounting') }}</strong>
-                <span>{{ t('virtualMedia.isoHomeDescription', 'Mount a disc image for the controlled device.') }}</span>
+                <strong>{{ t('virtualMedia.isoTab', 'Image mount') }}</strong>
+                <span>{{ t('virtualMedia.isoHomeDescription', 'Mount a system image (ISO), like inserting a disc.') }}</span>
               </button>
               <button v-if="storageAvailable" type="button" class="virtual-media-home-card" @click="openFeature('drive')">
                 <HardDrive :size="32" />
                 <strong>{{ t('virtualMedia.driveTab', 'Virtual disk') }}</strong>
-                <span>{{ t('virtualMedia.driveHomeDescription', 'Create, upload, and mount a virtual disk.') }}</span>
+                <span>{{ t('virtualMedia.driveHomeDescription', 'Emulate a USB flash drive. Create or upload a disk, then mount it.') }}</span>
               </button>
               <button v-if="mtpAvailable" type="button" class="virtual-media-home-card" @click="openFeature('mtp')">
                 <Smartphone :size="32" />
@@ -1285,14 +1147,14 @@ onBeforeUnmount(() => {
               <section v-if="isoSource === 'device' && status?.iso_mounted !== 'browser'" class="media-mode-panel">
                 <header class="media-mode-header">
                   <div class="media-mode-copy">
-                    <strong class="media-title"><Server :size="16" />{{ t('virtualMedia.isoMode', 'ISO images') }}</strong>
-                    <span>{{ t('virtualMedia.isoModeDescription', 'Upload resumable ISO images to the device and mount them later.') }}</span>
+                    <strong class="media-title"><Server :size="16" />{{ t('virtualMedia.isoMode', 'System images') }}</strong>
+                    <span>{{ t('virtualMedia.isoModeDescription', 'Upload system images to the device and mount them later.') }}</span>
                   </div>
                   <div class="media-mode-header-actions">
                     <small class="storage-free"><Database :size="13" />{{ formatBytes(status?.storage_free || 0) }} {{ t('virtualMedia.free', 'free') }}</small>
                     <label class="file-picker">
                       <input type="file" accept=".iso,application/x-iso9660-image" :disabled="uploading" @change="uploadISO" />
-                      <n-button :disabled="uploading" tag="span"><template #icon><Upload /></template>{{ pendingUploadKind === 'iso' && pendingUpload ? t('virtualMedia.resumeUpload', 'Resume upload') : t('virtualMedia.uploadISO', 'Upload ISO') }}</n-button>
+                      <n-button :disabled="uploading" tag="span"><template #icon><Upload /></template>{{ t('virtualMedia.uploadISO', 'Upload ISO') }}</n-button>
                     </label>
                     <n-button v-if="status?.iso_mounted && status.iso_mounted !== 'browser'" @click="eject('iso')"><template #icon><Unplug /></template>{{ t('virtualMedia.unmount', 'Eject') }}</n-button>
                   </div>
@@ -1303,7 +1165,7 @@ onBeforeUnmount(() => {
                 </div>
                 <div v-else-if="!isoMedia.length" class="iso-list-status">
                   <Disc3 :size="18" />
-                  <span>{{ t('virtualMedia.noISO', 'No uploaded ISO images') }}</span>
+                  <span>{{ t('virtualMedia.noISO', 'No system images yet') }}</span>
                 </div>
                 <div v-else class="media-list">
                   <div v-for="item in isoMedia" :key="item.id" class="media-row">
@@ -1342,66 +1204,39 @@ onBeforeUnmount(() => {
                 <section class="virtual-media-workspace">
                   <div class="virtual-drive-panel">
                     <div class="virtual-drive-toolbar">
-                      <n-popover
-                        v-model:show="driveCreateOpen"
-                        trigger="click"
-                        placement="left-start"
-                        to="body"
-                        :z-index="4500"
-                        :show-arrow="false"
-                        class="drive-create-popover"
-                      >
-                        <template #trigger>
-                          <n-button size="small" @click="browsingDrive = null"><template #icon><CirclePlus /></template>{{ t('virtualMedia.createDriveTab', 'Create disk') }}</n-button>
-                        </template>
-                        <section class="drive-create-card">
-                          <header class="drive-create-header">
-                            <strong class="media-title"><HardDrive :size="16" />{{ t('virtualMedia.createDriveTab', 'Create disk') }}</strong>
-                            <n-button text size="small" @click="driveCreateOpen = false">{{ t('common.cancel', 'Cancel') }}</n-button>
-                          </header>
-                          <n-form label-placement="top" class="drive-create-form">
-                            <n-form-item :label="t('virtualMedia.driveName', 'Disk name')">
-                              <n-input v-model:value="driveName" :placeholder="t('virtualMedia.driveName', 'Disk name')" />
-                            </n-form-item>
-                            <n-form-item :label="t('virtualMedia.driveCapacity', 'Capacity')">
-                              <div class="drive-size-input">
-                                <n-input-number
-                                  v-model:value="driveSize"
-                                  :min="minimumDriveSize"
-                                  :max="maximumDriveSize"
-                                  :step="driveSizeUnit === 'GiB' ? 0.25 : 64"
-                                />
-                                <n-select
-                                  :value="driveSizeUnit"
-                                  :options="driveSizeUnitOptions"
-                                  :consistent-menu-width="false"
-                                  @update:value="updateDriveSizeUnit"
-                                />
-                              </div>
-                            </n-form-item>
-                            <div class="drive-create-actions">
-                              <n-button type="primary" :loading="creatingDrive" :disabled="!driveName.trim() || !driveSize" @click="createDrive"><template #icon><CirclePlus /></template>{{ t('virtualMedia.createDrive', 'Create') }}</n-button>
-                            </div>
-                          </n-form>
-                        </section>
-                      </n-popover>
+                      <n-button size="small" @click="openCreateDrive"><template #icon><CirclePlus /></template>{{ t('virtualMedia.createDriveTab', 'Create disk') }}</n-button>
                       <label class="file-picker">
                         <input type="file" accept=".img,.raw,.bin,application/octet-stream" :disabled="uploading" @change="uploadDriveImage" />
                         <n-button size="small" :disabled="uploading" tag="span">
                           <template #icon><Upload /></template>
-                          {{ pendingUploadKind === 'drive' && pendingUpload ? t('virtualMedia.resumeUpload', 'Resume upload') : t('virtualMedia.uploadDriveImage', 'Upload disk image') }}
+                          {{ t('virtualMedia.uploadDriveImage', 'Upload disk image') }}
                         </n-button>
                       </label>
                     </div>
-                    <div v-if="driveMedia.length" class="media-list">
+                    <div v-if="loading && !driveMedia.length" class="iso-list-status" role="status">
+                      <LoaderCircle class="spin" :size="18" />
+                      <span>{{ t('virtualMedia.loadingDrives', 'Loading virtual disks…') }}</span>
+                    </div>
+                    <div v-else-if="!driveMedia.length" class="iso-list-status">
+                      <HardDrive :size="18" />
+                      <span>{{ t('virtualMedia.noVirtualDrive', 'No virtual disk') }}</span>
+                    </div>
+                    <div v-else class="media-list">
                         <div v-for="item in driveMedia" :key="item.id" class="media-row">
                           <HardDrive :size="24" />
-                          <div class="media-copy"><strong class="media-filename" :title="item.name">{{ item.name }}</strong><span>{{ item.label }} · {{ formatBytes(item.size) }}</span></div>
+                          <div class="media-copy">
+                            <strong class="media-filename" :title="item.name">{{ item.name }}</strong>
+                            <div class="media-badges">
+                              <span v-if="item.label">{{ item.label }}</span>
+                              <n-tag v-if="driveFilesystemLabel(item)" size="tiny" :bordered="false">{{ driveFilesystemLabel(item) }}</n-tag>
+                              <n-tag size="tiny" :bordered="false">{{ formatBytes(item.size) }}</n-tag>
+                            </div>
+                          </div>
                           <n-tag v-if="item.mounted" type="success" size="small"><CircleCheck :size="12" />{{ t('virtualMedia.mountedStatus', 'Mounted') }}</n-tag>
                           <n-button v-if="!item.mounted && !status?.drive_mounted" size="small" type="primary" :loading="mountingID === item.id" :disabled="hostMountBlocked || Boolean(mountingID && mountingID !== item.id)" @click="mount(item)"><template #icon><HardDrive /></template>{{ mountingID === item.id ? t('virtualMedia.mounting', 'Mounting') : t('virtualMedia.mount', 'Mount') }}</n-button>
                           <n-button v-else-if="item.mounted" size="small" @click="eject('drive')"><template #icon><Unplug /></template>{{ t('virtualMedia.unmount', 'Eject') }}</n-button>
-                          <n-button v-if="!item.imported" size="small" :disabled="item.mounted" @click="openDrive(item)"><template #icon><FolderOpen /></template>{{ t('virtualMedia.files', 'Files') }}</n-button>
-                          <n-button quaternary circle size="small" :disabled="item.mounted" @click="confirmDelete(item)"><template #icon><Trash2 /></template></n-button>
+                          <n-button v-if="!item.imported" size="small" :type="browsingDrive?.id === item.id ? 'primary' : 'default'" :disabled="item.mounted" @click="openDrive(item)"><template #icon><FolderOpen /></template>{{ browsingDrive?.id === item.id ? t('virtualMedia.closeFiles', 'Close') : t('virtualMedia.files', 'Files') }}</n-button>
+                          <n-button quaternary circle size="small" :loading="deletingID === item.id" :disabled="item.mounted || Boolean(deletingID)" @click="confirmDelete(item)"><template #icon><Trash2 /></template></n-button>
                         </div>
                     </div>
 
@@ -1428,12 +1263,13 @@ onBeforeUnmount(() => {
                               >{{ part }}</n-button>
                             </template>
                           </div>
+                          <n-button class="file-manager-close" quaternary circle size="small" :title="t('virtualMedia.closeFiles', 'Close')" @click="closeDrive"><template #icon><X /></template></n-button>
                         </div>
                         <n-alert v-if="browsingDrive.mounted" type="warning">{{ t('virtualMedia.ejectToManage', 'Eject the drive before managing files.') }}</n-alert>
                         <template v-else>
                           <div class="file-actions">
                             <label class="file-picker"><input type="file" :disabled="driveUpload.uploading.value" @change="uploadDriveFile" /><n-button tag="span" size="small" :disabled="driveUpload.uploading.value"><template #icon><Upload /></template>{{ t('virtualMedia.uploadFile', 'Upload file') }}</n-button></label>
-                            <n-popover v-model:show="folderCreateOpen" trigger="click" placement="bottom-start" to="body" :z-index="4600" :show-arrow="false" class="folder-create-popover">
+                            <n-popover v-model:show="folderCreateOpen" trigger="click" placement="bottom-start" :to="overlayTo" :z-index="4600" :show-arrow="false" class="folder-create-popover">
                               <template #trigger><n-button size="small"><template #icon><FolderPlus /></template>{{ t('virtualMedia.newFolder', 'New folder') }}</n-button></template>
                               <section class="folder-create-card">
                                 <strong class="media-title"><FolderPlus :size="16" />{{ t('virtualMedia.newFolder', 'New folder') }}</strong>
@@ -1490,7 +1326,7 @@ onBeforeUnmount(() => {
                                     :show="fileDeletePopoverPath === childPath(entry.name)"
                                     :positive-text="t('common.delete', 'Delete')"
                                     :negative-text="t('common.cancel', 'Cancel')"
-                                    to="body"
+                                    :to="overlayTo"
                                     :z-index="4600"
                                     @update:show="updateDeletePopover(entry, $event)"
                                     @positive-click="deleteDriveEntry(entry)"
@@ -1538,6 +1374,66 @@ onBeforeUnmount(() => {
       </n-card>
   </n-modal>
 
+  <n-modal
+    v-model:show="driveCreateOpen"
+    preset="card"
+    :to="overlayTo"
+    :z-index="4600"
+    class="drive-create-modal"
+    :style="{ width: 'min(400px, calc(100vw - 48px))' }"
+    :title="t('virtualMedia.createDriveTab', 'Create disk')"
+    :mask-closable="!creatingDrive"
+    :closable="!creatingDrive"
+    :auto-focus="false"
+  >
+    <n-form label-placement="top" :show-feedback="false" class="drive-create-form">
+      <n-form-item :label="t('virtualMedia.driveName', 'Disk name')">
+        <n-input v-model:value="driveName" :placeholder="t('virtualMedia.driveName', 'Disk name')" />
+      </n-form-item>
+      <div class="drive-create-row">
+        <n-form-item :label="t('virtualMedia.driveFormat', 'Format')">
+          <n-select
+            v-model:value="driveFilesystem"
+            class="drive-format-select"
+            :options="driveFormatOptions"
+            :consistent-menu-width="false"
+            :menu-props="{ to: overlayTo, zIndex: 4700 }"
+          />
+        </n-form-item>
+        <n-form-item :label="t('virtualMedia.driveCapacity', 'Capacity')">
+          <n-input-group class="drive-size-input">
+            <n-input-number
+              v-model:value="driveSize"
+              class="drive-size-number"
+              placeholder=" "
+              :show-button="false"
+              :min="minimumDriveSize"
+              :max="maximumDriveSize"
+              :step="driveSizeUnit === 'GiB' ? 0.25 : 64"
+            />
+            <n-select
+              class="drive-size-unit"
+              :value="driveSizeUnit"
+              :options="driveSizeUnitOptions"
+              :consistent-menu-width="false"
+              :menu-props="{ to: overlayTo, zIndex: 4700 }"
+              @update:value="updateDriveSizeUnit"
+            />
+          </n-input-group>
+        </n-form-item>
+      </div>
+      <p class="drive-format-hint">{{ driveFormatHint }}</p>
+    </n-form>
+    <template #footer>
+      <div class="drive-create-actions">
+        <n-button :disabled="creatingDrive" @click="driveCreateOpen = false">{{ t('common.cancel', 'Cancel') }}</n-button>
+        <n-button type="primary" :loading="creatingDrive" :disabled="!driveName.trim() || !driveSize" @click="createDrive">
+          <template #icon><CirclePlus /></template>{{ t('virtualMedia.createDrive', 'Create') }}
+        </n-button>
+      </div>
+    </template>
+  </n-modal>
+
   <XpTransferDialog
     ref="uploadWindow"
     :show="uploadDialogOpen"
@@ -1545,7 +1441,7 @@ onBeforeUnmount(() => {
     :window-style="uploadWindowStyle"
     :status="uploadStatusLabel"
     :transferred="uploadTransferred"
-    :total="pendingUpload?.size || uploadFileSize"
+    :total="uploadFileSize"
     :percentage="uploadProgress"
     :speed="uploadSpeed"
     :remaining-label="uploading ? uploadRemainingLabel : ''"
@@ -1557,22 +1453,8 @@ onBeforeUnmount(() => {
     <template #title-actions>
       <button class="xp-title-minimize" :aria-label="t('virtualMedia.minimizeUpload', 'Minimize upload window')" @click="minimizeUploadDialog" />
     </template>
-    <template #hint>
-      <div v-if="pendingUpload && !uploading" class="xp-resume-hint">
-        {{ t('virtualMedia.resumeHint', 'Select the same file again to resume from the saved position.') }}
-      </div>
-    </template>
     <template #actions>
-      <button v-if="uploading" @click="pauseUpload"><Pause :size="14" />{{ t('virtualMedia.pauseUpload', 'Pause') }}</button>
-      <label v-else-if="pendingUpload" class="xp-upload-file-button">
-        <input
-          type="file"
-          :accept="pendingUploadKind === 'drive' ? '.img,.raw,.bin,application/octet-stream' : '.iso,application/x-iso9660-image'"
-          @change="pendingUploadKind === 'drive' ? uploadDriveImage($event) : uploadISO($event)"
-        />
-        <span>{{ t('virtualMedia.resumeUpload', 'Resume upload') }}</span>
-      </label>
-      <button :disabled="!activeUploadID" @click="cancelUpload">{{ t('virtualMedia.cancelUpload', 'Cancel upload') }}</button>
+      <button :disabled="!uploading" @click="cancelUpload">{{ t('virtualMedia.cancelUpload', 'Cancel upload') }}</button>
     </template>
   </XpTransferDialog>
 
@@ -1759,13 +1641,17 @@ onBeforeUnmount(() => {
 .direct-mount-panel .file-picker :deep(.n-button) { width: 100%; }
 .virtual-drive-panel { margin-top: 2px; }
 .virtual-drive-toolbar { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 8px; margin-bottom: 10px; }
-.drive-create-card { width: min(360px, calc(100vw - 48px)); padding: 4px; }
-.drive-create-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
-.drive-create-form { display: grid; grid-template-columns: minmax(0, 1fr); }
-.drive-create-form :deep(.n-form-item) { min-width: 0; margin-bottom: 8px; }
-.drive-create-form :deep(.n-input), .drive-create-form :deep(.n-input-number) { width: 100%; }
-.drive-size-input { display: grid; grid-template-columns: minmax(0, 1fr) 86px; gap: 8px; }
-.drive-create-actions { display: flex; justify-content: flex-end; }
+.drive-create-form { display: grid; }
+.drive-create-form :deep(.n-form-item) { min-width: 0; margin-bottom: 10px; }
+.drive-create-form :deep(.n-input) { width: 100%; }
+.drive-create-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0 16px; }
+.drive-create-row :deep(.n-form-item) { flex: 0 0 auto; width: auto; margin-bottom: 8px; }
+.drive-format-select { width: 128px; }
+.drive-size-input { display: inline-flex; width: max-content; align-items: stretch; }
+.drive-size-number { width: 112px; }
+.drive-size-unit { width: 76px; }
+.drive-format-hint { margin: 0 0 4px; color: var(--n-text-color-3); font-size: 11px; line-height: 1.45; }
+.drive-create-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .folder-create-card { display: grid; width: min(320px, calc(100vw - 48px)); gap: 10px; padding: 4px; }
 .folder-create-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
@@ -1791,12 +1677,15 @@ onBeforeUnmount(() => {
 .browser-media-list { margin-bottom: 12px; }
 .media-list { display: grid; gap: 8px; }
 .media-row { display: flex; align-items: center; gap: 10px; min-height: 54px; padding: 9px 11px; border: 1px solid rgba(128, 128, 128, .2); border-radius: 8px; }
-.media-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; }
+.media-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 4px; }
 .media-filename { min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
 .media-copy span { color: var(--n-text-color-3); font-size: 12px; }
+.media-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.media-badges :deep(.n-tag) { flex: 0 0 auto; }
 .file-manager { margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(128, 128, 128, .2); }
 .file-manager-header { display: flex; min-width: 0; align-items: center; gap: 12px; margin-bottom: 12px; }
 .file-manager-header > strong { flex: 0 1 auto; }
+.file-manager-close { margin-left: auto; flex: 0 0 auto; }
 .breadcrumbs { display: flex; min-width: 0; align-items: center; gap: 4px; overflow: hidden; white-space: nowrap; }
 .breadcrumbs.has-nested-path { overflow-x: auto; overflow-y: hidden; }
 .breadcrumbs :deep(.n-button) { flex: 0 0 auto; }
@@ -1814,12 +1703,13 @@ onBeforeUnmount(() => {
 .file-open small { margin-left: auto; color: var(--n-text-color-3); }
 .file-icon-action { display: inline-flex; color: inherit; }
 @media (max-width: 760px) {
-  .virtual-media-dialog { width: calc(100vw - 16px); max-height: calc(100vh - 16px); }
+  .virtual-media-dialog { width: 100vw; max-width: 100vw; max-height: 92dvh; border-radius: 16px 16px 0 0; }
   .virtual-media-dialog :deep(.n-card-header) { padding: 12px 14px 10px; }
-  .virtual-media-dialog :deep(.n-card__content) { max-height: calc(100vh - 74px); padding: 0 12px 12px; }
+  .virtual-media-dialog :deep(.n-card__content) { max-height: calc(92dvh - 58px); padding: 0 12px 12px; }
   .virtual-media-content,
-  .virtual-media-pane { max-height: calc(100vh - 138px); }
+  .virtual-media-pane { max-height: calc(92dvh - 122px); }
   .virtual-media-home-grid { grid-template-columns: 1fr; }
+  .virtual-media-home-card { min-height: 96px; padding: 16px 14px; }
   .iso-mode-grid { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {

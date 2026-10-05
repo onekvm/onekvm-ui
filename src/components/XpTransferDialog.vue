@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useTemplateRef, type CSSProperties } from 'vue'
 
+import { useOverlayMount } from '@/composables/useOverlayMount'
+
 withDefaults(defineProps<{
   show: boolean
   dialogLabel: string
@@ -29,6 +31,7 @@ const emit = defineEmits<{
   titlePointerdown: [event: PointerEvent]
 }>()
 
+const overlayTo = useOverlayMount()
 const windowElement = useTemplateRef<HTMLElement>('windowElement')
 
 function formatBytes(value: number) {
@@ -42,7 +45,7 @@ defineExpose({ windowElement })
 </script>
 
 <template>
-  <Teleport to="body">
+  <Teleport :to="overlayTo">
     <Transition name="xp-upload-fade" appear>
       <div v-if="show" class="xp-upload-modal-layer" :class="layerClass">
         <section

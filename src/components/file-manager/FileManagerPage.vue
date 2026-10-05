@@ -271,4 +271,11 @@ function dropFiles(event: DragEvent) {
 
 .file-manager-safety { display: inline-flex; align-items: center; gap: 5px; color: var(--warning); }
 .file-editor-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+@media (max-width: 760px) {
+  .file-manager-page { gap: 14px; }
+  .file-manager-footer { align-items: flex-start; flex-direction: column; gap: 6px; }
+  .file-editor-actions { justify-content: stretch; }
+  .file-editor-actions :deep(.n-button) { flex: 1; }
+}
 </style>

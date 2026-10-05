@@ -189,6 +189,7 @@ function formatMode(mode: number) {
   color: var(--onekvm-text-secondary);
   font-size: 12px;
 }
+.file-list td:first-child { overflow: hidden; }
 
 .file-list tbody tr:last-child td { border-bottom: 0; }
 .file-list tbody tr:hover td { background: color-mix(in srgb, var(--accent) 66%, transparent); }
@@ -211,7 +212,7 @@ function formatMode(mode: number) {
 .file-name:not(.directory) { cursor: default; }
 .file-name > svg { flex: 0 0 auto; color: var(--muted-foreground); }
 .file-name.directory > svg { color: var(--primary); }
-.file-name > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-name > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-size,
 .file-modified,
 .file-mode { font-variant-numeric: tabular-nums; }
@@ -243,11 +244,12 @@ function formatMode(mode: number) {
   border: 0;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 760px) {
   .file-list th,
-  .file-list td { padding-inline: 8px; }
-  .file-list th:first-child { width: 48%; }
-  .file-list th:last-child { width: 52%; }
+  .file-list td { padding-inline: 10px; }
+  .file-list td { height: 56px; }
+  .file-list th:first-child { width: auto; }
+  .file-list th:last-child { width: 124px; }
   .file-list th:nth-child(2),
   .file-list th:nth-child(3),
   .file-list th:nth-child(4),
@@ -256,7 +258,7 @@ function formatMode(mode: number) {
   .file-list td:nth-child(3),
   .file-list td:nth-child(4),
   .file-list td:nth-child(5) { display: none; }
-  .file-row-actions { gap: 0; }
+  .file-row-actions { gap: 2px; opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

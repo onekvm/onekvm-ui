@@ -73,9 +73,10 @@ const channelOptions = computed(() => [
 </template>
 
 <style scoped>
-.audio-settings { display: grid; gap: 16px; }
-.audio-settings-card { display: grid; gap: 14px; padding: 16px; border: 1px solid #30363d; border-radius: 7px; background: #14191e; }
+.audio-settings { display: grid; gap: 18px; }
+.audio-settings-card { display: grid; gap: 16px; padding: 16px; border: 1px solid var(--border); border-radius: 7px; background: var(--card); }
 .audio-settings-card header h2 { margin: 0; font-size: 14px; }
-.audio-settings-card header p { margin: 5px 0 0; color: #8f99a3; font-size: 11px; }
-.audio-settings-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.audio-settings-card header p { margin: 5px 0 0; color: var(--muted-foreground); font-size: 11px; line-height: 1.5; }
+.audio-settings-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.audio-settings-grid :deep(.n-form-item) { margin-bottom: 0; }
 </style>

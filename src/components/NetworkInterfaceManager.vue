@@ -1,21 +1,43 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { ChevronRight, Layers3, Plus, RefreshCw, Shield } from '@lucide/vue'
+import { ChevronRight, Layers3, Network, Plus, RefreshCw, Shield, Wifi } from '@lucide/vue'
 
 import {
   api,
   type ManagedNetworkInterface,
   type NetworkConfig,
   type NetworkInterfaceStatus,
+  type VpnClientConfig,
   type WireGuardConfig,
 } from '@/api/client'
 import { t } from '@/i18n/runtime'
+import { defaultManagedTunnel, networkKindLabel } from '@/lib/network'
 
 import NetworkSettingsForm from './NetworkSettingsForm.vue'
+import TunnelSettingsForm from './TunnelSettingsForm.vue'
 import VLANSettingsForm from './VLANSettingsForm.vue'
+import VpnSettingsForm from './VpnSettingsForm.vue'
+import WifiOnboarding from './WifiOnboarding.vue'
 import WireGuardSettingsForm from './WireGuardSettingsForm.vue'
 
-const props = defineProps<{ modelValue: NetworkConfig; disabled?: boolean }>()
+const TUNNEL_KINDS = ['gre', 'ipip', 'sit', 'vxlan', 'geneve', 'fou', 'bareudp', 'gretap'] as const
+type TunnelKind = (typeof TUNNEL_KINDS)[number]
+const OVERLAY_KINDS = ['vxlan', 'geneve'] as const
+const POINT_TUNNEL_KINDS = ['gre', 'ipip', 'sit', 'fou', 'bareudp', 'gretap'] as const
+const VPN_KINDS = ['openvpn', 'pppoe', 'pptp', 'l2tp'] as const
+type VpnKind = (typeof VPN_KINDS)[number]
+
+const props = defineProps<{
+  modelValue: NetworkConfig
+  disabled?: boolean
+  wireguardAvailable?: boolean
+  ipTunnelsAvailable?: boolean
+  openvpnAvailable?: boolean
+  pppoeAvailable?: boolean
+  pptpAvailable?: boolean
+  l2tpAvailable?: boolean
+  wifiAvailable?: boolean
+}>()
 const emit = defineEmits<{
   'update:modelValue': [value: NetworkConfig]
   validity: [valid: boolean]
@@ -26,19 +48,82 @@ const expanded = ref('')
 const loading = ref(false)
 const loadError = ref('')
 const wireGuardValidity = ref<Record<string, boolean>>({})
+const wireguardSupported = computed(() => props.wireguardAvailable !== false)
+const tunnelsSupported = computed(() => props.ipTunnelsAvailable !== false)
+const vpnAvailability = computed(() => ({
+  openvpn: props.openvpnAvailable !== false,
+  pppoe: props.pppoeAvailable !== false,
+  pptp: props.pptpAvailable !== false,
+  l2tp: props.l2tpAvailable !== false,
+}))
 const addOptions = computed(() => [
-  { label: 'WireGuard', key: 'wireguard' },
-  { label: 'VLAN', key: 'vlan' },
+  {
+    type: 'group',
+    key: 'group-virtual',
+    label: t('network.interfaces.addGroupVirtual', 'Virtual'),
+    children: [{ label: networkKindLabel('vlan'), key: 'vlan' }],
+  },
+  {
+    type: 'group',
+    key: 'group-overlay',
+    label: t('network.interfaces.addGroupOverlay', 'Overlay'),
+    children: OVERLAY_KINDS.map((kind) => ({
+      label: networkKindLabel(kind),
+      key: kind,
+      disabled: !tunnelsSupported.value,
+    })),
+  },
+  {
+    type: 'group',
+    key: 'group-tunnels',
+    label: t('network.interfaces.addGroupTunnels', 'Tunnels'),
+    children: POINT_TUNNEL_KINDS.map((kind) => ({
+      label: networkKindLabel(kind),
+      key: kind,
+      disabled: !tunnelsSupported.value,
+    })),
+  },
+  {
+    type: 'group',
+    key: 'group-vpn',
+    label: t('network.interfaces.addGroupVpn', 'VPN'),
+    children: [
+      {
+        label: networkKindLabel('wireguard'),
+        key: 'wireguard',
+        disabled: !wireguardSupported.value,
+      },
+      ...VPN_KINDS.map((kind) => ({
+        label: networkKindLabel(kind),
+        key: kind,
+        disabled: !vpnAvailability.value[kind],
+      })),
+    ],
+  },
 ])
 
 const visibleInterfaces = computed(() => {
   const wireGuardNames = new Set((props.modelValue.wireguard || []).map(({ name }) => name))
   const managedNames = new Set((props.modelValue.interfaces || []).map(({ name }) => name))
-  const available = interfaces.value.filter(({ name }) => !wireGuardNames.has(name) && !managedNames.has(name)).map((networkInterface) => ({
-    ...networkInterface,
-    kind: 'physical' as const,
-    configured: networkInterface.name === props.modelValue.device,
-  }))
+  const vpnNames = new Set((props.modelValue.vpn || []).map(({ name }) => name))
+  const available = interfaces.value
+    .filter(({ name }) => !wireGuardNames.has(name) && !managedNames.has(name) && !vpnNames.has(name))
+    .map((networkInterface) => ({
+      ...networkInterface,
+      kind: props.wifiAvailable && networkInterface.name === 'ap0' ? 'wifi_ap' as const
+        : props.wifiAvailable && networkInterface.name === 'wlan0' ? 'wifi_station' as const : 'physical' as const,
+      configured: networkInterface.name === props.modelValue.device,
+    }))
+  if (props.wifiAvailable) {
+    if (!available.some(({ name }) => name === 'ap0')) {
+      available.push({ name: 'ap0', up: false, configured: false, mac: '', addresses: [],
+        kind: 'wifi_ap', port_type: 'virtual', link_speed_mbps: 0 })
+    }
+    if (!available.some(({ name }) => name === 'wlan0')) {
+      available.push({ name: 'wlan0', up: false, configured: false, mac: '', addresses: [],
+        kind: 'wifi_station', port_type: 'physical', link_speed_mbps: 0 })
+    }
+  }
   if (props.modelValue.device && !available.some(({ name }) => name === props.modelValue.device)) {
     available.unshift({
       name: props.modelValue.device,
@@ -56,7 +141,8 @@ const visibleInterfaces = computed(() => {
     return {
       name: configuration.name,
       up: status?.up || false,
-      configured: Boolean(status),
+      // Present in OneKVM config — not gated on kernel iface existing yet.
+      configured: true,
       mac: '',
       addresses: status?.addresses.length ? status.addresses : configuration.addresses,
       kind: 'wireguard' as const,
@@ -72,7 +158,7 @@ const visibleInterfaces = computed(() => {
     return {
       name: configuration.name,
       up: status?.up || false,
-      configured: Boolean(status),
+      configured: true,
       mac: '',
       addresses: status?.addresses.length ? status.addresses : addresses,
       kind: configuration.kind,
@@ -82,17 +168,49 @@ const visibleInterfaces = computed(() => {
       managedIndex,
     }
   })
-  return [...available, ...wireGuard, ...managed]
+  const vpn = (props.modelValue.vpn || []).map((configuration, vpnIndex) => {
+    const status = interfaces.value.find(({ name }) => name === configuration.name)
+    return {
+      name: configuration.name,
+      up: status?.up || false,
+      configured: true,
+      mac: '',
+      addresses: status?.addresses || [],
+      kind: configuration.kind,
+      port_type: 'virtual' as const,
+      link_speed_mbps: 0,
+      configuration,
+      vpnIndex,
+    }
+  })
+  return [...available, ...wireGuard, ...managed, ...vpn]
 })
+
+function isTunnelKind(kind: string): kind is TunnelKind {
+  return (TUNNEL_KINDS as readonly string[]).includes(kind)
+}
+
+function isVpnKind(kind: string): kind is VpnKind {
+  return (VPN_KINDS as readonly string[]).includes(kind)
+}
+
+type VisibleInterface = (typeof visibleInterfaces.value)[number]
+type ManagedVisibleInterface = Extract<VisibleInterface, { managedIndex: number }>
+type VpnVisibleInterface = Extract<VisibleInterface, { vpnIndex: number }>
+
+function isManagedTunnel(iface: VisibleInterface): iface is ManagedVisibleInterface & { kind: TunnelKind } {
+  return 'managedIndex' in iface && isTunnelKind(iface.kind)
+}
+
+function isVpnInterface(iface: VisibleInterface): iface is VpnVisibleInterface & { kind: VpnKind } {
+  return 'vpnIndex' in iface && isVpnKind(iface.kind)
+}
 
 async function load() {
   loading.value = true
   loadError.value = ''
   try {
     interfaces.value = await api.getNetworkInterfaces()
-    if (!expanded.value) {
-      expanded.value = props.modelValue.device || interfaces.value[0]?.name || ''
-    }
   } catch (error) {
     loadError.value = error instanceof Error ? error.message : String(error)
   } finally {
@@ -114,7 +232,7 @@ function updateConfig(value: NetworkConfig) {
 }
 
 function addWireGuard() {
-  const names = new Set((props.modelValue.wireguard || []).map(({ name }) => name))
+  const names = usedNames()
   let index = 0
   while (names.has(`wg${index}`)) index++
   const wireGuard: WireGuardConfig = {
@@ -130,10 +248,7 @@ function addWireGuard() {
 }
 
 function addVLAN() {
-  const names = new Set([
-    ...(props.modelValue.wireguard || []).map(({ name }) => name),
-    ...(props.modelValue.interfaces || []).map(({ name }) => name),
-  ])
+  const names = usedNames()
   let vlanID = 2
   while (names.has(`vlan${vlanID}`)) vlanID++
   const networkInterface: ManagedNetworkInterface = {
@@ -153,9 +268,71 @@ function addVLAN() {
   expanded.value = networkInterface.name
 }
 
+function usedNames() {
+  return new Set([
+    ...(props.modelValue.wireguard || []).map(({ name }) => name),
+    ...(props.modelValue.interfaces || []).map(({ name }) => name),
+    ...(props.modelValue.vpn || []).map(({ name }) => name),
+  ])
+}
+
+function addTunnel(kind: TunnelKind) {
+  const names = usedNames()
+  let index = 0
+  while (names.has(`${kind}${index}`)) index++
+  const networkInterface = defaultManagedTunnel(kind, `${kind}${index}`)
+  emit('update:modelValue', { ...props.modelValue, interfaces: [...(props.modelValue.interfaces || []), networkInterface] })
+  expanded.value = networkInterface.name
+}
+
+function addVpn(kind: VpnKind) {
+  const names = usedNames()
+  let index = 0
+  while (names.has(`${kind}${index}`)) index++
+  const client: VpnClientConfig = {
+    kind,
+    name: `${kind}${index}`,
+    enabled: true,
+    remote: '',
+    port: kind === 'openvpn' ? 1194 : 0,
+    protocol: kind === 'openvpn' ? 'udp' : '',
+    parent: kind === 'pppoe' ? props.modelValue.device : '',
+    username: '',
+    password: '',
+    service: '',
+    config: '',
+    default_route: kind === 'pppoe',
+  }
+  emit('update:modelValue', { ...props.modelValue, vpn: [...(props.modelValue.vpn || []), client] })
+  expanded.value = client.name
+}
+
+function addMenuProps() {
+  return {
+    class: 'network-add-interface-menu',
+    style: 'max-height: min(24rem, calc(100vh - 12rem))',
+  }
+}
+
 function addInterface(kind: string) {
-  if (kind === 'wireguard') addWireGuard()
-  if (kind === 'vlan') addVLAN()
+  if (kind === 'wireguard') {
+    if (!wireguardSupported.value) return
+    addWireGuard()
+    return
+  }
+  if (kind === 'vlan') {
+    addVLAN()
+    return
+  }
+  if (isTunnelKind(kind)) {
+    if (!tunnelsSupported.value) return
+    addTunnel(kind)
+    return
+  }
+  if (isVpnKind(kind)) {
+    if (!vpnAvailability.value[kind]) return
+    addVpn(kind)
+  }
 }
 
 function updateWireGuard(index: number, value: WireGuardConfig) {
@@ -205,6 +382,23 @@ function removeManagedInterface(index: number) {
   if (expanded.value === removed?.name) expanded.value = ''
 }
 
+function updateVpn(index: number, value: VpnClientConfig) {
+  const vpn = [...(props.modelValue.vpn || [])]
+  const oldName = vpn[index]?.name
+  vpn[index] = value
+  emit('update:modelValue', { ...props.modelValue, vpn })
+  if (expanded.value === oldName) expanded.value = value.name
+}
+
+function removeVpn(index: number) {
+  const removed = props.modelValue.vpn?.[index]
+  emit('update:modelValue', {
+    ...props.modelValue,
+    vpn: (props.modelValue.vpn || []).filter((_, vpnIndex) => vpnIndex !== index),
+  })
+  if (expanded.value === removed?.name) expanded.value = ''
+}
+
 onMounted(load)
 watch(() => props.disabled, (disabled, previous) => {
   if (previous && !disabled) void load()
@@ -216,15 +410,22 @@ watch(() => props.disabled, (disabled, previous) => {
     <header class="list-toolbar">
       <span>{{ visibleInterfaces.length }} {{ t('network.interfaces.title', 'Interfaces') }}</span>
       <div>
-        <n-dropdown trigger="click" :options="addOptions" :disabled="disabled" @select="addInterface">
+        <n-dropdown
+          trigger="click"
+          scrollable
+          :menu-props="addMenuProps"
+          :options="addOptions"
+          :disabled="disabled"
+          @select="addInterface"
+        >
           <n-button size="small" quaternary :disabled="disabled">
             <template #icon><Plus /></template>
-			{{ t('network.interfaces.addInterface', 'Add interface') }}
+            {{ t('network.interfaces.addInterface', 'Add interface') }}
           </n-button>
         </n-dropdown>
         <n-tooltip>
           <template #trigger>
-			<n-button quaternary circle size="small" :loading="loading" :aria-label="t('network.interfaces.refresh', 'Refresh interfaces')" @click="load">
+            <n-button quaternary circle size="small" :loading="loading" :aria-label="t('network.interfaces.refresh', 'Refresh interfaces')" @click="load">
               <template #icon><RefreshCw /></template>
             </n-button>
           </template>
@@ -234,8 +435,33 @@ watch(() => props.disabled, (disabled, previous) => {
     </header>
 
     <n-alert v-if="loadError" type="error" :show-icon="false">{{ loadError }}</n-alert>
+    <n-alert
+      v-else-if="!wireguardSupported || !tunnelsSupported"
+      type="warning"
+      :show-icon="false"
+      class="modules-unavailable"
+    >
+      <template v-if="!wireguardSupported && !tunnelsSupported">
+        {{ t(
+          'network.modules.unavailableBoth',
+          'WireGuard and IP tunnel kernel modules are not installed. Install onekvm-kernel-module-wireguard (depends on onekvm-kernel-module-ip-tunnels).',
+        ) }}
+      </template>
+      <template v-else-if="!wireguardSupported">
+        {{ t(
+          'network.wireguard.modulesUnavailable',
+          'WireGuard kernel modules are not installed. Install onekvm-kernel-module-wireguard (it depends on onekvm-kernel-module-ip-tunnels).',
+        ) }}
+      </template>
+      <template v-else>
+        {{ t(
+          'network.tunnels.modulesUnavailable',
+          'IP tunnel kernel modules are not installed. Install onekvm-kernel-module-ip-tunnels.',
+        ) }}
+      </template>
+    </n-alert>
     <n-spin :show="loading">
-	  <n-empty v-if="!loading && visibleInterfaces.length === 0" :description="t('network.interfaces.empty', 'No network interfaces')" />
+      <n-empty v-if="!loading && visibleInterfaces.length === 0" :description="t('network.interfaces.empty', 'No network interfaces')" />
       <ul v-else class="settings-list">
         <li v-for="networkInterface in visibleInterfaces" :key="networkInterface.name" class="settings-list-item">
           <div
@@ -252,23 +478,33 @@ watch(() => props.disabled, (disabled, previous) => {
               class="settings-list-chevron"
               :class="{ expanded: expanded === networkInterface.name }"
             />
-            <Shield v-if="networkInterface.kind === 'wireguard'" :size="16" class="interface-kind-icon" />
+            <Shield v-if="networkInterface.kind === 'wireguard' || isVpnKind(networkInterface.kind)" :size="16" class="interface-kind-icon" />
             <Layers3 v-else-if="networkInterface.kind === 'vlan'" :size="16" class="interface-kind-icon" />
+            <Wifi v-else-if="networkInterface.kind === 'wifi_ap' || networkInterface.kind === 'wifi_station'" :size="16" class="interface-kind-icon" />
+            <Network v-else :size="16" class="interface-kind-icon" />
             <div class="settings-list-identity">
               <strong>{{ networkInterface.name }}</strong>
               <span>{{ networkInterface.addresses[0] || t('network.interfaces.noAddress', 'No address') }}</span>
             </div>
-            <n-tag v-if="networkInterface.configured" size="small" type="info" :bordered="false">
-              {{ t('network.interfaces.configured', 'Configured') }}
-            </n-tag>
-			<n-tag size="small" :bordered="false">
-			  {{ networkInterface.port_type === 'physical'
-				? t('network.interfaces.physicalPort', 'Physical')
-				: t('network.interfaces.virtualPort', 'Virtual') }}
-			</n-tag>
-            <n-tag size="small" :type="networkInterface.up ? 'success' : 'default'" :bordered="false">
-			  {{ networkInterface.up ? t('network.interfaces.up', 'Up') : t('network.interfaces.down', 'Down') }}
-            </n-tag>
+            <div class="settings-list-tags">
+              <n-tag
+                v-if="networkInterface.configured"
+                class="configured-tag"
+                size="small"
+                type="info"
+                :bordered="false"
+              >
+                {{ t('network.interfaces.configured', 'Configured') }}
+              </n-tag>
+              <n-tag class="port-type-tag" size="small" :bordered="false">
+                {{ networkInterface.port_type === 'physical'
+                  ? t('network.interfaces.physicalPort', 'Physical')
+                  : t('network.interfaces.virtualPort', 'Virtual') }}
+              </n-tag>
+              <n-tag size="small" :type="networkInterface.up ? 'success' : 'default'" :bordered="false">
+                {{ networkInterface.up ? t('network.interfaces.up', 'Up') : t('network.interfaces.down', 'Down') }}
+              </n-tag>
+            </div>
           </div>
 
           <n-collapse-transition :show="expanded === networkInterface.name">
@@ -278,22 +514,25 @@ watch(() => props.disabled, (disabled, previous) => {
                   <dt>{{ t('network.interfaces.currentMAC', 'Current MAC address') }}</dt>
                   <dd>{{ networkInterface.mac || '-' }}</dd>
                 </div>
-				<div v-if="networkInterface.port_type === 'physical'">
-				  <dt>{{ t('network.interfaces.linkSpeed', 'Link speed') }}</dt>
-				  <dd>{{ networkInterface.link_speed_mbps > 0
-					? `${networkInterface.link_speed_mbps} Mbps`
-					: t('network.interfaces.speedUnavailable', 'Unavailable') }}</dd>
-				</div>
+                <div v-if="networkInterface.port_type === 'physical'">
+                  <dt>{{ t('network.interfaces.linkSpeed', 'Link speed') }}</dt>
+                  <dd>{{ networkInterface.link_speed_mbps > 0
+                    ? `${networkInterface.link_speed_mbps} Mbps`
+                    : t('network.interfaces.speedUnavailable', 'Unavailable') }}</dd>
+                </div>
                 <div>
                   <dt>{{ t('network.interfaces.addresses', 'Addresses') }}</dt>
-                  <dd>
+                  <dd class="interface-addresses">
                     <span v-for="address in networkInterface.addresses" :key="address">{{ address }}</span>
                     <span v-if="networkInterface.addresses.length === 0">-</span>
                   </dd>
                 </div>
               </dl>
 
-              <n-form v-if="networkInterface.kind === 'wireguard'" label-placement="top" :show-feedback="false">
+              <WifiOnboarding v-if="networkInterface.kind === 'wifi_ap' && expanded === networkInterface.name" interface-name="ap0" @changed="load" />
+              <WifiOnboarding v-else-if="networkInterface.kind === 'wifi_station' && expanded === networkInterface.name" interface-name="wlan0" @changed="load" />
+
+              <n-form v-else-if="networkInterface.kind === 'wireguard'" label-placement="top" :show-feedback="false">
                 <WireGuardSettingsForm
                   :model-value="networkInterface.configuration"
                   :disabled="disabled"
@@ -308,6 +547,23 @@ watch(() => props.disabled, (disabled, previous) => {
                   :disabled="disabled"
                   @update:model-value="updateManagedInterface(networkInterface.managedIndex, $event)"
                   @remove="removeManagedInterface(networkInterface.managedIndex)"
+                />
+              </n-form>
+              <n-form v-else-if="isManagedTunnel(networkInterface)" label-placement="top" :show-feedback="false">
+                <TunnelSettingsForm
+                  :model-value="networkInterface.configuration"
+                  :disabled="disabled"
+                  @update:model-value="updateManagedInterface(networkInterface.managedIndex, $event)"
+                  @remove="removeManagedInterface(networkInterface.managedIndex)"
+                />
+              </n-form>
+              <n-form v-else-if="isVpnInterface(networkInterface)" label-placement="top" :show-feedback="false">
+                <VpnSettingsForm
+                  :model-value="networkInterface.configuration"
+                  :disabled="disabled"
+                  :parent-device="modelValue.device"
+                  @update:model-value="updateVpn(networkInterface.vpnIndex, $event)"
+                  @remove="removeVpn(networkInterface.vpnIndex)"
                 />
               </n-form>
               <n-form v-else-if="networkInterface.configured" label-placement="top" :show-feedback="false">
@@ -332,57 +588,89 @@ watch(() => props.disabled, (disabled, previous) => {
 </template>
 
 <style scoped>
-.network-interface-manager { display: grid; gap: 10px; }
+.network-interface-manager { display: grid; gap: 16px; }
 .list-toolbar {
   display: flex;
-  min-height: 28px;
   align-items: center;
   justify-content: space-between;
-  color: #929ca5;
+  gap: 12px;
+  color: var(--foreground);
   font-size: 12px;
 }
-.list-toolbar > div { display: flex; gap: 2px; }
-.interface-kind-icon { flex: 0 0 auto; color: #58a6ff; }
+.list-toolbar > div { display: flex; align-items: center; gap: 4px; }
 .settings-list {
   margin: 0;
   padding: 0;
-  overflow: hidden;
-  border: 1px solid #30363d;
-  border-radius: 6px;
   list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card);
 }
-.settings-list-item + .settings-list-item { border-top: 1px solid #30363d; }
+.settings-list-item + .settings-list-item { border-top: 1px solid var(--border); }
 .settings-list-row {
-  display: flex;
-  min-height: 54px;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 9px;
-  padding: 7px 12px;
-  background: #15191e;
+  gap: 10px;
+  padding: 14px;
   cursor: pointer;
 }
 .settings-list-row:hover,
-.settings-list-row:focus-visible { background: #1b2026; outline: none; }
-.settings-list-chevron { flex: 0 0 auto; color: #818b95; transition: transform 160ms ease; }
+.settings-list-row:focus-visible { background: var(--accent); outline: none; }
+.settings-list-chevron { flex: 0 0 auto; color: var(--muted-foreground); transition: transform 160ms ease; }
 .settings-list-chevron.expanded { transform: rotate(90deg); }
 .settings-list-identity {
   display: grid;
-  min-width: 0;
-  flex: 1;
   gap: 2px;
+  min-width: 0;
 }
 .settings-list-identity strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; }
-.settings-list-identity span { overflow: hidden; color: #8f99a3; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.settings-list-detail { display: grid; gap: 18px; padding: 14px 16px 18px 37px; background: #11151a; }
-.interface-facts { display: grid; margin: 0; gap: 7px; }
-.interface-facts > div { display: grid; grid-template-columns: minmax(80px, .3fr) minmax(0, 1fr); gap: 14px; }
-.interface-facts dt { color: #8f99a3; font-size: 11px; }
-.interface-facts dd { display: grid; min-width: 0; margin: 0; font-size: 12px; }
-.interface-facts dd span { overflow-wrap: anywhere; }
-.interface-select-action { display: flex; justify-content: flex-end; }
-@media (max-width: 520px) {
-  .settings-list-row { padding-inline: 9px; }
-  .settings-list-detail { padding: 14px 10px 16px 34px; }
-  .settings-list-row :deep(.n-tag):first-of-type { display: none; }
+.settings-list-identity span { overflow: hidden; color: var(--muted-foreground); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.settings-list-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.settings-list-detail { display: grid; gap: 18px; padding: 14px 16px 18px 37px; background: var(--onekvm-surface-inset); }
+.modules-unavailable { margin-bottom: 12px; }
+.interface-kind-icon { color: var(--muted-foreground); }
+.interface-facts {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+.interface-facts > div { display: grid; gap: 2px; }
+.interface-facts dt { color: var(--muted-foreground); font-size: 11px; }
+.interface-facts dd { margin: 0; font-size: 13px; }
+.interface-addresses {
+  display: grid;
+  gap: 2px;
+}
+.interface-addresses span {
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  .settings-list-row {
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: start;
+    gap: 8px 10px;
+    padding: 14px 12px;
+  }
+  .settings-list-tags {
+    grid-column: 3;
+    justify-content: flex-start;
+  }
+  .settings-list-detail { padding: 14px 12px 18px 38px; }
+  .settings-list-row :deep(.port-type-tag) { display: none; }
+}
+</style>
+
+<style>
+.network-add-interface-menu {
+  max-height: min(24rem, calc(100vh - 12rem));
 }
 </style>

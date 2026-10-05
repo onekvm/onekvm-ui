@@ -3,7 +3,9 @@ import { computed } from 'vue'
 
 import type { IPv4Mode, IPv6Mode } from '@/api/client'
 import { t } from '@/i18n/runtime'
-import { isIPv4, isIPv6, validCIDR } from '@/lib/network'
+import { DEFAULT_FALLBACK_IPV4, ipv4ModeUsesStaticAddress, isIPv4, isIPv6, validCIDR } from '@/lib/network'
+
+import IosChoice from './IosChoice.vue'
 
 interface NetworkAddressConfig {
   ipv4_mode: IPv4Mode
@@ -18,19 +20,24 @@ interface NetworkAddressConfig {
 const props = withDefaults(defineProps<{
   modelValue: NetworkAddressConfig
   disabled?: boolean
-  allowIPv4Disabled?: boolean
+  hideDisabledIpv4?: boolean
+  hideRouteMetric?: boolean
+  inset?: boolean
 }>(), {
   disabled: false,
-  allowIPv4Disabled: true,
+  hideDisabledIpv4: false,
+  hideRouteMetric: false,
+  inset: false,
 })
 
 const emit = defineEmits<{ 'update:modelValue': [value: NetworkAddressConfig] }>()
 
 const ipv4Options = computed(() => [
-  ...(props.allowIPv4Disabled
-    ? [{ label: t('network.interfaces.ipv4Disabled', 'Disabled'), value: 'disabled' }]
-    : []),
+  ...(props.hideDisabledIpv4
+    ? []
+    : [{ label: t('network.interfaces.ipv4Disabled', 'Disabled'), value: 'disabled' }]),
   { label: t('network.interfaces.automatic', 'Automatic (DHCP)'), value: 'dhcp' },
+  { label: t('network.interfaces.dhcpStatic', 'DHCP + fallback IP'), value: 'dhcp-static' },
   { label: t('network.interfaces.staticIP', 'Static IP'), value: 'static' },
 ])
 
@@ -42,16 +49,28 @@ const ipv6Options = computed(() => [
 ])
 
 function update<K extends keyof NetworkAddressConfig>(key: K, value: NetworkAddressConfig[K]) {
-  emit('update:modelValue', { ...props.modelValue, [key]: value })
+  const next = { ...props.modelValue, [key]: value }
+  if (key === 'ipv4_mode' && value === 'dhcp-static' && !next.ipv4_address) {
+    next.ipv4_address = DEFAULT_FALLBACK_IPV4
+  }
+  emit('update:modelValue', next)
 }
 </script>
 
 <template>
-  <div class="network-address-settings">
+  <div class="network-address-settings" :class="{ 'is-inset': inset }">
     <section class="network-config-section">
       <h3>{{ t('network.interfaces.ipv4Config', 'IPv4 Configuration') }}</h3>
       <div class="network-fields">
-        <n-form-item :label="t('network.interfaces.mode', 'Mode')">
+        <IosChoice
+          v-if="inset"
+          :label="t('network.interfaces.ipv4Mode', 'IPv4 mode')"
+          :value="modelValue.ipv4_mode"
+          :options="ipv4Options"
+          :disabled="disabled"
+          @select="update('ipv4_mode', $event as IPv4Mode)"
+        />
+        <n-form-item v-else :label="t('network.interfaces.ipv4Mode', 'IPv4 mode')">
           <n-select
             :value="modelValue.ipv4_mode"
             :disabled="disabled"
@@ -59,15 +78,20 @@ function update<K extends keyof NetworkAddressConfig>(key: K, value: NetworkAddr
             @update:value="update('ipv4_mode', $event as IPv4Mode)"
           />
         </n-form-item>
-        <template v-if="modelValue.ipv4_mode === 'static'">
-          <n-form-item :label="t('network.interfaces.ipv4Address', 'IPv4 Address')">
+        <template v-if="ipv4ModeUsesStaticAddress(modelValue.ipv4_mode)">
+          <n-form-item :label="modelValue.ipv4_mode === 'dhcp-static'
+            ? t('network.interfaces.fallbackIP', 'Fallback IPv4 address')
+            : t('network.interfaces.ipv4Address', 'IPv4 Address')">
             <n-input
               :value="modelValue.ipv4_address"
               :disabled="disabled"
-              placeholder="192.168.1.20/24"
+              :placeholder="modelValue.ipv4_mode === 'dhcp-static' ? DEFAULT_FALLBACK_IPV4 : '192.168.1.20/24'"
               :status="modelValue.ipv4_address && !validCIDR(modelValue.ipv4_address, 4) ? 'error' : undefined"
               @update:value="update('ipv4_address', $event)"
             />
+            <template v-if="modelValue.ipv4_mode === 'dhcp-static'" #feedback>
+              {{ t('network.interfaces.fallbackIPHint', 'Always assigned so the device stays reachable if DHCP is unavailable.') }}
+            </template>
           </n-form-item>
           <n-form-item :label="t('network.interfaces.gateway', 'Gateway')">
             <n-input
@@ -77,6 +101,9 @@ function update<K extends keyof NetworkAddressConfig>(key: K, value: NetworkAddr
               :status="modelValue.ipv4_gateway && !isIPv4(modelValue.ipv4_gateway) ? 'error' : undefined"
               @update:value="update('ipv4_gateway', $event)"
             />
+            <template v-if="modelValue.ipv4_mode === 'dhcp-static'" #feedback>
+              {{ t('network.interfaces.gatewayOptionalHint', 'Leave empty to use the DHCP gateway.') }}
+            </template>
           </n-form-item>
         </template>
       </div>
@@ -85,7 +112,15 @@ function update<K extends keyof NetworkAddressConfig>(key: K, value: NetworkAddr
     <section class="network-config-section">
       <h3>{{ t('network.interfaces.ipv6Config', 'IPv6 Configuration') }}</h3>
       <div class="network-fields">
-        <n-form-item :label="t('network.interfaces.ipv6Mode', 'IPv6 Mode')">
+        <IosChoice
+          v-if="inset"
+          :label="t('network.interfaces.ipv6Mode', 'IPv6 Mode')"
+          :value="modelValue.ipv6_mode"
+          :options="ipv6Options"
+          :disabled="disabled"
+          @select="update('ipv6_mode', $event as IPv6Mode)"
+        />
+        <n-form-item v-else :label="t('network.interfaces.ipv6Mode', 'IPv6 Mode')">
           <n-select
             :value="modelValue.ipv6_mode"
             :disabled="disabled"
@@ -116,7 +151,7 @@ function update<K extends keyof NetworkAddressConfig>(key: K, value: NetworkAddr
       </div>
     </section>
 
-    <n-form-item class="network-route-metric" :label="t('network.interfaces.routeMetric', 'Route metric')">
+    <n-form-item v-if="!hideRouteMetric" class="network-route-metric" :label="t('network.interfaces.routeMetric', 'Route metric')">
       <n-input-number
         :value="modelValue.route_metric"
         :disabled="disabled"
@@ -129,14 +164,28 @@ function update<K extends keyof NetworkAddressConfig>(key: K, value: NetworkAddr
 </template>
 
 <style scoped>
-.network-address-settings { display: grid; gap: 4px; }
+.network-address-settings { display: grid; gap: 8px; }
+.network-address-settings.is-inset { gap: 0; }
+.network-address-settings.is-inset .network-config-section,
+.network-address-settings.is-inset > .network-route-metric {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-strong);
+}
+.network-address-settings.is-inset .network-config-section {
+  display: grid;
+  gap: 14px;
+}
+.network-address-settings.is-inset .network-fields { display: grid; gap: 14px; }
+.network-address-settings.is-inset .network-route-metric { width: 100%; }
+.network-address-settings.is-inset h3 { margin: 0 4px; font-size: 13px; font-weight: 400; color: var(--muted-foreground); }
 .network-config-section {
   padding-top: 12px;
-  border-top: 1px solid #30363d;
+  border-top: 1px solid var(--border);
 }
 .network-config-section h3 {
   margin: 0 0 12px;
-  color: #c9d1d9;
+  color: var(--onekvm-text-secondary);
   font-size: 13px;
   font-weight: 600;
 }
@@ -148,7 +197,7 @@ function update<K extends keyof NetworkAddressConfig>(key: K, value: NetworkAddr
 .network-fields > :first-child { grid-column: 1 / -1; }
 .network-route-metric { width: calc(50% - 6px); }
 .network-route-metric :deep(.n-input-number) { width: 100%; }
-@media (max-width: 520px) {
+@media (max-width: 760px) {
   .network-fields { grid-template-columns: 1fr; }
   .network-fields > * { grid-column: 1 !important; }
   .network-route-metric { width: 100%; }

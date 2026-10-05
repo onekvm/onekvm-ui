@@ -267,21 +267,24 @@ function selectEditorMode(value: 'form' | 'file') {
 .wireguard-fields,
 .peer-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
 .key-field { display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) 34px; gap: 6px; }
-.peer-section { display: grid; gap: 12px; padding-top: 14px; border-top: 1px solid #30363d; }
+.peer-section { display: grid; gap: 12px; padding-top: 14px; border-top: 1px solid var(--border); }
 .peer-section > header,
 .peer-fields > header { display: flex; grid-column: 1 / -1; align-items: center; justify-content: space-between; }
 .peer-section h3 { margin: 0; font-size: 13px; }
-.peer-fields { padding-top: 12px; border-top: 1px solid #252b32; }
+.peer-fields { padding-top: 12px; border-top: 1px solid var(--border); }
 .peer-fields > header strong { font-size: 12px; }
 .allowed-ips-field { grid-column: 1 / -1; }
 .configuration-file-editor { display: grid; gap: 8px; }
-.configuration-file-editor p { margin: 0; color: #8f99a3; font-size: 11px; }
+.configuration-file-editor p { margin: 0; color: var(--muted-foreground); font-size: 11px; }
 .wireguard-form > footer { display: flex; justify-content: flex-end; }
-@media (max-width: 560px) {
+@media (max-width: 760px) {
   .wireguard-editor-header,
   .wireguard-fields,
   .peer-fields { grid-template-columns: 1fr; }
   .peer-fields > *,
   .peer-fields > header { grid-column: 1; }
+  .key-field { grid-template-columns: minmax(0, 1fr) 44px; }
+  .wireguard-form > footer { justify-content: stretch; }
+  .wireguard-form > footer .n-button { width: 100%; }
 }
 </style>

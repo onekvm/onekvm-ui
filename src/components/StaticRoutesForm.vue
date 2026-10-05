@@ -50,66 +50,81 @@ function nextHopValid(route: StaticRoute) {
     </header>
 
     <n-empty v-if="modelValue.length === 0" :description="t('network.routes.empty', 'No static routes')" size="small" />
-    <div v-for="(route, index) in modelValue" :key="index" class="route-row">
-      <n-form-item :label="t('network.routes.destination', 'Destination prefix')">
-        <n-input
-          :value="route.destination"
-          :disabled="disabled"
-          placeholder="192.0.2.0/24"
-          :status="route.destination && !destinationValid(route.destination) ? 'error' : undefined"
-          @update:value="updateRoute(index, { destination: $event })"
-        />
-      </n-form-item>
-      <n-form-item :label="t('network.routes.nextHop', 'Next hop')">
-        <n-input
-          :value="route.next_hop"
-          :disabled="disabled"
-          placeholder="192.0.2.1"
-          :status="route.next_hop && !nextHopValid(route) ? 'error' : undefined"
-          @update:value="updateRoute(index, { next_hop: $event })"
-        />
-      </n-form-item>
-      <n-form-item :label="t('network.routes.interface', 'Interface')">
-        <n-select
-          :value="route.interface || ''"
-          :options="interfaceOptions"
-          :disabled="disabled"
-          @update:value="updateRoute(index, { interface: $event })"
-        />
-      </n-form-item>
-      <n-form-item :label="t('network.routes.metric', 'Metric')">
-        <n-input-number
-          :value="route.metric"
-          :disabled="disabled"
-          :min="0"
-          :precision="0"
-          @update:value="updateRoute(index, { metric: $event || 0 })"
-        />
-      </n-form-item>
-      <n-tooltip>
-        <template #trigger>
-          <n-button quaternary circle type="error" :disabled="disabled" :aria-label="t('network.routes.remove', 'Remove route')" @click="removeRoute(index)">
-            <template #icon><Trash2 /></template>
-          </n-button>
-        </template>
-        {{ t('network.routes.remove', 'Remove route') }}
-      </n-tooltip>
+    <div v-for="(route, index) in modelValue" :key="index" class="route-panel">
+      <div class="route-fields">
+        <n-form-item :label="t('network.routes.destination', 'Destination prefix')">
+          <n-input
+            :value="route.destination"
+            :disabled="disabled"
+            placeholder="192.0.2.0/24"
+            :status="route.destination && !destinationValid(route.destination) ? 'error' : undefined"
+            @update:value="updateRoute(index, { destination: $event })"
+          />
+        </n-form-item>
+        <n-form-item :label="t('network.routes.nextHop', 'Next hop')">
+          <n-input
+            :value="route.next_hop"
+            :disabled="disabled"
+            placeholder="192.0.2.1"
+            :status="route.next_hop && !nextHopValid(route) ? 'error' : undefined"
+            @update:value="updateRoute(index, { next_hop: $event })"
+          />
+        </n-form-item>
+        <n-form-item :label="t('network.routes.interface', 'Interface')">
+          <n-select
+            :value="route.interface || ''"
+            :options="interfaceOptions"
+            :disabled="disabled"
+            @update:value="updateRoute(index, { interface: $event })"
+          />
+        </n-form-item>
+        <n-form-item :label="t('network.routes.metric', 'Metric')">
+          <n-input-number
+            :value="route.metric"
+            :disabled="disabled"
+            :min="0"
+            :precision="0"
+            @update:value="updateRoute(index, { metric: $event || 0 })"
+          />
+        </n-form-item>
+      </div>
+      <div class="route-actions">
+        <n-button quaternary size="small" type="error" :disabled="disabled" @click="removeRoute(index)">
+          <template #icon><Trash2 /></template>
+          {{ t('network.routes.remove', 'Remove route') }}
+        </n-button>
+      </div>
     </div>
   </section>
 </template>
 
 <style scoped>
-.network-global-card { display: grid; gap: 14px; padding-top: 18px; border-top: 1px solid #30363d; }
+.network-global-card { display: grid; gap: 14px; padding-top: 18px; border-top: 1px solid var(--border); }
 .network-global-card > header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .network-global-card header h2 { margin: 0; font-size: 14px; }
-.network-global-card header p { margin: 4px 0 0; color: #8f99a3; font-size: 11px; }
-.route-row { display: grid; grid-template-columns: minmax(145px, 1.25fr) minmax(130px, 1fr) minmax(120px, .8fr) 100px 34px; align-items: end; gap: 10px; }
-@media (max-width: 760px) {
-  .route-row { grid-template-columns: 1fr 1fr; }
-  .route-row > :last-child { justify-self: end; }
+.network-global-card header p { margin: 4px 0 0; color: var(--muted-foreground); font-size: 11px; }
+.route-panel {
+  overflow: hidden;
+  border: 1px solid var(--border, var(--border));
+  border-radius: var(--radius-large, 7px);
+  background: var(--card, var(--card));
 }
-@media (max-width: 520px) {
-  .network-global-card > header { align-items: flex-start; }
-  .route-row { grid-template-columns: 1fr; }
+.route-fields {
+  display: grid;
+  grid-template-columns: minmax(145px, 1.25fr) minmax(130px, 1fr) minmax(120px, .8fr) 100px;
+  align-items: end;
+  gap: 10px;
+  padding: 14px;
+}
+.route-fields :deep(.n-form-item) { margin-bottom: 0; }
+.route-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 8px;
+  border-top: 1px solid var(--border, var(--border));
+}
+@media (max-width: 760px) {
+  .network-global-card > header { align-items: flex-start; flex-wrap: wrap; }
+  .route-fields { grid-template-columns: 1fr; gap: 12px; padding: 14px 12px; }
 }
 </style>

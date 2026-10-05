@@ -67,7 +67,9 @@ function update<K extends keyof ManagedNetworkInterface>(key: K, value: ManagedN
 .vlan-form { display: grid; gap: 18px; }
 .vlan-identity-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
 .vlan-form > footer { display: flex; justify-content: flex-end; }
-@media (max-width: 560px) {
+@media (max-width: 760px) {
   .vlan-identity-fields { grid-template-columns: 1fr; }
+  .vlan-form > footer { justify-content: stretch; }
+  .vlan-form > footer .n-button { width: 100%; }
 }
 </style>

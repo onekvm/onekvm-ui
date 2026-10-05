@@ -1,4 +1,5 @@
-export type IPv4Mode = 'disabled' | 'dhcp' | 'static'
+import { resolveServiceURL, serviceBaseUrl, serviceURL, serviceWebSocketURL } from './service-url'
+export type IPv4Mode = 'disabled' | 'dhcp' | 'dhcp-static' | 'static'
 export type IPv6Mode = 'disabled' | 'slaac' | 'dhcp' | 'static'
 export type DeviceLanguage = 'en' | 'zh' | 'zh_tw'
 
@@ -9,6 +10,7 @@ export interface NetworkConfig {
   ipv4_address: string
   ipv4_gateway: string
   dns: string[]
+  use_custom_dns?: boolean
   ipv6_enabled: boolean
   ipv6_mode: IPv6Mode
   ipv6_address: string
@@ -19,7 +21,10 @@ export interface NetworkConfig {
   wifi_psk?: string
   hostname: string
   mdns?: boolean
-  dnssec?: boolean
+  discovery_enabled?: boolean
+  use_custom_discovery_url?: boolean
+  discovery_url?: string
+  dnssec?: string | boolean
   http_port: number
   https_port: number
   tls_enabled: boolean
@@ -28,13 +33,94 @@ export interface NetworkConfig {
   tls_key_path: string
   wireguard: WireGuardConfig[]
   interfaces: ManagedNetworkInterface[]
+  vpn?: VpnClientConfig[]
+  proxy?: ProxyConfig
+  webrtc?: WebRtcIceConfig
+}
+
+export interface WifiNetwork {
+  ssid: string
+  signal_dbm: number
+  secure: boolean
+  /** open, wep, wpa, wpa2, wpa3, wpa2-wpa3, owe. Absent on older servers. */
+  security?: string
+  bands?: { band: string; generation: string | null }[]
+}
+
+export interface WifiStatus {
+  available: boolean
+  mode: 'ap' | 'ap_station' | 'station'
+  ap_enabled: boolean
+  ap_ssid: string
+  ap_password: string
+  ap_address: string
+  ap_channel: number
+  ap_band: '2.4' | '5'
+  ap_operating_channel: number | null
+  ap_channels?: number[]
+  ap_expires_in: number | null
+  connecting: boolean
+  connected: boolean
+  station_ssid: string
+  station_address: string
+  error: string
+}
+
+export interface ProxyConfig {
+  http?: string
+  https?: string
+  no_proxy?: string
+}
+
+export interface WebRtcIceConfig {
+  stun?: string
+  turn_servers?: WebRtcTurnServerConfig[]
+  /** Legacy shared-credential TURN fields kept for config compatibility. */
+  turn?: string
+  turn_username?: string
+  turn_credential?: string
+}
+
+export interface WebRtcTurnServerConfig {
+  url: string
+  username: string
+  credential: string
+}
+
+export interface IceServer {
+  urls: string | string[]
+  username?: string
+  credential?: string
+}
+
+export interface VpnClientConfig {
+  kind: 'openvpn' | 'pppoe' | 'pptp' | 'l2tp'
+  name: string
+  enabled: boolean
+  remote?: string
+  port?: number
+  protocol?: string
+  parent?: string
+  username?: string
+  password?: string
+  service?: string
+  config?: string
+  default_route?: boolean
 }
 
 export interface ManagedNetworkInterface {
-  kind: 'vlan'
+  kind: 'vlan' | 'gre' | 'ipip' | 'sit' | 'vxlan' | 'geneve' | 'fou' | 'bareudp' | 'gretap'
   name: string
   parent: string
   vlan_id: number
+  local?: string
+  remote?: string
+  key?: string
+  vni?: number
+  port?: number
+  group?: string
+  protocol?: string
+  ether_type?: string
   ipv4_mode: IPv4Mode
   ipv4_address: string
   ipv4_gateway: string
@@ -136,9 +222,15 @@ export interface OneKVMConfig {
   auth: Record<string, unknown>
   ota: Record<string, unknown>
   logging: Record<string, unknown>
-  system: { language: 'en' | 'zh' | 'zh_tw' }
+  system: { language: 'en' | 'zh' | 'zh_tw'; zram_size_mb?: number }
   keyboard: KeyboardConfig
-	usb: USBConfig
+  input: InputConfig
+  usb: USBConfig
+}
+
+export interface InputConfig {
+  mouse_report_rate_hz: number
+  mouse_scroll_interval_ms: number
 }
 
 export interface USBConfig {
@@ -242,8 +334,15 @@ export interface SSHServiceSettings {
   authorized_keys: string[]
 }
 
+export interface ZramServiceSettings {
+  size_mb: number
+  max_size_mb?: number
+}
+
 export interface OneKVMStatus {
   machine: string
+  vendor?: string
+  name?: string
   variant: string
   version: string
   uptime_seconds: number
@@ -251,6 +350,7 @@ export interface OneKVMStatus {
     active: boolean
     hdmi_connected: boolean
 		codec: string
+		actual_codec?: string
 		fps: number
 		actual_fps?: number
 		resolution: number
@@ -281,6 +381,8 @@ export interface OneKVMStatus {
     available: boolean
     connected: boolean
     gamepad?: boolean
+    macro_generation?: number
+    macro_owner?: string | null
     num_lock?: boolean
     caps_lock?: boolean
     scroll_lock?: boolean
@@ -307,8 +409,15 @@ export interface OneKVMStatus {
   }
   system: {
     processor: string
+    architecture?: string
+    soc_name?: string
     kernel_version: string
     memory_total_bytes: number
+    memory_physical_bytes?: number
+    memory_type?: string
+    memory_available_bytes?: number
+    memory_hardware_reserved_bytes?: number | null
+    memory_linux_reserved_bytes?: number | null
     storage_total_bytes: number
     storage_available_bytes: number
     storage_type: string
@@ -328,6 +437,7 @@ export interface StoragePartitionStatus {
 export interface ResourceSample {
   timestamp: number
   cpu_percent: number
+  temperature_celsius?: number
   memory_used_bytes: number
   memory_total_bytes: number
   network_receive_bytes_per_second: number
@@ -407,8 +517,39 @@ export interface SystemUpdateStatus {
   slots: SystemUpdateSlot[]
 }
 
+export interface SystemOnlineUpdate {
+  repository: string | null
+  current_version: string
+  latest_version: string | null
+  available: boolean
+  reason: 'source_not_configured' | 'up_to_date' | 'bundle_missing' | ''
+  asset_name?: string
+  asset_size?: number
+}
+
+export interface SystemOnlineUpdateProgress {
+  phase: 'idle' | 'downloading' | 'installing' | 'error'
+  bytes: number
+  total_bytes: number
+  error: string
+}
+
+export type SystemUpdateSource =
+  | { source: 'http'; url: string }
+  | { source: 'tftp'; server: string; path: string; port?: number }
+  | { source: 'nfs'; server: string; export: string; path: string }
+  | { source: 'local'; path: string }
+
+export interface SystemUpdateLocalFile {
+  path: string
+  name: string
+  size: number
+}
+
 export interface ConfigSchema {
   machine: string
+  vendor?: string
+  name?: string
   variant: string
   hardware_revision?: string
   detected?: Record<string, boolean>
@@ -498,6 +639,17 @@ export interface ExtensionSettingProperty {
   required_when?: ExtensionSettingCondition
 }
 
+export interface ExtensionToolboxItem {
+  id: string
+  title: string
+  i18n?: Record<string, { title: string }>
+  icon?: { source: 'lucide'; name: string } | { source: 'custom'; path: string }
+  order?: number
+  presentation: 'drawer' | 'window'
+  size?: { width?: number; height?: number }
+  view: { renderer: 'vue'; entrypoint: string }
+}
+
 export interface ExtensionSummary {
   id: string
   name: string
@@ -514,12 +666,18 @@ export interface ExtensionSummary {
   error?: string
   icon?:
     | { source: 'lucide'; name: string }
-    | { source: 'custom'; path: string }
+    | { source: 'custom'; path: string; data?: string }
+  icon_data_url?: string
   has_page?: boolean
   has_toolbar?: boolean
   toolbar?: {
     entrypoint: string
   }
+  has_shell?: boolean
+  shell?: {
+    entrypoint: string
+  }
+  toolbox?: { items: ExtensionToolboxItem[] }
   has_settings?: boolean
   services?: ExtensionService[]
 	memory_budget_bytes?: number
@@ -531,6 +689,10 @@ export interface ExtensionSummary {
     login?: string
     enroll?: string
   }
+}
+
+export type RemoveExtensionOptions = {
+  deleteData?: boolean
 }
 
 export interface ExtensionPackagePreview extends ExtensionSummary {
@@ -570,6 +732,7 @@ export interface MSDStatus {
   storage_total: number
   minimum_drive_mib: number
   maximum_drive_mib: number
+  drive_filesystems?: string[]
 }
 
 export interface MSDMedia {
@@ -582,6 +745,7 @@ export interface MSDMedia {
   mounted: boolean
   external?: boolean
   imported?: boolean
+  filesystem?: 'exfat' | 'fat32' | string
 }
 
 export interface MSDISOUpload {
@@ -671,6 +835,9 @@ export interface ExtensionStatus extends ExtensionSummary {
   toolbar?: {
     entrypoint: string
   }
+  shell?: {
+    entrypoint: string
+  }
   routes?: ExtensionRoute[]
   auth_provider?: {
     method: string
@@ -726,22 +893,29 @@ export interface ExtensionLayout {
   sections: Array<{
     title: string
     i18n: ExtensionLocalizedText
+    description?: string
+    description_i18n?: ExtensionLocalizedText
     columns: 1 | 2
     settings: string[]
   }>
 }
 
-export function extensionAssetURL(extension: Pick<ExtensionStatus, 'id' | 'version'>, path: string) {
+export function extensionPagePath(extension: Pick<ExtensionStatus, 'id' | 'version'>, path: string) {
   if (!extension.version) return ''
   const encodedPath = path.split('/').map(encodeURIComponent).join('/')
   return `/api/extension-pages/${encodeURIComponent(extension.id)}/${encodeURIComponent(extension.version)}/${encodedPath}`
+}
+
+export function extensionAssetURL(extension: Pick<ExtensionStatus, 'id' | 'version'>, path: string) {
+  const pagePath = extensionPagePath(extension, path)
+  return pagePath ? serviceURL(pagePath) : ''
 }
 
 export function extensionRouteURL(extension: Pick<ExtensionSummary, 'id'>, route: Pick<ExtensionRoute, 'path' | 'backend'>) {
   if (route.backend !== 'file') return ''
   const encodedPath = route.path.split('/').filter(Boolean).map(encodeURIComponent).join('/')
   const path = `/plugins/${encodeURIComponent(extension.id)}/${encodedPath ? `${encodedPath}/` : ''}`
-  return new URL(path, serviceBaseUrl()).toString()
+  return serviceURL(path)
 }
 
 export class APIError extends Error {
@@ -757,18 +931,8 @@ export function isUnauthorizedError(error: unknown): boolean {
   return error instanceof APIError && error.status === 401
 }
 
-function serviceBaseUrl() {
-  return window.location.origin
-}
-
-function serviceWebSocketURL(path: string) {
-  const url = new URL(path, serviceBaseUrl())
-  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-  return url.toString()
-}
-
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${serviceBaseUrl()}${path}`, {
+  const response = await fetch(resolveServiceURL(serviceBaseUrl(), path), {
     credentials: import.meta.env.VITE_WITH_CREDENTIALS === 'false' ? 'omit' : 'include',
     ...options,
     headers: {
@@ -783,9 +947,13 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
     if (response.status === 401 && !path.startsWith('/api/auth/')) {
       window.dispatchEvent(new Event('onekvm:unauthorized'))
     }
+    if (response.status === 403) window.dispatchEvent(new Event('onekvm:permissions-changed'))
     throw new APIError(body?.error || `HTTP ${response.status}`, response.status)
   }
 
+  if (path.startsWith('/api/extensions') && options.method && options.method !== 'GET' && !path.includes('/invoke/')) {
+    window.dispatchEvent(new Event('onekvm:extensions-changed'))
+  }
   if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
 }
@@ -937,41 +1105,38 @@ async function readDeviceFile(path: string, signal?: AbortSignal) {
   return new Uint8Array(await response.arrayBuffer())
 }
 
-function writeMSDISOUploadChunk(
-  id: string,
-  offset: number,
-  data: Blob,
+function postOctetStream<T>(
+  path: string,
+  file: Blob,
   onProgress?: (loaded: number, total: number) => void,
   signal?: AbortSignal,
-  base = '/api/msd/iso-uploads',
 ) {
-  return new Promise<MSDISOUpload>((resolve, reject) => {
+  return new Promise<T>((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     const removeAbortListener = () => signal?.removeEventListener('abort', abortRequest)
     const abortRequest = () => xhr.abort()
-    xhr.open('PATCH', `${serviceBaseUrl()}${base}/${encodeURIComponent(id)}`)
+    xhr.open('POST', `${serviceBaseUrl()}${path}`)
     xhr.withCredentials = import.meta.env.VITE_WITH_CREDENTIALS !== 'false'
     xhr.setRequestHeader('Accept', 'application/json')
     xhr.setRequestHeader('Content-Type', 'application/octet-stream')
-    xhr.setRequestHeader('Upload-Offset', String(offset))
     xhr.upload.addEventListener('progress', (event) => {
-      onProgress?.(event.loaded, event.lengthComputable && event.total > 0 ? event.total : data.size)
+      onProgress?.(event.loaded, event.lengthComputable && event.total > 0 ? event.total : file.size)
     })
     xhr.addEventListener('load', () => {
-      let body: MSDISOUpload | { error?: string } | null = null
+      let body: T | { error?: string } | null = null
       try {
-        body = xhr.responseText ? JSON.parse(xhr.responseText) as MSDISOUpload | { error?: string } : null
+        body = xhr.responseText ? JSON.parse(xhr.responseText) as T | { error?: string } : null
       } catch {
         // Preserve the HTTP status fallback when an intermediary returns HTML.
       }
-      if (xhr.status >= 200 && xhr.status < 300 && body && 'id' in body) {
+      if (xhr.status >= 200 && xhr.status < 300 && body && typeof body === 'object' && 'id' in body) {
         removeAbortListener()
-        onProgress?.(data.size, data.size)
-        resolve(body)
+        onProgress?.(file.size, file.size)
+        resolve(body as T)
         return
       }
       if (xhr.status === 401) window.dispatchEvent(new Event('onekvm:unauthorized'))
-      const detail = body && 'error' in body ? body.error : ''
+      const detail = body && typeof body === 'object' && 'error' in body ? body.error : ''
       removeAbortListener()
       reject(new APIError(detail || `HTTP ${xhr.status || 0}`, xhr.status || 0))
     })
@@ -988,8 +1153,18 @@ function writeMSDISOUploadChunk(
       return
     }
     signal?.addEventListener('abort', abortRequest, { once: true })
-    xhr.send(data)
+    xhr.send(file)
   })
+}
+
+function uploadStoredImage(
+  path: string,
+  file: File,
+  onProgress?: (loaded: number, total: number) => void,
+  signal?: AbortSignal,
+) {
+  const query = new URLSearchParams({ name: file.name })
+  return postOctetStream<MSDMedia>(`${path}?${query}`, file, onProgress, signal)
 }
 
 async function transferMSDDriveFile(
@@ -1041,6 +1216,11 @@ async function transferMSDDriveFile(
 
 export type EDIDApplyRequired = 'none' | 'hotplug' | 'reboot' | 'power_cycle'
 
+export type DiagnosticsEvent =
+  | { type: 'line'; text: string }
+  | { type: 'done'; id: string; name: string }
+  | { type: 'error'; message: string }
+
 export interface EDIDStatus {
   supported: boolean
   writable?: boolean
@@ -1063,6 +1243,18 @@ export interface EDIDStatus {
     writable: boolean
     files: { id: string; size: number }[]
   }[]
+}
+
+let wifiScanFlight: Promise<WifiNetwork[]> | null = null
+
+/** One scan at a time. Callers that arrive while it runs wait and receive that result. */
+function scanWifi(): Promise<WifiNetwork[]> {
+  if (!wifiScanFlight) {
+    wifiScanFlight = request<WifiNetwork[]>('/api/network/wifi/scan', { cache: 'no-store' }).finally(() => {
+      wifiScanFlight = null
+    })
+  }
+  return wifiScanFlight
 }
 
 export const api = {
@@ -1166,6 +1358,7 @@ export const api = {
   getMJPEGStreamURL: () => `${serviceBaseUrl()}/api/stream`,
   getVideoWebSocketURL: () => serviceWebSocketURL('/api/stream/ws'),
   getHIDWebSocketURL: () => serviceWebSocketURL('/api/hid/ws'),
+  resetUSB: () => request<{ status: string }>('/api/hid/reset', { method: 'POST' }),
   getMSDWebSocketURL: () => serviceWebSocketURL('/api/msd/ws'),
   getStatusEventsURL: () => `${serviceBaseUrl()}/api/status/events`,
   getMSDStatus: () => request<MSDStatus>('/api/msd/status', { cache: 'no-store' }),
@@ -1177,27 +1370,13 @@ export const api = {
   mountMSDMedia: (id: string) => request<MSDStatus>(`/api/msd/media/${encodeURIComponent(id)}/mount`, { method: 'POST' }),
   ejectMSD: (kind: 'iso' | 'drive') => request<MSDStatus>(`/api/msd/eject/${kind}`, { method: 'POST' }),
   deleteMSDMedia: (id: string) => request<void>(`/api/msd/media/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  beginMSDISOUpload: (name: string, size: number) => request<MSDISOUpload>('/api/msd/iso-uploads', {
+  uploadMSDISO: (file: File, onProgress?: (loaded: number, total: number) => void, signal?: AbortSignal) =>
+    uploadStoredImage('/api/msd/iso-uploads', file, onProgress, signal),
+  uploadMSDDriveImage: (file: File, onProgress?: (loaded: number, total: number) => void, signal?: AbortSignal) =>
+    uploadStoredImage('/api/msd/drive-uploads', file, onProgress, signal),
+  createMSDDrive: (name: string, label: string, sizeMiB: number, filesystem = 'exfat') => request<MSDMedia>('/api/msd/drives', {
     method: 'POST',
-    body: JSON.stringify({ name, size }),
-  }),
-  getMSDISOUpload: (id: string) => request<MSDISOUpload>(`/api/msd/iso-uploads/${encodeURIComponent(id)}`),
-  writeMSDISOUpload: (id: string, offset: number, data: Blob, onProgress?: (loaded: number, total: number) => void, signal?: AbortSignal) =>
-    writeMSDISOUploadChunk(id, offset, data, onProgress, signal),
-  completeMSDISOUpload: (id: string) => request<MSDMedia>(`/api/msd/iso-uploads/${encodeURIComponent(id)}/complete`, { method: 'POST' }),
-  cancelMSDISOUpload: (id: string) => request<void>(`/api/msd/iso-uploads/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  beginMSDDriveUpload: (name: string, size: number) => request<MSDISOUpload>('/api/msd/drive-uploads', {
-    method: 'POST',
-    body: JSON.stringify({ name, size }),
-  }),
-  getMSDDriveUpload: (id: string) => request<MSDISOUpload>(`/api/msd/drive-uploads/${encodeURIComponent(id)}`),
-  writeMSDDriveUpload: (id: string, offset: number, data: Blob, onProgress?: (loaded: number, total: number) => void, signal?: AbortSignal) =>
-    writeMSDISOUploadChunk(id, offset, data, onProgress, signal, '/api/msd/drive-uploads'),
-  completeMSDDriveUpload: (id: string) => request<MSDMedia>(`/api/msd/drive-uploads/${encodeURIComponent(id)}/complete`, { method: 'POST' }),
-  cancelMSDDriveUpload: (id: string) => request<void>(`/api/msd/drive-uploads/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  createMSDDrive: (name: string, label: string, sizeMiB: number) => request<MSDMedia>('/api/msd/drives', {
-    method: 'POST',
-    body: JSON.stringify({ name, label, size_mib: sizeMiB }),
+    body: JSON.stringify({ name, label, size_mib: sizeMiB, filesystem }),
   }),
   listMSDDriveFiles: (id: string, path = '') => request<MSDFileEntry[]>(`/api/msd/drives/${encodeURIComponent(id)}/files?path=${encodeURIComponent(path)}`),
   uploadMSDDriveFile,
@@ -1240,6 +1419,12 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(keyboard),
     }),
+  getInputConfig: () => request<InputConfig>('/api/config/input', { cache: 'no-store' }),
+  saveInputConfig: (input: InputConfig) =>
+    request<InputConfig>('/api/config/input', {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    }),
   getConfigSchema: () => request<ConfigSchema>('/api/config/schema'),
   saveConfig: (config: OneKVMConfig, webRTCSessionId = '') =>
 		request<ConfigSaveResponse>('/api/config', {
@@ -1257,6 +1442,69 @@ export const api = {
   factoryReset: () => request<{ status: string }>('/api/system/factory-reset', { method: 'POST', keepalive: true }),
   rebootSystem: () => request<{ status: string }>('/api/system/reboot', { method: 'POST', keepalive: true }),
   enterRecovery: () => request<{ status: string }>('/api/system/recovery', { method: 'POST', keepalive: true }),
+  runDiagnostics: async (
+    onEvent: (event: DiagnosticsEvent) => void,
+    signal?: AbortSignal,
+  ) => {
+    const response = await fetch(`${serviceBaseUrl()}/api/system/diagnostics/run`, {
+      method: 'POST',
+      credentials: import.meta.env.VITE_WITH_CREDENTIALS === 'false' ? 'omit' : 'include',
+      headers: { Accept: 'application/x-ndjson' },
+      signal,
+    })
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as { error?: string } | null
+      if (response.status === 401) window.dispatchEvent(new Event('onekvm:unauthorized'))
+      throw new APIError(body?.error || `HTTP ${response.status}`, response.status)
+    }
+    if (!response.body) throw new APIError('Empty diagnostics response', 0)
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let pending = ''
+    const consume = (line: string) => {
+      if (!line.trim()) return
+      const event = JSON.parse(line) as DiagnosticsEvent
+      onEvent(event)
+      if (event.type === 'error') throw new APIError(event.message, 0)
+    }
+    while (true) {
+      const { value, done } = await reader.read()
+      pending += decoder.decode(value, { stream: !done })
+      const lines = pending.split('\n')
+      pending = lines.pop() || ''
+      for (const line of lines) consume(line)
+      if (done) break
+    }
+    if (pending.trim()) consume(pending)
+  },
+  downloadDiagnostics: async (id: string) => {
+    const response = await fetch(
+      `${serviceBaseUrl()}/api/system/diagnostics/${encodeURIComponent(id)}/download`,
+      {
+        credentials: import.meta.env.VITE_WITH_CREDENTIALS === 'false' ? 'omit' : 'include',
+      },
+    )
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as { error?: string } | null
+      if (response.status === 401) window.dispatchEvent(new Event('onekvm:unauthorized'))
+      throw new APIError(body?.error || `HTTP ${response.status}`, response.status)
+    }
+    const disposition = response.headers.get('Content-Disposition') || ''
+    const match = /filename="([^"]+)"/i.exec(disposition)
+    const name = match?.[1] || `onekvm-diagnostics-${id}.zip`
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    try {
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = name
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+    } finally {
+      URL.revokeObjectURL(url)
+    }
+  },
   getStatus: () => request<OneKVMStatus>('/api/status', { cache: 'no-store' }),
   getResources: () => request<ResourceHistory>('/api/resources'),
   getSessions: () => request<OnlineSession[]>('/api/sessions', { cache: 'no-store' }),
@@ -1296,12 +1544,24 @@ export const api = {
 			method: 'PUT',
 			body: JSON.stringify(settings),
 		}),
+	getZramServiceSettings: () => request<ZramServiceSettings>('/api/services/zram'),
+	saveZramServiceSettings: (settings: ZramServiceSettings) =>
+		request<ZramServiceSettings>('/api/services/zram', {
+			method: 'PUT',
+			body: JSON.stringify(settings),
+		}),
 	getNetworkInterfaces: () => request<NetworkInterfaceStatus[]>('/api/network/interfaces'),
+	getWifiStatus: () => request<WifiStatus>('/api/network/wifi', { cache: 'no-store' }),
+	scanWifi,
+	connectWifi: (ssid: string, password: string) => request<WifiStatus>('/api/network/wifi/connect', { method: 'POST', body: JSON.stringify({ ssid, password }) }),
+	setWifiAp: (enabled: boolean) => request<WifiStatus>('/api/network/wifi/ap', { method: 'POST', body: JSON.stringify({ enabled }) }),
+	setWifiApConfig: (ssid: string, password: string, channel: number, band: '2.4' | '5') => request<WifiStatus>('/api/network/wifi/ap/config', { method: 'POST', body: JSON.stringify({ ssid, password, channel, band }) }),
+	setWifiMode: (mode: WifiStatus['mode']) => request<WifiStatus>('/api/network/wifi/mode', { method: 'POST', body: JSON.stringify({ mode }) }),
 	getNetworkApplyStatus: () => request<NetworkApplyStatus>('/api/network/apply', { cache: 'no-store' }),
 	confirmNetworkApply: () => request<{ status: string }>('/api/network/apply/confirm', { method: 'POST' }),
 	confirmNetworkApplyToken: (token: string) => request<{ status: string }>(`/api/network/apply/confirm?token=${encodeURIComponent(token)}`, { method: 'POST' }),
-	getNetworkDNS: () => request<{ servers: string[] }>('/api/network/dns'),
-	setNetworkDNS: (servers: string[]) => request<{ status: string }>('/api/network/dns', { method: 'PUT', body: JSON.stringify({ servers }) }),
+	getNetworkDNS: () => request<{ servers: string[]; use_custom_dns: boolean; automatic_servers: string[] }>('/api/network/dns'),
+	setNetworkDNS: (servers: string[], useCustomDNS = servers.length > 0) => request<{ status: string }>('/api/network/dns', { method: 'PUT', body: JSON.stringify({ servers, use_custom_dns: useCustomDNS }) }),
 	getNetworkRoutes: () => request<StaticRoute[]>('/api/network/routes'),
 	setNetworkRoutes: (routes: StaticRoute[]) => request<{ status: string }>('/api/network/routes', { method: 'PUT', body: JSON.stringify(routes) }),
 	getNetworkActiveRoutes: () => request<ActiveNetworkRoute[]>('/api/network/routes/active'),
@@ -1317,6 +1577,12 @@ export const api = {
       body: JSON.stringify({ ntp: false, time_usec: Date.now() * 1000 }),
     }),
   getSystemUpdate: () => request<SystemUpdateStatus>('/api/system/update'),
+  getSystemOnlineUpdate: () => request<SystemOnlineUpdate>('/api/system/update/online'),
+  startSystemOnlineUpdate: () => request<{ status: string }>('/api/system/update/online', { method: 'POST' }),
+  getSystemOnlineUpdateProgress: () => request<SystemOnlineUpdateProgress>('/api/system/update/online/progress'),
+  getSystemUpdateFiles: () => request<{ files: SystemUpdateLocalFile[] }>('/api/system/update/files'),
+  startSystemUpdateSource: (source: SystemUpdateSource) =>
+    request<{ status: string }>('/api/system/update/source', { method: 'POST', body: JSON.stringify(source) }),
   setSystemUpdateSlot: (slot: string, allowBad = false) =>
     request<SystemUpdateStatus>('/api/system/update/slot', {
       method: 'POST',
@@ -1334,7 +1600,7 @@ export const api = {
     if (!extension.page || extension.page.renderer !== 'layout') {
       return Promise.reject(new Error('Extension does not register a layout page'))
     }
-    return request<ExtensionLayout>(extensionAssetURL(extension, extension.page.entrypoint))
+    return request<ExtensionLayout>(extensionPagePath(extension, extension.page.entrypoint))
   },
   installExtension: (id: string) =>
     request<{ status: string }>('/api/extensions', {
@@ -1370,8 +1636,12 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  removeExtension: (id: string) =>
-    request<{ status: string }>(`/api/extensions/${id}`, { method: 'DELETE' }),
+  removeExtension: (id: string, options?: RemoveExtensionOptions) =>
+    request<{ status: string }>(`/api/extensions/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ delete_data: Boolean(options?.deleteData) }),
+    }),
+  getWebRTCIce: () => request<{ ice_servers: IceServer[] }>('/api/webrtc/ice', { cache: 'no-store' }),
   createWebRTCSession: (sdp: string, microphone = false) =>
     request<WebRTCAnswer>('/api/webrtc/offer', {
       method: 'POST',

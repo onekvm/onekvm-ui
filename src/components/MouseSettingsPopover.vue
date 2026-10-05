@@ -1,16 +1,22 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import { type MouseMode } from '@/composables/useMouse'
+import { useOverlayMount } from '@/composables/useOverlayMount'
 import { t } from '@/i18n/runtime'
+import { DISMISS_CONTROL_OVERLAY_EVENT } from '@/lib/overlay-target'
+import ControlOverlay from './ControlOverlay.vue'
 import HidHostAlert from './HidHostAlert.vue'
 
 const props = defineProps<{
   mouseMode: MouseMode
   scrollInterval: number
   mouseReportRate: number
+  hideLocalCursor?: boolean
   hid?: { available: boolean; connected: boolean } | null
   placement?: 'top-end' | 'bottom-end' | 'right-start' | 'left-start'
+  sheet?: boolean
+  trackpad?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -18,8 +24,11 @@ const emit = defineEmits<{
   'update:mouseMode': [mode: MouseMode]
   'update:scrollInterval': [interval: number]
   'update:mouseReportRate': [rate: number]
+  'update:hideLocalCursor': [hidden: boolean]
+  'update:trackpad': [open: boolean]
 }>()
 
+const overlayTo = useOverlayMount()
 const popoverOpen = ref(false)
 const menuOpen = ref(false)
 
@@ -44,20 +53,26 @@ const mouseReportRateSelection = computed<MouseReportRateSelection>(() =>
     ? 'custom'
     : props.mouseReportRate as 60 | 100 | 125,
 )
-const selectProps = {
+const selectProps = computed(() => ({
   class: 'display-status-select',
-  size: 'tiny' as const,
-  menuSize: 'tiny' as const,
+  size: (props.sheet ? 'medium' : 'tiny') as 'medium' | 'tiny',
+  menuSize: (props.sheet ? 'medium' : 'tiny') as 'medium' | 'tiny',
   consistentMenuWidth: false,
   showCheckmark: false,
-  to: '.console-workspace',
+  to: overlayTo.value,
   menuProps: { class: 'display-fit-select-menu' },
-}
-
+}))
 function updateShow(show: boolean) {
   if (!show && menuOpen.value) return
   popoverOpen.value = show
   emit('update:show', show)
+}
+
+function forceClose() {
+  menuOpen.value = false
+  if (!popoverOpen.value) return
+  popoverOpen.value = false
+  emit('update:show', false)
 }
 
 function updateMode(value: string | number | null) {
@@ -90,25 +105,51 @@ function updateCustomReportRate(value: number | null) {
   if (next === props.mouseReportRate) return
   emit('update:mouseReportRate', next)
 }
+
+function updateTrackpad(value: boolean) {
+  if (value === Boolean(props.trackpad)) return
+  emit('update:trackpad', value)
+  if (value) updateShow(false)
+}
+
+onMounted(() => window.addEventListener(DISMISS_CONTROL_OVERLAY_EVENT, forceClose))
+onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, forceClose))
 </script>
 
 <template>
-  <n-popover
+  <ControlOverlay
     :show="popoverOpen"
-    trigger="click"
-    :placement="placement || 'bottom-end'"
-    :show-arrow="false"
-    class="control-popover mouse-control-popover"
+    :sheet="sheet"
+    :placement="placement"
+    popover-class="control-popover mouse-control-popover"
     to=".console-workspace"
     @update:show="updateShow"
   >
-    <template #trigger><slot /></template>
+    <slot />
+    <template #title>{{ t('settings.mouse.title', 'Mouse') }}</template>
+    <template #panel>
     <div class="display-status-popover">
       <header class="control-popover-header">
         <strong>{{ t('settings.mouse.title', 'Mouse') }}</strong>
       </header>
       <HidHostAlert :hid="hid" />
       <div class="display-status-values">
+        <div v-if="sheet">
+          <span>{{ t('mouse.trackpad', 'Trackpad') }}</span>
+          <n-switch
+            :size="sheet ? 'medium' : 'small'"
+            :value="Boolean(trackpad)"
+            @update:value="updateTrackpad"
+          />
+        </div>
+        <div>
+          <span>{{ t('mouse.hideLocalCursor', 'Hide local cursor') }}</span>
+          <n-switch
+            :size="sheet ? 'medium' : 'small'"
+            :value="Boolean(hideLocalCursor)"
+            @update:value="emit('update:hideLocalCursor', $event)"
+          />
+        </div>
         <div>
           <span>{{ t('mouse.mode', 'Mouse mode') }}</span>
           <n-select
@@ -155,5 +196,6 @@ function updateCustomReportRate(value: number | null) {
         </div>
       </div>
     </div>
-  </n-popover>
+    </template>
+  </ControlOverlay>
 </template>

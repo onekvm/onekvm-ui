@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { Power, RotateCcw, TimerReset } from '@lucide/vue'
 
 import { t } from '@/i18n/runtime'
+import ControlOverlay from './ControlOverlay.vue'
 
 type PowerAction = 'on' | 'off' | 'reset'
 
@@ -13,6 +14,7 @@ const props = defineProps<{
   hddLed?: boolean
   loadingAction: PowerAction | null
   placement?: 'top-end' | 'bottom-end' | 'right-start' | 'left-start'
+  sheet?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -33,39 +35,46 @@ function selectAction(action: PowerAction) {
   emit('action', action)
 }
 
-function ledLabel(value: boolean | undefined) {
-  if (value === undefined) return t('deviceStatus.waiting', 'Unknown')
-  return value ? t('power.on', 'On') : t('power.off', 'Off')
+function hasLed(value: boolean | undefined | null) {
+  return value === true || value === false
+}
+
+function ledLabel(value: boolean | undefined | null) {
+  return value ? t('power.ledOn', 'On') : t('power.ledOff', 'Off')
 }
 </script>
 
 <template>
-  <n-popover
+  <ControlOverlay
     :show="popoverOpen"
-    trigger="click"
-    :placement="props.placement || 'bottom-end'"
-    :show-arrow="false"
-    class="control-popover power-control-popover"
+    :sheet="sheet"
+    :placement="props.placement"
+    popover-class="control-popover power-control-popover"
     @update:show="updateShow"
   >
-    <template #trigger><slot /></template>
-
+    <slot />
+    <template #title>{{ t('power.title', 'Power') }}</template>
+    <template #panel>
     <div class="power-control-panel">
       <header class="control-popover-header">
         <strong>{{ t('power.title', 'Power') }}</strong>
       </header>
 
-      <div class="power-status-values" :aria-label="t('power.atxStatus', 'ATX status')">
+      <div
+        v-if="!available || hasLed(pwrLed) || hasLed(hddLed)"
+        class="power-status-values"
+        :aria-label="t('power.atxStatus', 'ATX status')"
+      >
         <div v-if="!available">
           <span>{{ t('power.atxStatus', 'ATX status') }}</span>
           <strong>{{ t('deviceStatus.error', 'Disconnected') }}</strong>
         </div>
-        <div v-if="pwrLed !== undefined">
-          <span><i class="power-status-led pwr" :data-on="pwrLed" />{{ t('power.pwrLed', 'PWR LED') }}</span>
+        <div v-else-if="hasLed(pwrLed)">
+          <span><i class="power-status-led pwr" :data-on="pwrLed === true" />{{ t('power.pwrLed', 'PWR LED') }}</span>
           <strong>{{ ledLabel(pwrLed) }}</strong>
         </div>
-        <div v-if="hddLed !== undefined">
-          <span><i class="power-status-led hdd" :data-on="hddLed" />{{ t('power.hddLed', 'HDD LED') }}</span>
+        <div v-if="available && hasLed(hddLed)">
+          <span><i class="power-status-led hdd" :data-on="hddLed === true" />{{ t('power.hddLed', 'HDD LED') }}</span>
           <strong>{{ ledLabel(hddLed) }}</strong>
         </div>
       </div>
@@ -100,5 +109,6 @@ function ledLabel(value: boolean | undefined) {
         </n-button>
       </div>
     </div>
-  </n-popover>
+    </template>
+  </ControlOverlay>
 </template>

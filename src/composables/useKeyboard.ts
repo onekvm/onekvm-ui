@@ -87,6 +87,7 @@ export function useKeyboard(
     window.addEventListener('keydown', keyDown, { capture: true })
     window.addEventListener('keyup', keyUp, { capture: true })
     window.addEventListener('blur', releaseAll)
+    window.addEventListener('pagehide', releaseAll)
     document.addEventListener('visibilitychange', releaseAll)
   })
 
@@ -94,6 +95,7 @@ export function useKeyboard(
     window.removeEventListener('keydown', keyDown, { capture: true })
     window.removeEventListener('keyup', keyUp, { capture: true })
     window.removeEventListener('blur', releaseAll)
+    window.removeEventListener('pagehide', releaseAll)
     document.removeEventListener('visibilitychange', releaseAll)
     releaseAll()
   })

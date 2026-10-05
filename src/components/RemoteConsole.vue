@@ -1,10 +1,17 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, toRef, watch } from 'vue'
 import { WifiOff } from '@lucide/vue'
 
 import { useMouse, type MouseMode } from '@/composables/useMouse'
-import type { VideoFit } from '@/lib/video-fit'
+import { consolePointerCursor } from '@/lib/console-pointer'
+import { useViewportZoom } from '@/composables/useViewportZoom'
+import { useZoomBadge } from '@/composables/useZoomBadge'
+import { canvasDeviceSize, mapAbsoluteMouse, originalCssSize, paintedCssSize, rotatedVideoSize, unrotateMouseDelta, type VideoFit, type VideoRotation } from '@/lib/video-fit'
+import { MOUSE_BUTTON_LEFT, sendRelativeMotion } from '@/lib/hid-mouse'
+import { cursorToScreen, viewOverflows } from '@/lib/viewport-zoom'
 import { useKeyboard } from '@/composables/useKeyboard'
+import ConnectionTrace from './ConnectionTrace.vue'
+import TrackpadOverlay from './TrackpadOverlay.vue'
 import { useVideoFps } from '@/composables/useVideoFps'
 import { useMJPEGStream } from '@/composables/useMJPEGStream'
 import { api } from '@/api/client'
@@ -22,12 +29,17 @@ const props = defineProps<{
   mouseMode: MouseMode
   scrollInterval: number
   mouseReportRate: number
+  hideLocalCursor?: boolean
   videoFit: VideoFit
+  videoRotation: VideoRotation
   keyboardBlocked: boolean
   rightControlAsMeta: boolean
+  trackpad?: boolean
+  usbConnected?: boolean
 }>()
 
 const emit = defineEmits<{
+  'update:trackpad': [open: boolean]
   metadata: [width: number, height: number]
   'canvas-size': [width: number, height: number]
   fps: [value: number]
@@ -41,7 +53,19 @@ const video = ref<HTMLVideoElement | null>(null)
 const remoteAudio = ref<HTMLAudioElement | null>(null)
 const canvas = ref<HTMLCanvasElement | null>(null)
 const inputSurface = ref<HTMLElement | null>(null)
+const trackpadOn = computed(() => Boolean(props.trackpad))
+const hidEnabled = computed(() => !trackpadOn.value && !props.keyboardBlocked)
+const hidCursor = ref<string | undefined>(undefined)
+let lastPointer: { x: number; y: number } | null = null
+const trackpadChrome = shallowRef(0)
+const trackpadButtons = shallowRef(0)
+const stageStyle = computed(() => (
+  trackpadOn.value && trackpadChrome.value > 0
+    ? { '--trackpad-overlay-span': `${trackpadChrome.value}px` }
+    : undefined
+))
 let canvasObserver: ResizeObserver | undefined
+let trackpadFramed = false
 const playing = ref(false)
 const mediaError = ref(false)
 const reconnecting = ref(false)
@@ -81,19 +105,9 @@ const transportFailed = computed(
   () => ['failed', 'disconnected'].includes(props.state.connection),
 )
 const connectionProblem = computed(
-  () => !props.state.websocketFallbackOffered && (
+  () => !props.state.fallbackPrompt && (
     props.serverUnavailable || transportFailed.value || (mediaError.value && props.signalConnected !== false)
   ),
-)
-const connectionProblemTitle = computed(() =>
-  props.state.errorKind === 'codec-unsupported'
-    ? t('screen.h265UnsupportedTitle', 'This browser cannot decode H.265')
-    : t('screen.connectionLostTitle', 'Connection interrupted'),
-)
-const connectionProblemDetail = computed(() =>
-  props.state.errorKind === 'codec-unsupported'
-    ? t('screen.h265UnsupportedDetail', 'H.265 needs a HEVC decoder. This browser has neither WebRTC H.265 nor MSE HEVC. Switch the codec to H.264, or use Safari or a Chrome/Edge build with HEVC.')
-    : t('screen.connectionLostDetail', 'The browser can no longer reach OneKVM. Check the network connection or wait for the service to restart.'),
 )
 
 useMouse(
@@ -103,7 +117,19 @@ useMouse(
   toRef(props, 'mouseReportRate'),
   toRef(props, 'videoFit'),
   inputSurface,
+  hidEnabled,
+  toRef(props, 'videoRotation'),
 )
+const {
+  view: zoomView,
+  cursor: zoomCursor,
+  interacting: zooming,
+  style: viewportStyle,
+  reset: resetZoom,
+  followLook,
+  zoomToOneToOne,
+} = useViewportZoom(inputSurface, stage, trackpadOn)
+const { shown: zoomBadgeShown } = useZoomBadge(() => zoomView.scale, zooming)
 useKeyboard(toRef(props, 'keyboardBlocked'), inputSurface, toRef(props, 'rightControlAsMeta'))
 const webrtcPresent = computed(() => props.state.videoMode === 'webrtc')
 useVideoFps(video, (fps) => {
@@ -118,10 +144,51 @@ const loading = computed(
 )
 const frameWidth = ref(0)
 const frameHeight = ref(0)
-const originalSizeStyle = computed(() => {
-  if (props.videoFit !== 'original' || frameWidth.value <= 0 || frameHeight.value <= 0)
+const displayPixelRatio = ref(1)
+const stageWidth = shallowRef(0)
+const stageHeight = shallowRef(0)
+let pixelRatioQuery: MediaQueryList | undefined
+
+function onPixelRatioChange() {
+  syncDisplayPixelRatio()
+}
+
+function syncDisplayPixelRatio() {
+  displayPixelRatio.value = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1
+  pixelRatioQuery?.removeEventListener('change', onPixelRatioChange)
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+  pixelRatioQuery = window.matchMedia(`(resolution: ${displayPixelRatio.value}dppx)`)
+  pixelRatioQuery.addEventListener('change', onPixelRatioChange)
+}
+
+const pictureSize = computed(() => {
+  if (frameWidth.value <= 0 || frameHeight.value <= 0)
     return undefined
-  return { width: `${frameWidth.value}px`, height: `${frameHeight.value}px` }
+  const source = rotatedVideoSize(frameWidth.value, frameHeight.value, props.videoRotation)
+  return !trackpadOn.value && props.videoFit === 'original'
+    ? originalCssSize(source.width, source.height, displayPixelRatio.value)
+    : paintedCssSize(stageWidth.value, stageHeight.value, source.width, source.height, 'stretch')
+})
+const pictureStyle = computed(() => pictureSize.value
+  ? { width: `${pictureSize.value.width}px`, height: `${pictureSize.value.height}px` }
+  : undefined)
+const mediaStyle = computed(() => {
+  const size = pictureSize.value
+  if (!size) return undefined
+  const media = rotatedVideoSize(size.width, size.height, props.videoRotation)
+  return {
+    position: 'absolute' as const,
+    inset: 'auto',
+    left: '50%',
+    top: '50%',
+    margin: '0',
+    width: `${media.width}px`,
+    height: `${media.height}px`,
+    maxWidth: 'none',
+    maxHeight: 'none',
+    objectFit: 'fill' as const,
+    transform: `translate(-50%, -50%) rotate(${props.videoRotation}deg)`,
+  }
 })
 
 function updateMetadata() {
@@ -142,15 +209,27 @@ function onVideoWaiting() {
 function publishCanvasSize() {
   const target = inputTarget.value ?? stage.value
   if (!target) return
-  const width = Math.round(target.clientWidth)
-  const height = Math.round(target.clientHeight)
-  if (width <= 0 || height <= 0) return
-  emit('canvas-size', width, height)
+  const painted = paintedCssSize(
+    target.clientWidth,
+    target.clientHeight,
+    frameWidth.value,
+    frameHeight.value,
+    trackpadOn.value ? 'stretch' : props.videoFit,
+  )
+  const device = canvasDeviceSize(painted.width, painted.height, displayPixelRatio.value)
+  if (device.width <= 0 || device.height <= 0) return
+  emit('canvas-size', device.width, device.height)
 }
 
 function observeCanvas() {
   canvasObserver?.disconnect()
-  canvasObserver = new ResizeObserver(publishCanvasSize)
+  const syncStageSize = () => {
+    stageWidth.value = stage.value?.clientWidth ?? 0
+    stageHeight.value = stage.value?.clientHeight ?? 0
+    publishCanvasSize()
+  }
+  syncStageSize()
+  canvasObserver = new ResizeObserver(syncStageSize)
   if (stage.value) canvasObserver.observe(stage.value)
   if (inputTarget.value) canvasObserver.observe(inputTarget.value)
   void nextTick(publishCanvasSize)
@@ -202,9 +281,141 @@ function focusVideo() {
   inputSurface.value?.focus({ preventScroll: true })
 }
 
+function hidFit(): VideoFit {
+  return trackpadOn.value ? 'stretch' : props.videoFit
+}
+
+function refreshHidCursor(clientX?: number, clientY?: number) {
+  const x = clientX ?? lastPointer?.x
+  const y = clientY ?? lastPointer?.y
+  if (x == null || y == null || trackpadOn.value) {
+    hidCursor.value = undefined
+    return
+  }
+  const target = inputTarget.value
+  const source = sourceSize()
+  const inside = Boolean(target && source.width > 0) && mapAbsoluteMouse(
+    x,
+    y,
+    target!.getBoundingClientRect(),
+    source.width,
+    source.height,
+    hidFit(),
+    props.videoRotation,
+  ).inside
+  hidCursor.value = consolePointerCursor(
+    Boolean(props.hideLocalCursor),
+    props.mouseMode === 'relative',
+    trackpadOn.value,
+    inside,
+  )
+}
+
+function onHidPointerMove(event: PointerEvent) {
+  lastPointer = { x: event.clientX, y: event.clientY }
+  refreshHidCursor(event.clientX, event.clientY)
+}
+
+function onHidPointerLeave() {
+  lastPointer = null
+  hidCursor.value = undefined
+}
+
+function sourceSize() {
+  const element = inputTarget.value
+  const width = frameWidth.value
+    || (element instanceof HTMLVideoElement ? element.videoWidth : element instanceof HTMLCanvasElement ? element.width : 0)
+  const height = frameHeight.value
+    || (element instanceof HTMLVideoElement ? element.videoHeight : element instanceof HTMLCanvasElement ? element.height : 0)
+  return { width, height }
+}
+
+function sendTrackpadAbsolute(buttons: number) {
+  const stageEl = stage.value
+  const videoEl = inputTarget.value
+  const source = sourceSize()
+  if (!stageEl || !videoEl || source.width <= 0 || source.height <= 0) return
+  const frame = inputSurface.value?.getBoundingClientRect() ?? stageEl.getBoundingClientRect()
+  const point = viewOverflows(zoomView.scale)
+    ? cursorToScreen(zoomView, zoomCursor)
+    : { x: frame.width / 2, y: frame.height / 2 }
+  const hid = mapAbsoluteMouse(
+    frame.left + point.x,
+    frame.top + point.y,
+    videoEl.getBoundingClientRect(),
+    source.width,
+    source.height,
+    'stretch',
+    props.videoRotation,
+  )
+  onekvm.sendAbsoluteMouse(buttons, hid.x, hid.y)
+}
+
+function onTrackpadLook(dx: number, dy: number) {
+  if (viewOverflows(zoomView.scale)) {
+    followLook(dx, dy)
+    sendTrackpadAbsolute(trackpadButtons.value)
+    return
+  }
+  const movement = unrotateMouseDelta(dx, dy, props.videoRotation)
+  sendRelativeMotion(trackpadButtons.value, movement.x, movement.y)
+}
+
+function onTrackpadTap() {
+  const held = trackpadButtons.value
+  if (viewOverflows(zoomView.scale)) {
+    sendTrackpadAbsolute(held | MOUSE_BUTTON_LEFT)
+    sendTrackpadAbsolute(held)
+    return
+  }
+  onekvm.sendRelativeMouse(held | MOUSE_BUTTON_LEFT)
+  onekvm.sendRelativeMouse(held)
+}
+
+function onTrackpadWheel(delta: number) {
+  sendRelativeMotion(trackpadButtons.value, 0, 0, delta)
+}
+
+function onTrackpadButtons(next: number) {
+  trackpadButtons.value = next
+  if (viewOverflows(zoomView.scale)) sendTrackpadAbsolute(next)
+  else onekvm.sendRelativeMouse(next)
+}
+
+function onTrackpadChrome(height: number) {
+  trackpadChrome.value = height
+  void nextTick(() => {
+    if (viewOverflows(zoomView.scale)) sendTrackpadAbsolute(trackpadButtons.value)
+  })
+}
+
+async function prepareTrackpadView() {
+  await nextTick()
+  const source = sourceSize()
+  if (source.width <= 0 || source.height <= 0) return
+  const rotated = rotatedVideoSize(source.width, source.height, props.videoRotation)
+  zoomToOneToOne(rotated.width, rotated.height)
+  if (viewOverflows(zoomView.scale)) sendTrackpadAbsolute(trackpadButtons.value)
+}
+
 defineExpose({ focusVideo })
 
+watch(trackpadOn, (open) => {
+  trackpadFramed = false
+  if (open) return
+  trackpadChrome.value = 0
+  trackpadButtons.value = 0
+})
+
+watch([trackpadChrome, frameWidth, frameHeight], () => {
+  if (!trackpadOn.value || trackpadChrome.value <= 0 || trackpadFramed) return
+  if (sourceSize().width <= 0 || sourceSize().height <= 0) return
+  trackpadFramed = true
+  void prepareTrackpadView()
+})
+
 onMounted(() => {
+  syncDisplayPixelRatio()
   unsubscribeBitrate = onekvm.subscribeVideoBitrate((value) => emit('bitrate', value))
   unsubscribeBrowserLatency = onekvm.subscribeBrowserLatency((value) => {
     webrtcLatency = value
@@ -217,10 +428,14 @@ onMounted(() => {
   }
   if (remoteAudio.value) detachAudio = onekvm.attachAudio(remoteAudio.value)
   observeCanvas()
-  void onekvm.connect().catch(() => undefined)
+  void onekvm.connect().then(() => {
+    onekvm.sendRelativeMouse(0)
+  }).catch(() => undefined)
 })
 
 onBeforeUnmount(() => {
+  pixelRatioQuery?.removeEventListener('change', onPixelRatioChange)
+  pixelRatioQuery = undefined
   canvasObserver?.disconnect()
   detachVideo?.()
   detachAudio?.()
@@ -248,33 +463,51 @@ watch(() => props.state.videoMode, (mode) => {
   publishBrowserLatency()
 })
 
-watch([() => props.videoFit, originalSizeStyle, inputTarget], () => {
+watch([() => props.videoFit, mediaStyle, inputTarget, displayPixelRatio], () => {
   void nextTick(observeCanvas)
 })
+
+watch(() => props.videoRotation, () => {
+  resetZoom()
+  if (trackpadOn.value) void prepareTrackpadView()
+})
+
+watch(
+  [() => props.hideLocalCursor, () => props.mouseMode, trackpadOn, () => props.videoFit, () => props.videoRotation],
+  () => refreshHidCursor(),
+  { flush: 'post' },
+)
 </script>
 
 <template>
   <main
     ref="stage"
     class="console-stage"
-    :class="{ 'console-stage-original': videoFit === 'original' }"
+    :class="{
+      'console-stage-original': videoFit === 'original' && !trackpadOn,
+      'is-zoomable': trackpadOn,
+      'has-trackpad': trackpadOn,
+    }"
+    :style="stageStyle"
     @pointerdown="onekvm.unlockAudio()"
   >
+    <ConnectionTrace :usb-connected="Boolean(usbConnected)" :video-connected="playing" />
     <audio ref="remoteAudio" class="console-remote-audio" autoplay playsinline />
+    <div class="console-viewport" :style="viewportStyle">
+    <div class="console-picture" :style="pictureStyle">
     <video
       id="screen"
       ref="video"
       class="console-video"
       :class="{
-        'cursor-crosshair': mouseMode === 'relative',
         'console-video-ready': playing && !isMJPEG,
-        'console-video-original': videoFit === 'original',
-        'console-video-stretch': videoFit === 'stretch',
+        'console-video-original': videoFit === 'original' && !trackpadOn,
+        'console-video-stretch': videoFit === 'stretch' || trackpadOn,
       }"
       autoplay
       playsinline
       muted
-      :style="originalSizeStyle"
+      :style="mediaStyle"
       :disablePictureInPicture="true"
       controlslist="nopictureinpicture"
       tabindex="-1"
@@ -291,19 +524,43 @@ watch([() => props.videoFit, originalSizeStyle, inputTarget], () => {
       ref="canvas"
       class="console-video console-video-canvas"
       :class="{
-        'cursor-crosshair': mouseMode === 'relative',
         'console-video-ready': playing && isMJPEG,
-        'console-video-original': videoFit === 'original',
-        'console-video-stretch': videoFit === 'stretch',
+        'console-video-original': videoFit === 'original' && !trackpadOn,
+        'console-video-stretch': videoFit === 'stretch' || trackpadOn,
       }"
-      :style="originalSizeStyle"
+      :style="mediaStyle"
       tabindex="-1"
     />
+    </div>
+    </div>
     <div
       ref="inputSurface"
       class="console-hid-layer"
-      :class="{ 'cursor-crosshair': mouseMode === 'relative' }"
+      :style="hidCursor ? { cursor: hidCursor } : undefined"
       tabindex="0"
+      @pointerenter="onHidPointerMove"
+      @pointermove="onHidPointerMove"
+      @pointerleave="onHidPointerLeave"
+    />
+    <Transition name="console-zoom-badge">
+      <button
+        v-if="zoomBadgeShown"
+        type="button"
+        class="console-zoom-badge"
+        :aria-label="t('mouse.resetZoom', 'Reset zoom')"
+        @click="resetZoom()"
+      >
+        {{ Math.round(zoomView.scale * 100) }}%
+      </button>
+    </Transition>
+    <TrackpadOverlay
+      v-if="trackpadOn"
+      @close="emit('update:trackpad', false)"
+      @look="onTrackpadLook"
+      @tap="onTrackpadTap"
+      @wheel="onTrackpadWheel"
+      @buttons="onTrackpadButtons"
+      @chrome="onTrackpadChrome"
     />
 
     <div
@@ -333,7 +590,7 @@ watch([() => props.videoFit, originalSizeStyle, inputTarget], () => {
       to=".console-workspace"
       preset="card"
       class="connection-problem-modal"
-      :title="connectionProblemTitle"
+      :title="t('screen.connectionLostTitle', 'Connection interrupted')"
       :closable="false"
       :mask-closable="false"
       :close-on-esc="false"
@@ -341,7 +598,7 @@ watch([() => props.videoFit, originalSizeStyle, inputTarget], () => {
     >
       <div class="connection-problem-content" aria-live="assertive">
         <WifiOff :size="42" />
-        <p>{{ connectionProblemDetail }}</p>
+        <p>{{ t('screen.connectionLostDetail', 'The browser can no longer reach OneKVM. Check the network connection or wait for the service to restart.') }}</p>
         <code v-if="state.error">{{ state.error }}</code>
       </div>
       <template #footer>
@@ -354,3 +611,17 @@ watch([() => props.videoFit, originalSizeStyle, inputTarget], () => {
     </n-modal>
   </main>
 </template>
+
+<style scoped>
+.console-stage-original {
+  align-items: safe center;
+  justify-content: safe center;
+}
+
+.console-picture {
+  position: relative;
+  flex: 0 0 auto;
+  width: 100%;
+  height: 100%;
+}
+</style>

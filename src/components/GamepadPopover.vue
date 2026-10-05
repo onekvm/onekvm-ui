@@ -14,11 +14,13 @@ import {
   webHIDSupported,
 } from '@/lib/gamepad'
 import { onekvm, type GamepadReport } from '@/lib/onekvm'
+import ControlOverlay from './ControlOverlay.vue'
 import HidHostAlert from './HidHostAlert.vue'
 
 const props = defineProps<{
   hid?: OneKVMStatus['hid'] | null
   placement?: 'top-end' | 'bottom-end' | 'right-start' | 'left-start'
+  sheet?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -218,16 +220,17 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <n-popover
+  <ControlOverlay
     :show="popoverOpen"
-    trigger="click"
-    :placement="placement || 'bottom-end'"
-    :show-arrow="false"
-    class="control-popover gamepad-control-popover"
+    :sheet="sheet"
+    :placement="placement"
+    popover-class="control-popover gamepad-control-popover"
     to=".console-workspace"
     @update:show="updateShow"
   >
-    <template #trigger><slot /></template>
+    <slot />
+    <template #title>{{ t('gamepad.title', 'Gamepad') }}</template>
+    <template #panel>
     <div class="display-status-popover">
       <header class="control-popover-header">
         <strong>{{ t('gamepad.title', 'Gamepad') }}</strong>
@@ -265,14 +268,15 @@ onBeforeUnmount(() => {
         {{ t('gamepad.empty', 'No controller is forwarding yet.') }}
       </p>
     </div>
-  </n-popover>
+    </template>
+  </ControlOverlay>
 </template>
 
 <style scoped>
 .gamepad-hint,
 .gamepad-empty {
   margin: 8px 0 0;
-  color: #8f99a3;
+  color: var(--muted-foreground);
   font-size: 11px;
   line-height: 1.45;
 }

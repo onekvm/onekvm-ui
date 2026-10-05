@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import { Save } from '@lucide/vue'
 
 import type { KeyboardShortcut } from '@/api/client'
+import { useOverlayMount } from '@/composables/useOverlayMount'
 import { t } from '@/i18n/runtime'
 import { normalizeShortcuts } from '@/lib/keyboard-shortcuts'
 
@@ -18,6 +19,7 @@ const emit = defineEmits<{
   save: [shortcuts: KeyboardShortcut[]]
 }>()
 
+const overlayTo = useOverlayMount()
 const draft = ref<KeyboardShortcut[]>([])
 const valid = ref(true)
 
@@ -37,6 +39,7 @@ function save() {
 <template>
   <n-drawer
     :show="show"
+    :to="overlayTo"
     placement="right"
     class="shortcut-drawer"
     :width="620"

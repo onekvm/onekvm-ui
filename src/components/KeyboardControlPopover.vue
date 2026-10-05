@@ -6,6 +6,8 @@ import { useMessage, type DropdownOption, type InputInst } from 'naive-ui'
 import { api, type KeyboardLayout } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { filterKeyboardText } from '@/input/keyboard-text'
+import { useOverlayMount } from '@/composables/useOverlayMount'
+import ControlOverlay from './ControlOverlay.vue'
 import HidHostAlert from './HidHostAlert.vue'
 
 const props = defineProps<{
@@ -16,6 +18,7 @@ const props = defineProps<{
   capsLock?: boolean
   scrollLock?: boolean
   placement?: 'top-end' | 'bottom-end' | 'right-start' | 'left-start'
+  sheet?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -30,6 +33,7 @@ const text = ref('')
 const sendingText = ref(false)
 const textInput = ref<InputInst | null>(null)
 const compactViewport = ref(window.innerWidth <= 520)
+const overlayTo = useOverlayMount()
 const panel = ref<HTMLElement | null>(null)
 const position = ref({ x: 24, y: 58 })
 let dragOffset = { x: 0, y: 0 }
@@ -44,12 +48,7 @@ const panelStyle = computed(() => ({
   left: `${position.value.x}px`,
   top: `${position.value.y}px`,
 }))
-const popoverPlacement = computed(() => {
-  if (compactViewport.value) return 'bottom-start'
-  return props.placement || 'bottom-end'
-})
-const popoverX = computed(() => compactViewport.value ? 8 : undefined)
-const popoverY = computed(() => compactViewport.value ? 36 : undefined)
+const popoverPlacement = computed(() => props.placement || (compactViewport.value ? 'bottom-start' : 'bottom-end'))
 
 function lockLabel(value: boolean | undefined) {
   if (value === undefined) return t('keyboard.lockUnknown', 'Unknown')
@@ -177,18 +176,16 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <n-popover
+  <ControlOverlay
     :show="popoverOpen"
-    trigger="click"
+    :sheet="sheet"
     :placement="popoverPlacement"
-    :x="popoverX"
-    :y="popoverY"
-    :show-arrow="false"
-    class="control-popover keyboard-control-popover"
+    popover-class="control-popover keyboard-control-popover"
     @update:show="updateShow"
   >
-    <template #trigger><slot /></template>
-
+    <slot />
+    <template #title>{{ t('keyboard.title', 'Keyboard') }}</template>
+    <template #panel>
     <div class="keyboard-control-panel">
       <header class="control-popover-header">
         <div class="keyboard-control-heading">
@@ -198,8 +195,8 @@ onBeforeUnmount(() => {
             <small>{{ t('keyboard.layout', 'Keyboard layout') }} · {{ layoutLabel(layout) }}</small>
           </span>
         </div>
-        <div class="control-popover-header-actions">
-          <n-tooltip to="body" :z-index="4000">
+        <div v-if="!sheet" class="control-popover-header-actions">
+          <n-tooltip :to="overlayTo" :z-index="4000">
             <template #trigger>
               <n-button quaternary circle size="tiny" :aria-label="t('keyboard.pinStatus', 'Pin keyboard status')" @click="pinPanel($event)">
                 <template #icon><Pin /></template>
@@ -230,10 +227,12 @@ onBeforeUnmount(() => {
       <n-menu accordion :value="null" :options="actionOptions" :indent="16" class="keyboard-control-menu keyboard-action-menu" @update:value="selectOption" />
       <n-menu accordion :value="null" :options="remainingOptions" :indent="16" class="keyboard-control-menu keyboard-secondary-menu" @update:value="selectOption" />
     </div>
-  </n-popover>
+    </template>
+  </ControlOverlay>
 
   <n-modal
     v-model:show="textModalOpen"
+    :to="overlayTo"
     preset="card"
     class="keyboard-text-modal"
     :title="t('keyboard.paste', 'Send text')"
@@ -267,7 +266,7 @@ onBeforeUnmount(() => {
     </div>
   </n-modal>
 
-  <Teleport to="body">
+  <Teleport :to="overlayTo">
     <Transition name="win11-window">
     <section
       v-if="pinned"
@@ -283,7 +282,7 @@ onBeforeUnmount(() => {
         <strong>{{ t('keyboard.title', 'Keyboard') }}</strong>
         <span class="display-status-pinned-label">{{ t('keyboard.pinned', 'Pinned') }}</span>
         <div class="control-popover-header-actions" @pointerdown.stop>
-          <n-tooltip to="body" :z-index="4000">
+          <n-tooltip :to="overlayTo" :z-index="4000">
             <template #trigger>
               <n-button quaternary circle size="tiny" :aria-label="t('keyboard.unpinStatus', 'Unpin keyboard status')" @click="unpinPanel">
                 <template #icon><PinOff /></template>

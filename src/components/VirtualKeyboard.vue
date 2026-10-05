@@ -1,146 +1,101 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { GripHorizontal, X } from '@lucide/vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { ArrowBigUp, CornerDownLeft, Delete, GripHorizontal, X } from '@lucide/vue'
 
 import { t } from '@/i18n/runtime'
+import { useOverlayMount } from '@/composables/useOverlayMount'
 import type { KeyboardLayout } from '@/api/client'
 import { KeyboardCodes } from '@/input/keyboard'
+import { COARSE_POINTER_QUERY } from '@/lib/mobile-viewport'
+import {
+  clampOverlayPosition,
+  overlayGrabOffset,
+  overlayMountHostRect,
+  overlayPlaceBottomCenter,
+  overlayPointerPosition,
+  type OverlayPoint,
+} from '@/lib/overlay-drag'
 import { onekvm } from '@/lib/onekvm'
+import { TOOLBAR_LAUNCHER_QUERY, toolbarLauncherActive } from '@/lib/toolbar-dock'
+import {
+  applyKeyLabels,
+  baseMainRows,
+  functionRow,
+  layoutLabels,
+  mobileLayerRows,
+  mobileModifierRow,
+  mobileRowClass,
+  navigationRows,
+  nextKeyboardLayer,
+  type KeyboardLayer,
+  type VirtualKey,
+} from '@/lib/virtual-keyboard'
 
 const props = defineProps<{ show: boolean; layout: KeyboardLayout }>()
 const emit = defineEmits<{ 'update:show': [show: boolean] }>()
-
-type Key = {
-  label: string
-  code: string
-  units?: number
-  modifier?: number
-  gapAfter?: boolean
-}
-
-const key = (label: string, code: string, units = 1, modifier?: number, gapAfter = false): Key => ({
-  label,
-  code,
-  units,
-  modifier,
-  gapAfter,
-})
-
-const functionRow: Key[] = [
-  key('Esc', 'Escape', 1, undefined, true),
-  key('F1', 'F1'), key('F2', 'F2'), key('F3', 'F3'), key('F4', 'F4', 1, undefined, true),
-  key('F5', 'F5'), key('F6', 'F6'), key('F7', 'F7'), key('F8', 'F8', 1, undefined, true),
-  key('F9', 'F9'), key('F10', 'F10'), key('F11', 'F11'), key('F12', 'F12', 1, undefined, true),
-  key('PrtSc', 'PrintScreen'), key('Pause', 'Pause'),
-]
-
-const baseMainRows: Key[][] = [
-  [
-    key('`', 'Backquote'), key('1', 'Digit1'), key('2', 'Digit2'), key('3', 'Digit3'),
-    key('4', 'Digit4'), key('5', 'Digit5'), key('6', 'Digit6'), key('7', 'Digit7'),
-    key('8', 'Digit8'), key('9', 'Digit9'), key('0', 'Digit0'), key('-', 'Minus'),
-    key('=', 'Equal'), key('Backspace', 'Backspace', 2),
-  ],
-  [
-    key('Tab', 'Tab', 1.5), key('Q', 'KeyQ'), key('W', 'KeyW'), key('E', 'KeyE'),
-    key('R', 'KeyR'), key('T', 'KeyT'), key('Y', 'KeyY'), key('U', 'KeyU'),
-    key('I', 'KeyI'), key('O', 'KeyO'), key('P', 'KeyP'), key('[', 'BracketLeft'),
-    key(']', 'BracketRight'), key('\\', 'Backslash', 1.5),
-  ],
-  [
-    key('Caps', 'CapsLock', 1.75), key('A', 'KeyA'), key('S', 'KeyS'), key('D', 'KeyD'),
-    key('F', 'KeyF'), key('G', 'KeyG'), key('H', 'KeyH'), key('J', 'KeyJ'),
-    key('K', 'KeyK'), key('L', 'KeyL'), key(';', 'Semicolon'), key("'", 'Quote'),
-    key('Enter', 'Enter', 2.25),
-  ],
-  [
-    key('Shift', 'ShiftLeft', 2.25, 2), key('Z', 'KeyZ'), key('X', 'KeyX'), key('C', 'KeyC'),
-    key('V', 'KeyV'), key('B', 'KeyB'), key('N', 'KeyN'), key('M', 'KeyM'),
-    key(',', 'Comma'), key('.', 'Period'), key('/', 'Slash'), key('Shift', 'ShiftRight', 2.75, 32),
-  ],
-  [
-    key('Ctrl', 'ControlLeft', 1.5, 1), key('Meta', 'MetaLeft', 1.25, 8),
-    key('Alt', 'AltLeft', 1.25, 4), key('Space', 'Space', 6.25),
-    key('Alt', 'AltRight', 1.25, 64), key('Menu', 'Menu', 1.25),
-    key('Ctrl', 'ControlRight', 1.5, 16),
-  ],
-]
-
-const layoutLabels: Partial<Record<KeyboardLayout, Record<string, string>>> = {
-	de: {
-		KeyY: 'Z', KeyZ: 'Y', Minus: 'ß', Equal: '´', BracketLeft: 'Ü', BracketRight: '+',
-		Semicolon: 'Ö', Quote: 'Ä', Backslash: '#', Slash: '-',
-	},
-	fr: {
-		Backquote: '²', Digit1: '&', Digit2: 'É', Digit3: '"', Digit4: "'", Digit5: '(',
-		Digit6: '-', Digit7: 'È', Digit8: '_', Digit9: 'Ç', Digit0: 'À', Minus: ')',
-		KeyQ: 'A', KeyW: 'Z', BracketLeft: '^', BracketRight: '$', Backslash: '*',
-		KeyA: 'Q', Semicolon: 'M', Quote: 'Ù', KeyZ: 'W', KeyM: ',', Comma: ';',
-		Period: ':', Slash: '!',
-	},
-	es: {
-		Backquote: 'º', Minus: "'", Equal: '¡', BracketLeft: '`', BracketRight: '+',
-		Backslash: 'Ç', Semicolon: 'Ñ', Quote: '´', Slash: '-',
-	},
-	it: {
-		Backquote: '\\', Minus: "'", Equal: 'Ì', BracketLeft: 'È', BracketRight: '+',
-		Backslash: 'Ù', Semicolon: 'Ò', Quote: 'À', Slash: '-',
-	},
-	ru: {
-		KeyQ: 'Й', KeyW: 'Ц', KeyE: 'У', KeyR: 'К', KeyT: 'Е', KeyY: 'Н', KeyU: 'Г',
-		KeyI: 'Ш', KeyO: 'Щ', KeyP: 'З', BracketLeft: 'Х', BracketRight: 'Ъ',
-		KeyA: 'Ф', KeyS: 'Ы', KeyD: 'В', KeyF: 'А', KeyG: 'П', KeyH: 'Р', KeyJ: 'О',
-		KeyK: 'Л', KeyL: 'Д', Semicolon: 'Ж', Quote: 'Э', KeyZ: 'Я', KeyX: 'Ч',
-		KeyC: 'С', KeyV: 'М', KeyB: 'И', KeyN: 'Т', KeyM: 'Ь', Comma: 'Б', Period: 'Ю',
-	},
-	jp: {
-		Equal: '^', BracketLeft: '@', BracketRight: '[', Backslash: ']', Quote: ':',
-	},
-	ko: {
-		KeyQ: 'ㅂ', KeyW: 'ㅈ', KeyE: 'ㄷ', KeyR: 'ㄱ', KeyT: 'ㅅ', KeyY: 'ㅛ', KeyU: 'ㅕ',
-		KeyI: 'ㅑ', KeyO: 'ㅐ', KeyP: 'ㅔ', KeyA: 'ㅁ', KeyS: 'ㄴ', KeyD: 'ㅇ', KeyF: 'ㄹ',
-		KeyG: 'ㅎ', KeyH: 'ㅗ', KeyJ: 'ㅓ', KeyK: 'ㅏ', KeyL: 'ㅣ', KeyZ: 'ㅋ', KeyX: 'ㅌ',
-		KeyC: 'ㅊ', KeyV: 'ㅍ', KeyB: 'ㅠ', KeyN: 'ㅜ', KeyM: 'ㅡ',
-	},
-}
-
-const mainRows = computed(() => {
-	const labels = layoutLabels[props.layout] || {}
-	return baseMainRows.map((row) => row.map((item) => ({ ...item, label: labels[item.code] || item.label })))
-})
-
-const navigationRows: Key[][] = [
-  [key('Ins', 'Insert'), key('Home', 'Home'), key('PgUp', 'PageUp')],
-  [key('Del', 'Delete'), key('End', 'End'), key('PgDn', 'PageDown')],
-  [key('↑', 'ArrowUp')],
-  [key('←', 'ArrowLeft'), key('↓', 'ArrowDown'), key('→', 'ArrowRight')],
-]
-
+const overlayTo = useOverlayMount()
 const panel = ref<HTMLElement | null>(null)
-const desktop = ref(true)
+
+function readViewport() {
+  if (typeof window === 'undefined') return { width: 1024, height: 768 }
+  return { width: window.innerWidth, height: window.innerHeight }
+}
+
+const viewport = ref(readViewport())
+const desktop = computed(() => !toolbarLauncherActive(viewport.value.width, viewport.value.height))
+const landscape = computed(() => !desktop.value && viewport.value.width > viewport.value.height)
+const touchUi = shallowRef(typeof window !== 'undefined' && Boolean(window.matchMedia?.(COARSE_POINTER_QUERY)?.matches))
+const layer = shallowRef<KeyboardLayer>('letters')
 const position = ref({ x: 24, y: 96 })
-const modifiers = ref(0)
-const pressedCode = ref('')
-let media: MediaQueryList | undefined
-let dragOffset = { x: 0, y: 0 }
+const hasPlaced = shallowRef(false)
+const modifiers = shallowRef(0)
+const pressedCode = shallowRef('')
+let launcherMedia: MediaQueryList | undefined
+let pointerMedia: MediaQueryList | undefined
+let dragOffset: OverlayPoint = { x: 0, y: 0 }
 let dragging = false
+let dragHandle: HTMLElement | null = null
+let dragPointerId: number | null = null
 
-const panelStyle = computed(() =>
-  desktop.value ? { left: `${position.value.x}px`, top: `${position.value.y}px` } : undefined,
-)
+const mainRows = computed(() => applyKeyLabels(baseMainRows, layoutLabels[props.layout] || {}))
+const mobileRows = computed(() => applyKeyLabels(mobileLayerRows(layer.value), layoutLabels[props.layout] || {}))
+const panelStyle = computed(() => {
+  if (landscape.value) return undefined
+  return {
+    left: `${position.value.x}px`,
+    top: `${position.value.y}px`,
+  }
+})
 
-function modifierActive(item: Key) {
+function modifierActive(item: VirtualKey) {
   return Boolean(item.modifier && modifiers.value & item.modifier)
 }
 
-function toggleModifier(item: Key) {
+function layerActive(item: VirtualKey) {
+  return item.kind === 'layer' && item.layer === layer.value
+}
+
+function mobileKeyClass(item: VirtualKey) {
+  return {
+    active: modifierActive(item) || layerActive(item),
+    pressed: pressedCode.value === item.code,
+    'is-space': item.code === 'Space',
+    'is-wide': item.code === 'ShiftLeft' || item.code === 'Backspace' || item.code === 'Enter',
+  }
+}
+
+function toggleModifier(item: VirtualKey) {
   if (!item.modifier) return
   modifiers.value ^= item.modifier
   onekvm.sendKeyboard([], modifiers.value)
 }
 
-function press(item: Key, event: PointerEvent) {
-  event.currentTarget instanceof HTMLElement && event.currentTarget.setPointerCapture(event.pointerId)
+function press(item: VirtualKey, event: PointerEvent) {
+  if (item.kind === 'layer' && item.layer) {
+    layer.value = nextKeyboardLayer(layer.value, item.layer)
+    return
+  }
+  if (event.currentTarget instanceof HTMLElement) event.currentTarget.setPointerCapture(event.pointerId)
   if (item.modifier) {
     toggleModifier(item)
     return
@@ -151,8 +106,8 @@ function press(item: Key, event: PointerEvent) {
   onekvm.sendKeyboard([usage], modifiers.value)
 }
 
-function release(item: Key) {
-  if (item.modifier || pressedCode.value !== item.code) return
+function release(item: VirtualKey) {
+  if (item.kind === 'layer' || item.modifier || pressedCode.value !== item.code) return
   pressedCode.value = ''
   onekvm.sendKeyboard([], modifiers.value)
 }
@@ -170,102 +125,176 @@ function releaseAll() {
 
 function close() {
   releaseAll()
+  layer.value = 'letters'
   emit('update:show', false)
 }
 
-function clampPosition() {
-  if (!panel.value || !desktop.value) return
-  const rect = panel.value.getBoundingClientRect()
-  position.value = {
-    x: Math.max(8, Math.min(window.innerWidth - rect.width - 8, position.value.x)),
-    y: Math.max(48, Math.min(window.innerHeight - rect.height - 8, position.value.y)),
-  }
+function viewportSize() {
+  return viewport.value
 }
 
-async function placePanel() {
+function hostRect() {
+  return overlayMountHostRect(overlayTo.value, viewportSize())
+}
+
+function panelSize() {
+  const el = panel.value
+  if (!el) return null
+  const width = el.offsetWidth
+  const height = el.offsetHeight
+  if (width <= 0 || height <= 0) return null
+  return { width, height }
+}
+
+function clampPosition() {
+  const size = panelSize()
+  if (!size) return
+  position.value = clampOverlayPosition(position.value, size, hostRect())
+}
+
+async function placePanel(force = false) {
   await nextTick()
-  if (!panel.value || !desktop.value) return
-  const rect = panel.value.getBoundingClientRect()
-  position.value = {
-    x: Math.max(8, (window.innerWidth - rect.width) / 2),
-    y: Math.max(48, window.innerHeight - rect.height - 34),
+  if (!panelSize()) await nextTick()
+  const size = panelSize()
+  if (!size) return
+  if (landscape.value) {
+    hasPlaced.value = true
+    return
+  }
+  if (force || !hasPlaced.value) {
+    position.value = overlayPlaceBottomCenter(size, hostRect())
+    hasPlaced.value = true
   }
   clampPosition()
 }
 
 function startDrag(event: PointerEvent) {
-  if (!desktop.value || event.button !== 0 || !panel.value) return
-  const rect = panel.value.getBoundingClientRect()
-  dragOffset = { x: event.clientX - rect.left, y: event.clientY - rect.top }
+  if (landscape.value) return
+  if (event.button !== 0 || !panel.value) return
+  const handle = event.currentTarget
+  if (!(handle instanceof HTMLElement)) return
+  try {
+    handle.setPointerCapture(event.pointerId)
+  } catch {
+    /* capture is optional */
+  }
+  event.preventDefault()
+  event.stopPropagation()
+  dragOffset = overlayGrabOffset(event.clientX, event.clientY, panel.value.getBoundingClientRect())
   dragging = true
+  dragHandle = handle
+  dragPointerId = event.pointerId
   window.addEventListener('pointermove', drag)
-  window.addEventListener('pointerup', stopDrag, { once: true })
+  window.addEventListener('pointerup', stopDrag)
+  window.addEventListener('pointercancel', stopDrag)
 }
 
 function drag(event: PointerEvent) {
   if (!dragging) return
-  position.value = { x: event.clientX - dragOffset.x, y: event.clientY - dragOffset.y }
+  event.preventDefault()
+  position.value = overlayPointerPosition(event.clientX, event.clientY, hostRect(), dragOffset)
   clampPosition()
 }
 
 function stopDrag() {
   dragging = false
+  if (dragHandle && dragPointerId != null) {
+    try {
+      dragHandle.releasePointerCapture(dragPointerId)
+    } catch {
+      /* already released */
+    }
+  }
+  dragHandle = null
+  dragPointerId = null
   window.removeEventListener('pointermove', drag)
+  window.removeEventListener('pointerup', stopDrag)
+  window.removeEventListener('pointercancel', stopDrag)
 }
 
-function updateMedia(event?: MediaQueryListEvent) {
-  desktop.value = event?.matches ?? media?.matches ?? true
-  if (props.show && desktop.value) void placePanel()
+function syncViewport() {
+  const previous = viewport.value
+  const next = readViewport()
+  const changed = toolbarLauncherActive(previous.width, previous.height)
+    !== toolbarLauncherActive(next.width, next.height)
+    || (previous.width > previous.height) !== (next.width > next.height)
+  viewport.value = next
+  if (changed) hasPlaced.value = false
+  if (props.show) void placePanel(changed)
+  else clampPosition()
+}
+
+function syncTouchUi(event?: MediaQueryListEvent) {
+  touchUi.value = event?.matches ?? Boolean(pointerMedia?.matches)
 }
 
 watch(
   () => props.show,
   (show) => {
-    if (show) void placePanel()
-    else releaseAll()
+    if (show) {
+      layer.value = 'letters'
+      void placePanel()
+      return
+    }
+    stopDrag()
+    releaseAll()
   },
+  { immediate: true },
 )
 
+watch(overlayTo, () => {
+  if (props.show) clampPosition()
+})
+
 onMounted(() => {
-  media = window.matchMedia('(min-width: 768px)')
-  desktop.value = media.matches
-  media.addEventListener('change', updateMedia)
-  window.addEventListener('resize', clampPosition)
+  launcherMedia = window.matchMedia(TOOLBAR_LAUNCHER_QUERY)
+  pointerMedia = window.matchMedia(COARSE_POINTER_QUERY)
+  touchUi.value = pointerMedia.matches
+  viewport.value = readViewport()
+  launcherMedia.addEventListener('change', syncViewport)
+  pointerMedia.addEventListener('change', syncTouchUi)
+  window.addEventListener('resize', syncViewport)
 })
 
 onBeforeUnmount(() => {
-  media?.removeEventListener('change', updateMedia)
-  window.removeEventListener('resize', clampPosition)
-  window.removeEventListener('pointermove', drag)
+  launcherMedia?.removeEventListener('change', syncViewport)
+  pointerMedia?.removeEventListener('change', syncTouchUi)
+  window.removeEventListener('resize', syncViewport)
+  stopDrag()
   releaseAll()
 })
 </script>
 
 <template>
-  <Teleport to="body">
-    <Transition name="win11-window">
+  <Teleport :to="overlayTo">
+    <Transition :name="desktop ? 'win11-window' : 'keyboard-sheet'" :duration="320">
     <section
       v-if="show"
       ref="panel"
       class="keyboard-panel"
-      :class="{ 'keyboard-panel-mobile': !desktop }"
+      :class="{
+        'keyboard-panel-mobile': !desktop,
+        'is-landscape': landscape,
+        'is-touch': touchUi,
+      }"
       :style="panelStyle"
       role="dialog"
       :aria-label="t('keyboard.virtualKeyboard')"
     >
       <header class="keyboard-titlebar" @pointerdown="startDrag">
-        <GripHorizontal :size="16" class="keyboard-grip" />
-		<strong>{{ t('keyboard.virtualKeyboard') }} · {{ t(`keyboard.layouts.${layout}`, layout.toUpperCase()) }}</strong>
+        <GripHorizontal v-if="!landscape" :size="16" class="keyboard-grip" />
+        <strong v-if="desktop">{{ t('keyboard.virtualKeyboard') }} · {{ t(`keyboard.layouts.${layout}`, layout.toUpperCase()) }}</strong>
+        <strong v-else>{{ t('keyboard.title', 'Keyboard') }}</strong>
         <div class="keyboard-title-actions" @pointerdown.stop>
-          <n-button size="tiny" secondary @click="sendChord([76], 1 | 4)">{{ t('keyboard.ctrlaltdel', 'Ctrl+Alt+Del') }}</n-button>
-          <n-button size="tiny" secondary @click="releaseAll">{{ t('keyboard.releaseAll', 'Release all') }}</n-button>
+          <n-button size="tiny" secondary @click="sendChord([76], 1 | 4)">{{ desktop ? t('keyboard.ctrlaltdel', 'Ctrl+Alt+Del') : t('keyboard.cadShort', 'CAD') }}</n-button>
+          <n-button size="tiny" secondary @click="releaseAll">{{ desktop ? t('keyboard.releaseAll', 'Release all') : t('keyboard.releaseShort', 'Release') }}</n-button>
           <n-button quaternary circle size="tiny" :aria-label="t('common.close', 'Close')" @click="close">
             <template #icon><X /></template>
           </n-button>
         </div>
       </header>
 
-      <div class="keyboard-scroll">
+      <div v-if="desktop" class="keyboard-scroll">
         <div class="virtual-keyboard">
           <div class="keyboard-row keyboard-function-row">
             <button
@@ -278,6 +307,7 @@ onBeforeUnmount(() => {
               @pointerdown.prevent="press(item, $event)"
               @pointerup.prevent="release(item)"
               @pointercancel="release(item)"
+              @lostpointercapture="release(item)"
             >
               {{ item.label }}
             </button>
@@ -297,6 +327,7 @@ onBeforeUnmount(() => {
                   @pointerdown.prevent="press(item, $event)"
                   @pointerup.prevent="release(item)"
                   @pointercancel="release(item)"
+                  @lostpointercapture="release(item)"
                 >
                   {{ item.label }}
                 </button>
@@ -314,12 +345,63 @@ onBeforeUnmount(() => {
                   @pointerdown.prevent="press(item, $event)"
                   @pointerup.prevent="release(item)"
                   @pointercancel="release(item)"
+                  @lostpointercapture="release(item)"
                 >
                   {{ item.label }}
                 </button>
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div v-else class="keyboard-mobile">
+        <div class="keyboard-mobile-row is-mods">
+          <button
+            v-for="item in mobileModifierRow"
+            :key="item.code"
+            type="button"
+            class="keyboard-key keyboard-mobile-key"
+            :class="mobileKeyClass(item)"
+            :aria-pressed="item.modifier || item.kind === 'layer' ? modifierActive(item) || layerActive(item) : undefined"
+            :aria-label="item.kind === 'layer' ? t('keyboard.layerFn', 'Function keys') : item.label"
+            @pointerdown.prevent="press(item, $event)"
+            @pointerup.prevent="release(item)"
+            @pointercancel="release(item)"
+            @lostpointercapture="release(item)"
+          >
+            {{ item.label }}
+          </button>
+        </div>
+        <div
+          v-for="(row, rowIndex) in mobileRows"
+          :key="`${layer}-${rowIndex}`"
+          class="keyboard-mobile-row"
+          :class="mobileRowClass(row)"
+        >
+          <button
+            v-for="item in row"
+            :key="item.code"
+            type="button"
+            class="keyboard-key keyboard-mobile-key"
+            :class="mobileKeyClass(item)"
+            :style="item.flex ? { flex: `${item.flex} 1 0` } : undefined"
+            :aria-pressed="item.modifier || item.kind === 'layer' ? modifierActive(item) || layerActive(item) : undefined"
+            :aria-label="item.kind === 'layer' && item.layer === 'numbers'
+              ? t('keyboard.layerNumbers', 'Numbers')
+              : item.kind === 'layer'
+                ? t('keyboard.layerLetters', 'Letters')
+                : item.label"
+            @pointerdown.prevent="press(item, $event)"
+            @pointerup.prevent="release(item)"
+            @pointercancel="release(item)"
+            @lostpointercapture="release(item)"
+          >
+            <ArrowBigUp v-if="item.code === 'ShiftLeft'" :size="18" />
+            <Delete v-else-if="item.code === 'Backspace'" :size="18" />
+            <CornerDownLeft v-else-if="item.code === 'Enter'" :size="18" />
+            <template v-else-if="item.code !== 'Space'">{{ item.label }}</template>
+          </button>
         </div>
       </div>
     </section>

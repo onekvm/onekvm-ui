@@ -1,31 +1,49 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { WifiOff } from '@lucide/vue'
-import { useDialog } from 'naive-ui'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { useDialog, useMessage } from 'naive-ui'
 
 import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type OneKVMStatus } from '@/api/client'
+import { isCloudHosted } from '@/api/service-url'
+import ToolboxWorkspace from './toolbox/ToolboxWorkspace.vue'
+import MacroRunBanner from './toolbox/MacroRunBanner.vue'
+import { useToolbox } from '@/composables/useToolbox'
 import { useAuth } from '@/composables/useAuth'
+import { useDeviceInputSettings } from '@/composables/useDeviceInputSettings'
 import { hasPermission } from '@/build'
 import { type MouseMode } from '@/composables/useMouse'
-import { parseVideoFit, VIDEO_FIT_KEY, type VideoFit } from '@/lib/video-fit'
+import { parseVideoFit, parseVideoRotation, VIDEO_FIT_KEY, VIDEO_ROTATION_KEY, type VideoFit, type VideoRotation } from '@/lib/video-fit'
 import {
   parseToolbarDock,
+  toolbarLauncherActive,
+  toolbarStageDuration,
+  toolbarStageEase,
   toolbarWorkspaceClass,
   TOOLBAR_DOCK_KEY,
   type ToolbarDock,
 } from '@/lib/toolbar-dock'
+import {
+  advancedSettingsHash,
+  advancedSettingsRouteFromHash,
+  isAdvancedSettingsHash,
+  settingsAppActive,
+} from '@/lib/settings-nav'
+import { storedHideLocalCursor } from '@/lib/console-pointer'
+import { consumeConsoleBack, lockConsoleHistory } from '@/lib/history-lock'
+import { fullscreenTopInsetPx, isIpadLikeUserAgent, readSafeAreaTop } from '@/lib/fullscreen-inset'
 import { useTransport } from '@/composables/useTransport'
 import { onekvm, type BrowserAudioStats, type BrowserVideoLatencyUs } from '@/lib/onekvm'
+import { videoCodecLabel } from '@/lib/video-transport'
 import { loadLocalShortcuts, saveLocalShortcuts } from '@/lib/keyboard-shortcuts'
 import { statusEvents } from '@/lib/status-events'
 import { t } from '@/i18n/runtime'
-import { loadExtensionToolbars } from '@/extensions/pluginUi'
+import { loadExtensionShells, loadExtensionToolbars } from '@/extensions/pluginUi'
 import { uiProduct } from '@/product'
 
 import ControlToolbar from './ControlToolbar.vue'
 import RemoteConsole from './RemoteConsole.vue'
 import VideoPerformanceOverlay from './VideoPerformanceOverlay.vue'
 import AdvancedSettingsLoading from './AdvancedSettingsLoading.vue'
+import VideoFallbackModal from './VideoFallbackModal.vue'
 
 const AccountDrawer = defineAsyncComponent(() => import('./AccountDrawer.vue'))
 const AdvancedSettingsPage = defineAsyncComponent({
@@ -37,36 +55,50 @@ const KeyboardShortcutDrawer = defineAsyncComponent(() => import('./KeyboardShor
 const VirtualKeyboard = defineAsyncComponent(() => import('./VirtualKeyboard.vue'))
 
 const MOUSE_MODE_KEY = 'nano-kvm-mouse-mode'
-const SCROLL_INTERVAL_KEY = 'nanokvm-kvm-mouse-scroll-interval'
-const MOUSE_REPORT_RATE_KEY = 'onekvm-mouse-report-rate'
+const HIDE_LOCAL_CURSOR_KEY = 'onekvm-hide-local-cursor'
 const RIGHT_CONTROL_AS_META_KEY = 'onekvm-right-control-as-meta'
 const PERFORMANCE_OVERLAY_KEY = 'onekvm-performance-overlay'
-const ADVANCED_SETTINGS_ROUTE = '#/settings/advanced'
 
 function isAdvancedSettingsRoute(hash: string) {
-  return hash === ADVANCED_SETTINGS_ROUTE || hash.startsWith(`${ADVANCED_SETTINGS_ROUTE}/`)
+  return isAdvancedSettingsHash(hash)
+}
+
+function phoneSettingsActive() {
+  return settingsAppActive(window.innerWidth, window.innerHeight)
 }
 
 function advancedRouteFromHash(hash: string) {
-  return isAdvancedSettingsRoute(hash)
-    ? hash.slice(ADVANCED_SETTINGS_ROUTE.length).replace(/^\//, '') || 'system'
-    : 'system'
+  return advancedSettingsRouteFromHash(hash, phoneSettingsActive())
 }
 
 const { state } = useTransport()
 const { auth, logout, refresh } = useAuth()
+const toolbox = useToolbox()
 const dialog = useDialog()
+const message = useMessage()
 const canSettings = computed(() => hasPermission(auth, 'settings.view'))
+const canChangeVideo = computed(() =>
+  canSettings.value && (state.value.videoMode !== 'webrtc' || state.value.videoPrimary),
+)
 const canPower = computed(() => hasPermission(auth, 'power.control'))
 const brandBadge = computed(() => uiProduct.badge(auth))
 const accountOpen = ref(false)
 const virtualKeyboardOpen = ref(false)
 const shortcutDialogOpen = ref(false)
 const toolbarOverlayOpen = ref(false)
-const toolbarDock = ref<ToolbarDock>(parseToolbarDock(localStorage.getItem(TOOLBAR_DOCK_KEY)).dock)
+const toolbarDock = ref<ToolbarDock>(
+  toolbarLauncherActive(window.innerWidth, window.innerHeight)
+    ? 'float'
+    : parseToolbarDock(localStorage.getItem(TOOLBAR_DOCK_KEY)).dock,
+)
+const toolbarStageStyle = computed(() => ({
+  '--toolbar-stage-ms': `${toolbarStageDuration(toolbarDock.value)}ms`,
+  '--toolbar-stage-ease': toolbarStageEase(toolbarDock.value),
+}))
 const advancedSettingsOpen = ref(isAdvancedSettingsRoute(window.location.hash))
 const advancedSettingsRoute = ref(advancedRouteFromHash(window.location.hash))
 const consoleWorkspace = ref<HTMLElement | null>(null)
+const controlToolbar = ref<{ dismissOverlays: () => void } | null>(null)
 const remoteConsole = ref<InstanceType<typeof RemoteConsole> | null>(null)
 const fullscreen = ref(false)
 const performanceOpen = ref(localStorage.getItem(PERFORMANCE_OVERLAY_KEY) !== 'false')
@@ -79,13 +111,17 @@ const mouseMode = ref<MouseMode>(
   localStorage.getItem(MOUSE_MODE_KEY) === 'relative' ? 'relative' : 'absolute',
 )
 const videoFit = ref<VideoFit>(parseVideoFit(localStorage.getItem(VIDEO_FIT_KEY)))
-const scrollInterval = ref(Number(localStorage.getItem(SCROLL_INTERVAL_KEY)) || 0)
-const storedMouseReportRate = Number(localStorage.getItem(MOUSE_REPORT_RATE_KEY))
-const mouseReportRate = ref(
-  Number.isFinite(storedMouseReportRate) && storedMouseReportRate >= 1 && storedMouseReportRate <= 1000
-    ? Math.round(storedMouseReportRate)
-    : 60,
-)
+const videoRotation = shallowRef<VideoRotation>(parseVideoRotation(localStorage.getItem(VIDEO_ROTATION_KEY)))
+const {
+  mouseReportRate,
+  scrollInterval,
+  updateMouseReportRate,
+  updateScrollInterval,
+} = useDeviceInputSettings({
+  onError: () => message.error(t('settings.mouse.saveFailed', 'Failed to save mouse settings')),
+})
+const trackpadOpen = ref(false)
+const hideLocalCursor = ref(storedHideLocalCursor(localStorage.getItem(HIDE_LOCAL_CURSOR_KEY)))
 const status = ref<OneKVMStatus | null>(null)
 const msdStatus = ref<MSDStatus | null>(null)
 const serverUnavailable = ref(false)
@@ -102,7 +138,8 @@ const presentUs = ref(0)
 const audioBitrate = ref(0)
 const audioPacketsPerSecond = ref(0)
 const audioJitterBufferUs = ref(0)
-const switchingTransport = ref<'websocket' | 'webrtc' | ''>('')
+const switchingTransport = shallowRef<'websocket' | 'webrtc' | 'h264' | ''>('')
+const fallbackActionError = shallowRef('')
 let unsubscribeKeyboardLED: (() => void) | undefined
 let unsubscribeStatus: (() => void) | undefined
 
@@ -114,19 +151,30 @@ const audioOverlayChannels = computed(() => {
   if (status.value?.audio.channels === 'stereo') return 2
   return 0
 })
+const macroInputReset = ref(false)
+watch(() => status.value?.hid.macro_generation, async (generation, previous) => {
+  if (generation === previous || previous === undefined) return
+  macroInputReset.value = true
+  await nextTick()
+  macroInputReset.value = false
+})
 const keyboardBlocked = computed(
-  () => advancedSettingsOpen.value || accountOpen.value || virtualKeyboardOpen.value || shortcutDialogOpen.value || toolbarOverlayOpen.value || state.value.websocketFallbackOffered,
+  () => macroInputReset.value || Boolean(status.value?.hid.macro_owner) || toolbox.inputBlocked || advancedSettingsOpen.value || accountOpen.value || virtualKeyboardOpen.value || shortcutDialogOpen.value || toolbarOverlayOpen.value || Boolean(state.value.fallbackPrompt),
 )
 watch(mouseMode, (value) => localStorage.setItem(MOUSE_MODE_KEY, value))
 watch(videoFit, (value) => localStorage.setItem(VIDEO_FIT_KEY, value))
-watch(scrollInterval, (value) => localStorage.setItem(SCROLL_INTERVAL_KEY, String(value)))
-watch(mouseReportRate, (value) => localStorage.setItem(MOUSE_REPORT_RATE_KEY, String(value)))
+watch(videoRotation, (value) => localStorage.setItem(VIDEO_ROTATION_KEY, String(value)))
+watch(hideLocalCursor, (value) => localStorage.setItem(HIDE_LOCAL_CURSOR_KEY, String(value)))
 watch(rightControlAsMeta, (value) => localStorage.setItem(RIGHT_CONTROL_AS_META_KEY, String(value)))
 watch(performanceOpen, (value) => localStorage.setItem(PERFORMANCE_OVERLAY_KEY, String(value)))
 watch(
+  () => state.value.fallbackPrompt,
+  () => { fallbackActionError.value = '' },
+)
+watch(
   () => auth.authenticated,
   (authenticated) => {
-    void refreshExtensionToolbars()
+    void refreshExtensionContributions()
     if (authenticated) return
     void onekvm.close()
   },
@@ -151,15 +199,17 @@ watch(
   { immediate: true },
 )
 
-async function refreshExtensionToolbars() {
+async function refreshExtensionContributions() {
   if (!auth.authenticated) {
-    await loadExtensionToolbars([])
+    await Promise.all([loadExtensionToolbars([]), loadExtensionShells([])])
     return
   }
   try {
-    await loadExtensionToolbars(await api.getExtensions())
+    const extensions = await api.getExtensions()
+    toolbox.acceptCatalog(extensions)
+    await Promise.all([loadExtensionToolbars(extensions), loadExtensionShells(extensions)])
   } catch {
-    await loadExtensionToolbars([])
+    await Promise.all([loadExtensionToolbars([]), loadExtensionShells([])])
   }
 }
 
@@ -235,6 +285,22 @@ async function retryWebRTC() {
   }
 }
 
+async function switchToH264() {
+  if (switchingTransport.value) return
+  switchingTransport.value = 'h264'
+  fallbackActionError.value = ''
+  try {
+    await onekvm.switchToH264Fallback()
+  } catch {
+    fallbackActionError.value = t(
+      'screen.h264FallbackFailed',
+      'Could not switch to H.264. Please try again.',
+    )
+  } finally {
+    switchingTransport.value = ''
+  }
+}
+
 type KeyboardLock = {
   lock: (keyCodes?: string[]) => Promise<void>
   unlock: () => void
@@ -261,12 +327,48 @@ async function toggleFullscreen() {
   }
   await keyboardLockRequest
   await nextTick()
+  applyFullscreenInset()
   remoteConsole.value?.focusVideo()
+}
+
+function applyFullscreenInset() {
+  const workspace = consoleWorkspace.value
+  if (!workspace) return
+  const inset = fullscreenTopInsetPx({
+    fullscreen: document.fullscreenElement === workspace,
+    safeTop: readSafeAreaTop(),
+    visualOffsetTop: window.visualViewport?.offsetTop ?? 0,
+    ipad: isIpadLikeUserAgent(navigator.userAgent, navigator.platform, navigator.maxTouchPoints),
+  })
+  workspace.style.setProperty('--onekvm-fullscreen-top', `${inset}px`)
 }
 
 function syncFullscreen() {
   fullscreen.value = document.fullscreenElement === consoleWorkspace.value
   if (!fullscreen.value) browserKeyboard()?.unlock()
+  applyFullscreenInset()
+}
+
+function onPopState() {
+  const action = consumeConsoleBack(
+    isAdvancedSettingsRoute(window.location.hash),
+    {
+      trackpad: trackpadOpen.value,
+      account: accountOpen.value,
+      keyboard: virtualKeyboardOpen.value,
+      shortcuts: shortcutDialogOpen.value,
+      toolbar: toolbarOverlayOpen.value,
+    },
+  )
+  if (action.type === 'navigate-settings') return
+  if (action.type === 'close') {
+    if (action.overlay === 'trackpad') trackpadOpen.value = false
+    else if (action.overlay === 'keyboard') virtualKeyboardOpen.value = false
+    else if (action.overlay === 'account') accountOpen.value = false
+    else if (action.overlay === 'shortcuts') shortcutDialogOpen.value = false
+    else controlToolbar.value?.dismissOverlays()
+  }
+  lockConsoleHistory()
 }
 
 function syncRoute() {
@@ -285,7 +387,7 @@ function syncRoute() {
 
 function openAdvancedSettings() {
   if (advancedSettingsOpen.value || !canSettings.value) return
-  window.location.hash = '/settings/advanced/system'
+  window.location.hash = advancedSettingsHash(phoneSettingsActive() ? '' : 'system')
 }
 
 function confirmAdvancedSettings() {
@@ -308,7 +410,7 @@ function closeAdvancedSettings() {
   shortcutDialogOpen.value = false
   toolbarOverlayOpen.value = false
   advancedSettingsOpen.value = false
-  advancedSettingsRoute.value = 'system'
+  advancedSettingsRoute.value = phoneSettingsActive() ? '' : 'system'
   const url = new URL(window.location.href)
   url.hash = ''
   window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}`)
@@ -320,8 +422,13 @@ function focusConsole() {
 }
 
 function navigateAdvancedSettings(route: string) {
-  window.location.hash = `/settings/advanced/${route}`
+  window.location.hash = advancedSettingsHash(route)
 }
+
+watch(advancedSettingsOpen, (open) => {
+  if (open) return
+  void nextTick(applyFullscreenInset)
+})
 
 onMounted(() => {
 	unsubscribeStatus = statusEvents.subscribe(
@@ -348,11 +455,16 @@ onMounted(() => {
 	})
 	void refreshMSDStatus()
   void refreshDeviceShortcuts()
-  void refreshExtensionToolbars()
+  void refreshExtensionContributions()
   window.addEventListener('pagehide', closeSession)
   window.addEventListener('hashchange', syncRoute)
+  window.addEventListener('popstate', onPopState)
   document.addEventListener('fullscreenchange', syncFullscreen)
+  window.visualViewport?.addEventListener('resize', applyFullscreenInset)
+  window.visualViewport?.addEventListener('scroll', applyFullscreenInset)
+  lockConsoleHistory()
   syncRoute()
+  applyFullscreenInset()
 })
 
 onBeforeUnmount(() => {
@@ -361,7 +473,10 @@ onBeforeUnmount(() => {
 	unsubscribeKeyboardLED?.()
   window.removeEventListener('pagehide', closeSession)
   window.removeEventListener('hashchange', syncRoute)
+  window.removeEventListener('popstate', onPopState)
   document.removeEventListener('fullscreenchange', syncFullscreen)
+  window.visualViewport?.removeEventListener('resize', applyFullscreenInset)
+  window.visualViewport?.removeEventListener('scroll', applyFullscreenInset)
   browserKeyboard()?.unlock()
   closeSession()
 })
@@ -374,6 +489,8 @@ onBeforeUnmount(() => {
         <AdvancedSettingsPage
           :status="status"
           :route="advancedSettingsRoute"
+          :can-change-video="canChangeVideo"
+          :video-session-id="state.webRTCSessionId"
           @close="closeAdvancedSettings"
           @navigate="navigateAdvancedSettings"
         />
@@ -385,18 +502,24 @@ onBeforeUnmount(() => {
       ref="consoleWorkspace"
       class="console-workspace"
       :class="toolbarWorkspaceClass(toolbarDock)"
+      :style="toolbarStageStyle"
       @pointerdown.capture="onekvm.unlockAudio()"
     >
         <ControlToolbar
+          ref="controlToolbar"
           :state="state"
           :can-settings="canSettings"
+          :can-change-video="canChangeVideo"
           :can-power="canPower"
           :brand-badge="brandBadge"
-          :username="auth.username"
+          :username="isCloudHosted() ? t('auth.cloudIdentity', 'Cloud account') : auth.username"
           :mouse-mode="mouseMode"
           :scroll-interval="scrollInterval"
           :mouse-report-rate="mouseReportRate"
+          :hide-local-cursor="hideLocalCursor"
+          :trackpad="trackpadOpen"
           :video-fit="videoFit"
+          :video-rotation="videoRotation"
           :status="status"
           :msd-status="msdStatus"
           :canvas-width="canvasWidth"
@@ -409,6 +532,7 @@ onBeforeUnmount(() => {
           :keyboard-layout="keyboardLayout"
           :user-shortcuts="userShortcuts"
           :device-shortcuts="deviceShortcuts"
+          :conceal-launcher="virtualKeyboardOpen"
           @settings="confirmAdvancedSettings"
           @account="accountOpen = true"
           @logout="logout"
@@ -421,10 +545,16 @@ onBeforeUnmount(() => {
           @overlay="toolbarOverlayOpen = $event"
           @dock="toolbarDock = $event"
           @update:video-fit="videoFit = $event"
+          @update:video-rotation="videoRotation = $event"
           @update:mouse-mode="mouseMode = $event"
-          @update:scroll-interval="scrollInterval = $event"
-          @update:mouse-report-rate="mouseReportRate = $event"
+          @update:scroll-interval="updateScrollInterval"
+          @update:mouse-report-rate="updateMouseReportRate"
+          @update:hide-local-cursor="hideLocalCursor = $event"
+          @update:trackpad="trackpadOpen = $event"
         />
+
+        <MacroRunBanner :owner="status?.hid.macro_owner" />
+    <ToolboxWorkspace />
 
         <RemoteConsole
           ref="remoteConsole"
@@ -437,20 +567,23 @@ onBeforeUnmount(() => {
           :mouse-mode="mouseMode"
           :scroll-interval="scrollInterval"
           :mouse-report-rate="mouseReportRate"
+          :hide-local-cursor="hideLocalCursor"
           :video-fit="videoFit"
+          :video-rotation="videoRotation"
           :keyboard-blocked="keyboardBlocked"
           :right-control-as-meta="rightControlAsMeta"
+          :trackpad="trackpadOpen"
+          :usb-connected="Boolean(status?.hid.connected)"
           @metadata="setMetadata"
           @canvas-size="setCanvasSize"
           @fps="videoFps = $event"
           @bitrate="videoBitrate = $event"
           @browser-latency="setBrowserLatency"
           @audio-stats="setAudioStats"
+          @update:trackpad="trackpadOpen = $event"
         />
 
-        <Transition name="win11-window">
         <VideoPerformanceOverlay
-          v-show="performanceOpen"
           :visible="performanceOpen"
           :origin-x="performanceOrigin?.x"
           :origin-y="performanceOrigin?.y"
@@ -459,7 +592,7 @@ onBeforeUnmount(() => {
           :video-fps="videoFps"
           :video-bitrate="videoBitrate"
           :target-fps="status?.video.fps || 60"
-          :codec="status?.video.codec?.toUpperCase() || ''"
+          :codec="status ? videoCodecLabel(status.video) : ''"
           :transport="state.videoMode"
           :input-width="status?.video.input_width ?? 0"
           :input-height="status?.video.input_height ?? 0"
@@ -481,44 +614,16 @@ onBeforeUnmount(() => {
           :audio-jitter-buffer-us="audioJitterBufferUs"
           @close="performanceOpen = false"
         />
-        </Transition>
 
-        <n-modal
-          :show="state.websocketFallbackOffered && auth.authenticated"
-          to=".console-workspace"
-          preset="card"
-          class="connection-problem-modal"
-          :title="t('screen.webrtcUnavailableTitle', 'WebRTC connection unavailable')"
-          :closable="false"
-          :mask-closable="false"
-          :close-on-esc="false"
-          :auto-focus="false"
-        >
-          <div class="connection-problem-content" aria-live="assertive">
-            <WifiOff :size="42" />
-            <p>{{ t('screen.webrtcUnavailableDetail', 'You can try a WebSocket connection instead. Video and control latency may be higher.') }}</p>
-            <code v-if="state.error">{{ state.error }}</code>
-          </div>
-          <template #footer>
-            <div class="connection-problem-actions">
-              <n-button
-                :disabled="Boolean(switchingTransport)"
-                :loading="switchingTransport === 'webrtc'"
-                @click="retryWebRTC"
-              >
-                {{ t('screen.retryWebRTC', 'Retry WebRTC') }}
-              </n-button>
-              <n-button
-                type="primary"
-                :disabled="Boolean(switchingTransport)"
-                :loading="switchingTransport === 'websocket'"
-                @click="useWebSocketFallback"
-              >
-                {{ t('screen.tryWebSocket', 'Try WebSocket') }}
-              </n-button>
-            </div>
-          </template>
-        </n-modal>
+        <VideoFallbackModal
+          :show="Boolean(state.fallbackPrompt) && auth.authenticated"
+          :prompt="state.fallbackPrompt"
+          :loading="switchingTransport"
+          :error="fallbackActionError"
+          @retry-webrtc="retryWebRTC"
+          @use-websocket="useWebSocketFallback"
+          @switch-h264="switchToH264"
+        />
 
         <AccountDrawer v-model:show="accountOpen" />
         <VirtualKeyboard v-if="virtualKeyboardOpen" v-model:show="virtualKeyboardOpen" :layout="keyboardLayout" />

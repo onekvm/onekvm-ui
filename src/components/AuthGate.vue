@@ -1,18 +1,32 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { ArrowLeft, ArrowRight, ChevronDown, Languages, LogIn, Settings2 } from '@lucide/vue'
+import { serviceURL } from '@/api/service-url'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { ChevronDown, ChevronLeft, ChevronRight, Circle, CircleCheck, Languages, LogIn, Settings2 } from '@lucide/vue'
 
-import type { DeviceLanguage, SetupSystemSettings } from '@/api/client'
+import type { DeviceLanguage, NetworkConfig, SetupSystemSettings } from '@/api/client'
 import { useAuth } from '@/composables/useAuth'
 import { uiProduct } from '@/product'
 import { currentLanguage, languageOptions, setLanguage, t } from '@/i18n/runtime'
-import { defaultNetworkConfig, isNetworkConfigValid, withManagementVLAN } from '@/lib/network'
+import {
+  defaultNetworkConfig,
+  configuredIPv4Address,
+  isNetworkConfigValid,
+  withManagementVLAN,
+} from '@/lib/network'
 import { getPasskey } from '@/lib/webauthn'
 import { api } from '@/api/client'
 import { timezones } from '@/lib/timezones'
+import { useOneKVMTheme } from '@/theme/runtime'
+import {
+  clearRememberedLogin,
+  readRememberedLogin,
+  writeRememberedLogin,
+} from '@/lib/remember-login'
 
+import IosChoice from './IosChoice.vue'
 import NetworkSettingsForm from './NetworkSettingsForm.vue'
 import TimezoneMap from './TimezoneMap.vue'
+import WifiOnboarding from './WifiOnboarding.vue'
 
 const setupTimezones = ['UTC', ...timezones]
 
@@ -25,21 +39,11 @@ function detectedTimezone() {
   }
 }
 
-const REMEMBER_LOGIN_KEY = 'onekvm-remember-login'
-
-function readRememberedLogin() {
-  try {
-    const raw = localStorage.getItem(REMEMBER_LOGIN_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as { username?: unknown; password?: unknown }
-    if (typeof parsed.username !== 'string' || typeof parsed.password !== 'string') return null
-    return { username: parsed.username, password: parsed.password }
-  } catch {
-    return null
-  }
-}
-
 const { auth, login, setup, completeMfa, cancelMfa } = useAuth()
+const { theme } = useOneKVMTheme()
+const logoSource = computed(() => theme.value.appearance === 'light'
+  ? serviceURL('/brand/onekvm-logo-primary.svg')
+  : serviceURL('/brand/onekvm-logo-inverse.svg'))
 const rememberedLogin = readRememberedLogin()
 const username = ref(rememberedLogin?.username || '')
 const password = ref(rememberedLogin?.password || '')
@@ -48,7 +52,8 @@ const hostname = ref('onekvm')
 const setupUsername = ref('admin')
 const setupPassword = ref('')
 const confirmPassword = ref('')
-const setupStep = ref(1)
+const setupPage = ref<'menu' | 'account' | 'network' | 'region'>('menu')
+const setupMotion = ref<'ios-push' | 'ios-pop'>('ios-push')
 const setupNetwork = ref(defaultNetworkConfig())
 const networkAdvancedOpen = ref(false)
 const setupVLANEnabled = ref(false)
@@ -104,16 +109,45 @@ const setupRegionValid = computed(() => {
   return !setupNTP.value || !server || /^[A-Za-z0-9][A-Za-z0-9._:-]{0,252}$/.test(server)
 })
 const setupValid = computed(() => setupAccountValid.value && setupNetworkValid.value && setupRegionValid.value)
-const setupDateTime = computed(() => {
+const setupSectionValid = computed(() => {
+  if (setupPage.value === 'account') return setupAccountValid.value
+  if (setupPage.value === 'network') return setupNetworkValid.value
+  if (setupPage.value === 'region') return setupRegionValid.value
+  return false
+})
+const setupClock = computed(() => {
+  const locale = ({ en: 'en-US', zh: 'zh-CN', zh_tw: 'zh-TW' } as const)[setupLanguage.value]
+  const now = new Date()
   try {
-    return new Intl.DateTimeFormat(
-      ({ en: 'en-US', zh: 'zh-CN', zh_tw: 'zh-TW' } as const)[setupLanguage.value],
-      { dateStyle: 'full', timeStyle: 'medium', timeZone: setupTimezone.value },
-    ).format(new Date())
+    return {
+      date: new Intl.DateTimeFormat(locale, {
+        weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: setupTimezone.value,
+      }).format(now),
+      time: new Intl.DateTimeFormat(locale, { timeStyle: 'medium', timeZone: setupTimezone.value }).format(now),
+    }
   } catch {
-    return new Date().toLocaleString()
+    return { date: '', time: now.toLocaleString() }
   }
 })
+
+function setupRedirectTarget(network: NetworkConfig) {
+  const address = configuredIPv4Address(network)
+  if (!address || address === window.location.hostname) return ''
+  try {
+    const target = new URL(window.location.href)
+    target.hostname = address
+    const port = target.protocol === 'https:' ? network.https_port : network.http_port
+    target.port = port && !((target.protocol === 'https:' && port === 443) || (target.protocol === 'http:' && port === 80))
+      ? String(port)
+      : ''
+    target.pathname = '/'
+    target.search = ''
+    target.hash = ''
+    return target.toString()
+  } catch {
+    return ''
+  }
+}
 
 watch(
   () => auth.username,
@@ -129,8 +163,20 @@ watch(currentLanguage, (language) => {
 })
 watch(rememberPassword, (enabled) => {
   if (enabled) return
-  localStorage.removeItem(REMEMBER_LOGIN_KEY)
+  clearRememberedLogin()
 })
+
+watch(
+  () => auth.required && !auth.authenticated && !auth.mfa_required,
+  (showLogin) => {
+    if (!showLogin) return
+    const remembered = readRememberedLogin()
+    if (!remembered) return
+    username.value = remembered.username
+    password.value = remembered.password
+    rememberPassword.value = true
+  },
+)
 
 async function selectUILanguage(value: string | number) {
   const language = String(value) as DeviceLanguage
@@ -158,15 +204,8 @@ async function submit() {
       backupCode.value = ''
       return
     }
-    if (rememberPassword.value) {
-      localStorage.setItem(REMEMBER_LOGIN_KEY, JSON.stringify({
-        username: username.value,
-        password: password.value,
-      }))
-    } else {
-      localStorage.removeItem(REMEMBER_LOGIN_KEY)
-    }
-    password.value = ''
+    persistRememberedLogin()
+    if (!rememberPassword.value) password.value = ''
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : String(reason)
   } finally {
@@ -201,12 +240,21 @@ async function submitMfa() {
     }
     totpCode.value = ''
     backupCode.value = ''
-    password.value = ''
+    persistRememberedLogin()
+    if (!rememberPassword.value) password.value = ''
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : String(reason)
   } finally {
     busy.value = false
   }
+}
+
+function persistRememberedLogin() {
+  if (rememberPassword.value && username.value) {
+    writeRememberedLogin({ username: username.value, password: password.value })
+    return
+  }
+  clearRememberedLogin()
 }
 
 async function cancelChallenge() {
@@ -228,6 +276,7 @@ async function initialize() {
   if (!setupValid.value) return
   busy.value = true
   error.value = ''
+  const redirectTarget = setupRedirectTarget(setupNetworkRequest.value)
   try {
     const system: SetupSystemSettings = {
       language: setupLanguage.value,
@@ -244,6 +293,9 @@ async function initialize() {
     )
     setupPassword.value = ''
     confirmPassword.value = ''
+    if (redirectTarget) {
+      window.setTimeout(() => window.location.assign(redirectTarget), 500)
+    }
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : String(reason)
   } finally {
@@ -251,16 +303,106 @@ async function initialize() {
   }
 }
 
-function nextSetupStep() {
-  if ((setupStep.value === 1 && setupAccountValid.value) || (setupStep.value === 2 && setupNetworkValid.value)) {
-    error.value = ''
-    setupStep.value += 1
+function openSetupPage(page: 'account' | 'network' | 'region') {
+  error.value = ''
+  setupMotion.value = 'ios-push'
+  setupPage.value = page
+  if (!history.state?.onekvmSetup) history.pushState({ onekvmSetup: page }, '')
+}
+
+function showSetupMenu() {
+  setupMotion.value = 'ios-pop'
+  setupPage.value = 'menu'
+}
+
+function closeSetupPage() {
+  if (history.state?.onekvmSetup) {
+    history.back()
+    return
+  }
+  showSetupMenu()
+}
+
+function saveSetupPage() {
+  if (!setupSectionValid.value) return
+  closeSetupPage()
+}
+
+function onSetupPop() {
+  if (setupPage.value !== 'menu') showSetupMenu()
+}
+
+const edgeSwipe = { x: 0, y: 0, tracking: false, page: null as HTMLElement | null }
+
+function drawerOpen() {
+  return Boolean(document.querySelector('.n-drawer'))
+}
+
+function onEdgeStart(event: TouchEvent) {
+  if (setupPage.value === 'menu' || drawerOpen()) return
+  const touch = event.changedTouches[0]
+  if (!touch || touch.clientX > 28) return
+  edgeSwipe.tracking = true
+  edgeSwipe.x = touch.clientX
+  edgeSwipe.y = touch.clientY
+  edgeSwipe.page = document.querySelector('.auth-panel-setup .ios-page')
+}
+
+function onEdgeMove(event: TouchEvent) {
+  if (!edgeSwipe.tracking) return
+  const touch = event.changedTouches[0]
+  if (!touch) return
+  const dx = touch.clientX - edgeSwipe.x
+  const dy = touch.clientY - edgeSwipe.y
+  if (dy * dy > dx * dx) {
+    edgeSwipe.tracking = false
+    if (edgeSwipe.page) edgeSwipe.page.style.transform = ''
+    return
+  }
+  if (dx > 8) event.preventDefault()
+  if (edgeSwipe.page) {
+    edgeSwipe.page.style.transition = 'none'
+    edgeSwipe.page.style.transform = `translateX(${Math.max(0, dx)}px)`
   }
 }
 
-function previousSetupStep() {
-  if (setupStep.value > 1) setupStep.value -= 1
+function onEdgeEnd(event: TouchEvent) {
+  if (!edgeSwipe.tracking) return
+  edgeSwipe.tracking = false
+  const touch = event.changedTouches[0]
+  const dx = touch ? touch.clientX - edgeSwipe.x : 0
+  const page = edgeSwipe.page
+  edgeSwipe.page = null
+  if (!page) return
+  if (dx < 72) {
+    page.style.transition = 'transform 220ms ease'
+    page.style.transform = ''
+    return
+  }
+  page.style.transition = 'transform 280ms cubic-bezier(.32, .72, 0, 1)'
+  page.style.transform = 'translateX(100%)'
+  window.setTimeout(() => {
+    page.style.transition = ''
+    page.style.transform = ''
+    closeSetupPage()
+  }, 280)
 }
+
+onMounted(() => {
+  history.replaceState({ ...(history.state || {}), onekvmSetupRoot: true }, '')
+  window.addEventListener('popstate', onSetupPop)
+  window.addEventListener('touchstart', onEdgeStart, { passive: true })
+  window.addEventListener('touchmove', onEdgeMove, { passive: false })
+  window.addEventListener('touchend', onEdgeEnd)
+  window.addEventListener('touchcancel', onEdgeEnd)
+})
+onUnmounted(() => {
+  window.removeEventListener('popstate', onSetupPop)
+  window.removeEventListener('touchstart', onEdgeStart)
+  window.removeEventListener('touchmove', onEdgeMove)
+  window.removeEventListener('touchend', onEdgeEnd)
+  window.removeEventListener('touchcancel', onEdgeEnd)
+})
 </script>
 
 <template>
@@ -269,10 +411,13 @@ function previousSetupStep() {
   </div>
 
   <main v-else-if="!auth.configured" class="auth-screen">
-    <form class="auth-panel auth-panel-setup" @submit.prevent="initialize">
-      <div class="auth-panel-topline">
+    <form class="auth-panel auth-panel-setup" @submit.prevent="setupPage === 'menu' && initialize()">
+      <div class="ios-stage">
+      <Transition :name="setupMotion">
+      <div :key="setupPage" class="ios-page">
+      <div v-if="setupPage === 'menu'" class="auth-panel-topline">
         <div class="auth-brand">
-          <img class="auth-logo" src="/brand/onekvm-logo-inverse.svg" alt="OneKVM" />
+          <img class="auth-logo" :src="logoSource" alt="OneKVM" />
           <span v-if="brandBadge" class="brand-badge">{{ brandBadge }}</span>
         </div>
         <n-dropdown trigger="click" :options="languageMenuOptions" @select="selectUILanguage">
@@ -282,140 +427,188 @@ function previousSetupStep() {
           </n-button>
         </n-dropdown>
       </div>
-      <h1>{{ t('auth.initialize', 'Initialize OneKVM') }}</h1>
-      <n-steps :current="setupStep" size="small" class="setup-steps">
-        <n-step :title="t('auth.accountStep', 'Account')" />
-        <n-step :title="t('auth.networkStep', 'Network')" />
-        <n-step :title="t('auth.regionTimeStep', 'Region and time')" />
-      </n-steps>
-      <n-alert v-if="error" type="error" :bordered="false">{{ error }}</n-alert>
-      <n-form v-if="setupStep === 1" label-placement="top" :show-feedback="false">
-        <n-form-item :label="t('auth.hostname', 'Hostname')">
-          <n-input
-            v-model:value="hostname"
-            placeholder=""
-            autocomplete="off"
-            :maxlength="63"
-            :status="hostname && !hostnameValid ? 'error' : undefined"
-            autofocus
-          />
-        </n-form-item>
-        <n-form-item :label="t('auth.username', 'Username')">
-          <n-input v-model:value="setupUsername" placeholder="" autocomplete="username" :maxlength="64" />
-        </n-form-item>
-        <n-form-item :label="t('auth.password', 'Password')">
-          <n-input
-            v-model:value="setupPassword"
-            type="password"
-            placeholder=""
-            show-password-on="click"
-            autocomplete="new-password"
-          />
-        </n-form-item>
-        <n-form-item :label="t('auth.confirmPassword', 'Confirm password')">
-          <n-input
-            v-model:value="confirmPassword"
-            type="password"
-            placeholder=""
-            show-password-on="click"
-            autocomplete="new-password"
-            :status="confirmPassword && confirmPassword !== setupPassword ? 'error' : undefined"
-          />
-        </n-form-item>
-      </n-form>
-      <n-form v-else-if="setupStep === 2" label-placement="top" :show-feedback="false">
-        <NetworkSettingsForm
-          v-model="setupNetwork"
-          :disabled="busy"
-          :showMAC="false"
-          :allowIPv4Disabled="false"
-        />
-        <n-button
-          text
-          class="setup-advanced-toggle"
-          :disabled="busy"
-          @click="networkAdvancedOpen = !networkAdvancedOpen"
-        >
-          <template #icon><Settings2 /></template>
-          {{ t('auth.advancedSettings', 'Advanced settings') }}
-          <ChevronDown :class="{ expanded: networkAdvancedOpen }" />
-        </n-button>
-        <n-collapse-transition :show="networkAdvancedOpen">
-          <section class="setup-network-advanced">
-            <n-form-item :label="t('auth.useVLAN', 'Use a management VLAN')">
-              <n-switch v-model:value="setupVLANEnabled" :disabled="busy" />
-            </n-form-item>
-            <n-form-item v-if="setupVLANEnabled" :label="t('auth.vlanID', 'VLAN ID')">
-              <n-input-number
-                v-model:value="setupVLANID"
-                :disabled="busy"
-                :min="1"
-                :max="4094"
-                :precision="0"
-              />
-              <template #feedback>
-                {{ t('auth.vlanHint', 'The management address above will be moved to this tagged VLAN.') }}
-              </template>
-            </n-form-item>
+      <div v-else class="ios-nav">
+        <button type="button" class="ios-back" @click="closeSetupPage">
+          <ChevronLeft />
+          <span>{{ t('auth.initialize', 'Initialize OneKVM') }}</span>
+        </button>
+        <button type="button" class="ios-save" :disabled="busy || !setupSectionValid" @click="saveSetupPage">
+          {{ t('auth.save', 'Save') }}
+        </button>
+      </div>
+      <h1>{{ setupPage === 'account' ? t('auth.accountStep', 'Account') : setupPage === 'network' ? t('auth.networkStep', 'Network') : setupPage === 'region' ? t('auth.regionTimeStep', 'Region and time') : t('auth.initialize', 'Initialize OneKVM') }}</h1>
+      <n-alert v-if="error && setupPage === 'menu'" type="error" :bordered="false">{{ error }}</n-alert>
+      <section v-if="setupPage === 'menu'" class="ios-group">
+        <button type="button" class="ios-menu" @click="openSetupPage('account')">
+          <CircleCheck v-if="setupAccountValid" class="ios-state done" />
+          <Circle v-else class="ios-state" />
+          <span>{{ t('auth.accountStep', 'Account') }}</span>
+          <em>{{ hostname || t('auth.hostname', 'Hostname') }}</em>
+          <ChevronRight />
+        </button>
+        <button type="button" class="ios-menu" @click="openSetupPage('network')">
+          <CircleCheck v-if="setupNetworkValid" class="ios-state done" />
+          <Circle v-else class="ios-state" />
+          <span>{{ t('auth.networkStep', 'Network') }}</span>
+          <em>{{ setupNetwork.device || 'eth0' }}</em>
+          <ChevronRight />
+        </button>
+        <button type="button" class="ios-menu" @click="openSetupPage('region')">
+          <CircleCheck v-if="setupRegionValid" class="ios-state done" />
+          <Circle v-else class="ios-state" />
+          <span>{{ t('auth.regionTimeStep', 'Region and time') }}</span>
+          <em>{{ setupTimezone.split('_').join(' ') }}</em>
+          <ChevronRight />
+        </button>
+      </section>
+      <button v-if="setupPage === 'menu'" class="ios-finish" type="submit" :disabled="busy || !setupValid">
+        {{ t('auth.initializeButton', 'Initialize') }}
+      </button>
+      <div v-else-if="setupPage === 'account'" class="ios-fields">
+        <label class="ios-field">
+          <span>{{ t('auth.hostname', 'Hostname') }}</span>
+          <section class="ios-group">
+            <n-input
+              v-model:value="hostname"
+              placeholder=""
+              autocomplete="off"
+              :maxlength="63"
+              :status="hostname && !hostnameValid ? 'error' : undefined"
+              autofocus
+            />
           </section>
-        </n-collapse-transition>
-      </n-form>
-      <n-form v-else label-placement="top" :show-feedback="false">
-        <div class="setup-region-fields">
-          <n-form-item :label="t('auth.deviceLanguage', 'Language and regional format')">
-            <n-select
-              :value="setupLanguage"
-              :options="languageOptions"
-              :disabled="busy"
-              @update:value="selectUILanguage"
+        </label>
+        <label class="ios-field">
+          <span>{{ t('auth.username', 'Username') }}</span>
+          <section class="ios-group">
+            <n-input v-model:value="setupUsername" placeholder="" autocomplete="username" :maxlength="64" />
+          </section>
+        </label>
+        <label class="ios-field">
+          <span>{{ t('auth.password', 'Password') }}</span>
+          <section class="ios-group">
+            <n-input
+              v-model:value="setupPassword"
+              type="password"
+              placeholder=""
+              show-password-on="click"
+              autocomplete="new-password"
             />
-          </n-form-item>
-          <n-form-item :label="t('auth.timezone', 'Time zone')">
-            <n-select
-              v-model:value="setupTimezone"
-              :options="timezoneOptions"
-              :disabled="busy"
-              filterable
-              virtual-scroll
+          </section>
+        </label>
+        <label class="ios-field">
+          <span>{{ t('auth.confirmPassword', 'Confirm password') }}</span>
+          <section class="ios-group">
+            <n-input
+              v-model:value="confirmPassword"
+              type="password"
+              placeholder=""
+              show-password-on="click"
+              autocomplete="new-password"
+              :status="confirmPassword && confirmPassword !== setupPassword ? 'error' : undefined"
             />
-          </n-form-item>
-        </div>
-        <TimezoneMap v-model="setupTimezone" />
-        <div class="setup-time-preview">{{ setupDateTime }}</div>
-        <div class="setup-time-row">
-          <div>
-            <strong>{{ t('auth.automaticTime', 'Set time automatically') }}</strong>
-            <span>{{ t('auth.automaticTimeHint', 'Synchronize the device clock over the network.') }}</span>
-          </div>
-          <n-switch v-model:value="setupNTP" :disabled="busy" />
-        </div>
-        <n-form-item v-if="setupNTP" :label="t('auth.ntpServer', 'Custom NTP server (optional)')">
-          <n-input
-            v-model:value="setupNTPServer"
+          </section>
+        </label>
+      </div>
+      <n-form v-else-if="setupPage === 'network'" class="setup-network" label-placement="top" :show-feedback="false">
+        <WifiOnboarding initial-setup />
+        <h2 class="ios-header">{{ t('settings.advancedSettings.systemPage.ethernet', 'Ethernet') }}</h2>
+        <section class="ios-plain">
+          <NetworkSettingsForm
+            v-model="setupNetwork"
+            inset
             :disabled="busy"
-            placeholder="time.cloudflare.com"
-            :maxlength="253"
+            :showMAC="false"
+            :allowIPv4Disabled="false"
           />
-        </n-form-item>
+          <button type="button" class="ios-disclosure" :disabled="busy" @click="networkAdvancedOpen = !networkAdvancedOpen">
+            <Settings2 />
+            <span>{{ t('auth.advancedSettings', 'Advanced settings') }}</span>
+            <ChevronDown :class="{ expanded: networkAdvancedOpen }" />
+          </button>
+          <n-collapse-transition :show="networkAdvancedOpen">
+            <div class="setup-network-advanced">
+              <label class="ios-field">
+                <span>{{ t('network.interfaces.routeMetric', 'Route metric') }}</span>
+                <section class="ios-group">
+                  <n-input-number
+                    :value="setupNetwork.route_metric"
+                    :disabled="busy"
+                    :min="0"
+                    :precision="0"
+                    @update:value="setupNetwork.route_metric = $event ?? 0"
+                  />
+                </section>
+              </label>
+              <section class="ios-group ios-switch">
+                <span>{{ t('auth.useVLAN', 'Use a management VLAN') }}</span>
+                <n-switch v-model:value="setupVLANEnabled" :disabled="busy" />
+              </section>
+              <label v-if="setupVLANEnabled" class="ios-field">
+                <span>{{ t('auth.vlanID', 'VLAN ID') }}</span>
+                <section class="ios-group">
+                  <n-input-number
+                    v-model:value="setupVLANID"
+                    :disabled="busy"
+                    :min="1"
+                    :max="4094"
+                    :precision="0"
+                  />
+                </section>
+              </label>
+              <p v-if="setupVLANEnabled" class="ios-note">
+                {{ t('auth.vlanHint', 'The management address above will be moved to this tagged VLAN.') }}
+              </p>
+            </div>
+          </n-collapse-transition>
+        </section>
       </n-form>
-      <div class="setup-actions">
-        <n-button v-if="setupStep > 1" :disabled="busy" @click="previousSetupStep">
-          <template #icon><ArrowLeft /></template>
-          {{ t('auth.back', 'Back') }}
-        </n-button>
-        <n-button
-          v-if="setupStep < 3"
-          type="primary"
-          :disabled="setupStep === 1 ? !setupAccountValid : !setupNetworkValid"
-          @click="nextSetupStep"
-        >
-          <template #icon><ArrowRight /></template>
-          {{ t('common.next', 'Next') }}
-        </n-button>
-        <n-button v-else type="primary" attr-type="submit" :loading="busy" :disabled="!setupValid">
-          <template #icon><ArrowRight /></template>
-          {{ t('auth.initializeButton', 'Initialize') }}
-        </n-button>
+      <n-form v-else class="setup-region" label-placement="top" :show-feedback="false">
+        <section class="ios-group">
+          <IosChoice
+            :label="t('auth.deviceLanguage', 'Language and regional format')"
+            :value="setupLanguage"
+            :options="languageOptions.map((option) => ({ label: option.label, value: option.value }))"
+            :disabled="busy"
+            @select="selectUILanguage($event as DeviceLanguage)"
+          />
+          <IosChoice
+            scroll
+            :label="t('auth.timezone', 'Time zone')"
+            :value="setupTimezone"
+            :options="timezoneOptions"
+            :disabled="busy"
+            @select="setupTimezone = $event"
+          />
+        </section>
+        <TimezoneMap v-model="setupTimezone" />
+        <div class="setup-time-preview">
+          <span v-if="setupClock.date">{{ setupClock.date }}</span>
+          <strong>{{ setupClock.time }}</strong>
+        </div>
+        <section class="ios-group">
+          <div class="setup-time-row">
+            <div>
+              <strong>{{ t('auth.automaticTime', 'Set time automatically') }}</strong>
+              <span>{{ t('auth.automaticTimeHint', 'Synchronize the device clock over the network.') }}</span>
+            </div>
+            <n-switch v-model:value="setupNTP" :disabled="busy" />
+          </div>
+        </section>
+        <label v-if="setupNTP" class="ios-field">
+          <span>{{ t('auth.ntpServer', 'Custom NTP server (optional)') }}</span>
+          <section class="ios-group">
+            <n-input
+              v-model:value="setupNTPServer"
+              :disabled="busy"
+              placeholder="time.cloudflare.com"
+              :maxlength="253"
+            />
+          </section>
+        </label>
+      </n-form>
+      </div>
+      </Transition>
       </div>
     </form>
   </main>
@@ -425,7 +618,7 @@ function previousSetupStep() {
       <form v-if="mfaPending" class="auth-panel" @submit.prevent="submitMfa">
         <div class="auth-panel-topline">
           <div class="auth-brand">
-            <img class="auth-logo" src="/brand/onekvm-logo-inverse.svg" alt="OneKVM" />
+            <img class="auth-logo" :src="logoSource" alt="OneKVM" />
             <span v-if="brandBadge" class="brand-badge">{{ brandBadge }}</span>
           </div>
         </div>
@@ -451,7 +644,9 @@ function previousSetupStep() {
             {{ t('auth.passkeyHelp', 'Use a passkey. The device hostname must be used over HTTPS, not an IP address.') }}
           </p>
           <p v-else-if="selected?.type === 'plugin'" class="auth-mfa-help">
-            {{ t('auth.hardwareConfirm', 'Press the BOOT button on the device. The OLED will show a prompt; tap once, do not hold.') }}
+            {{ selected.id === 'cloud'
+              ? t('auth.cloudConfirm', 'Approve this sign-in from the OneKVM Cloud email sent to the enrolled account. The request expires in five minutes.')
+              : t('auth.hardwareConfirm', 'Press the BOOT button on the device. The OLED will show a prompt; tap once, do not hold.') }}
           </p>
         </n-form>
         <n-button type="primary" attr-type="submit" block :loading="busy">
@@ -464,7 +659,7 @@ function previousSetupStep() {
       <form v-else class="auth-panel" @submit.prevent="submit">
         <div class="auth-panel-topline">
           <div class="auth-brand">
-            <img class="auth-logo" src="/brand/onekvm-logo-inverse.svg" alt="OneKVM" />
+            <img class="auth-logo" :src="logoSource" alt="OneKVM" />
             <span v-if="brandBadge" class="brand-badge">{{ brandBadge }}</span>
           </div>
           <n-dropdown trigger="click" :options="languageMenuOptions" @select="selectUILanguage">

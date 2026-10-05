@@ -1,6 +1,7 @@
 import { reactive, readonly } from 'vue'
 
 import { api, type AuthStatus, type NetworkConfig, type SetupSystemSettings } from '@/api/client'
+import { isCloudHosted } from '@/api/service-url'
 
 const state = reactive<AuthStatus & { loading: boolean }>({
   configured: false,
@@ -14,6 +15,7 @@ const state = reactive<AuthStatus & { loading: boolean }>({
   mfa_required: false,
   pending_token: '',
   factors: [],
+  mfa: { totp: false, passkeys: [], backup_codes: 0, plugins: [] },
   loading: true,
 })
 
@@ -26,7 +28,8 @@ function assign(status: AuthStatus) {
   state.mfa_required = false
   state.pending_token = ''
   state.factors = []
-  Object.assign(state, status, { loading: false })
+  const mfa = status.mfa ?? { totp: false, passkeys: [], backup_codes: 0, plugins: [] }
+  Object.assign(state, status, { loading: false, mfa })
 }
 
 function scheduleRefreshRetry() {
@@ -83,6 +86,7 @@ async function cancelMfa(pendingToken?: string) {
   state.mfa_required = false
   state.pending_token = ''
   state.factors = []
+  state.mfa = { totp: false, passkeys: [], backup_codes: 0, plugins: [] }
 }
 
 async function setup(
@@ -100,23 +104,34 @@ async function updateAccount(username: string, currentPassword: string, newPassw
 }
 
 async function logout() {
+  if (isCloudHosted()) {
+    window.parent.postMessage({ type: 'onekvm-cloud-logout' }, window.location.origin)
+    return
+  }
   await api.authLogout()
   state.authenticated = false
   state.required = true
   state.mfa_required = false
   state.pending_token = ''
   state.factors = []
+  state.mfa = { totp: false, passkeys: [], backup_codes: 0, plugins: [] }
 }
 
 export function useAuth() {
   if (!initialized) {
     initialized = true
+    window.addEventListener('onekvm:permissions-changed', () => { void refresh() })
     window.addEventListener('onekvm:unauthorized', () => {
+      if (isCloudHosted()) {
+        window.parent.postMessage({ type: 'onekvm-cloud-expired' }, window.location.origin)
+        return
+      }
       state.authenticated = false
       state.required = true
       state.mfa_required = false
       state.pending_token = ''
       state.factors = []
+      state.mfa = { totp: false, passkeys: [], backup_codes: 0, plugins: [] }
       state.loading = false
     })
     void refresh()

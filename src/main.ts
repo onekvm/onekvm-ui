@@ -22,6 +22,7 @@ import {
   NFormItem,
   NGlobalStyle,
   NInput,
+  NInputGroup,
   NInputNumber,
   NMenu,
   NMessageProvider,
@@ -34,6 +35,7 @@ import {
   NRadioButton,
   NRadioGroup,
   NSelect,
+  NSkeleton,
   NSlider,
   NSpin,
   NStep,
@@ -49,7 +51,17 @@ import {
 import App from './App.vue'
 import { api, APIError } from './api/client'
 import { initializeLanguage } from './i18n/runtime'
+import { lockMobileViewport } from './lib/mobile-viewport'
+import { uiProduct } from './product'
+import { initializeThemeRuntime } from './theme/runtime'
 import './style.css'
+
+lockMobileViewport()
+
+initializeThemeRuntime({
+  themes: uiProduct.themes,
+  defaultTheme: uiProduct.defaultTheme,
+})
 
 const naive = create({
   components: [
@@ -74,6 +86,7 @@ const naive = create({
     NFormItem,
     NGlobalStyle,
     NInput,
+    NInputGroup,
     NInputNumber,
     NMenu,
     NMessageProvider,
@@ -86,6 +99,7 @@ const naive = create({
     NRadioButton,
     NRadioGroup,
     NSelect,
+    NSkeleton,
     NSlider,
     NSpin,
     NStep,

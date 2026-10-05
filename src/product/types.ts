@@ -1,6 +1,7 @@
 import type { Component, DeepReadonly } from 'vue'
 
 import type { AuthStatus, AuthUser, AuthUserUpdate } from '@/api/client'
+import type { OneKVMThemeDefinition } from '@/theme/types'
 
 export type ProductAuthStatus = DeepReadonly<AuthStatus>
 
@@ -30,4 +31,6 @@ export interface UIProduct {
   badge: (auth: ProductAuthStatus) => string
   userAssignments?: ProductUserAssignments
   settingsSections?: readonly ProductSettingsSection[]
+  themes?: readonly OneKVMThemeDefinition[]
+  defaultTheme?: string
 }

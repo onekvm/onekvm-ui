@@ -72,3 +72,10 @@ export function edidSelectOptions(
 export function edidRequiresRestart(policy: string | undefined) {
   return policy === 'reboot' || policy === 'power_cycle'
 }
+
+export function supportsHdmiReset(status: EDIDStatus | null) {
+  return status?.supported === true
+    && status.writable === true
+    && status.hotplug === true
+    && !edidRequiresRestart(status.apply_policy)
+}

@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 
 import { t } from '@/i18n/runtime'
+import { formatCanvasScale, formatCanvasSize } from '@/lib/video-fit'
 import { formatLatencyUs, type LatencySample, type StreamSample } from '@/lib/video-stream-chart'
 
 import VideoLatencyChart from './VideoLatencyChart.vue'
@@ -40,10 +41,13 @@ const props = defineProps<{
   audioJitterBufferUs?: number
 }>()
 
-const canvasSize = computed(() => {
-  if (!props.canvasWidth || !props.canvasHeight) return '-'
-  return `${props.canvasWidth} × ${props.canvasHeight}`
-})
+const canvasSize = computed(() => formatCanvasSize(props.canvasWidth, props.canvasHeight))
+const canvasScale = computed(() => formatCanvasScale(
+  props.canvasWidth,
+  props.canvasHeight,
+  props.inputWidth,
+  props.inputHeight,
+))
 
 const inputSize = computed(() => {
   if (!props.inputWidth || !props.inputHeight) return '-'
@@ -120,7 +124,7 @@ const audioLatencyTotal = computed(() => formatLatencyUs(
           <span>{{ t('screen.inputResolution', 'Input resolution') }}</span>
           <strong>{{ inputSize }}</strong>
         </div>
-        <div>
+        <div :title="canvasScale">
           <span>{{ t('screen.canvasSize', 'Canvas size') }}</span>
           <strong>{{ canvasSize }}</strong>
         </div>
@@ -167,8 +171,13 @@ const audioLatencyTotal = computed(() => formatLatencyUs(
           <span>{{ t('screen.decodeLatency', 'Decode latency') }}</span>
           <strong>{{ decodeLatency }}</strong>
         </div>
-        <div>
-          <span>{{ t('screen.latencyTotal', 'Total measured latency') }}</span>
+        <div
+          :title="t(
+            'screen.latencyTotalHint',
+            'Capture + encode + display. Excludes HDMI scan and untimestamped hardware queues; not glass-to-glass.',
+          )"
+        >
+          <span>{{ t('screen.latencyTotal', 'Measured pipeline') }}</span>
           <strong>{{ knownLatencyTotal }}</strong>
         </div>
       </div>

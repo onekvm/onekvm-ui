@@ -1,17 +1,24 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { Cable, Monitor, RotateCcw, SlidersHorizontal, Waypoints } from '@lucide/vue'
 import { useDialog, useMessage, type SelectOption } from 'naive-ui'
 
 import { api, APIError, type ConfigSchema, type EDIDStatus, type OneKVMConfig } from '@/api/client'
+import { useOverlayMount } from '@/composables/useOverlayMount'
+import { useVideoCodecSupport } from '@/composables/useVideoCodecSupport'
 import { t } from '@/i18n/runtime'
 import {
   edidCurrentSummary,
   edidRequiresRestart,
   edidSelectOptions,
   parseEdidSelection,
+  supportsHdmiReset,
 } from '@/lib/edid'
-import { onekvm } from '@/lib/onekvm'
-import type { VideoFit } from '@/lib/video-fit'
+import { DISMISS_CONTROL_OVERLAY_EVENT } from '@/lib/overlay-target'
+import { onekvm, type TransportState } from '@/lib/onekvm'
+import type { VideoFit, VideoRotation } from '@/lib/video-fit'
+import { connectionVideoCodec, parseVideoTransport, supportsWebRTCClient, VIDEO_TRANSPORT_KEY, type EncodedVideoTransport } from '@/lib/video-transport'
+import { supportsWebSocketVideo } from '@/lib/websocket-video-support'
 import { qualityTier } from '@/lib/video-quality'
 import { isVideoResolutionValue, videoResolutionOptions } from '@/lib/video-resolution'
 import {
@@ -22,25 +29,34 @@ import {
   setQpPreset,
   type QpPresetKey,
 } from '@/lib/video-qp'
+import ControlOverlay from './ControlOverlay.vue'
+import DisplaySettingsGroup from './DisplaySettingsGroup.vue'
 
 const props = defineProps<{
+  state: TransportState
+  videoCodec: string
   videoResolution: number
   targetFps: number
   videoFit: VideoFit
+  videoRotation: VideoRotation
   canChangeVideo: boolean
   placement?: 'top-end' | 'bottom-end' | 'right-start' | 'left-start'
+  sheet?: boolean
 }>()
 
 const emit = defineEmits<{
   'update:show': [show: boolean]
   'update:videoFit': [fit: VideoFit]
+  'update:videoRotation': [rotation: VideoRotation]
 }>()
 
 const message = useMessage()
 const dialog = useDialog()
+const overlayTo = useOverlayMount()
 const popoverOpen = ref(false)
 const menuOpen = ref(false)
 const saving = ref(false)
+const switchingProtocol = shallowRef<EncodedVideoTransport | ''>('')
 const resolution = ref(props.videoResolution)
 const fps = ref(props.targetFps)
 const video = ref<OneKVMConfig['video'] | null>(null)
@@ -48,6 +64,11 @@ const schema = ref<ConfigSchema | null>(null)
 const edid = ref<EDIDStatus | null>(null)
 const edidSelection = ref('')
 const edidBusy = ref(false)
+const resettingHdmi = shallowRef(false)
+const codecTransport = computed(() => switchingProtocol.value || (props.state.videoMode === 'mjpeg'
+  ? parseVideoTransport(localStorage.getItem(VIDEO_TRANSPORT_KEY))
+  : props.state.videoMode))
+const { h265WebRTCSupported, h265WebSocketSupported, allCodecOptions } = useVideoCodecSupport(codecTransport)
 
 watch(() => props.videoResolution, (value) => { resolution.value = value })
 watch(() => props.targetFps, (value) => { fps.value = value })
@@ -56,15 +77,24 @@ const fitOptions = computed(() => [
   { label: t('screen.fitOriginal', 'Original'), value: 'original' as const },
   { label: t('screen.fitStretch', 'Stretch'), value: 'stretch' as const },
 ])
+const rotationOptions = computed(() => [
+  { label: t('screen.rotationNone', '0°'), value: 0 },
+  { label: t('screen.rotation90', '90°'), value: 90 },
+  { label: '180°', value: 180 },
+  { label: t('screen.rotation270', '270°'), value: 270 },
+])
+const protocolOptions = computed(() => {
+  const codec = video.value ? connectionVideoCodec(video.value) : ''
+  const mjpeg = codec === 'mjpeg'
+  return [
+    { label: 'WebRTC', value: 'webrtc', disabled: !codec || mjpeg || !supportsWebRTCClient() || (codec === 'h265' && h265WebRTCSupported.value !== true) },
+    { label: 'WebSocket', value: 'websocket', disabled: codec === 'h265' ? h265WebSocketSupported.value !== true : !supportsWebSocketVideo(codec) },
+    { label: t('screen.protocolHttpMjpeg', 'HTTP (MJPEG only)'), value: 'mjpeg', disabled: !mjpeg },
+  ]
+})
 const resolutionOptions = computed(() =>
   videoResolutionOptions(t('screen.auto', 'Automatic')),
 )
-const allCodecOptions = computed(() => [
-  { label: t('screen.auto', 'Automatic'), value: 'auto' },
-  { label: 'H.264', value: 'h264' },
-  { label: 'H.265', value: 'h265' },
-  { label: 'MJPEG', value: 'mjpeg' },
-])
 const codecOptions = computed(() => {
   const supported = schema.value?.video_codecs || []
   return supported.length
@@ -75,13 +105,14 @@ const fpsOptions = [10, 15, 24, 30, 45, 60, 120].map((value) => ({
   label: `${value} FPS`,
   value,
 }))
-const videoDisabled = computed(() => !props.canChangeVideo || saving.value)
+const videoDisabled = computed(() => !props.canChangeVideo || saving.value || edidBusy.value || !!switchingProtocol.value)
 const edidOptions = computed(() => edidSelectOptions(edid.value, {
   factory: t('settings.advancedSettings.displayPage.edidFactory', 'Factory'),
   presets: t('settings.advancedSettings.displayPage.edidMachinePresets', 'Machine presets'),
   custom: t('settings.advancedSettings.displayPage.edidCustomFiles', 'Custom files'),
 }))
-const edidDisabled = computed(() => saving.value || edidBusy.value || !edid.value?.writable)
+const edidDisabled = computed(() => saving.value || edidBusy.value || !!switchingProtocol.value || !edid.value?.writable)
+const canResetHdmi = computed(() => supportsHdmiReset(edid.value))
 const edidPlaceholder = computed(() => edidCurrentSummary(
   edid.value,
   t('settings.advancedSettings.displayPage.edidSelect', 'Choose a machine preset or a custom file'),
@@ -136,10 +167,6 @@ const qualityBudgetLabel = computed(() => video.value?.codec === 'mjpeg'
   : t('screen.bitrate', 'Bitrate'))
 type SimpleQpSelection = 'auto' | QpPresetKey | 'custom'
 const simpleQpOptions = computed(() => [
-  {
-    label: t('settings.advancedSettings.displayPage.qpAutomatic', 'Automatic'),
-    value: 'auto',
-  },
   ...qpPresets.map((preset) => ({
     label: t(preset.labelKey, preset.labelFallback),
     value: preset.value,
@@ -153,7 +180,7 @@ const simpleQpOptions = computed(() => [
 const simpleQpSelection = computed<SimpleQpSelection>({
   get: () => {
     const current = video.value
-    if (!current || !hasQpOverride(current)) return 'auto'
+    if (!current || !hasQpOverride(current)) return 'balanced'
     return matchingQpPreset(current)?.value ?? 'custom'
   },
   set: (selection) => {
@@ -168,15 +195,15 @@ const simpleQpSelection = computed<SimpleQpSelection>({
   },
 })
 
-const selectProps = {
+const selectProps = computed(() => ({
   class: 'display-status-select',
-  size: 'tiny' as const,
-  menuSize: 'tiny' as const,
+  size: (props.sheet ? 'medium' : 'tiny') as 'medium' | 'tiny',
+  menuSize: (props.sheet ? 'medium' : 'tiny') as 'medium' | 'tiny',
   consistentMenuWidth: false,
   showCheckmark: false,
-  to: '.console-workspace',
+  to: overlayTo.value,
   menuProps: { class: 'display-fit-select-menu' },
-}
+}))
 
 function renderQualityLabel(option: SelectOption, selected: boolean) {
   if (option.value === 'custom') return t('screen.qualityCustom', 'Custom')
@@ -189,6 +216,13 @@ function updateShow(show: boolean) {
   if (!show && menuOpen.value) return
   popoverOpen.value = show
   emit('update:show', show)
+}
+
+function forceClose() {
+  menuOpen.value = false
+  if (!popoverOpen.value) return
+  popoverOpen.value = false
+  emit('update:show', false)
 }
 
 async function loadVideo() {
@@ -255,12 +289,39 @@ async function updateEdid(value: string | number | null) {
   }
 }
 
+async function resetHdmi() {
+  if (!canResetHdmi.value || edidDisabled.value) return
+  edidBusy.value = true
+  resettingHdmi.value = true
+  try {
+    // Reapply the freshly read EDID to trigger HDMI hotplug without replacing
+    // it with the factory preset used by /api/video/edid/reset.
+    const current = await api.getVideoEDID()
+    edid.value = current.supported ? current : null
+    if (!supportsHdmiReset(current) || !current.data_hex) {
+      throw new Error(t('screen.resetHdmiUnavailable', 'Cannot reset HDMI with the current device settings.'))
+    }
+    const result = await api.applyVideoEDID({ data_hex: current.data_hex })
+    if (edidRequiresRestart(result.apply_required)) {
+      await confirmEdidApply(result.apply_required)
+    } else {
+      message.success(t('screen.resetHdmiSuccess', 'HDMI reset. Detecting the input signal again.'))
+    }
+    edid.value = await api.getVideoEDID()
+  } catch (reason) {
+    message.error(reason instanceof Error ? reason.message : String(reason))
+  } finally {
+    resettingHdmi.value = false
+    edidBusy.value = false
+  }
+}
+
 async function patchVideo(
   entries: Array<[string, string | number | boolean]> | string,
   value?: string | number | boolean,
   reconnect = false,
 ) {
-  if (!props.canChangeVideo || saving.value) return
+  if (!props.canChangeVideo || saving.value || edidBusy.value || switchingProtocol.value) return
   const updates: Array<[string, string | number | boolean]> = typeof entries === 'string'
     ? [[entries, value ?? '']]
     : entries
@@ -285,6 +346,25 @@ function updateFit(value: string | number | null) {
   emit('update:videoFit', value)
 }
 
+function updateRotation(value: string | number | null) {
+  if (value !== 0 && value !== 90 && value !== 180 && value !== 270) return
+  emit('update:videoRotation', value)
+}
+
+async function updateProtocol(value: string | number | null) {
+  if (value !== 'webrtc' && value !== 'websocket') return
+  if (value === props.state.videoMode || switchingProtocol.value || saving.value || edidBusy.value) return
+  if (protocolOptions.value.find((option) => option.value === value)?.disabled !== false) return
+  switchingProtocol.value = value
+  try {
+    await onekvm.setVideoTransport(value)
+  } catch (reason) {
+    message.error(reason instanceof Error ? reason.message : String(reason))
+  } finally {
+    switchingProtocol.value = ''
+  }
+}
+
 function updateResolution(value: string | number | null) {
   if (typeof value !== 'number' || !isVideoResolutionValue(value)) return
   if (value === resolution.value) return
@@ -303,6 +383,8 @@ function updateFps(value: string | number | null) {
 
 function updateCodec(value: string | number | null) {
   if (!video.value || typeof value !== 'string' || value === video.value.codec) return
+  const option = codecOptions.value.find((option) => option.value === value)
+  if (!option || option.disabled) return
   video.value.codec = value
   void patchVideo('video.codec', value, true)
 }
@@ -345,27 +427,31 @@ function updateFrameDetect(value: boolean) {
 watch(popoverOpen, (open) => {
   if (open) void loadVideo()
 })
+
+onMounted(() => window.addEventListener(DISMISS_CONTROL_OVERLAY_EVENT, forceClose))
+onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, forceClose))
 </script>
 
 <template>
-  <n-popover
+  <ControlOverlay
     :show="popoverOpen"
-    trigger="click"
-    :placement="placement || 'bottom-end'"
-    :show-arrow="false"
-    class="control-popover display-status-control-popover"
+    :sheet="sheet"
+    :placement="placement"
+    popover-class="control-popover display-status-control-popover"
     to=".console-workspace"
     @update:show="updateShow"
   >
-    <template #trigger><slot /></template>
+    <slot />
+    <template #title>{{ t('settings.screen.title', 'Display') }}</template>
+    <template #panel>
     <div class="display-status-popover">
       <header class="control-popover-header">
         <strong>{{ t('settings.screen.title', 'Display') }}</strong>
       </header>
-      <n-alert v-if="!canChangeVideo" type="info" :bordered="false" :show-icon="false">
-        {{ t('screen.sharedStream', 'Shared from the primary WebRTC client') }}
-      </n-alert>
-      <div class="display-status-values">
+      <DisplaySettingsGroup
+        :title="t('screen.groups.display', 'Display')"
+        :icon="Monitor"
+      >
         <div>
           <span>{{ t('screen.fitMode', 'Display mode') }}</span>
           <n-select
@@ -373,6 +459,43 @@ watch(popoverOpen, (open) => {
             :value="videoFit"
             :options="fitOptions"
             @update:value="updateFit"
+            @update:show="menuOpen = $event"
+          />
+        </div>
+        <div>
+          <span>{{ t('screen.rotation', 'Screen rotation') }}</span>
+          <n-select
+            v-bind="selectProps"
+            :aria-label="t('screen.rotation', 'Screen rotation')"
+            :value="videoRotation"
+            :options="rotationOptions"
+            @update:value="updateRotation"
+            @update:show="menuOpen = $event"
+          />
+        </div>
+      </DisplaySettingsGroup>
+      <DisplaySettingsGroup :title="t('screen.groups.videoStream', 'Video stream')" :icon="Waypoints">
+        <div>
+          <span>{{ t('screen.protocol', 'Connection protocol') }}</span>
+          <n-select
+            v-bind="selectProps"
+            :aria-label="t('screen.protocol', 'Connection protocol')"
+            :value="switchingProtocol || state.videoMode"
+            :options="protocolOptions"
+            :loading="!!switchingProtocol"
+            :disabled="!video || saving || edidBusy || !!switchingProtocol || state.connection === 'connecting'"
+            @update:value="updateProtocol"
+            @update:show="menuOpen = $event"
+          />
+        </div>
+        <div>
+          <span>{{ t('screen.codec', 'Codec') }}</span>
+          <n-select
+            v-bind="selectProps"
+            :value="video?.codec"
+            :options="codecOptions"
+            :disabled="videoDisabled || !video"
+            @update:value="updateCodec"
             @update:show="menuOpen = $event"
           />
         </div>
@@ -398,30 +521,14 @@ watch(popoverOpen, (open) => {
             @update:show="menuOpen = $event"
           />
         </div>
-        <div>
-          <span>{{ t('screen.codec', 'Codec') }}</span>
-          <n-select
-            v-bind="selectProps"
-            :value="video?.codec"
-            :options="codecOptions"
-            :disabled="videoDisabled || !video"
-            @update:value="updateCodec"
-            @update:show="menuOpen = $event"
-          />
-        </div>
-        <div v-if="edid">
-          <span>{{ t('screen.edid', 'EDID') }}</span>
-          <n-select
-            v-bind="selectProps"
-            :value="edidSelection || null"
-            :options="edidOptions"
-            :placeholder="edidPlaceholder"
-            :disabled="edidDisabled"
-            @update:value="updateEdid"
-            @update:show="menuOpen = $event"
-          />
-        </div>
-        <p v-if="edid && edidRestartHint" class="display-edid-hint">{{ edidRestartHint }}</p>
+        <n-alert v-if="!canChangeVideo" type="info" :bordered="false" :show-icon="false">
+          {{ t('screen.sharedStream', 'Shared from the primary WebRTC client') }}
+        </n-alert>
+      </DisplaySettingsGroup>
+      <DisplaySettingsGroup
+        :title="t('screen.groups.quality', 'Picture quality')"
+        :icon="SlidersHorizontal"
+      >
         <div>
           <span>{{ qualityBudgetLabel }}</span>
           <n-select
@@ -438,7 +545,7 @@ watch(popoverOpen, (open) => {
           <span>{{ t('screen.qualityCustom', 'Custom') }}</span>
           <n-input-number
             class="display-status-select"
-            size="tiny"
+            :size="sheet ? 'medium' : 'tiny'"
             :value="qualityPercent"
             :min="1"
             :max="100"
@@ -469,7 +576,46 @@ watch(popoverOpen, (open) => {
             @update:value="updateFrameDetect"
           />
         </div>
-      </div>
+      </DisplaySettingsGroup>
+      <DisplaySettingsGroup
+        v-if="edid"
+        :title="t('screen.groups.hdmi', 'HDMI input')"
+        :icon="Cable"
+        collapsible
+      >
+        <div>
+          <span>{{ t('screen.edid', 'EDID') }}</span>
+          <n-select
+            v-bind="selectProps"
+            :value="edidSelection || null"
+            :options="edidOptions"
+            :placeholder="edidPlaceholder"
+            :disabled="edidDisabled"
+            @update:value="updateEdid"
+            @update:show="menuOpen = $event"
+          />
+        </div>
+        <p v-if="edidRestartHint" class="display-edid-hint">{{ edidRestartHint }}</p>
+        <n-button
+          v-if="canResetHdmi"
+          class="display-hdmi-reset"
+          :size="sheet ? 'medium' : 'small'"
+          :disabled="edidDisabled"
+          :loading="resettingHdmi"
+          @click="resetHdmi"
+        >
+          <template #icon><RotateCcw :size="14" aria-hidden="true" /></template>
+          {{ t('screen.resetHdmi', 'Reset HDMI') }}
+        </n-button>
+      </DisplaySettingsGroup>
     </div>
-  </n-popover>
+    </template>
+  </ControlOverlay>
 </template>
+
+<style scoped>
+.display-hdmi-reset {
+  justify-self: stretch;
+  margin-top: 4px;
+}
+</style>

@@ -7,6 +7,7 @@ import {
   encodeEdidSelection,
   machinePresetLabel,
   parseEdidSelection,
+  supportsHdmiReset,
 } from '../src/lib/edid.ts'
 
 assert.equal(machinePresetLabel('factory', 'Factory'), 'Factory')
@@ -25,6 +26,14 @@ assert.equal(edidRequiresRestart('hotplug'), false)
 assert.equal(edidRequiresRestart('none'), false)
 assert.equal(edidRequiresRestart('reboot'), true)
 assert.equal(edidRequiresRestart('power_cycle'), true)
+
+assert.equal(supportsHdmiReset(null), false)
+assert.equal(supportsHdmiReset({ supported: false, writable: true, hotplug: true }), false)
+assert.equal(supportsHdmiReset({ supported: true, writable: false, hotplug: true }), false)
+assert.equal(supportsHdmiReset({ supported: true, writable: true }), false)
+assert.equal(supportsHdmiReset({ supported: true, writable: true, hotplug: true, apply_policy: 'reboot' }), false)
+assert.equal(supportsHdmiReset({ supported: true, writable: true, hotplug: true, apply_policy: 'power_cycle' }), false)
+assert.equal(supportsHdmiReset({ supported: true, writable: true, hotplug: true, apply_policy: 'hotplug' }), true)
 
 const options = edidSelectOptions({
   supported: true,

@@ -5,6 +5,7 @@ import { useDialog, useMessage } from 'naive-ui'
 import { api, APIError, type EDIDApplyRequired, type EDIDStatus } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { edidSelectOptions, parseEdidSelection } from '@/lib/edid'
+import SettingsPanel from './SettingsPanel.vue'
 
 defineProps<{ disabled?: boolean }>()
 
@@ -93,11 +94,11 @@ onMounted(() => {
 </script>
 
 <template>
-  <section v-if="status?.supported" class="edid-settings-panel">
-    <h3>{{ t('settings.advancedSettings.displayPage.edid', 'HDMI EDID') }}</h3>
-    <p class="display-setting-field-hint">
-      {{ t('settings.advancedSettings.displayPage.edidHint', 'Apply a saved EDID file to the HDMI capture chip. Edit files in the EDID Editor plugin.') }}
-    </p>
+  <SettingsPanel
+    v-if="status?.supported"
+    :title="t('settings.advancedSettings.displayPage.edid', 'HDMI EDID')"
+    :description="t('settings.advancedSettings.displayPage.edidHint', 'Apply a saved EDID file to the HDMI capture chip. Edit files in the EDID Editor plugin.')"
+  >
     <p class="display-setting-field-hint">
       {{ status.summary?.preferred
         ? `${status.summary.preferred.width}×${status.summary.preferred.height}@${status.summary.preferred.fps}`
@@ -115,16 +116,9 @@ onMounted(() => {
     <n-button type="primary" :disabled="disabled || !selection || !status.writable" :loading="busy" @click="applySelection">
       {{ t('settings.advancedSettings.displayPage.edidApply', 'Apply EDID') }}
     </n-button>
-  </section>
+  </SettingsPanel>
 </template>
 
 <style scoped>
-.edid-settings-panel {
-  display: grid;
-  gap: 10px;
-  margin-top: 18px;
-}
-.edid-settings-panel h3 {
-  margin: 0;
-}
+.display-setting-field-hint { margin: 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.6; }
 </style>

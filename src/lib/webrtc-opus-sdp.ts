@@ -31,6 +31,13 @@ export function applyOpusStereoPreference(sdp: string, stereo: boolean): string 
   return withFmtp.join(newline)
 }
 
+/* Chrome NetEq waits for in-band FEC before playing. KVM is a LAN console:
+ * FEC mainly inflates the audio jitter buffer. Strip it on offer and answer. */
+export function preferLowDelayOpus(sdp: string): string {
+  if (!sdp) return sdp
+  return sdp.replace(/useinbandfec=1/gi, 'useinbandfec=0')
+}
+
 export function setOpusStereoParams(params: string, stereo: boolean): string {
   const parts = params.split(';').map((part) => part.trim()).filter(Boolean)
   const kept = parts.filter((part) => {

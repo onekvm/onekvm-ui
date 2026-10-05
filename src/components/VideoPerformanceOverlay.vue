@@ -17,10 +17,13 @@ import {
   COMPACT_CHART_WIDTH,
   formatCompactBitrate,
   formatCompactResolution,
+  performanceAudioVisible,
 } from '@/lib/performance-compact'
+import { TOOLBAR_LAUNCHER_QUERY, toolbarLauncherActive } from '@/lib/toolbar-dock'
 import { compactChartPaths } from '@/lib/video-stream-chart'
 
 import DisplayStatusValues from './DisplayStatusValues.vue'
+import ConsoleFloatingWindow from './ConsoleFloatingWindow.vue'
 
 const props = defineProps<{
   canvasWidth: number
@@ -63,6 +66,8 @@ const COMPACT_KEY = 'onekvm-performance-compact'
 const advanced = ref(localStorage.getItem(ADVANCED_KEY) === 'true')
 const showAudio = ref(localStorage.getItem(AUDIO_KEY) !== 'false')
 const compact = ref(localStorage.getItem(COMPACT_KEY) === 'true')
+const mobile = ref(toolbarLauncherActive(window.innerWidth, window.innerHeight))
+let launcherMedia: MediaQueryList | undefined
 
 const { samples } = useVideoStreamHistory(() => props.videoFps, () => props.videoBitrate)
 const { samples: latencySamples } = useLatencyHistory(() => ({
@@ -82,7 +87,8 @@ const { samples: audioLatencySamples } = useLatencyHistory(() => ({
   decode: 0,
   present: 0,
 }))
-const panel = ref<HTMLElement | null>(null)
+const frame = ref<InstanceType<typeof ConsoleFloatingWindow> | null>(null)
+const panel = computed(() => frame.value?.element || null)
 const position = ref({ x: 24, y: 8 })
 let dragOffset: OverlayPoint = { x: 0, y: 0 }
 let dragging = false
@@ -132,7 +138,7 @@ async function placePanel() {
   clampPosition()
 }
 
-const showAudioColumn = computed(() => showAudio.value)
+const showAudioColumn = computed(() => performanceAudioVisible(Boolean(props.audioEnabled), showAudio.value))
 const compactResolution = computed(() => formatCompactResolution(props.inputWidth, props.inputHeight))
 const compactChart = computed(() => compactChartPaths(
   samples.value,
@@ -143,10 +149,8 @@ const compactChart = computed(() => compactChartPaths(
 
 function startDrag(event: PointerEvent) {
   if (event.button !== 0 || !panel.value) return
-  if (!compact.value && window.innerWidth < 768) return
   const handle = event.currentTarget
   if (!(handle instanceof HTMLElement)) return
-  handle.setPointerCapture(event.pointerId)
   event.preventDefault()
   event.stopPropagation()
   const rect = panel.value.getBoundingClientRect()
@@ -154,6 +158,12 @@ function startDrag(event: PointerEvent) {
   dragging = true
   dragHandle = handle
   dragPointerId = event.pointerId
+  try {
+    handle.setPointerCapture(event.pointerId)
+  } catch {
+    // Window listeners still keep mouse/touch dragging functional when a
+    // browser refuses capture for a synthetic or already-retargeted pointer.
+  }
   window.addEventListener('pointermove', drag)
   window.addEventListener('pointerup', stopDrag)
   window.addEventListener('pointercancel', stopDrag)
@@ -179,18 +189,26 @@ function stopDrag() {
   window.removeEventListener('pointercancel', stopDrag)
 }
 
+function syncMobile() {
+  mobile.value = toolbarLauncherActive(window.innerWidth, window.innerHeight)
+}
+
 onMounted(() => {
+  launcherMedia = window.matchMedia(TOOLBAR_LAUNCHER_QUERY)
+  launcherMedia.addEventListener('change', syncMobile)
   window.addEventListener('resize', clampPosition)
   if (props.visible) void placePanel()
 })
 
 onBeforeUnmount(() => {
+  launcherMedia?.removeEventListener('change', syncMobile)
   window.removeEventListener('resize', clampPosition)
   stopDrag()
 })
 
 watch(() => props.visible, (visible) => {
   if (visible) void placePanel()
+  else stopDrag()
 })
 watch(() => [props.canvasWidth, props.canvasHeight], () => {
   if (props.visible) clampPosition()
@@ -212,19 +230,28 @@ watch(compact, (value) => {
   localStorage.setItem(COMPACT_KEY, String(value))
   persistLayout()
 })
+watch(() => props.audioEnabled, persistLayout)
 </script>
 
 <template>
-  <section
-    ref="panel"
+  <ConsoleFloatingWindow
+    ref="frame"
+    :title="t('screen.performance', 'Performance')"
+    :show="visible"
+    :close-label="t('screen.hidePerformance', 'Hide performance overlay')"
     class="video-performance-overlay"
-    :class="{ 'is-advanced': advanced && !compact, 'has-audio': showAudioColumn && !compact, 'is-compact': compact }"
+    :class="{
+      'is-advanced': advanced && !compact,
+      'has-audio': showAudioColumn && !compact,
+      'is-compact': compact,
+      'is-mobile-sheet': mobile,
+    }"
     :style="panelStyle"
-    role="dialog"
-    :aria-label="t('screen.performance', 'Performance')"
+    @close="emit('close')"
+    @header-pointerdown="startDrag"
   >
+    <template v-if="compact" #chrome>
     <div
-      v-if="compact"
       class="performance-compact-bar"
       @pointerdown="startDrag"
     >
@@ -270,7 +297,7 @@ watch(compact, (value) => {
           <span>{{ (audioEncoder || '').toUpperCase() || 'AUD' }}</span>
         </span>
       </template>
-      <div class="performance-compact-actions" @pointerdown.stop>
+      <div class="performance-window-actions" @pointerdown.stop>
         <n-button
           quaternary
           circle
@@ -291,12 +318,19 @@ watch(compact, (value) => {
         </n-button>
       </div>
     </div>
-    <header v-else class="display-status-titlebar" @pointerdown="startDrag">
-      <GripHorizontal :size="15" class="floating-window-grip" />
-      <Activity :size="15" />
-      <strong>{{ t('screen.performance', 'Performance') }}</strong>
-      <div class="control-popover-header-actions" @pointerdown.stop>
-        <label class="performance-advanced-toggle">
+    </template>
+    <template #title-icon><Activity :size="15" /></template>
+    <template #actions>
+      <n-tooltip to=".console-workspace" :z-index="4000" style="pointer-events: none">
+        <template #trigger>
+          <n-button quaternary circle size="tiny" :aria-label="t('screen.performanceMinimize', 'Compact performance overlay')" @click="compact = true"><template #icon><Minus /></template></n-button>
+        </template>
+        {{ t('screen.performanceMinimize', 'Compact performance overlay') }}
+      </n-tooltip>
+    </template>
+    <template #header-extra>
+      <div class="performance-toggle-row" @pointerdown.stop>
+        <label v-if="audioEnabled" class="performance-advanced-toggle">
           <span>{{ t('screen.performanceAudio', 'Audio') }}</span>
           <n-switch v-model:value="showAudio" size="small" />
         </label>
@@ -304,36 +338,8 @@ watch(compact, (value) => {
           <span>{{ t('screen.performanceAdvanced', 'Advanced') }}</span>
           <n-switch v-model:value="advanced" size="small" />
         </label>
-        <n-tooltip to=".console-workspace" :z-index="4000">
-          <template #trigger>
-            <n-button
-              quaternary
-              circle
-              size="tiny"
-              :aria-label="t('screen.performanceMinimize', 'Compact performance overlay')"
-              @click="compact = true"
-            >
-              <template #icon><Minus /></template>
-            </n-button>
-          </template>
-          {{ t('screen.performanceMinimize', 'Compact performance overlay') }}
-        </n-tooltip>
-        <n-tooltip to=".console-workspace" :z-index="4000">
-          <template #trigger>
-            <n-button
-              quaternary
-              circle
-              size="tiny"
-              :aria-label="t('screen.hidePerformance', 'Hide performance overlay')"
-              @click="emit('close')"
-            >
-              <template #icon><X /></template>
-            </n-button>
-          </template>
-          {{ t('screen.hidePerformance', 'Hide performance overlay') }}
-        </n-tooltip>
       </div>
-    </header>
+    </template>
     <div v-if="!compact" class="display-status-content">
       <DisplayStatusValues
         :canvas-width="canvasWidth"
@@ -368,5 +374,5 @@ watch(compact, (value) => {
         :audio-jitter-buffer-us="audioJitterBufferUs"
       />
     </div>
-  </section>
+  </ConsoleFloatingWindow>
 </template>

@@ -22,9 +22,8 @@ export interface VideoQpValues {
   max_qp?: number
 }
 
-// Balanced is NanoKVM's original encoder configuration. The outer presets
-// stay within Sophgo's documented VBR QP ranges and move in small steps to
-// avoid extreme bitrate changes between adjacent choices.
+// Balanced matches kmpp onekvm_setup (PicoKVM VEPU: init 22, P 12–48).
+// Outer presets keep the same step spacing.
 export const qpPresets: readonly QpPreset[] = [
   {
     value: 'minimum-latency',
@@ -52,9 +51,9 @@ export const qpPresets: readonly QpPreset[] = [
     labelFallback: 'Balanced',
     descriptionKey: 'settings.advancedSettings.displayPage.qpBalancedHint',
     descriptionFallback: 'Balances detail, bitrate, and transmission latency.',
-    initialQp: 35,
-    minQp: 20,
-    maxQp: 51,
+    initialQp: 22,
+    minQp: 12,
+    maxQp: 48,
   },
   {
     value: 'quality-priority',

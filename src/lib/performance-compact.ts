@@ -11,3 +11,7 @@ export function formatCompactResolution(width: number, height: number) {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return '—'
   return `${Math.round(width)}×${Math.round(height)}`
 }
+
+export function performanceAudioVisible(usbAudioEnabled: boolean, showAudio: boolean) {
+  return Boolean(usbAudioEnabled) && showAudio
+}

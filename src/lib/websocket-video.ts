@@ -7,7 +7,7 @@ const MAGIC = [0x4f, 0x4b, 0x56, 0x46]
 
 interface WebSocketVideoCallbacks {
   bitrate: (kbps: number) => void
-  disconnected: (message: string) => void
+  disconnected: (message: string, codecUnsupported?: boolean) => void
 }
 
 type ExtendedJMuxerOptions = JMuxer.Options & {
@@ -36,6 +36,18 @@ export class WebSocketVideo {
   private lastSequence: bigint | null = null
   private sampleStartedAt = 0
   private sampleBytes = 0
+  private startupTimer: ReturnType<typeof setTimeout> | undefined
+  private decoded = false
+  private playbackFailed = false
+  private readonly onDecoded = () => {
+    this.decoded = true
+    clearTimeout(this.startupTimer)
+    this.startupTimer = undefined
+  }
+  private readonly onMediaError = () => this.failPlayback(
+    `Video decoder failed for ${this.codec.toUpperCase()} over WebSocket`,
+    this.video.error?.code === 3 || this.video.error?.code === 4,
+  )
   private readonly debug = localStorage.getItem('onekvm-video-debug') === 'true'
 
   constructor(
@@ -54,6 +66,8 @@ export class WebSocketVideo {
   connect() {
     return new Promise<void>((resolve, reject) => {
       this.closed = false
+      this.video.addEventListener('loadeddata', this.onDecoded)
+      this.video.addEventListener('error', this.onMediaError)
       this.createMuxer()
 
       const socket = new WebSocket(this.url, 'onekvm.video.v1')
@@ -92,6 +106,10 @@ export class WebSocketVideo {
 
   destroy() {
     this.closed = true
+    clearTimeout(this.startupTimer)
+    this.startupTimer = undefined
+    this.video.removeEventListener('loadeddata', this.onDecoded)
+    this.video.removeEventListener('error', this.onMediaError)
     const socket = this.socket
     this.socket = null
     if (socket && socket.readyState < WebSocket.CLOSING) socket.close()
@@ -118,12 +136,16 @@ export class WebSocketVideo {
         this.log('MSE ready')
         this.requestKeyframe()
       },
-      onError: () => {
-        this.waitingForKeyframe = true
-        this.requestKeyframe()
+      onError: (data: { name?: string }) => {
+        if (data.name === 'InvalidStateError' && !this.video.error) {
+          this.waitingForKeyframe = true
+          this.requestKeyframe()
+        } else {
+          this.failPlayback(`Video buffer failed for ${this.codec.toUpperCase()} over WebSocket`, true)
+        }
       },
       onUnsupportedCodec: () => {
-        this.callbacks.disconnected(`The browser cannot decode ${this.codec.toUpperCase()} over WebSocket`)
+        this.failPlayback(`The browser cannot decode ${this.codec.toUpperCase()} over WebSocket`, true)
       },
       onLoggerLog: (...data) => console.debug('[OneKVM WebSocket video]', ...data),
       onLoggerErr: (...data) => console.error('[OneKVM WebSocket video]', ...data),
@@ -133,6 +155,7 @@ export class WebSocketVideo {
   }
 
   private handleFrame(buffer: ArrayBuffer) {
+    if (this.closed || this.playbackFailed) return
     if (buffer.byteLength < HEADER_SIZE) return
     const bytes = new Uint8Array(buffer)
     if (!MAGIC.every((value, index) => bytes[index] === value) || bytes[4] !== 1) return
@@ -163,13 +186,35 @@ export class WebSocketVideo {
       duration: Math.max(1, durationUsec / 1000),
       isLastVideoFrameComplete: true,
     }
-    this.muxer?.feed(frame)
+    if (!this.decoded && this.startupTimer === undefined) {
+      this.startupTimer = setTimeout(() => {
+        this.failPlayback(`The browser could not start ${this.codec.toUpperCase()} playback over WebSocket`, true)
+      }, 5000)
+    }
+    try {
+      this.muxer?.feed(frame)
+    } catch {
+      this.failPlayback(`Video decoder failed for ${this.codec.toUpperCase()} over WebSocket`, true)
+      return
+    }
     void this.video.play().catch(() => undefined)
     this.recordBytes(payloadLength)
   }
 
   private requestKeyframe() {
     if (this.socket?.readyState === WebSocket.OPEN) this.socket.send('keyframe')
+  }
+
+  private failPlayback(message: string, codecUnsupported: boolean) {
+    if (this.closed || this.playbackFailed) return
+    this.playbackFailed = true
+    clearTimeout(this.startupTimer)
+    this.startupTimer = undefined
+    // JMuxer can report failure while feeding. Dispose it after that call
+    // unwinds so its own buffer/remux callbacks cannot access destroyed state.
+    queueMicrotask(() => {
+      if (!this.closed) this.callbacks.disconnected(message, codecUnsupported)
+    })
   }
 
   private recordBytes(bytes: number) {

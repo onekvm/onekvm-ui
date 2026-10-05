@@ -23,6 +23,7 @@ export const LATENCY_STACK_KEYS = [
 ] as const
 
 export type LatencyStackKey = (typeof LATENCY_STACK_KEYS)[number]
+export type LatencyStackParts = Record<LatencyStackKey, number>
 
 export const STREAM_HISTORY_CAPACITY = 60
 export const STREAM_SAMPLE_MS = 1_000
@@ -59,21 +60,40 @@ export function formatLatencyUs(value: number): string {
   return `${value} µs`
 }
 
+export function latencyStackParts(sample: LatencySample): LatencyStackParts {
+  const capture = Math.max(0, sample.capture)
+  const encode = Math.max(0, sample.encode)
+  const present = Math.max(0, sample.present)
+  let jitter = Math.max(0, sample.jitter)
+  let decode = Math.max(0, sample.decode)
+  let display = 0
+
+  /* `present` is receive→display and therefore already contains the browser
+     jitter and decode stages. Keep the stack mutually exclusive. The browser
+     metrics use independent rolling windows, so clamp jitter/decode
+     proportionally when their sum momentarily exceeds the present budget. */
+  if (present > 0) {
+    const measured = jitter + decode
+    if (measured > present && measured > 0) {
+      const scale = present / measured
+      jitter *= scale
+      decode *= scale
+    }
+    display = Math.max(0, present - jitter - decode)
+  }
+
+  return { capture, encode, jitter, decode, present: display }
+}
+
 export function latencyStackTotal(sample: LatencySample): number {
+  const parts = latencyStackParts(sample)
   let total = 0
-  for (const key of LATENCY_STACK_KEYS) total += Math.max(0, sample[key])
+  for (const key of LATENCY_STACK_KEYS) total += parts[key]
   return total
 }
 
 export function latencyKnownTotal(sample: LatencySample): number {
-  const capture = Math.max(0, sample.capture)
-  const encode = Math.max(0, sample.encode)
-  const present = Math.max(0, sample.present)
-  /* Present is receive→display and already includes jitter+decode. Audio
-     samples have no present, so browser delay is jitter+decode. ICE RTT is
-     a separate path measurement, not added into the one-way total. */
-  if (present > 0) return capture + encode + present
-  return capture + encode + Math.max(0, sample.jitter) + Math.max(0, sample.decode)
+  return latencyStackTotal(sample)
 }
 
 export function latencyScaleMax(samples: readonly LatencySample[]): number {
@@ -121,7 +141,7 @@ export function latencyStackBands(
   const count = samples.length
   const lower = Array.from({ length: count }, () => 0)
   for (const key of LATENCY_STACK_KEYS) {
-    const upper = samples.map((sample, index) => lower[index] + Math.max(0, sample[key]))
+    const upper = samples.map((sample, index) => lower[index] + latencyStackParts(sample)[key])
     bands[key] = stackedBandPath(upper, lower, max, width, height)
     for (let index = 0; index < count; index++) lower[index] = upper[index]
   }

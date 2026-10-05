@@ -14,6 +14,17 @@ export function supportsWebSocketVideo(codecName: string) {
   }
   const candidates = codec === 'h264'
     ? ['video/mp4; codecs="avc1.42E01E"', 'video/mp4; codecs="avc1.640028"']
-    : ['video/mp4; codecs="hvc1.1.6.L93.B0"', 'video/mp4; codecs="hev1.1.6.L93.B0"']
+    // JMuxer opens an hvc1 SourceBuffer. Accepting hev1 alone cannot prove
+    // that path works; NanoKVM's Main encoder currently signals level 5.0.
+    : ['video/mp4; codecs="hvc1.1.6.L150.B0"']
   return candidates.some((candidate) => MediaSource.isTypeSupported(candidate))
+}
+
+let h265WebSocketProbe: Promise<boolean> | undefined
+
+export function detectH265WebSocketVideoSupport() {
+  h265WebSocketProbe ??= supportsWebSocketVideo('h265')
+    ? import('./websocket-video-probe').then(({ probeH265WebSocketVideoSupport }) => probeH265WebSocketVideoSupport()).catch(() => false)
+    : Promise.resolve(false)
+  return h265WebSocketProbe
 }

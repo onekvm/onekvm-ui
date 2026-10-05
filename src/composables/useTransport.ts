@@ -7,9 +7,10 @@ export function useTransport() {
     connection: 'idle',
     controlReady: false,
     videoMode: 'webrtc',
+    webRTCSessionId: '',
+    videoPrimary: false,
     websocketFallbackAvailable: false,
-    websocketFallbackOffered: false,
-    errorKind: '',
+    fallbackPrompt: '',
     error: '',
   })
   let unsubscribe: (() => void) | undefined

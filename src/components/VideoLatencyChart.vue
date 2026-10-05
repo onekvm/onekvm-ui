@@ -7,6 +7,7 @@ import {
   formatSampleTime,
   latencyScaleMax,
   latencyStackBands,
+  latencyStackParts,
   latencyKnownTotal,
   linePath,
   nearestSampleIndex,
@@ -47,7 +48,8 @@ const hover = computed(() => {
     x: sampleX(index, props.samples.length, width),
     time: formatSampleTime(sample.t),
     total: latencyKnownTotal(sample),
-    sample,
+    parts: latencyStackParts(sample),
+    ice: sample.ice,
   }
 })
 
@@ -78,7 +80,7 @@ const stackLegend: { key: LatencyStackKey; label: string; fallback: string }[] =
   { key: 'encode', label: 'screen.encodeLatency', fallback: 'Encode latency' },
   { key: 'jitter', label: 'screen.jitterBuffer', fallback: 'Jitter buffer' },
   { key: 'decode', label: 'screen.decodeLatency', fallback: 'Decode latency' },
-  { key: 'present', label: 'screen.presentLatency', fallback: 'Receive to display' },
+  { key: 'present', label: 'screen.presentLatency', fallback: 'Display overhead' },
 ]
 
 function setHover(event: PointerEvent) {
@@ -177,12 +179,12 @@ function clearHover() {
       <div v-for="item in stackLegend" :key="item.key">
         <span class="stream-chart-swatch" :class="`latency-swatch-${item.key}`" aria-hidden="true" />
         <span>{{ t(item.label, item.fallback) }}</span>
-        <strong>{{ formatMs(hover.sample[item.key]) }}</strong>
+        <strong>{{ formatMs(hover.parts[item.key]) }}</strong>
       </div>
       <div>
         <span class="stream-chart-swatch latency-swatch-ice" aria-hidden="true" />
         <span>{{ t('screen.iceRtt', 'ICE RTT') }}</span>
-        <strong>{{ formatMs(hover.sample.ice) }}</strong>
+        <strong>{{ formatMs(hover.ice) }}</strong>
       </div>
     </div>
 

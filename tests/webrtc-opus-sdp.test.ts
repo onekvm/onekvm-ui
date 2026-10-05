@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 
-import { applyOpusStereoPreference, setOpusStereoParams } from '../src/lib/webrtc-opus-sdp.ts'
+import { applyOpusStereoPreference, preferLowDelayOpus, setOpusStereoParams } from '../src/lib/webrtc-opus-sdp.ts'
 
 const chromeOffer = [
   'v=0',
@@ -22,6 +22,10 @@ assert.match(stripped, /a=fmtp:111 minptime=10;useinbandfec=1/)
 const firefoxOffer = applyOpusStereoPreference(chromeOffer, true)
 const unchanged = applyOpusStereoPreference(firefoxOffer, true)
 assert.equal(unchanged, firefoxOffer)
+
+const lowDelay = preferLowDelayOpus(stereo)
+assert.match(lowDelay, /useinbandfec=0/)
+assert.doesNotMatch(lowDelay, /useinbandfec=1/)
 
 assert.equal(setOpusStereoParams('minptime=10;useinbandfec=1;stereo=0', true), 'minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1')
 assert.equal(setOpusStereoParams('minptime=10;useinbandfec=1;stereo=1', false), 'minptime=10;useinbandfec=1')

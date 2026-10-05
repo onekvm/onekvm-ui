@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 
-import { formatCompactBitrate, formatCompactResolution } from '../src/lib/performance-compact.ts'
+import {
+  formatCompactBitrate,
+  formatCompactResolution,
+  performanceAudioVisible,
+} from '../src/lib/performance-compact.ts'
 import { compactChartPaths } from '../src/lib/video-stream-chart.ts'
 
 assert.equal(formatCompactBitrate(0), '0')
@@ -17,5 +21,10 @@ const paths = compactChartPaths([
 assert.ok(paths.fps.includes('M'))
 assert.ok(paths.bitrate.includes('L'))
 assert.ok(paths.fpsArea.endsWith('Z'))
+
+assert.equal(performanceAudioVisible(false, true), false)
+assert.equal(performanceAudioVisible(false, false), false)
+assert.equal(performanceAudioVisible(true, false), false)
+assert.equal(performanceAudioVisible(true, true), true)
 
 console.log('performance-compact tests passed')

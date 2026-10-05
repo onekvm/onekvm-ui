@@ -9,6 +9,7 @@ import {
   fpsScaleMax,
   latencyMs,
   latencyScaleMax,
+  latencyStackParts,
   latencyStackBands,
   latencyKnownTotal,
   latencyStackTotal,
@@ -83,8 +84,16 @@ assert.equal(formatLatencyUs(16000), '16 ms')
 const latencySample = {
   t: 1, capture: 16.7, encode: 9.1, ice: 2, jitter: 4, decode: 5, present: 8,
 }
-assert.equal(Math.round(latencyStackTotal(latencySample) * 10) / 10, 42.8)
 assert.equal(Math.round(latencyKnownTotal(latencySample) * 10) / 10, 33.8)
+assert.equal(Math.round(latencyStackTotal(latencySample) * 10) / 10, 33.8)
+const parts = latencyStackParts(latencySample)
+assert.equal(parts.capture, 16.7)
+assert.equal(parts.encode, 9.1)
+assert.equal(parts.present, 0)
+assert.equal(Math.round((parts.jitter + parts.decode) * 10) / 10, 8)
+const oversubscribed = latencyStackParts({ ...latencySample, jitter: 40, decode: 20, present: 30 })
+assert.equal(oversubscribed.present, 0)
+assert.equal(Math.round((oversubscribed.jitter + oversubscribed.decode) * 10) / 10, 30)
 assert.equal(
   latencyKnownTotal({ t: 1, capture: 0.02, encode: 1.7, ice: 0, jitter: 328, decode: 0, present: 0 }),
   329.72,

@@ -3,4 +3,5 @@ dist/
 dist-recovery/
 test-results/
 *.local
+artifacts/screenshots/
 

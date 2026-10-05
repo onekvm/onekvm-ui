@@ -4,6 +4,9 @@ import { RefreshCw } from '@lucide/vue'
 
 import { t } from '@/i18n/runtime'
 
+import { useOverlayMount } from '@/composables/useOverlayMount'
+
+const overlayTo = useOverlayMount()
 const CHECK_INTERVAL_MS = 60_000
 const ENTRY_ASSET_PATTERN = /\/assets\/index-[^/?#]+\.js$/
 
@@ -102,6 +105,7 @@ onBeforeUnmount(() => {
 <template>
   <n-modal
     :show="updateAvailable"
+    :to="overlayTo"
     preset="card"
     class="ui-update-modal"
     :title="t('settings.uiUpdate.title', 'OneKVM was updated')"
@@ -122,5 +126,5 @@ onBeforeUnmount(() => {
 
 <style>
 .ui-update-modal { width: min(440px, calc(100vw - 32px)); }
-.ui-update-modal p { margin: 0; color: #aeb7c0; line-height: 1.7; }
+.ui-update-modal p { margin: 0; color: var(--muted-foreground); line-height: 1.7; }
 </style>

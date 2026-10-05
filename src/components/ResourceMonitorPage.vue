@@ -9,6 +9,13 @@ import {
   type ServiceResourceUsage,
 } from '@/api/client'
 import { currentLanguage, t } from '@/i18n/runtime'
+import {
+  defaultResourceServiceSortDir,
+  visibleResourceServices,
+  type ResourceServiceSortDir,
+  type ResourceServiceSortKey,
+  type ResourceServiceStatusFilter,
+} from '@/lib/resource-services'
 
 import ResourceChart, { type ResourceChartSeries } from './ResourceChart.vue'
 
@@ -34,6 +41,18 @@ const memorySeries = computed<ResourceChartSeries[]>(() => [{
     ? sample.memory_used_bytes * 100 / sample.memory_total_bytes
     : 0),
 }])
+const temperatureSamples = computed(() => samples.value.filter(
+  (sample) => typeof sample.temperature_celsius === 'number'
+    && Number.isFinite(sample.temperature_celsius),
+))
+const latestTemperature = computed(() => temperatureSamples.value.at(-1)?.temperature_celsius)
+const temperatureTimestamps = computed(() => temperatureSamples.value.map((sample) => sample.timestamp))
+const temperatureSeries = computed<ResourceChartSeries[]>(() => [{
+  name: t('settings.advancedSettings.resourcesPage.device', 'Device'),
+  color: '#f2b75d',
+  values: temperatureSamples.value.map((sample) => sample.temperature_celsius as number),
+}])
+const hasTemperature = computed(() => latestTemperature.value !== undefined)
 const networkSeries = computed<ResourceChartSeries[]>(() => [
   {
     name: t('settings.advancedSettings.resourcesPage.receive', 'Receive'),
@@ -48,7 +67,25 @@ const networkSeries = computed<ResourceChartSeries[]>(() => [
 ])
 const networkMaximum = computed(() => Math.max(1, ...networkSeries.value.flatMap((item) => item.values)) * 1.12)
 
-type ServiceRow = ServiceResourceUsage & { name: string; status: string }
+type ServiceRow = ServiceResourceUsage & { name: string; running: boolean }
+const serviceQuery = ref('')
+const serviceStatusFilter = ref<ResourceServiceStatusFilter>('running')
+const serviceSortKey = ref<ResourceServiceSortKey>('memory')
+const serviceSortDir = ref<ResourceServiceSortDir>('desc')
+
+const runningLabel = computed(() => t('settings.advancedSettings.resourcesPage.running', 'Running'))
+const stoppedLabel = computed(() => t('settings.advancedSettings.resourcesPage.stopped', 'Stopped'))
+const serviceStatusOptions = computed(() => [
+  { label: runningLabel.value, value: 'running' },
+  { label: t('settings.advancedSettings.resourcesPage.statusAll', 'All statuses'), value: 'all' },
+  { label: stoppedLabel.value, value: 'stopped' },
+])
+const serviceSortOptions = computed(() => [
+  { label: t('settings.advancedSettings.resourcesPage.sortMemory', 'Memory'), value: 'memory' },
+  { label: t('settings.advancedSettings.resourcesPage.sortCpu', 'CPU'), value: 'cpu' },
+  { label: t('settings.advancedSettings.resourcesPage.sortName', 'Name'), value: 'name' },
+])
+
 const serviceRows = computed<ServiceRow[]>(() => {
   const usage = new Map((history.value?.services || []).map((service) => [`${service.kind}:${service.id}`, service]))
   const rows: ServiceRow[] = []
@@ -58,7 +95,7 @@ const serviceRows = computed<ServiceRow[]>(() => {
     rows.push({
       ...host,
       name: t('settings.advancedSettings.resourcesPage.pluginHost', 'Plugin host'),
-      status: t('settings.advancedSettings.resourcesPage.running', 'Running'),
+      running: true,
     })
   }
   const included = new Set<string>()
@@ -73,9 +110,7 @@ const serviceRows = computed<ServiceRow[]>(() => {
       name: extensionTranslation(extension, currentLanguage.value).name,
       cpu_percent: resource?.cpu_percent || 0,
       memory_bytes: resource?.memory_bytes || 0,
-      status: extension.running
-        ? t('settings.advancedSettings.resourcesPage.running', 'Running')
-        : t('settings.advancedSettings.resourcesPage.stopped', 'Stopped'),
+      running: Boolean(extension.running),
     })
   }
   for (const resource of history.value?.services || []) {
@@ -83,9 +118,7 @@ const serviceRows = computed<ServiceRow[]>(() => {
     rows.push({
       ...resource,
       name: resource.id,
-      status: resource.memory_bytes > 0
-        ? t('settings.advancedSettings.resourcesPage.running', 'Running')
-        : t('settings.advancedSettings.resourcesPage.stopped', 'Stopped'),
+      running: resource.memory_bytes > 0,
     })
   }
   for (const extension of props.extensions.filter((item) => item.installed && !item.system)) {
@@ -97,9 +130,7 @@ const serviceRows = computed<ServiceRow[]>(() => {
       name: `${t('settings.advancedSettings.resourcesPage.pluginPrefix', 'Plugin')}: ${extensionTranslation(extension, currentLanguage.value).name}`,
       cpu_percent: resource?.cpu_percent || 0,
       memory_bytes: resource?.memory_bytes || 0,
-      status: extension.running
-        ? t('settings.advancedSettings.resourcesPage.running', 'Running')
-        : t('settings.advancedSettings.resourcesPage.stopped', 'Stopped'),
+      running: Boolean(extension.running),
     })
   }
   for (const resource of history.value?.services || []) {
@@ -107,18 +138,56 @@ const serviceRows = computed<ServiceRow[]>(() => {
     rows.push({
       ...resource,
       name: `${t('settings.advancedSettings.resourcesPage.pluginPrefix', 'Plugin')}: ${resource.id}`,
-      status: resource.memory_bytes > 0
-        ? t('settings.advancedSettings.resourcesPage.running', 'Running')
-        : t('settings.advancedSettings.resourcesPage.stopped', 'Stopped'),
+      running: resource.memory_bytes > 0,
     })
   }
   rows.push({
-    id: 'onekvm-server', kind: 'core', name: 'onekvm-server',
-    cpu_percent: core?.cpu_percent || 0, memory_bytes: core?.memory_bytes || 0,
-    status: t('settings.advancedSettings.resourcesPage.running', 'Running'),
+    id: 'onekvm-server',
+    kind: 'core',
+    name: 'onekvm-server',
+    cpu_percent: core?.cpu_percent || 0,
+    memory_bytes: core?.memory_bytes || 0,
+    running: true,
   })
   return rows
 })
+
+const visibleServiceRows = computed(() => visibleResourceServices(
+  serviceRows.value,
+  serviceQuery.value,
+  serviceStatusFilter.value,
+  serviceSortKey.value,
+  serviceSortDir.value,
+))
+
+const serviceFilterCount = computed(() => t(
+  'settings.advancedSettings.resourcesPage.filteredCount',
+  'Showing {visible} of {total}',
+).replace('{visible}', String(visibleServiceRows.value.length)).replace('{total}', String(serviceRows.value.length)))
+
+function serviceStatusText(running: boolean) {
+  return running ? runningLabel.value : stoppedLabel.value
+}
+
+function setServiceSortKey(key: string) {
+  if (key !== 'name' && key !== 'status' && key !== 'cpu' && key !== 'memory') return
+  if (serviceSortKey.value === key) return
+  serviceSortKey.value = key
+  serviceSortDir.value = defaultResourceServiceSortDir(key)
+}
+
+function toggleServiceSort(key: ResourceServiceSortKey) {
+  if (serviceSortKey.value === key) {
+    serviceSortDir.value = serviceSortDir.value === 'asc' ? 'desc' : 'asc'
+    return
+  }
+  setServiceSortKey(key)
+}
+
+function sortMarker(key: ResourceServiceSortKey) {
+  if (serviceSortKey.value !== key) return ''
+  return serviceSortDir.value === 'asc' ? '↑' : '↓'
+}
 
 function formatBytes(bytes: number) {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
@@ -186,7 +255,19 @@ onBeforeUnmount(() => {
       :now-label="t('settings.advancedSettings.resourcesPage.now', 'Now')"
     />
     <ResourceChart
-      class="resource-network-chart"
+      v-if="hasTemperature"
+      :title="t('settings.advancedSettings.resourcesPage.temperature', 'Temperature')"
+      :value="`${latestTemperature?.toFixed(1)} °C`"
+      :series="temperatureSeries"
+      :timestamps="temperatureTimestamps"
+      :format-value="(value: number) => `${value.toFixed(1)} °C`"
+      :max="100"
+      max-label="100 °C"
+      :empty-label="t('settings.advancedSettings.resourcesPage.collecting', 'Collecting data')"
+      :now-label="t('settings.advancedSettings.resourcesPage.now', 'Now')"
+    />
+    <ResourceChart
+      :class="{ 'resource-network-chart': !hasTemperature }"
       :title="t('settings.advancedSettings.resourcesPage.network', 'Network')"
       :value="`↓ ${formatRate(latest?.network_receive_bytes_per_second || 0)}  ↑ ${formatRate(latest?.network_transmit_bytes_per_second || 0)}`"
       :series="networkSeries"
@@ -204,20 +285,61 @@ onBeforeUnmount(() => {
       <h2>{{ t('settings.advancedSettings.resourcesPage.services', 'OneKVM and plugin usage') }}</h2>
       <span>{{ t('settings.advancedSettings.resourcesPage.lastFiveMinutes', 'Last 5 minutes') }}</span>
     </header>
+    <div class="resource-services-tools">
+      <n-input
+        v-model:value="serviceQuery"
+        size="small"
+        clearable
+        :placeholder="t('settings.advancedSettings.resourcesPage.searchPlaceholder', 'Search components')"
+      />
+      <n-select
+        :value="serviceStatusFilter"
+        size="small"
+        :options="serviceStatusOptions"
+        @update:value="serviceStatusFilter = $event"
+      />
+      <n-select
+        :value="serviceSortKey"
+        size="small"
+        :options="serviceSortOptions"
+        @update:value="setServiceSortKey($event)"
+      />
+      <span class="resource-services-count">{{ serviceFilterCount }}</span>
+    </div>
     <div class="resource-table-scroll">
-      <table>
+      <table class="resource-table">
         <thead>
           <tr>
-            <th>{{ t('settings.advancedSettings.resourcesPage.component', 'Component') }}</th>
-            <th>{{ t('settings.advancedSettings.resourcesPage.status', 'Status') }}</th>
-            <th>CPU</th>
-            <th>{{ t('settings.advancedSettings.resourcesPage.memory', 'Memory') }}</th>
+            <th>
+              <button type="button" class="resource-sort" :class="{ active: serviceSortKey === 'name' }" @click="toggleServiceSort('name')">
+                {{ t('settings.advancedSettings.resourcesPage.component', 'Component') }}
+                <span v-if="sortMarker('name')">{{ sortMarker('name') }}</span>
+              </button>
+            </th>
+            <th>
+              <button type="button" class="resource-sort" :class="{ active: serviceSortKey === 'status' }" @click="toggleServiceSort('status')">
+                {{ t('settings.advancedSettings.resourcesPage.status', 'Status') }}
+                <span v-if="sortMarker('status')">{{ sortMarker('status') }}</span>
+              </button>
+            </th>
+            <th>
+              <button type="button" class="resource-sort" :class="{ active: serviceSortKey === 'cpu' }" @click="toggleServiceSort('cpu')">
+                CPU
+                <span v-if="sortMarker('cpu')">{{ sortMarker('cpu') }}</span>
+              </button>
+            </th>
+            <th>
+              <button type="button" class="resource-sort" :class="{ active: serviceSortKey === 'memory' }" @click="toggleServiceSort('memory')">
+                {{ t('settings.advancedSettings.resourcesPage.memory', 'Memory') }}
+                <span v-if="sortMarker('memory')">{{ sortMarker('memory') }}</span>
+              </button>
+            </th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="service in serviceRows" :key="`${service.kind}:${service.id}`">
+          <tr v-for="service in visibleServiceRows" :key="`${service.kind}:${service.id}`">
             <td><strong>{{ service.name }}</strong><small>{{ service.id }}</small></td>
-            <td><span class="resource-service-state" :class="{ running: service.status === t('settings.advancedSettings.resourcesPage.running', 'Running') }"><i />{{ service.status }}</span></td>
+            <td><span class="resource-service-state" :class="{ running: service.running }"><i />{{ serviceStatusText(service.running) }}</span></td>
             <td>{{ service.cpu_percent.toFixed(1) }}%</td>
             <td>
               <span class="resource-memory-total">{{ formatBytes(service.memory_bytes) }}</span>
@@ -231,6 +353,47 @@ onBeforeUnmount(() => {
           </tr>
         </tbody>
       </table>
+      <n-empty
+        v-if="visibleServiceRows.length === 0"
+        class="resource-services-empty"
+        :description="serviceRows.length
+          ? t('settings.advancedSettings.resourcesPage.emptyFiltered', 'No components match the current filters')
+          : t('settings.advancedSettings.resourcesPage.collecting', 'Collecting data')"
+      />
+      <ul v-else class="resource-service-cards">
+        <li v-for="service in visibleServiceRows" :key="`card-${service.kind}:${service.id}`" class="resource-service-card">
+          <header>
+            <strong>{{ service.name }}</strong>
+            <small>{{ service.id }}</small>
+          </header>
+          <dl class="resource-service-metrics">
+            <div>
+              <dt>{{ t('settings.advancedSettings.resourcesPage.status', 'Status') }}</dt>
+              <dd>
+                <span class="resource-service-state" :class="{ running: service.running }">
+                  <i />{{ serviceStatusText(service.running) }}
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt>CPU</dt>
+              <dd>{{ service.cpu_percent.toFixed(1) }}%</dd>
+            </div>
+            <div>
+              <dt>{{ t('settings.advancedSettings.resourcesPage.memory', 'Memory') }}</dt>
+              <dd>
+                <span class="resource-memory-total">{{ formatBytes(service.memory_bytes) }}</span>
+                <small v-if="hasMemoryBreakdown(service)" class="resource-memory-breakdown">
+                  {{ t('settings.advancedSettings.resourcesPage.pluginProcesses', 'Processes') }}
+                  {{ formatBytes(service.process_memory_bytes || 0) }} ·
+                  {{ t('settings.advancedSettings.resourcesPage.helper', 'Helper') }}
+                  {{ formatBytes(service.helper_memory_bytes || 0) }}
+                </small>
+              </dd>
+            </div>
+          </dl>
+        </li>
+      </ul>
     </div>
   </section>
 </section>

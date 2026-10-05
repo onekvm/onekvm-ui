@@ -239,30 +239,31 @@ onMounted(load)
 
 .user-management-list-layout .account-management-heading {
   min-height: 28px;
-  color: #929ca5;
+  color: var(--muted-foreground);
   font-size: 12px;
 }
 
 .user-management-list-layout .account-management-list {
   overflow: hidden;
-  border: 1px solid #30363d;
+  border: 1px solid var(--border);
   border-radius: 6px;
 }
 
 .user-management-list-layout .account-management-list li {
-  min-height: 54px;
-  padding: 7px 12px;
+  min-height: 56px;
+  padding: 10px 14px;
   border-bottom: 0;
-  background: #15191e;
-  grid-template-columns: 32px minmax(0, 1fr) 32px 32px;
+  background: var(--card);
+  grid-template-columns: 32px minmax(0, 1fr) 40px 40px;
+  gap: 8px;
 }
 
 .user-management-list-layout .account-management-list li + li {
-  border-top: 1px solid #30363d;
+  border-top: 1px solid var(--border);
 }
 
 .user-management-list-layout .account-management-list li:hover {
-  background: #1b2026;
+  background: var(--accent);
 }
 
 .user-editor-drawer-actions {
@@ -284,14 +285,28 @@ onMounted(load)
 }
 
 .user-editor-error {
-  color: #e88080;
+  color: var(--destructive);
   font-size: 11px;
   line-height: 1.4;
 }
 
-@media (max-width: 520px) {
+@media (max-width: 760px) {
+  .user-management-list-layout .account-management-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .user-management-list-layout .account-management-heading .n-button {
+    width: 100%;
+  }
   .user-management-list-layout .account-management-list li {
-    padding-inline: 9px;
+    padding: 12px 14px;
+  }
+  .user-editor-drawer-actions {
+    justify-content: stretch;
+  }
+  .user-editor-drawer-actions :deep(.n-button) {
+    flex: 1;
   }
 }
 </style>

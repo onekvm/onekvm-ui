@@ -8,6 +8,8 @@ import '@xterm/xterm/css/xterm.css'
 
 import { api } from '@/api/client'
 import { t } from '@/i18n/runtime'
+import { xtermTheme } from '@/lib/terminal-theme'
+import { activeTheme } from '@/theme/runtime'
 
 const lines = ref<string[]>([])
 const lineLimit = ref(250)
@@ -92,28 +94,7 @@ async function initializeTerminal() {
     fontSize: 11,
     lineHeight: 1.45,
     scrollback: 1100,
-    theme: {
-      background: '#11161a',
-      foreground: '#c5ced5',
-      cursor: '#11161a',
-      selectionBackground: '#345d55',
-      black: '#11161a',
-      brightBlack: '#65717b',
-      red: '#df6262',
-      brightRed: '#f07878',
-      green: '#42d2a4',
-      brightGreen: '#63dfb6',
-      yellow: '#d6a746',
-      brightYellow: '#e7bc61',
-      blue: '#61aef4',
-      brightBlue: '#7bbdf7',
-      magenta: '#bc8cf2',
-      brightMagenta: '#cda5f5',
-      cyan: '#55c9d8',
-      brightCyan: '#78d7e2',
-      white: '#c5ced5',
-      brightWhite: '#f0f3f5',
-    },
+    theme: xtermTheme(activeTheme.value.appearance),
   })
   fitAddon = new FitAddon()
   terminal.loadAddon(fitAddon)
@@ -176,6 +157,9 @@ async function copyLogs() {
 }
 
 watch(autoRefresh, restartRefreshTimer)
+watch(() => activeTheme.value.appearance, (appearance) => {
+  if (terminal) terminal.options.theme = xtermTheme(appearance)
+})
 watch(lineLimit, () => { void refresh(true) })
 watch(search, async () => {
   await nextTick()
@@ -260,7 +244,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .logs-page {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 .logs-toolbar {
@@ -277,7 +261,7 @@ onBeforeUnmount(() => {
 
 .logs-field > span,
 .logs-auto-refresh > span {
-  color: #8e99a3;
+  color: var(--muted-foreground);
   font-size: 11px;
   font-weight: 500;
 }
@@ -297,9 +281,9 @@ onBeforeUnmount(() => {
 
 .logs-console-shell {
   overflow: hidden;
-  border: 1px solid #30363d;
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: #11161a;
+  background: var(--onekvm-surface-inset);
 }
 
 .logs-console-shell > header {
@@ -309,18 +293,18 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 12px;
   padding: 0 14px;
-  border-bottom: 1px solid #30363d;
-  background: #171c21;
+  border-bottom: 1px solid var(--border);
+  background: var(--onekvm-surface-raised);
 }
 
 .logs-console-shell > header span {
-  color: #dce2e7;
+  color: var(--foreground);
   font-size: 12px;
   font-weight: 600;
 }
 
 .logs-console-shell > header small {
-  color: #78848e;
+  color: var(--muted-foreground);
   font-size: 10px;
 }
 
@@ -342,7 +326,7 @@ onBeforeUnmount(() => {
 }
 
 .logs-terminal :deep(.xterm-viewport) {
-  scrollbar-color: #3b454e #11161a;
+  scrollbar-color: var(--border-strong) var(--onekvm-surface-inset);
   scrollbar-width: thin;
 }
 
@@ -351,7 +335,7 @@ onBeforeUnmount(() => {
   inset: 0;
   display: grid;
   place-items: center;
-  background: #11161a;
+  background: var(--onekvm-surface-inset);
 }
 
 @media (max-width: 820px) {
@@ -369,18 +353,24 @@ onBeforeUnmount(() => {
   }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 760px) {
   .logs-toolbar {
     grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
   }
 
   .logs-limit {
-    width: 120px;
+    width: 100%;
   }
 
   .logs-auto-refresh,
   .logs-actions {
     grid-column: 1;
+  }
+
+  .logs-auto-refresh {
+    min-height: 44px;
+    justify-content: space-between;
   }
 
   .logs-actions {
@@ -389,6 +379,11 @@ onBeforeUnmount(() => {
 
   .logs-actions :deep(.n-button) {
     flex: 1;
+    min-height: 40px;
+  }
+
+  .logs-console {
+    height: clamp(280px, calc(100dvh - 320px), 520px);
   }
 }
 </style>

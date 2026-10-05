@@ -94,42 +94,70 @@ onBeforeUnmount(() => {
         class="sessions-empty"
         :description="t('settings.advancedSettings.sessionsPage.empty', 'No active video streams')"
       />
-      <div v-else class="sessions-table-scroll">
-        <table class="sessions-table">
-          <thead>
-            <tr>
-              <th>{{ t('settings.advancedSettings.sessionsPage.protocol', 'Protocol') }}</th>
-              <th>{{ t('settings.advancedSettings.sessionsPage.method', 'Connection method') }}</th>
-              <th>{{ t('settings.advancedSettings.sessionsPage.client', 'Client IP') }}</th>
-              <th>{{ t('settings.advancedSettings.sessionsPage.user', 'User') }}</th>
-              <th>{{ t('settings.advancedSettings.sessionsPage.codec', 'Codec') }}</th>
-              <th>{{ t('settings.advancedSettings.sessionsPage.duration', 'Connected for') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="session in sessions" :key="session.id">
-              <td>
-                <span class="session-protocol"><i />{{ protocolLabel(session) }}</span>
-              </td>
-              <td>
-                <span class="session-detail">
-                  <MonitorPlay v-if="session.source === 'browser'" :size="16" />
-                  <PlugZap v-else :size="16" />
-                  <span>{{ sourceLabel(session.source) }}<small v-if="session.transport">{{ session.transport }}</small></span>
-                </span>
-              </td>
-              <td>
-                <span class="session-detail"><Globe2 :size="16" /><span>{{ session.client_ip || '-' }}</span></span>
-              </td>
-              <td>
-                <span class="session-detail"><UserRound :size="16" /><span>{{ session.username || '-' }}</span></span>
-              </td>
-              <td><span class="session-codec">{{ session.codec?.toUpperCase() || '-' }}</span></td>
-              <td class="session-duration">{{ formatDuration(session.connected_at) }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <template v-else>
+        <div class="sessions-table-scroll">
+          <table class="sessions-table">
+            <thead>
+              <tr>
+                <th>{{ t('settings.advancedSettings.sessionsPage.protocol', 'Protocol') }}</th>
+                <th>{{ t('settings.advancedSettings.sessionsPage.method', 'Connection method') }}</th>
+                <th>{{ t('settings.advancedSettings.sessionsPage.client', 'Client IP') }}</th>
+                <th>{{ t('settings.advancedSettings.sessionsPage.user', 'User') }}</th>
+                <th>{{ t('settings.advancedSettings.sessionsPage.codec', 'Codec') }}</th>
+                <th>{{ t('settings.advancedSettings.sessionsPage.duration', 'Connected for') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="session in sessions" :key="session.id">
+                <td>
+                  <span class="session-protocol"><i />{{ protocolLabel(session) }}</span>
+                </td>
+                <td>
+                  <span class="session-detail">
+                    <MonitorPlay v-if="session.source === 'browser'" :size="16" />
+                    <PlugZap v-else :size="16" />
+                    <span>{{ sourceLabel(session.source) }}<small v-if="session.transport">{{ session.transport }}</small></span>
+                  </span>
+                </td>
+                <td>
+                  <span class="session-detail"><Globe2 :size="16" /><span>{{ session.client_ip || '-' }}</span></span>
+                </td>
+                <td>
+                  <span class="session-detail"><UserRound :size="16" /><span>{{ session.username || '-' }}</span></span>
+                </td>
+                <td><span class="session-codec">{{ session.codec?.toUpperCase() || '-' }}</span></td>
+                <td class="session-duration">{{ formatDuration(session.connected_at) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ul class="sessions-cards">
+          <li v-for="session in sessions" :key="`card-${session.id}`">
+            <header>
+              <span class="session-protocol"><i />{{ protocolLabel(session) }}</span>
+              <span class="session-codec">{{ session.codec?.toUpperCase() || '-' }}</span>
+            </header>
+            <dl>
+              <div>
+                <dt>{{ t('settings.advancedSettings.sessionsPage.method', 'Connection method') }}</dt>
+                <dd>{{ sourceLabel(session.source) }}<small v-if="session.transport">{{ session.transport }}</small></dd>
+              </div>
+              <div>
+                <dt>{{ t('settings.advancedSettings.sessionsPage.client', 'Client IP') }}</dt>
+                <dd>{{ session.client_ip || '-' }}</dd>
+              </div>
+              <div>
+                <dt>{{ t('settings.advancedSettings.sessionsPage.user', 'User') }}</dt>
+                <dd>{{ session.username || '-' }}</dd>
+              </div>
+              <div>
+                <dt>{{ t('settings.advancedSettings.sessionsPage.duration', 'Connected for') }}</dt>
+                <dd>{{ formatDuration(session.connected_at) }}</dd>
+              </div>
+            </dl>
+          </li>
+        </ul>
+      </template>
     </n-spin>
   </section>
 </template>
@@ -156,7 +184,7 @@ onBeforeUnmount(() => {
 }
 .sessions-table td { padding: 13px 14px; border-top: 1px solid var(--border-color); color: var(--text-color-2); }
 .session-protocol { display: inline-flex; align-items: center; gap: 7px; color: var(--text-color-1); font-weight: 600; white-space: nowrap; }
-.session-protocol i { width: 7px; height: 7px; border-radius: 50%; background: #35c98b; box-shadow: 0 0 0 3px rgba(53, 201, 139, .14); }
+.session-protocol i { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px rgba(53, 201, 139, .14); }
 .session-detail { display: inline-flex; align-items: center; gap: 7px; min-width: 0; white-space: nowrap; }
 .session-detail > svg { flex: 0 0 auto; color: var(--text-color-3); }
 .session-detail > span { display: grid; }
@@ -167,9 +195,31 @@ onBeforeUnmount(() => {
   font-family: inherit; font-size: 12px; font-weight: 600; line-height: 20px; letter-spacing: .025em;
 }
 .session-duration { color: var(--text-color-1) !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sessions-cards { display: none; margin: 0; padding: 0; list-style: none; }
+.sessions-cards > li {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--card-color);
+}
+.sessions-cards > li > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.sessions-cards dl { display: grid; gap: 10px; margin: 0; }
+.sessions-cards dl > div { display: grid; gap: 3px; }
+.sessions-cards dt { color: var(--text-color-3); font-size: 11px; }
+.sessions-cards dd { margin: 0; color: var(--text-color-1); font-size: 13px; overflow-wrap: anywhere; }
+.sessions-cards dd small { margin-left: 6px; color: var(--text-color-3); font-size: 10px; text-transform: uppercase; }
 
-@media (max-width: 720px) {
+@media (max-width: 760px) {
   .session-summary { grid-template-columns: 1fr; }
-  .session-summary > div { padding: 12px 14px; }
+  .session-summary > div { padding: 14px; }
+  .sessions-table-scroll { display: none; }
+  .sessions-cards { display: grid; gap: 12px; }
 }
 </style>

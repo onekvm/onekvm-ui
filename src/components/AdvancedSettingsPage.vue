@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
+import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch, type Component } from 'vue'
 import {
   ArrowLeft,
   Activity,
   Box,
   Boxes,
   Cable,
+  Check,
   ChevronDown,
   CircleUserRound,
+  Cloud,
   Clock3,
   Download,
   ExternalLink,
@@ -21,9 +23,9 @@ import {
   LogOut,
   Cpu,
   HardDrive,
-  MemoryStick,
   MonitorUp,
   Network,
+  Palette,
   Plus,
   RadioTower,
   RefreshCw,
@@ -38,6 +40,10 @@ import {
   icons,
 } from '@lucide/vue'
 import { NIcon, useDialog, useMessage, type DropdownOption } from 'naive-ui'
+
+import { useOneKVMTheme } from '@/theme/runtime'
+import { isCloudHosted } from '@/api/service-url'
+import { oneKVMThemeCSSVariables, type OneKVMAppearancePreference } from '@/theme/model'
 
 import {
   api,
@@ -55,22 +61,42 @@ import {
   type SystemTimeStatus,
   type SystemUpdateSlot,
   type SystemUpdateStatus,
+  type SystemOnlineUpdate,
+  type SystemOnlineUpdateProgress,
+  type SystemUpdateSource,
 } from '@/api/client'
 import { hasPermission } from '@/build'
 import { useAuth } from '@/composables/useAuth'
 import { currentLanguage, languageOptions, setLanguage, t } from '@/i18n/runtime'
-import { isNetworkConfigValid, validHostname } from '@/lib/network'
+import { machineDisplayName } from '@/lib/machine'
+import { brandPluginIconUrl } from '@/lib/plugin-icons'
+import { DEFAULT_DISCOVERY_URL, configuredStaticAddresses, isNetworkConfigDirty, isNetworkConfigValid, networkConfigSnapshot, usesCustomDNS, usesCustomDiscoveryURL, validHostname } from '@/lib/network'
+import {
+  SETTINGS_APP_QUERY,
+  SETTINGS_INDEX,
+  cloudSettingsTarget,
+  settingsSidebarActive,
+  settingsSidebarGroupActive,
+  groupSettingsSections,
+  isSettingsIndex,
+  settingsBackTarget,
+  settingsGroupTone,
+} from '@/lib/settings-nav'
 import { uiProduct } from '@/product'
 
 import ExtensionLayoutPage from './ExtensionLayoutPage.vue'
 import ExtensionServiceRecovery from './ExtensionServiceRecovery.vue'
 import ExtensionVuePage from './ExtensionVuePage.vue'
+import CloudProvidersPage from './CloudProvidersPage.vue'
 import AccountDrawer from './AccountDrawer.vue'
 import DNSSettingsForm from './DNSSettingsForm.vue'
 import ActiveRoutesPanel from './ActiveRoutesPanel.vue'
 import DisplaySettingsForm from './DisplaySettingsForm.vue'
 import HostnameSettingsForm from './HostnameSettingsForm.vue'
+import DiscoverySettingsForm from './DiscoverySettingsForm.vue'
 import NetworkInterfaceManager from './NetworkInterfaceManager.vue'
+import ProxySettingsForm from './ProxySettingsForm.vue'
+import WebRtcIceSettingsForm from './WebRtcIceSettingsForm.vue'
 import ExtensionManager from './ExtensionManager.vue'
 import ResourceMonitorPage from './ResourceMonitorPage.vue'
 import OnlineSessionsPage from './OnlineSessionsPage.vue'
@@ -78,12 +104,17 @@ import LogsPage from './LogsPage.vue'
 import ServicesPage from './ServicesPage.vue'
 import StaticRoutesForm from './StaticRoutesForm.vue'
 import TimezoneMap from './TimezoneMap.vue'
+import SystemUpdateSourceSelector, { type UpdateMethod } from './SystemUpdateSourceSelector.vue'
 import { timezones } from '@/lib/timezones'
 import KeyboardShortcutEditor from './KeyboardShortcutEditor.vue'
 import UserManagement from './UserManagement.vue'
 import USBSettingsForm from './USBSettingsForm.vue'
 import AdvancedSettingsLoading from './AdvancedSettingsLoading.vue'
+import DiagnosticsCollectModal from './DiagnosticsCollectModal.vue'
 import FileManagerPage from './file-manager/FileManagerPage.vue'
+import SettingsAppList from './SettingsAppList.vue'
+import SystemMemorySpec from './SystemMemorySpec.vue'
+import SystemSpecBadge from './SystemSpecBadge.vue'
 
 type Section = string
 type SystemAction = 'factory-reset' | 'reboot' | 'recovery'
@@ -99,6 +130,7 @@ type SidebarSection = {
 
 function sectionFromRoute(route: string): Section {
   const normalized = route.replace(/^\/+|\/+$/g, '')
+  if (!normalized || normalized === SETTINGS_INDEX) return SETTINGS_INDEX
   if (normalized.startsWith('plugins/')) {
     try {
       return `extension:${decodeURIComponent(normalized.slice('plugins/'.length))}`
@@ -106,17 +138,36 @@ function sectionFromRoute(route: string): Section {
       return 'plugins'
     }
   }
+  if (normalized.startsWith('cloud/')) {
+    try {
+      return `extension:${decodeURIComponent(normalized.slice('cloud/'.length))}`
+    } catch {
+      return 'cloud'
+    }
+  }
   if (uiProduct.settingsSections?.some((item) => item.key === normalized)) return normalized
   if (normalized === 'audio') return 'usb'
-  return ['display', 'network', 'keyboard', 'usb', 'plugins', 'services', 'logs', 'resources', 'sessions', 'system', 'files', 'users', 'time', 'update'].includes(normalized) ? normalized : 'system'
+  return ['display', 'network', 'keyboard', 'usb', 'cloud', 'plugins', 'services', 'logs', 'resources', 'sessions', 'system', 'files', 'users', 'time', 'update'].includes(normalized) ? normalized : 'system'
 }
 
 function routeFromSection(value: Section) {
-  if (value.startsWith('extension:')) return `plugins/${encodeURIComponent(value.slice('extension:'.length))}`
+  if (isSettingsIndex(value)) return ''
+  if (value.startsWith('extension:')) {
+    const id = value.slice('extension:'.length)
+    const prefix = extensions.value.find((extension) => extension.id === id)?.kind === 'cloud-provider'
+      ? 'cloud'
+      : 'plugins'
+    return `${prefix}/${encodeURIComponent(id)}`
+  }
   return value
 }
 
-const props = defineProps<{ status: OneKVMStatus | null; route: string }>()
+const props = defineProps<{
+  status: OneKVMStatus | null
+  route: string
+  canChangeVideo: boolean
+  videoSessionId: string
+}>()
 const emit = defineEmits<{ close: []; navigate: [route: string] }>()
 
 const storagePartitions = computed(() =>
@@ -135,6 +186,9 @@ const canManageUsers = computed(() => hasPermission(auth, 'users.manage'))
 const canManageSettings = computed(() => hasPermission(auth, 'settings.manage'))
 const accountOpen = ref(false)
 const section = ref<Section>(sectionFromRoute(props.route))
+const lastDetailSection = ref<Section>(isSettingsIndex(section.value) ? 'system' : section.value)
+const mobileSettings = shallowRef(window.matchMedia(SETTINGS_APP_QUERY).matches)
+let settingsAppQuery: MediaQueryList | null = null
 const config = ref<OneKVMConfig | null>(null)
 const schema = ref<ConfigSchema | null>(null)
 const extensions = ref<ExtensionSummary[]>([])
@@ -159,6 +213,12 @@ const keyboardLayoutOptions = computed(() => [
 	{ value: 'ko', label: t('keyboard.layouts.ko', 'Korean') },
 ])
 const networkEditorsValid = ref(true)
+const automaticDNSServers = ref<string[]>([])
+const savedNetworkSnapshot = shallowRef('')
+const networkDirty = computed(() => {
+  const network = config.value?.network
+  return Boolean(network && isNetworkConfigDirty(network, savedNetworkSnapshot.value))
+})
 const networkApply = ref<NetworkApplyStatus | null>(null)
 const networkApplyExpiresAt = ref(0)
 const networkApplyConnectionLost = ref(false)
@@ -166,6 +226,7 @@ const networkConfirming = ref(false)
 const resetting = ref(false)
 const rebooting = ref(false)
 const enteringRecovery = ref(false)
+const diagnosticsOpen = ref(false)
 const systemAction = ref<SystemAction | null>(null)
 const systemActionStage = ref<SystemActionStage>('submitting')
 const systemActionInitialUptime = ref(0)
@@ -175,6 +236,17 @@ const error = ref('')
 const systemDetailsError = ref('')
 const systemTime = ref<SystemTimeStatus | null>(null)
 const systemUpdate = ref<SystemUpdateStatus | null>(null)
+const systemUpdateUnavailable = ref(false)
+const onlineUpdate = ref<SystemOnlineUpdate | null>(null)
+const updateMethod = shallowRef<UpdateMethod>('github')
+const updateStarted = shallowRef(false)
+const onlineUpdateProgress = ref<SystemOnlineUpdateProgress | null>(null)
+const onlineUpdateError = ref('')
+const onlineUpdateLoading = ref(false)
+const onlineDownloadPercent = computed(() => {
+  const progress = onlineUpdateProgress.value
+  return progress?.total_bytes ? Math.round(progress.bytes / progress.total_bytes * 100) : 0
+})
 const selectedTimezone = ref('UTC')
 const selectedNTP = ref(true)
 const selectedNTPServers = ref<string[]>([])
@@ -197,6 +269,7 @@ let pluginFrameMutationObserver: MutationObserver | null = null
 let pluginFrameAnimationFrame: number | null = null
 let clockTimer: number | null = null
 let updatePollTimer: number | null = null
+let onlineUpdateTimer: number | null = null
 let updatePollSawOperation = false
 let systemActionRun = 0
 let networkApplyPollInFlight = false
@@ -210,7 +283,7 @@ const networkApplySeconds = computed(() => {
 
 const networkApplyMessage = computed(() =>
 	(networkApply.value?.ready === false
-		? t('network.confirm.preparing', 'Preparing the new network address…')
+		? t('network.confirm.preparing', 'Applying network settings…')
 		: t('network.confirm.message', 'Please confirm configuration within {{time}}'))
 		.replace('{{time}}', `${networkApplySeconds.value}s`),
 )
@@ -228,26 +301,22 @@ const networkApplyLinks = computed(() => {
 			url.searchParams.set('network-confirm', networkApply.value.confirm_token)
 		}
 		url.hash = '/settings/advanced/network'
-		return { address, href: url.toString() }
-	})
+		return { address, label: url.origin, href: url.toString() }
+	}).filter((link) => new URL(link.href).origin !== window.location.origin)
 })
 
 function pendingNetworkStatus(): NetworkApplyStatus {
 	const network = config.value?.network
-	const addresses: string[] = []
-	const addStaticAddress = (mode: string, value: string) => {
-		if (mode !== 'static' || !value) return
-		const address = value.trim().split('/')[0]
-		if (address && !addresses.includes(address)) addresses.push(address)
-	}
-	if (network) {
-		addStaticAddress(network.ipv4_mode, network.ipv4_address)
-		addStaticAddress(network.ipv6_mode, network.ipv6_address)
-		for (const networkInterface of network.interfaces || []) {
-			addStaticAddress(networkInterface.ipv4_mode, networkInterface.ipv4_address)
-			addStaticAddress(networkInterface.ipv6_mode, networkInterface.ipv6_address)
-		}
-	}
+	const previous = savedNetworkSnapshot.value ? JSON.parse(savedNetworkSnapshot.value) as typeof network : null
+	const existing = new Set(previous ? configuredStaticAddresses(previous) : [])
+	const endpointChanged = Boolean(previous && network && (
+		previous.tls_enabled !== network.tls_enabled ||
+		previous.http_port !== network.http_port ||
+		previous.https_port !== network.https_port
+	))
+	const addresses = network
+		? configuredStaticAddresses(network).filter((address) => endpointChanged || !existing.has(address))
+		: []
 	return { pending: true, seconds_remaining: 60, new_addresses: addresses, applying: true }
 }
 
@@ -340,12 +409,34 @@ const systemActionDescription = computed(() => {
 let updatePollIdleCount = 0
 
 const dropdownIcon = (component: typeof CircleUserRound) => () => h(NIcon, null, { default: () => h(component) })
+const { appearance, setAppearance } = useOneKVMTheme()
+const themeChoices: { key: OneKVMAppearancePreference; label: () => string }[] = [
+  { key: 'system', label: () => t('settings.appearance.followSystem', 'System') },
+  { key: 'light', label: () => t('settings.appearance.light', 'Light') },
+  { key: 'dark', label: () => t('settings.appearance.dark', 'Dark') },
+]
 const accountOptions = computed<DropdownOption[]>(() => [
+  {
+    key: 'theme',
+    label: t('settings.appearance.theme', 'Theme'),
+    icon: dropdownIcon(Palette),
+    children: themeChoices.map((choice) => ({
+      key: `theme-${choice.key}`,
+      label: choice.label(),
+      icon: appearance.value === choice.key ? dropdownIcon(Check) : undefined,
+    })),
+  },
+  { type: 'divider', key: 'account-theme-divider' },
   { key: 'settings', label: t('settings.account.manage', 'Account settings'), icon: dropdownIcon(CircleUserRound) },
   { key: 'logout', label: t('settings.account.logoutBtn', 'Logout'), icon: dropdownIcon(LogOut) },
 ])
 
 function selectAccount(key: string | number) {
+  const value = String(key)
+  if (value.startsWith('theme-')) {
+    setAppearance(value.slice('theme-'.length))
+    return
+  }
   if (key === 'settings') accountOpen.value = true
   if (key === 'logout') void logout()
 }
@@ -356,16 +447,31 @@ function lucideIcon(name: string | undefined): Component {
   return (icons as Record<string, Component>)[componentName] || Box
 }
 
+const activeCloudProviderPage = computed(() => extensions.value.find(
+  (extension) => extension.installed
+    && extension.enabled
+    && extension.version
+    && extension.has_page
+    && extension.kind === 'cloud-provider',
+) || null)
+
 const sections = computed<SidebarSection[]>(() => {
-  const extensionPages = extensions.value
-    .filter((extension) => extension.installed && extension.enabled && extension.version && extension.has_page)
+  const pluginPages = extensions.value
+    .filter((extension) => extension.installed
+      && extension.enabled
+      && extension.version
+      && extension.has_page
+      && extension.kind !== 'cloud-provider')
     .map((extension): SidebarSection => {
       const icon = extension.icon
       return {
         key: `extension:${extension.id}`,
         label: extensionTranslation(extension, currentLanguage.value).name,
         icon: icon?.source === 'lucide' ? lucideIcon(icon.name) : Box,
-        iconURL: icon?.source === 'custom' ? extensionAssetURL(extension, icon.path) : undefined,
+        iconURL:
+          icon?.source === 'custom' && extension.icon_data_url?.startsWith('data:image/')
+            ? extension.icon_data_url
+            : brandPluginIconUrl(extension.id) || undefined,
         parent: 'plugins',
       }
     })
@@ -376,10 +482,11 @@ const sections = computed<SidebarSection[]>(() => {
       : []),
     { key: 'display', label: t('settings.advancedSettings.display', 'Display'), icon: MonitorUp },
 		{ key: 'keyboard', label: t('settings.advancedSettings.keyboard', 'Keyboard'), icon: Keyboard },
-	{ key: 'usb', label: t('settings.advancedSettings.usb', 'USB'), icon: Usb },
+		{ key: 'usb', label: t('settings.advancedSettings.usb', 'USB'), icon: Usb },
     { key: 'network', label: t('settings.advancedSettings.network', 'Network'), icon: Network },
+    { key: 'cloud', label: t('settings.advancedSettings.cloudProviders', 'Cloud services'), icon: Cloud },
     { key: 'plugins', label: t('settings.advancedSettings.plugins', 'Plugins'), icon: Box },
-    ...extensionPages,
+    ...pluginPages,
     { key: 'services', label: t('settings.advancedSettings.services', 'Services'), icon: ListRestart },
     { key: 'logs', label: t('settings.advancedSettings.logs', 'Logs'), icon: ScrollText },
     { key: 'resources', label: t('settings.advancedSettings.resources', 'Resource monitor'), icon: Activity },
@@ -401,20 +508,77 @@ const sections = computed<SidebarSection[]>(() => {
 })
 
 const visibleSections = computed(() => sections.value.filter((item) => !item.parent || pluginsExpanded.value))
-const extensionSectionActive = computed(() => section.value.startsWith('extension:'))
+const paneSection = computed(() => (isSettingsIndex(section.value) ? lastDetailSection.value : section.value))
+const mobileDetail = computed(() => mobileSettings.value && !isSettingsIndex(section.value))
+const activeExtensionParent = computed(() => {
+  const sidebarParent = sections.value.find((item) => item.key === paneSection.value)?.parent
+  if (sidebarParent) return sidebarParent
+  if (!paneSection.value.startsWith('extension:')) return undefined
+  const id = paneSection.value.slice('extension:'.length)
+  return extensions.value.find((extension) => extension.id === id)?.kind === 'cloud-provider'
+    ? 'cloud'
+    : undefined
+})
+const settingsPageClass = computed(() => ({
+  'is-settings-app': mobileSettings.value,
+  'is-settings-index': mobileSettings.value && isSettingsIndex(section.value),
+  'is-settings-detail': mobileDetail.value,
+}))
 
 function sidebarItemLoading(item: SidebarSection) {
-  if (item.key === 'plugins') return extensionsLoading.value
-  return item.key === section.value && item.parent === 'plugins' && extensionLoading.value
+  if (item.key === 'cloud' || item.key === 'plugins') return extensionsLoading.value
+  return item.key === paneSection.value && Boolean(item.parent) && extensionLoading.value
 }
 
-const activeTitle = computed(() => sections.value.find((item) => item.key === section.value)?.label || '')
+const activeTitle = computed(() => {
+  const sidebarTitle = sections.value.find((item) => item.key === paneSection.value)?.label
+  if (sidebarTitle) return sidebarTitle
+  if (!paneSection.value.startsWith('extension:')) return ''
+  const id = paneSection.value.slice('extension:'.length)
+  const extension = extensions.value.find((item) => item.id === id)
+  return extension ? extensionTranslation(extension, currentLanguage.value).name : ''
+})
+const settingsBackLabel = computed(() => {
+  if (!mobileDetail.value) return t('settings.advancedSettings.console', 'Console')
+  const current = sections.value.find((item) => item.key === section.value)
+  const target = settingsBackTarget(section.value, current?.parent)
+  if (target === 'cloud' || target === 'plugins') {
+    return sections.value.find((item) => item.key === target)?.label
+      || (target === 'cloud'
+        ? t('settings.advancedSettings.cloudProviders', 'Cloud services')
+        : t('settings.advancedSettings.plugins', 'Plugins'))
+  }
+  return t('settings.advancedSettings.title', 'Advanced settings')
+})
+const settingsHeaderTitle = computed(() =>
+  mobileDetail.value ? activeTitle.value : t('settings.advancedSettings.title', 'Advanced settings'),
+)
+const settingsListGroups = computed(() => {
+  const labels: Record<string, string> = {
+    device: t('settings.advancedSettings.groups.device', 'Device'),
+    network: t('settings.advancedSettings.groups.network', 'Network'),
+    extensions: t('settings.advancedSettings.groups.extensions', 'Extensions'),
+    admin: t('settings.advancedSettings.groups.administration', 'Administration'),
+  }
+  return groupSettingsSections(sections.value).map((group) => ({
+    id: group.id,
+    label: labels[group.id] || '',
+    items: group.items.map((item) => ({
+      key: item.key,
+      label: item.label,
+      icon: item.icon,
+      iconURL: item.iconURL,
+      tone: settingsGroupTone(group.id),
+      loading: sidebarItemLoading(item),
+    })),
+  }))
+})
 const activeProductSection = computed(() =>
-  sections.value.find((item) => item.key === section.value && item.component),
+  sections.value.find((item) => item.key === paneSection.value && item.component),
 )
 const activeExtensionSummary = computed(() => {
-  if (!section.value.startsWith('extension:')) return null
-  const id = section.value.slice('extension:'.length)
+  if (!paneSection.value.startsWith('extension:')) return null
+  const id = paneSection.value.slice('extension:'.length)
   return extensions.value.find((extension) => extension.id === id && extension.enabled && extension.has_page) || null
 })
 const activeExtension = computed(() => {
@@ -432,13 +596,12 @@ const activeExtensionStandaloneURL = computed(() => {
   const fileRoute = extension.routes?.find((route) => route.backend === 'file' && route.path === '')
   return fileRoute ? extensionRouteURL(extension, fileRoute) : activeExtensionURL.value
 })
-const deviceVariant = computed(() => {
-  const machine = props.status?.machine === 'nanokvm' ? 'NanoKVM' : props.status?.machine || '-'
-  if (!props.status?.variant) return machine
-  const normalized = props.status.variant.toLowerCase()
-  const variant = normalized === 'pcie' ? 'PCIe' : normalized === 'cube' ? 'Cube' : props.status.variant
-  return `${machine} ${variant}`
-})
+const deviceVariant = computed(() => machineDisplayName({
+  vendor: props.status?.vendor || schema.value?.vendor,
+  name: props.status?.name || schema.value?.name,
+  machine: props.status?.machine || schema.value?.machine,
+  variant: props.status?.variant || schema.value?.variant,
+}))
 const routeInterfaceNames = computed(() => {
 	if (!config.value) return []
 	return [
@@ -507,16 +670,12 @@ function formatStorageCapacity(bytes: number) {
 
 function formatStorageBytes(bytes: number) {
   if (!Number.isFinite(bytes) || bytes < 0) return '-'
-  if (bytes >= 1_000_000_000) {
-    const value = bytes / 1_000_000_000
-    return `${value.toFixed(value >= 10 ? 1 : 2)} GB`
-  }
-  if (bytes >= 1_000_000) {
-    const value = bytes / 1_000_000
-    return `${value.toFixed(value >= 10 ? 0 : 1)} MB`
-  }
-  if (bytes >= 1_000) return `${(bytes / 1_000).toFixed(0)} kB`
-  return `${bytes} B`
+  if (bytes < 1024) return `${bytes} B`
+  const units = ['KiB', 'MiB', 'GiB', 'TiB']
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)) - 1, units.length - 1)
+  const value = bytes / 1024 ** (index + 1)
+  const digits = value >= 100 ? 0 : value >= 10 ? 1 : 2
+  return `${Number(value.toFixed(digits))} ${units[index]}`
 }
 
 function partitionUsedPercent(partition: StoragePartitionStatus) {
@@ -554,6 +713,8 @@ function connectionLabel(connected: boolean, available = true) {
 
 function updateOperationLabel(operation: string) {
   if (operation === 'idle') {
+    if (onlineUpdateProgress.value?.phase === 'downloading') return t('settings.advancedSettings.systemPage.updateDownloading', '正在下载升级包')
+    if (onlineUpdateProgress.value?.phase === 'installing' || updateInstalling.value) return t('settings.advancedSettings.systemPage.updateInstalling', 'Installing')
     return updateFile.value
       ? t('settings.advancedSettings.systemPage.bundleReady', 'Bundle selected')
       : t('settings.advancedSettings.systemPage.updateIdle', 'Waiting for bundle')
@@ -561,10 +722,18 @@ function updateOperationLabel(operation: string) {
   return t('settings.advancedSettings.systemPage.updateInstalling', 'Installing')
 }
 
+function onlineUpdateLabel(update: SystemOnlineUpdate) {
+  if (update.available) return t('settings.advancedSettings.systemPage.onlineAvailable', 'A new system update is available')
+  if (update.reason === 'source_not_configured') return t('settings.advancedSettings.systemPage.onlineNoSource', 'No online update source is configured for this model')
+  if (update.reason === 'bundle_missing') return t('settings.advancedSettings.systemPage.onlineNoBundle', 'The latest release has no compatible .fwup update bundle')
+  return t('settings.advancedSettings.systemPage.onlineUpToDate', 'No newer system update is available')
+}
+
 async function loadSystemDetails() {
   if (section.value !== 'time' && section.value !== 'update') return
   systemDetailsLoading.value = true
   systemDetailsError.value = ''
+  systemUpdateUnavailable.value = false
   try {
     if (section.value === 'time') {
       const value = await api.getSystemTime()
@@ -575,9 +744,15 @@ async function loadSystemDetails() {
       selectedDeviceLanguage.value = value.language
     } else {
       systemUpdate.value = await api.getSystemUpdate()
+      void loadOnlineUpdate()
     }
   } catch (reason) {
-    systemDetailsError.value = reason instanceof Error ? reason.message : String(reason)
+    if (section.value === 'update' && reason instanceof APIError && reason.status === 503) {
+      systemUpdate.value = null
+      systemUpdateUnavailable.value = true
+    } else {
+      systemDetailsError.value = reason instanceof Error ? reason.message : String(reason)
+    }
   } finally {
     systemDetailsLoading.value = false
   }
@@ -671,6 +846,94 @@ function stopUpdatePolling() {
   updatePollTimer = null
 }
 
+async function loadOnlineUpdate() {
+  onlineUpdateLoading.value = true
+  onlineUpdateError.value = ''
+  try {
+    onlineUpdate.value = await api.getSystemOnlineUpdate()
+  } catch (reason) {
+    onlineUpdate.value = null
+    onlineUpdateError.value = reason instanceof Error ? reason.message : String(reason)
+  } finally {
+    onlineUpdateLoading.value = false
+  }
+}
+
+function stopOnlineUpdatePolling() {
+  if (onlineUpdateTimer !== null) window.clearTimeout(onlineUpdateTimer)
+  onlineUpdateTimer = null
+}
+
+async function pollOnlineUpdate() {
+  stopOnlineUpdatePolling()
+  try {
+    const progress = await api.getSystemOnlineUpdateProgress()
+    onlineUpdateProgress.value = progress
+    if (progress.phase === 'error') {
+      updateInstalling.value = false
+      onlineUpdateError.value = progress.error
+      return
+    }
+    if (progress.phase === 'installing') {
+      updatePollSawOperation = false
+      updatePollIdleCount = 0
+      await pollSystemUpdate()
+      return
+    }
+  } catch (reason) {
+    updateInstalling.value = false
+    onlineUpdateError.value = reason instanceof Error ? reason.message : String(reason)
+    return
+  }
+  onlineUpdateTimer = window.setTimeout(pollOnlineUpdate, 1000)
+}
+
+function confirmOnlineUpdate() {
+  if (onlineUpdateLoading.value || updateInstalling.value || systemUpdate.value?.operation !== 'idle' || !onlineUpdate.value?.available) return
+  dialog.warning({
+    title: t('settings.advancedSettings.systemPage.installUpdate', 'Install system update'),
+    content: t('settings.advancedSettings.systemPage.onlineUpdateConfirm', 'Download the signed update from the official release and install it to the inactive slot?'),
+    positiveText: t('settings.advancedSettings.systemPage.install', 'Install'),
+    negativeText: t('common.cancel', 'Cancel'),
+    onPositiveClick: async () => {
+      updateInstalling.value = true
+      onlineUpdateError.value = ''
+      onlineUpdateProgress.value = null
+      try {
+        await api.startSystemOnlineUpdate()
+        updateStarted.value = true
+        await pollOnlineUpdate()
+      } catch (reason) {
+        updateInstalling.value = false
+        onlineUpdateError.value = reason instanceof Error ? reason.message : String(reason)
+      }
+    },
+  })
+}
+
+function confirmSourceUpdate(source: SystemUpdateSource) {
+  if (updateInstalling.value || systemUpdate.value?.operation !== 'idle') return
+  dialog.warning({
+    title: t('settings.advancedSettings.systemPage.installUpdate', '安装系统升级'),
+    content: t('settings.advancedSettings.systemPage.installUpdateConfirm', '将所选来源的已签名升级包安装到非活动分区？'),
+    positiveText: t('settings.advancedSettings.systemPage.install', '安装'),
+    negativeText: t('common.cancel', '取消'),
+    onPositiveClick: async () => {
+      updateInstalling.value = true
+      onlineUpdateError.value = ''
+      onlineUpdateProgress.value = null
+      try {
+        await api.startSystemUpdateSource(source)
+        updateStarted.value = true
+        await pollOnlineUpdate()
+      } catch (reason) {
+        updateInstalling.value = false
+        onlineUpdateError.value = reason instanceof Error ? reason.message : String(reason)
+      }
+    },
+  })
+}
+
 async function pollSystemUpdate() {
   stopUpdatePolling()
   try {
@@ -710,6 +973,7 @@ function confirmSystemUpdate() {
       updatePollIdleCount = 0
       try {
         await api.installSystemUpdate(updateFile.value)
+        updateStarted.value = true
         await pollSystemUpdate()
       } catch (reason) {
         updateInstalling.value = false
@@ -723,16 +987,26 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [loadedConfig, loadedSchema] = await Promise.all([
+    const [loadedConfig, loadedSchema, dnsStatus] = await Promise.all([
       api.getConfig(),
       api.getConfigSchema(),
+      api.getNetworkDNS().catch(() => null),
     ])
 		loadedConfig.network.dns ||= []
+		automaticDNSServers.value = dnsStatus?.automatic_servers || []
 		loadedConfig.network.static_routes ||= []
 		loadedConfig.network.mac_address ||= ''
+		loadedConfig.network.wireguard ||= []
+		loadedConfig.network.interfaces ||= []
+		loadedConfig.network.vpn ||= []
+		loadedConfig.network.discovery_url ??= DEFAULT_DISCOVERY_URL
+		loadedConfig.network.discovery_enabled ??= true
+		loadedConfig.network.use_custom_discovery_url ??= usesCustomDiscoveryURL(loadedConfig.network)
 		loadedConfig.keyboard ||= { layout: 'us', shortcuts: [] }
 		loadedConfig.keyboard.layout ||= 'us'
     loadedConfig.keyboard.shortcuts ||= []
+    loadedConfig.system ||= { language: 'en' }
+    loadedConfig.system.zram_size_mb ??= 16
     loadedConfig.video.frame_detect ??= false
     loadedConfig.video.bitrate_kbps ??= 0
     loadedConfig.video.initial_qp ??= 0
@@ -741,6 +1015,7 @@ async function load() {
     networkEditorsValid.value = true
     config.value = loadedConfig
     schema.value = loadedSchema
+    savedNetworkSnapshot.value = networkConfigSnapshot(loadedConfig.network)
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : String(reason)
   } finally {
@@ -761,6 +1036,12 @@ async function loadExtensions() {
   }
 }
 
+function onExtensionsChanged() {
+  void api.getExtensions().then(updateExtensions).catch((reason) => {
+    extensionError.value = reason instanceof Error ? reason.message : String(reason)
+  })
+}
+
 function stopPluginFrameObserver() {
   pluginFrameObserver?.disconnect()
   pluginFrameObserver = null
@@ -772,6 +1053,25 @@ function stopPluginFrameObserver() {
 
 function pluginFrameCap() {
   return Math.max(240, Math.round(Math.min(720, window.innerHeight - 150)))
+}
+
+function applyPluginFrameTheme() {
+  try {
+    const frameDocument = pluginFrame.value?.contentDocument
+    if (!frameDocument?.documentElement) return
+    const hostRoot = document.documentElement
+    const appearance = hostRoot.dataset.theme || 'dark'
+    const source = getComputedStyle(hostRoot)
+    const target = frameDocument.documentElement
+    target.dataset.theme = appearance
+    target.style.colorScheme = appearance
+    for (const variable of Object.values(oneKVMThemeCSSVariables)) {
+      const value = source.getPropertyValue(variable).trim()
+      if (value) target.style.setProperty(variable, value)
+    }
+  } catch {
+    // Sandboxed or cross-origin plugin frames cannot be themed from the host.
+  }
 }
 
 function syncPluginFrameHeight() {
@@ -819,6 +1119,7 @@ function observePluginFrame() {
       childList: true,
       subtree: true,
     })
+    applyPluginFrameTheme()
     schedulePluginFrameHeight()
     void document.fonts?.ready.then(schedulePluginFrameHeight)
   } catch {
@@ -869,12 +1170,54 @@ async function loadExtensionDetail(summary: ExtensionSummary | null, force = fal
 }
 
 function selectSidebar(item: SidebarSection) {
+  const targetKey = item.key === 'cloud'
+    ? cloudSettingsTarget(activeCloudProviderPage.value?.id)
+    : item.key
   if (item.key === 'plugins') {
-    if (section.value === 'plugins') pluginsExpanded.value = !pluginsExpanded.value
+    if (paneSection.value === 'plugins') pluginsExpanded.value = !pluginsExpanded.value
     else pluginsExpanded.value = true
   }
-  section.value = item.key
-  emit('navigate', routeFromSection(item.key))
+  lastDetailSection.value = targetKey
+  section.value = targetKey
+  emit('navigate', routeFromSection(targetKey))
+}
+
+function selectSettingsItem(key: string) {
+  const targetKey = key === 'cloud'
+    ? cloudSettingsTarget(activeCloudProviderPage.value?.id)
+    : key
+  const item = sections.value.find((entry) => entry.key === targetKey)
+  const extension = targetKey.startsWith('extension:')
+    ? extensions.value.find((entry) => `extension:${entry.id}` === targetKey && entry.enabled && entry.has_page)
+    : null
+  if (!item && !extension) return
+  if (item?.parent === 'plugins') pluginsExpanded.value = true
+  lastDetailSection.value = targetKey
+  section.value = targetKey
+  emit('navigate', routeFromSection(targetKey))
+}
+
+function openCloudProvider(id: string) {
+  selectSettingsItem(`extension:${id}`)
+}
+
+function manageCloudProvider() {
+  selectSettingsItem('plugins')
+}
+
+function onSettingsBack() {
+  if (!mobileSettings.value) {
+    emit('close')
+    return
+  }
+  const current = sections.value.find((item) => item.key === section.value)
+  const target = settingsBackTarget(section.value, current?.parent)
+  if (!target) {
+    emit('close')
+    return
+  }
+  section.value = target
+  emit('navigate', routeFromSection(target))
 }
 
 function navigateFromService(route: string) {
@@ -896,16 +1239,20 @@ async function save() {
   if (!config.value) return
   saving.value = true
   try {
-		const response = await api.saveConfig(config.value)
+		const response = await api.saveConfig(config.value, props.videoSessionId)
 		if (response.network_apply?.pending) {
 			setNetworkApplyStatus(response.network_apply)
 		} else {
 			message.success(t('settings.success', 'Settings saved'))
 		}
+		savedNetworkSnapshot.value = networkConfigSnapshot(config.value.network)
 	} catch (reason) {
 		if (section.value === 'network' && !(reason instanceof APIError)) {
-			setNetworkApplyStatus(pendingNetworkStatus(), true)
-			message.warning(t('network.confirm.connectionLost', 'The network connection was interrupted. Open the new address and confirm within 60 seconds; otherwise the old configuration will return automatically.'))
+			const status = pendingNetworkStatus()
+			setNetworkApplyStatus(status, true)
+			message.warning(status.new_addresses?.length
+				? t('network.confirm.connectionLost', 'The connection was interrupted. Open the device at its new address and confirm within 60 seconds; otherwise the old configuration will return automatically.')
+				: t('network.confirm.connectionLostNoNewAddress', 'The connection was interrupted. Reconnect to the device and confirm within 60 seconds; otherwise the old configuration will return automatically.'))
 		} else {
 			message.error(reason instanceof Error ? reason.message : String(reason))
 		}
@@ -1154,7 +1501,16 @@ function confirmEnterRecovery() {
   })
 }
 
+function syncSettingsAppLayout(event?: MediaQueryListEvent) {
+  mobileSettings.value = event?.matches ?? Boolean(settingsAppQuery?.matches)
+}
+
 onMounted(() => {
+  window.addEventListener('onekvm:extensions-changed', onExtensionsChanged)
+  window.addEventListener('onekvm-themechange', applyPluginFrameTheme)
+  settingsAppQuery = window.matchMedia(SETTINGS_APP_QUERY)
+  mobileSettings.value = settingsAppQuery.matches
+  settingsAppQuery.addEventListener('change', syncSettingsAppLayout)
   void load()
   void loadExtensions()
 	void refreshNetworkApplyStatus()
@@ -1168,46 +1524,80 @@ onMounted(() => {
 	}, 1000)
 })
 onBeforeUnmount(() => {
+  window.removeEventListener('onekvm:extensions-changed', onExtensionsChanged)
+  window.removeEventListener('onekvm-themechange', applyPluginFrameTheme)
+  settingsAppQuery?.removeEventListener('change', syncSettingsAppLayout)
+  settingsAppQuery = null
   systemActionRun += 1
   stopPluginFrameObserver()
   stopUpdatePolling()
+  stopOnlineUpdatePolling()
   if (clockTimer !== null) window.clearInterval(clockTimer)
 })
 
 watch([sections, section, () => auth.loading], ([available]) => {
   if (auth.loading) return
+  if (isSettingsIndex(section.value)) return
   if (!extensionsLoaded.value && section.value.startsWith('extension:')) return
+  if (section.value.startsWith('extension:') && activeExtensionSummary.value) return
   if (!available.some(({ key }) => key === section.value)) {
-    emit('navigate', section.value === 'users' ? 'system' : 'plugins')
+    const fallback = section.value === 'users'
+      ? 'system'
+      : props.route.replace(/^\/+/, '').startsWith('cloud/') ? 'cloud' : 'plugins'
+    emit('navigate', fallback)
   }
 })
-watch(() => props.route, (route) => { section.value = sectionFromRoute(route) })
+watch(() => props.route, (route) => {
+  section.value = sectionFromRoute(route)
+  if (!isSettingsIndex(section.value)) lastDetailSection.value = section.value
+})
+watch(section, (value) => {
+  if (!isSettingsIndex(value)) lastDetailSection.value = value
+})
 watch(activeExtensionSummary, (extension, previous) => {
   void loadExtensionDetail(extension, Boolean(extension && extension.id !== previous?.id))
 }, { immediate: true })
-watch([section, visibleSections], revealActiveSidebarItem, { flush: 'post', immediate: true })
+watch(mobileSettings, (mobile) => {
+  if (mobile || !isSettingsIndex(section.value)) return
+  const fallback = lastDetailSection.value
+  section.value = fallback
+  emit('navigate', routeFromSection(fallback))
+})
+watch([section, visibleSections], () => {
+  if (mobileSettings.value) return
+  void revealActiveSidebarItem()
+}, { flush: 'post', immediate: true })
 watch(activeExtensionURL, () => {
   stopPluginFrameObserver()
   pluginFrameHeight.value = null
 })
-watch(section, (value) => {
+watch(paneSection, (value) => {
   if (value === 'time' || value === 'update') void loadSystemDetails()
-  else stopUpdatePolling()
+  else {
+    stopUpdatePolling()
+    stopOnlineUpdatePolling()
+  }
 }, { immediate: true })
 </script>
 
 <template>
   <div class="advanced-settings-root">
-  <section class="advanced-settings-page">
+  <section class="advanced-settings-page" :class="settingsPageClass">
     <header class="advanced-settings-header">
-      <n-button quaternary size="small" class="advanced-settings-back" :aria-label="t('settings.advancedSettings.back', 'Back')" @click="emit('close')">
+      <n-button
+        quaternary
+        size="small"
+        class="advanced-settings-back"
+        :aria-label="settingsBackLabel"
+        @click="onSettingsBack"
+      >
         <template #icon><ArrowLeft /></template>
-        {{ t('settings.advancedSettings.console', 'Console') }}
+        {{ settingsBackLabel }}
       </n-button>
-      <img class="brand-mark" src="/brand/onekvm-app-icon.svg" alt="OneKVM" />
-      <div class="advanced-settings-heading">
-        <strong>{{ t('settings.advancedSettings.title', 'Advanced settings') }}</strong>
-        <span class="advanced-settings-device">{{ deviceVariant }}</span>
+      <img v-if="!mobileSettings" class="brand-mark" src="/brand/onekvm-app-icon.svg" alt="OneKVM" />
+      <div v-if="!mobileSettings || mobileDetail" class="advanced-settings-heading">
+        <strong>{{ settingsHeaderTitle }}</strong>
+        <span v-if="!mobileDetail" class="advanced-settings-device">{{ deviceVariant }}</span>
       </div>
       <div class="advanced-settings-account">
         <n-dropdown trigger="click" placement="bottom-end" :options="accountOptions" @select="selectAccount">
@@ -1220,7 +1610,7 @@ watch(section, (value) => {
                 :aria-label="t('settings.account.title', 'Account')"
               >
                 <template #icon><CircleUserRound /></template>
-                <span class="button-label account-name">{{ auth.username }}</span>
+                <span class="button-label account-name">{{ isCloudHosted() ? t('auth.cloudIdentity', 'Cloud account') : auth.username }}</span>
               </n-button>
             </template>
             {{ t('settings.account.title', 'Account') }}
@@ -1237,9 +1627,9 @@ watch(section, (value) => {
             :key="item.key"
             type="button"
             :class="{
-              active: section === item.key,
-              'group-active': item.key === 'plugins' && extensionSectionActive,
-              'plugin-child': item.parent === 'plugins',
+              active: settingsSidebarActive(item.key, section, activeExtensionParent),
+              'group-active': settingsSidebarGroupActive(item.key, section, activeExtensionParent),
+              'plugin-child': Boolean(item.parent),
             }"
             :aria-busy="sidebarItemLoading(item)"
             :aria-expanded="item.key === 'plugins' ? pluginsExpanded : undefined"
@@ -1249,14 +1639,28 @@ watch(section, (value) => {
             <img v-else-if="item.iconURL" class="sidebar-custom-icon" :src="item.iconURL" alt="" />
             <component v-else :is="item.icon" :size="17" />
             <span>{{ item.label }}</span>
-            <ChevronDown v-if="item.key === 'plugins'" class="sidebar-group-chevron" :class="{ collapsed: !pluginsExpanded }" :size="14" />
+            <ChevronDown
+              v-if="item.key === 'plugins'"
+              class="sidebar-group-chevron"
+              :class="{ collapsed: !pluginsExpanded }"
+              :size="14"
+            />
           </button>
         </nav>
       </aside>
 
-      <main class="advanced-settings-main">
+      <div class="advanced-settings-panes">
+        <div v-if="mobileSettings" class="advanced-settings-index-pane">
+          <SettingsAppList
+            :title="t('settings.advancedSettings.title', 'Advanced settings')"
+            :subtitle="deviceVariant"
+            :groups="settingsListGroups"
+            @select="selectSettingsItem"
+          />
+        </div>
+        <main class="advanced-settings-main">
         <Transition name="advanced-section" mode="out-in">
-          <div :key="section" class="advanced-settings-view">
+          <div :key="paneSection" class="advanced-settings-view">
             <header class="advanced-settings-section-header">
               <h1>{{ activeTitle }}</h1>
               <n-button
@@ -1275,24 +1679,27 @@ watch(section, (value) => {
 
             <n-alert v-if="error || extensionError || systemDetailsError" type="error" :bordered="false">{{ error || extensionError || systemDetailsError }}</n-alert>
             <n-spin class="advanced-settings-content" :show="loading || systemDetailsLoading">
-              <section v-if="section === 'display' && config" class="advanced-settings-section">
+              <section v-if="paneSection === 'display' && config" class="advanced-settings-section">
+                <n-alert v-if="!canChangeVideo" type="info" :bordered="false">
+                  {{ t('settings.advancedSettings.displaySecondary', 'Video settings are controlled by the primary WebRTC client. This client shares its stream.') }}
+                </n-alert>
                 <DisplaySettingsForm
                   v-model="config.video"
-                  :disabled="saving"
+                  :disabled="saving || !canChangeVideo"
                   :read-only="schema?.read_only"
                   :video-codecs="schema?.video_codecs"
                   :video-bitrate-range="schema?.video_bitrate_kbps"
                 />
                 <footer class="advanced-settings-actions">
                   <n-button @click="load">{{ t('common.refresh', 'Reload') }}</n-button>
-                  <n-button type="primary" :loading="saving" @click="save">
+                  <n-button type="primary" :loading="saving" :disabled="!canChangeVideo" @click="save">
                     <template #icon><Save /></template>
                     {{ t('common.save', 'Save') }}
                   </n-button>
                 </footer>
               </section>
 
-              <section v-else-if="section === 'keyboard' && config" class="advanced-settings-section">
+              <section v-else-if="paneSection === 'keyboard' && config" class="advanced-settings-section">
 				<div class="system-control-list keyboard-layout-setting">
 					<div>
 						<dt>{{ t('keyboard.layout', 'Keyboard layout') }}</dt>
@@ -1325,7 +1732,7 @@ watch(section, (value) => {
                 </footer>
               </section>
 
-              <section v-else-if="section === 'usb' && config" class="advanced-settings-section">
+              <section v-else-if="paneSection === 'usb' && config" class="advanced-settings-section">
                 <USBSettingsForm
                   v-model="config.usb"
                   v-model:audio="config.audio"
@@ -1342,18 +1749,50 @@ watch(section, (value) => {
                 </footer>
               </section>
 
-              <section v-else-if="section === 'network' && config" class="advanced-settings-section">
-                <NetworkInterfaceManager v-model="config.network" :disabled="saving" @validity="networkEditorsValid = $event" />
+              <section v-else-if="paneSection === 'network' && config" class="advanced-settings-section">
+                <NetworkInterfaceManager
+                  v-model="config.network"
+                  :disabled="saving"
+                  :wireguard-available="schema?.capabilities?.wireguard !== false"
+                  :ip-tunnels-available="schema?.capabilities?.ip_tunnels !== false"
+                  :openvpn-available="schema?.capabilities?.openvpn !== false"
+                  :pppoe-available="schema?.capabilities?.pppoe !== false"
+                  :pptp-available="schema?.capabilities?.pptp !== false"
+                  :l2tp-available="schema?.capabilities?.l2tp !== false"
+                  :wifi-available="status?.network?.wifi_available === true"
+                  @validity="networkEditorsValid = $event"
+                />
 				<HostnameSettingsForm
 				  v-model="config.network.hostname"
 				  :mdns="config.network.mdns"
 				  :disabled="saving"
 				  @update:mdns="config.network.mdns = $event"
 				/>
+				<DiscoverySettingsForm
+				  v-model="config.network.discovery_url"
+				  :enabled="config.network.discovery_enabled"
+				  :use-custom-url="config.network.use_custom_discovery_url"
+				  :disabled="saving"
+				  @update:enabled="config.network.discovery_enabled = $event"
+				  @update:use-custom-url="config.network.use_custom_discovery_url = $event"
+				/>
+				<ProxySettingsForm
+				  :model-value="config.network.proxy"
+				  :disabled="saving"
+				  @update:model-value="config.network.proxy = $event"
+				/>
+				<WebRtcIceSettingsForm
+				  :model-value="config.network.webrtc"
+				  :disabled="saving"
+				  @update:model-value="config.network.webrtc = $event"
+				/>
 				<DNSSettingsForm
 				  v-model="config.network.dns"
+				  :custom-dns-enabled="usesCustomDNS(config.network)"
+				  :automatic-servers="automaticDNSServers"
 				  :dnssec="config.network.dnssec"
 				  :disabled="saving"
+				  @update:custom-dns-enabled="config.network.use_custom_dns = $event"
 				  @update:dnssec="config.network.dnssec = $event"
 				/>
 				<ActiveRoutesPanel />
@@ -1367,7 +1806,7 @@ watch(section, (value) => {
                   <n-button
                     type="primary"
                     :loading="saving"
-                    :disabled="!networkEditorsValid || !validHostname(config.network.hostname) || !isNetworkConfigValid(config.network)"
+                    :disabled="!networkDirty || !networkEditorsValid || !validHostname(config.network.hostname) || !isNetworkConfigValid(config.network)"
                     @click="save"
                   >
                     <template #icon><Save /></template>
@@ -1376,9 +1815,20 @@ watch(section, (value) => {
                 </footer>
               </section>
 
-              <section v-else-if="section === 'plugins'" class="advanced-settings-section">
+              <section v-else-if="paneSection === 'cloud'" class="advanced-settings-section">
+                <CloudProvidersPage
+                  :catalog="extensions"
+                  :loading="extensionsLoading"
+                  @catalog="updateExtensions"
+                  @open="openCloudProvider"
+                  @manage="manageCloudProvider"
+                  @open-plugins="manageCloudProvider"
+                />
+              </section>
+
+              <section v-else-if="paneSection === 'plugins'" class="advanced-settings-section">
                 <ExtensionManager
-                  :active="section === 'plugins'"
+                  :active="paneSection === 'plugins'"
                   :catalog="extensions"
                   :catalog-loading="extensionsLoading"
                   @catalog="updateExtensions"
@@ -1409,27 +1859,27 @@ watch(section, (value) => {
                 />
               </section>
 
-              <section v-else-if="section === 'resources'" class="advanced-settings-section">
+              <section v-else-if="paneSection === 'resources'" class="advanced-settings-section">
                 <ResourceMonitorPage :extensions="extensions" />
               </section>
 
-              <section v-else-if="section === 'sessions'" class="advanced-settings-section">
+              <section v-else-if="paneSection === 'sessions'" class="advanced-settings-section">
                 <OnlineSessionsPage />
               </section>
 
-              <section v-else-if="section === 'services'" class="advanced-settings-section">
+              <section v-else-if="paneSection === 'services'" class="advanced-settings-section">
                 <ServicesPage :extensions="extensions" @navigate="navigateFromService" />
               </section>
 
-              <section v-else-if="section === 'logs'" class="advanced-settings-section">
+              <section v-else-if="paneSection === 'logs'" class="advanced-settings-section">
                 <LogsPage />
               </section>
 
-              <section v-else-if="section === 'files' && canManageSettings" class="advanced-settings-section">
+              <section v-else-if="paneSection === 'files' && canManageSettings" class="advanced-settings-section">
                 <FileManagerPage />
               </section>
 
-              <section v-else-if="section === 'users' && canManageUsers" class="advanced-settings-section">
+              <section v-else-if="paneSection === 'users' && canManageUsers" class="advanced-settings-section">
                 <UserManagement
                   :auth="auth"
                   :current-username="auth.username"
@@ -1441,7 +1891,7 @@ watch(section, (value) => {
                 <component :is="activeProductSection.component" />
               </section>
 
-              <section v-else-if="section === 'system'" class="advanced-settings-section">
+              <section v-else-if="paneSection === 'system'" class="advanced-settings-section">
                 <template v-if="status">
                   <header class="system-device-overview">
                     <div class="system-device-icon"><ServerCog :size="30" /></div>
@@ -1458,17 +1908,36 @@ watch(section, (value) => {
                     <h2>{{ t('settings.advancedSettings.systemPage.deviceSpecifications', 'Device specifications') }}</h2>
                     <dl class="system-spec-cards">
                       <div>
-                        <dt><Cpu :size="17" />{{ t('settings.advancedSettings.systemPage.processor', 'Processor') }}</dt>
-                        <dd>{{ status.system?.processor || '-' }}</dd>
+                        <dt>
+                          <Cpu :size="17" />{{ t('settings.advancedSettings.systemPage.processor', 'Processor') }}
+                          <SystemSpecBadge
+                            v-if="status.system?.architecture"
+                            :value="status.system.architecture"
+                            :label="t('settings.advancedSettings.systemPage.processorArchitecture', 'Processor architecture')"
+                            :description="t('settings.advancedSettings.systemPage.processorArchitectureHint', 'The processor instruction set, such as arm64 or riscv64.')"
+                          />
+                        </dt>
+                        <dd>{{ status.system?.processor || '-' }}<small v-if="status.system?.soc_name" class="system-spec-detail">SoC: {{ status.system.soc_name }}</small></dd>
                       </div>
+                      <SystemMemorySpec
+                        :physical-bytes="status.system?.memory_physical_bytes"
+                        :memory-type="status.system?.memory_type"
+                        :managed-bytes="status.system?.memory_total_bytes"
+                        :hardware-reserved-bytes="status.system?.memory_hardware_reserved_bytes"
+                        :linux-reserved-bytes="status.system?.memory_linux_reserved_bytes"
+                      />
                       <div>
-                        <dt><MemoryStick :size="17" />{{ t('settings.advancedSettings.systemPage.installedMemory', 'Installed memory') }}</dt>
-                        <dd>{{ formatBytes(status.system?.memory_total_bytes || 0) }}</dd>
-                      </div>
-                      <div>
-                        <dt><HardDrive :size="17" />{{ t('settings.advancedSettings.systemPage.storage', 'Storage') }}</dt>
+                        <dt>
+                          <HardDrive :size="17" />{{ t('settings.advancedSettings.systemPage.storage', 'Storage') }}
+                          <SystemSpecBadge
+                            v-if="status.system?.storage_type"
+                            :value="status.system.storage_type"
+                            :label="t('settings.advancedSettings.systemPage.storageType', 'Storage type')"
+                            :description="t('settings.advancedSettings.systemPage.storageTypeHint', 'The storage medium used by the system, such as an SD card or eMMC.')"
+                          />
+                        </dt>
                         <dd>
-                          {{ formatStorageCapacity(storageCapacityBytes) }}<template v-if="status.system?.storage_type"> ({{ status.system.storage_type }})</template>
+                          {{ formatStorageCapacity(storageCapacityBytes) }}
                         </dd>
                       </div>
                       <div>
@@ -1635,11 +2104,18 @@ watch(section, (value) => {
                         {{ t('settings.recoveryMode.action', 'Enter') }}
                       </n-button>
                     </div>
+                    <div class="system-recovery-row">
+                      <strong>{{ t('settings.diagnostics.title', 'Download diagnostic data') }}</strong>
+                      <n-button secondary :disabled="systemAction !== null" @click="diagnosticsOpen = true">
+                        <template #icon><Download /></template>
+                        {{ t('settings.diagnostics.action', 'Download') }}
+                      </n-button>
+                    </div>
                   </section>
                 </template>
               </section>
 
-              <section v-else-if="section === 'time'" class="advanced-settings-section">
+              <section v-else-if="paneSection === 'time'" class="advanced-settings-section">
                 <template v-if="systemTime">
                   <dl class="system-control-list">
                     <div>
@@ -1729,7 +2205,10 @@ watch(section, (value) => {
                 </template>
               </section>
 
-              <section v-else-if="section === 'update'" class="advanced-settings-section">
+              <section v-else-if="paneSection === 'update'" class="advanced-settings-section">
+                <n-alert v-if="systemUpdateUnavailable" type="info" :bordered="false">
+                  {{ t('settings.advancedSettings.systemPage.updateUnavailable', 'System updates are unavailable in this boot mode. This development system has no A/B update service.') }}
+                </n-alert>
                 <template v-if="systemUpdate">
                   <section class="system-settings-group">
                     <h2>{{ t('settings.advancedSettings.systemPage.bootSlots', 'A/B boot slots') }}</h2>
@@ -1761,22 +2240,42 @@ watch(section, (value) => {
                   <section class="system-settings-group">
                     <h2>{{ t('settings.advancedSettings.systemPage.systemUpdate', 'System update') }}</h2>
                     <div class="system-update-panel">
-                      <div class="system-update-status">
-                        <Download :size="19" />
+                      <SystemUpdateSourceSelector
+                        v-model="updateMethod"
+                        :disabled="updateInstalling || systemUpdate.operation !== 'idle'"
+                        @install="confirmSourceUpdate"
+                      >
+                      <template #error>
+                        <n-alert v-if="onlineUpdateError" type="error" :bordered="false">{{ onlineUpdateError }}</n-alert>
+                      </template>
+                      <template #github>
+                      <div v-if="onlineUpdateLoading || onlineUpdate" class="system-update-source-info">
+                        <Download :size="20" />
                         <div>
-                          <strong>{{ updateOperationLabel(systemUpdate.operation) }}</strong>
-                          <span>{{ systemUpdate.compatible }}</span>
+                          <strong v-if="onlineUpdateLoading">{{ t('settings.advancedSettings.systemPage.checkingOnlineUpdate', 'Checking for updates…') }}</strong>
+                          <template v-else-if="onlineUpdate">
+                            <strong>{{ onlineUpdateLabel(onlineUpdate) }}</strong>
+                            <span>{{ t('settings.advancedSettings.systemPage.currentVersion', '当前版本') }} {{ onlineUpdate.current_version }}<template v-if="onlineUpdate.available && onlineUpdate.latest_version"> · {{ t('settings.advancedSettings.systemPage.latestVersion', '最新版本') }} {{ onlineUpdate.latest_version }}</template></span>
+                          </template>
                         </div>
-                        <span v-if="systemUpdate.operation !== 'idle'">{{ systemUpdate.progress.percentage }}%</span>
                       </div>
-                      <n-progress
-                        v-if="systemUpdate.operation !== 'idle' || updateInstalling"
-                        type="line"
-                        :percentage="systemUpdate.progress.percentage"
-                        :show-indicator="false"
-                        status="success"
-                      />
-                      <span v-if="systemUpdate.last_error" class="system-update-error">{{ systemUpdate.last_error }}</span>
+                      <div v-else class="system-update-source-info">
+                        <Download :size="20" />
+                        <span>{{ t('settings.advancedSettings.systemPage.checkOnlineUpdateHint', '检查此设备可用的最新正式版本') }}</span>
+                      </div>
+                      <div class="system-update-actions system-online-update-actions">
+                        <n-button secondary :loading="onlineUpdateLoading" :disabled="onlineUpdateLoading || updateInstalling" @click="loadOnlineUpdate">
+                          {{ t('settings.advancedSettings.systemPage.checkOnlineUpdate', 'Check for updates') }}
+                        </n-button>
+                        <n-button v-if="onlineUpdate?.available && !onlineUpdateLoading" type="primary" :disabled="updateInstalling || systemUpdate.operation !== 'idle'" :loading="updateInstalling" @click="confirmOnlineUpdate">
+                          {{ t('settings.advancedSettings.systemPage.downloadAndInstall', 'Download and install') }}
+                        </n-button>
+                      </div>
+                      <a v-if="!onlineUpdateLoading && onlineUpdate?.repository" class="system-update-release-link" :href="onlineUpdate.repository" target="_blank" rel="noopener noreferrer">
+                        {{ t('settings.advancedSettings.systemPage.releaseRepository', '查看发布仓库') }} <ExternalLink :size="13" />
+                      </a>
+                      </template>
+                      <template #upload>
                       <div
                         class="system-update-upload"
                         :class="{ selected: updateFile, dragging: updateFileDragging }"
@@ -1829,6 +2328,41 @@ watch(section, (value) => {
                           </n-button>
                         </div>
                       </div>
+                      </template>
+                      </SystemUpdateSourceSelector>
+                    </div>
+                  </section>
+
+                  <section v-if="updateStarted || systemUpdate.operation !== 'idle'" class="system-settings-group">
+                    <h2>{{ t('settings.advancedSettings.systemPage.updateStatus', '升级状态') }}</h2>
+                    <div class="system-update-panel">
+                      <n-progress
+                        v-if="onlineUpdateProgress?.phase === 'downloading'"
+                        type="line"
+                        :percentage="onlineDownloadPercent"
+                        :show-indicator="onlineUpdateProgress.total_bytes > 0"
+                        :processing="onlineUpdateProgress.total_bytes === 0"
+                      />
+                      <span v-if="onlineUpdateProgress?.phase === 'downloading'" class="system-update-transfer">
+                        {{ formatBytes(onlineUpdateProgress.bytes) }}<template v-if="onlineUpdateProgress.total_bytes"> / {{ formatBytes(onlineUpdateProgress.total_bytes) }}</template>
+                      </span>
+                      <div class="system-update-status">
+                        <Download :size="19" />
+                        <div>
+                          <strong>{{ updateOperationLabel(systemUpdate.operation) }}</strong>
+                          <span>{{ systemUpdate.compatible }}</span>
+                        </div>
+                        <span v-if="systemUpdate.operation !== 'idle'">{{ systemUpdate.progress.percentage }}%</span>
+                      </div>
+                      <n-progress
+                        v-if="systemUpdate.operation !== 'idle' || updateInstalling"
+                        type="line"
+                        :percentage="systemUpdate.progress.percentage"
+                        :show-indicator="false"
+                        status="success"
+                      />
+                      <span v-if="systemUpdate.last_error" class="system-update-error">{{ systemUpdate.last_error }}</span>
+
                     </div>
                   </section>
                 </template>
@@ -1837,8 +2371,10 @@ watch(section, (value) => {
           </div>
         </Transition>
       </main>
+      </div>
     </div>
     <AccountDrawer v-model:show="accountOpen" />
+    <DiagnosticsCollectModal v-model:show="diagnosticsOpen" />
   </section>
   <Transition name="onekvm-page-loading">
     <AdvancedSettingsLoading v-if="loading && !config" />
@@ -1866,7 +2402,9 @@ watch(section, (value) => {
 				<p id="network-apply-description">{{ networkApplyMessage }}</p>
 				<p>{{ t('network.confirm.description', 'If not confirmed, configuration will automatically rollback to previous state') }}</p>
 				<p v-if="networkApplyConnectionLost" class="network-apply-warning">
-					{{ t('network.confirm.connectionLost', 'The connection was interrupted. Open the device at its new address to confirm the configuration.') }}
+					{{ networkApplyLinks.length
+						? t('network.confirm.connectionLost', 'The connection was interrupted. Open the device at its new address and confirm within 60 seconds; otherwise the old configuration will return automatically.')
+						: t('network.confirm.connectionLostNoNewAddress', 'The connection was interrupted. Reconnect to the device and confirm within 60 seconds; otherwise the old configuration will return automatically.') }}
 				</p>
 				<div v-if="networkApplyLinks.length" class="network-apply-addresses">
 					<span>{{ t('network.confirm.openNewAddress', 'Open the new device address:') }}</span>
@@ -1879,7 +2417,7 @@ watch(section, (value) => {
 						type="primary"
 						secondary
 					>
-						{{ link.address }}
+						{{ link.label }}
 					</n-button>
 				</div>
 				<p v-else-if="networkApplySeconds <= 10" class="network-apply-warning">

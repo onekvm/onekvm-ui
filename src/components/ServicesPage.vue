@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, type Component } from 'vue'
-import { Box, Clock3, Play, RotateCw, Server, ServerCog, Settings2, Square, SquareTerminal, icons } from '@lucide/vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, type Component } from 'vue'
+import { Box, Clock3, Database, Play, RotateCw, Server, ServerCog, Settings2, Shield, Square, SquareTerminal } from '@lucide/vue'
 import { useMessage } from 'naive-ui'
 
-import { api, extensionAssetURL, type ExtensionSummary, type ManagedService } from '@/api/client'
+import { api, type ExtensionSummary, type ManagedService } from '@/api/client'
 import { currentLanguage, t } from '@/i18n/runtime'
+import { brandPluginIconUrl, lucidePluginIcon } from '@/lib/plugin-icons'
 
-import ServiceSettingsDrawer from './ServiceSettingsDrawer.vue'
+import OneKVMServiceSettingsDrawer from './OneKVMServiceSettingsDrawer.vue'
+import SSHServiceSettingsDrawer from './SSHServiceSettingsDrawer.vue'
+import ZramServiceSettingsDrawer from './ZramServiceSettingsDrawer.vue'
 
 const props = defineProps<{ extensions: ExtensionSummary[] }>()
 const emit = defineEmits<{ navigate: [route: string] }>()
@@ -15,7 +18,9 @@ const loading = ref(false)
 const refreshing = ref(false)
 const busy = ref('')
 const error = ref('')
-const settingsKind = ref<'onekvm' | 'ssh' | null>(null)
+const onekvmSettingsOpen = shallowRef(false)
+const sshSettingsOpen = shallowRef(false)
+const zramSettingsOpen = shallowRef(false)
 const message = useMessage()
 let refreshTimer: number | null = null
 
@@ -23,14 +28,17 @@ const extensionsByID = computed(() => new Map(props.extensions.map((extension) =
 const systemServiceIcons: Record<string, Component> = {
   'system.onekvm': ServerCog,
   'system.ssh': SquareTerminal,
+  'system.zram': Database,
   'system.time-sync': Clock3,
+  'system.watchdog': Shield,
 }
 
 function serviceIconURL(service: ManagedService) {
   if (service.kind !== 'extension' || !service.provider_id) return ''
   const extension = extensionsByID.value.get(service.provider_id)
-  const icon = extension?.icon
-  return extension && icon?.source === 'custom' ? extensionAssetURL(extension, icon.path) : ''
+  const dataUrl = extension?.icon_data_url?.trim() || ''
+  if (dataUrl.startsWith('data:image/')) return dataUrl
+  return brandPluginIconUrl(service.provider_id)
 }
 
 function serviceIconComponent(service: ManagedService): Component {
@@ -38,8 +46,7 @@ function serviceIconComponent(service: ManagedService): Component {
   if (!service.provider_id) return Box
   const icon = extensionsByID.value.get(service.provider_id)?.icon
   if (icon?.source !== 'lucide') return Box
-  const name = icon.name.split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join('')
-  return (icons as Record<string, Component>)[name] || Box
+  return lucidePluginIcon(icon.name)
 }
 
 function translation(service: ManagedService) {
@@ -124,17 +131,22 @@ function setAutostart(service: ManagedService, enabled: boolean) {
 }
 
 function supportsSettings(service: ManagedService) {
-  return service.id === 'system.onekvm' || service.id === 'system.ssh' || service.id === 'system.time-sync'
+  if (service.id === 'system.onekvm' || service.id === 'system.ssh' || service.id === 'system.zram' || service.id === 'system.time-sync') return true
+  if (service.kind !== 'extension' || !service.provider_id) return false
+  return extensionsByID.value.get(service.provider_id)?.has_page === true
+}
+
+function serviceSettingsHref(service: ManagedService) {
+  if (service.kind !== 'extension' || !service.provider_id || !supportsSettings(service)) return undefined
+  return `#/settings/advanced/plugins/${encodeURIComponent(service.provider_id)}`
 }
 
 function openSettings(service: ManagedService) {
-  if (service.id === 'system.onekvm') settingsKind.value = 'onekvm'
-  else if (service.id === 'system.ssh') settingsKind.value = 'ssh'
+  if (service.id === 'system.onekvm') onekvmSettingsOpen.value = true
+  else if (service.id === 'system.ssh') sshSettingsOpen.value = true
+  else if (service.id === 'system.zram') zramSettingsOpen.value = true
   else if (service.id === 'system.time-sync') emit('navigate', 'time')
-}
-
-function closeSettings(show: boolean) {
-  if (!show) settingsKind.value = null
+  else if (service.kind === 'extension' && service.provider_id) emit('navigate', `plugins/${encodeURIComponent(service.provider_id)}`)
 }
 
 onMounted(() => {
@@ -188,7 +200,16 @@ onBeforeUnmount(() => {
               <n-tooltip>
                 <template #trigger>
                   <span class="service-action-trigger">
-                    <n-button quaternary circle size="small" :disabled="!supportsSettings(service) || busy !== ''" :aria-label="`${t('settings.advancedSettings.servicesPage.settings', 'Settings')} ${translation(service).name}`" @click="openSettings(service)">
+                    <n-button
+                      :tag="serviceSettingsHref(service) ? 'a' : 'button'"
+                      :href="serviceSettingsHref(service)"
+                      quaternary
+                      circle
+                      size="small"
+                      :disabled="!supportsSettings(service) || busy !== ''"
+                      :aria-label="`${t('settings.advancedSettings.servicesPage.settings', 'Settings')} ${translation(service).name}`"
+                      @click="openSettings(service)"
+                    >
                       <template #icon><Settings2 /></template>
                     </n-button>
                   </span>
@@ -230,10 +251,8 @@ onBeforeUnmount(() => {
         </ul>
       </section>
     </n-spin>
-    <ServiceSettingsDrawer
-      :show="settingsKind !== null"
-      :kind="settingsKind || 'onekvm'"
-      @update:show="closeSettings"
-    />
+    <OneKVMServiceSettingsDrawer v-model:show="onekvmSettingsOpen" />
+    <SSHServiceSettingsDrawer v-model:show="sshSettingsOpen" />
+    <ZramServiceSettingsDrawer v-model:show="zramSettingsOpen" />
   </section>
 </template>

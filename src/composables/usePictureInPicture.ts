@@ -16,7 +16,8 @@ export function usePictureInPicture(videoMode: () => string) {
   const sourceVideo = () => document.querySelector<PiPVideo>('video#screen')
   const supported = computed(() => {
     const native = document.pictureInPictureEnabled && typeof HTMLVideoElement.prototype.requestPictureInPicture === 'function'
-    const safari = sourceVideo()?.webkitSupportsPresentationMode?.('picture-in-picture')
+    const prototype = HTMLVideoElement.prototype as PiPVideo
+    const safari = typeof prototype.webkitSupportsPresentationMode === 'function' && typeof prototype.webkitSetPresentationMode === 'function'
     return Boolean((native || safari) && (videoMode() !== 'mjpeg' || typeof HTMLCanvasElement.prototype.captureStream === 'function'))
   })
 

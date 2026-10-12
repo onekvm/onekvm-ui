@@ -16,6 +16,7 @@ import KeyboardQuickActions from './KeyboardQuickActions.vue'
 const props = defineProps<{
   options: DropdownOption[]
   layout: KeyboardLayout
+  inputSuspended?: boolean
   hid?: { available: boolean; connected: boolean } | null
   numLock?: boolean
   capsLock?: boolean
@@ -105,6 +106,7 @@ function unpinPanel() {
 }
 
 function selectOption(key: string | number) {
+  if (props.inputSuspended) return
   if (key === 'send-text') {
     if (!pinned.value) updateShow(false)
     textModalOpen.value = true
@@ -131,7 +133,7 @@ function resumeConsole() {
 watch(textModalOpen, (open) => emit('text-modal', open))
 
 async function sendText() {
-  if (!text.value || sendingText.value) return
+  if (props.inputSuspended || !text.value || sendingText.value) return
   sendingText.value = true
   try {
     const sent = text.value
@@ -234,8 +236,10 @@ onBeforeUnmount(() => {
           <strong>{{ lockLabel(scrollLock) }}</strong>
         </span>
       </div>
-      <KeyboardQuickActions @select="selectOption" />
-      <n-menu accordion :value="null" :options="remainingOptions" :indent="12" class="keyboard-control-menu keyboard-secondary-menu" @update:value="selectOption" />
+      <div :inert="inputSuspended">
+        <KeyboardQuickActions @select="selectOption" />
+        <n-menu accordion :value="null" :options="remainingOptions" :indent="12" class="keyboard-control-menu keyboard-secondary-menu" @update:value="selectOption" />
+      </div>
     </div>
     </template>
   </ControlOverlay>
@@ -270,7 +274,7 @@ onBeforeUnmount(() => {
         <n-button :disabled="sendingText" @click="textModalOpen = false">
           {{ t('common.cancel', 'Cancel') }}
         </n-button>
-        <n-button type="primary" :loading="sendingText" :disabled="!text" @click="sendText">
+        <n-button type="primary" :loading="sendingText" :disabled="inputSuspended || !text" @click="sendText">
           {{ t('keyboard.submit', 'Send') }}
         </n-button>
       </div>
@@ -325,8 +329,10 @@ onBeforeUnmount(() => {
             <strong>{{ lockLabel(scrollLock) }}</strong>
           </span>
         </div>
-        <KeyboardQuickActions @select="selectOption" />
-        <n-menu accordion :value="null" :options="remainingOptions" :indent="12" class="keyboard-control-menu keyboard-secondary-menu" @update:value="selectOption" />
+        <div :inert="inputSuspended">
+          <KeyboardQuickActions @select="selectOption" />
+          <n-menu accordion :value="null" :options="remainingOptions" :indent="12" class="keyboard-control-menu keyboard-secondary-menu" @update:value="selectOption" />
+        </div>
       </div>
     </section>
     </Transition>

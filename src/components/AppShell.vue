@@ -33,6 +33,7 @@ import { storedHideLocalCursor } from '@/lib/console-pointer'
 import { consumeConsoleBack, lockConsoleHistory } from '@/lib/history-lock'
 import { fullscreenTopInsetPx, isIpadLikeUserAgent, readSafeAreaTop } from '@/lib/fullscreen-inset'
 import { useTransport } from '@/composables/useTransport'
+import { usePictureInPicture } from '@/composables/usePictureInPicture'
 import { onekvm, type BrowserAudioStats, type BrowserVideoLatencyUs } from '@/lib/onekvm'
 import { effectiveVideoCodec } from '@/lib/video-transport'
 import { loadLocalShortcuts, saveLocalShortcuts } from '@/lib/keyboard-shortcuts'
@@ -77,6 +78,8 @@ function advancedRouteFromHash(hash: string) {
 }
 
 const { state } = useTransport()
+const pictureInPicture = usePictureInPicture(() => state.value.videoMode)
+const { active: pipActive, busy: pipBusy, supported: pipSupported } = pictureInPicture
 const { auth, logout, refresh } = useAuth()
 const toolbox = useToolbox()
 const dialog = useAsyncDialog()
@@ -181,7 +184,7 @@ watch(() => status.value?.hid.macro_generation, async (generation, previous) => 
   macroInputReset.value = false
 })
 const keyboardBlocked = computed(
-  () => macroInputReset.value || Boolean(status.value?.hid.macro_owner) || toolbox.inputBlocked || advancedSettingsOpen.value || accountOpen.value || shortcutDialogOpen.value || toolbarOverlayOpen.value || Boolean(state.value.fallbackPrompt),
+  () => pipActive.value || macroInputReset.value || Boolean(status.value?.hid.macro_owner) || toolbox.inputBlocked || advancedSettingsOpen.value || accountOpen.value || shortcutDialogOpen.value || toolbarOverlayOpen.value || Boolean(state.value.fallbackPrompt),
 )
 watch(mouseMode, (value) => localStorage.setItem(MOUSE_MODE_KEY, value))
 watch(videoFit, (value) => localStorage.setItem(VIDEO_FIT_KEY, value))
@@ -449,6 +452,15 @@ function focusConsole() {
   void nextTick(() => remoteConsole.value?.focusVideo())
 }
 
+async function togglePictureInPicture() {
+  try {
+    await pictureInPicture.toggle()
+    controlToolbar.value?.dismissOverlays()
+  } catch {
+    message.error(t('screen.pictureInPictureFailed', 'Could not open picture-in-picture. Make sure the stream is playing.'))
+  }
+}
+
 function navigateAdvancedSettings(route: string) {
   window.location.hash = advancedSettingsHash(route)
 }
@@ -549,6 +561,9 @@ onBeforeUnmount(() => {
         <ControlToolbar
           ref="controlToolbar"
           :state="state"
+          :pip-active="pipActive"
+          :pip-busy="pipBusy"
+          :pip-supported="pipSupported"
           :can-settings="canSettings"
           :can-change-video="canChangeVideo"
           :can-power="canPower"
@@ -584,6 +599,7 @@ onBeforeUnmount(() => {
           @restore-media-transfer="virtualMediaPopover?.restoreUploadDialog()"
           @edit-user-shortcuts="shortcutDialogOpen = true"
           @fullscreen="toggleFullscreen"
+          @picture-in-picture="togglePictureInPicture"
           @update:performance-open="setPerformanceOpen"
           @update:right-control-as-meta="rightControlAsMeta = $event"
           @overlay="toolbarOverlayOpen = $event"
@@ -615,6 +631,7 @@ onBeforeUnmount(() => {
           :video-fit="videoFit"
           :video-rotation="videoRotation"
           :keyboard-blocked="keyboardBlocked"
+          :input-suspended="pipActive"
           :right-control-as-meta="rightControlAsMeta"
           :trackpad="trackpadOpen"
           :usb-connected="Boolean(status?.hid.connected)"

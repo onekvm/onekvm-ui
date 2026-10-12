@@ -100,6 +100,9 @@ import ControlOverlay from './ControlOverlay.vue'
 
 const props = defineProps<{
   state: TransportState
+  pipActive: boolean
+  pipBusy: boolean
+  pipSupported: boolean
   canSettings: boolean
   canChangeVideo: boolean
   canPower: boolean
@@ -137,6 +140,7 @@ const emit = defineEmits<{
   media: [sheet: boolean]
   'restore-media-transfer': []
   fullscreen: []
+  'picture-in-picture': []
   'update:performanceOpen': [open: boolean, event?: MouseEvent]
   'update:rightControlAsMeta': [enabled: boolean]
   'edit-user-shortcuts': []
@@ -1171,6 +1175,7 @@ function sendCtrlAltDelete() {
 }
 
 function selectKeyboard(key: string | number) {
+  if (props.pipActive) return
   if (key === 'cad') sendCtrlAltDelete()
   if (key === 'virtual') {
     setLauncherMenuOpen(false)
@@ -1420,6 +1425,9 @@ onBeforeUnmount(() => {
       <div class="device-controls" :aria-label="t('deviceStatus.title', 'Device status')">
       <DisplaySettingsPopover
         :state="state"
+        :pip-active="pipActive"
+        :pip-busy="pipBusy"
+        :pip-supported="pipSupported"
         :video-codec="status ? effectiveVideoCodec(status.video) : ''"
         :video-resolution="status?.video.resolution ?? 0"
         :target-fps="status?.video.fps || 0"
@@ -1431,6 +1439,7 @@ onBeforeUnmount(() => {
         @update:show="updateMenu('display', $event)"
         @update:video-fit="emit('update:videoFit', $event)"
         @update:video-rotation="emit('update:videoRotation', $event)"
+        @picture-in-picture="emit('picture-in-picture')"
       >
         <n-tooltip :disabled="toolbarLauncher || openMenu === 'display'">
           <template #trigger>
@@ -1474,6 +1483,7 @@ onBeforeUnmount(() => {
               class="device-indicator"
               :data-state="inputState"
               :aria-label="deviceStateLabel(t('mouse.title', 'Mouse'), inputState)"
+              :disabled="pipActive"
             >
               <template #icon><MousePointer2 /></template>
               <span ref="mouseLed" class="device-led" />
@@ -1486,6 +1496,7 @@ onBeforeUnmount(() => {
 
       <KeyboardControlPopover
         :options="keyboardOptions"
+        :input-suspended="pipActive"
         :layout="keyboardLayout"
         :hid="status?.hid"
         :num-lock="status?.hid?.num_lock"
@@ -1505,6 +1516,7 @@ onBeforeUnmount(() => {
               class="device-indicator"
               :data-state="inputState"
               :aria-label="deviceStateLabel(t('keyboard.title', 'Keyboard'), inputState)"
+              :disabled="pipActive"
             >
               <template #icon><Keyboard /></template>
               <span ref="keyboardLed" class="device-led" />

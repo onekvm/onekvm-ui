@@ -6,7 +6,6 @@ import { useMessage, type SelectOption } from 'naive-ui'
 
 import { api, APIError, type ConfigSchema, type EDIDStatus, type OneKVMConfig } from '@/api/client'
 import { useOverlayMount } from '@/composables/useOverlayMount'
-import { usePictureInPicture } from '@/composables/usePictureInPicture'
 import { useVideoCodecSupport } from '@/composables/useVideoCodecSupport'
 import { t } from '@/i18n/runtime'
 import {
@@ -37,6 +36,9 @@ import DisplaySettingsGroup from './DisplaySettingsGroup.vue'
 
 const props = defineProps<{
   state: TransportState
+  pipActive: boolean
+  pipBusy: boolean
+  pipSupported: boolean
   videoCodec: string
   videoResolution: number
   targetFps: number
@@ -51,13 +53,12 @@ const emit = defineEmits<{
   'update:show': [show: boolean]
   'update:videoFit': [fit: VideoFit]
   'update:videoRotation': [rotation: VideoRotation]
+  'picture-in-picture': []
 }>()
 
 const message = useMessage()
 const dialog = useAsyncDialog()
 const overlayTo = useOverlayMount()
-const pictureInPicture = usePictureInPicture(() => props.state.videoMode)
-const { active: pipActive, busy: pipBusy, supported: pipSupported } = pictureInPicture
 const edidHelpHovered = shallowRef(false)
 const edidHelpFocused = shallowRef(false)
 const popoverOpen = ref(false)
@@ -359,15 +360,6 @@ function updateFit(value: string | number | null) {
   emit('update:videoFit', value)
 }
 
-async function togglePictureInPicture() {
-  try {
-    await pictureInPicture.toggle()
-    forceClose()
-  } catch {
-    message.error(t('screen.pictureInPictureFailed', 'Could not open picture-in-picture. Make sure the stream is playing.'))
-  }
-}
-
 function updateRotation(value: string | number | null) {
   if (value !== 0 && value !== 90 && value !== 180 && value !== 270) return
   emit('update:videoRotation', value)
@@ -667,7 +659,7 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
                 :size="sheet ? 'medium' : 'small'"
                 :disabled="!pipSupported || (!pipActive && state.connection !== 'connected')"
                 :loading="pipBusy"
-                @click="togglePictureInPicture"
+                @click="emit('picture-in-picture')"
               >
                 <template #icon><PictureInPicture2 :size="16" aria-hidden="true" /></template>
                 {{ pipActive ? t('screen.exitPictureInPicture', 'Exit picture-in-picture') : t('screen.pictureInPicture', 'Picture-in-picture') }}

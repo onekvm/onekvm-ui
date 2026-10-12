@@ -34,6 +34,7 @@ const props = defineProps<{
   videoFit: VideoFit
   videoRotation: VideoRotation
   keyboardBlocked: boolean
+  inputSuspended: boolean
   rightControlAsMeta: boolean
   trackpad?: boolean
   usbConnected?: boolean
@@ -268,6 +269,7 @@ async function reconnect() {
 }
 
 function focusVideo() {
+  if (props.inputSuspended) return
   inputSurface.value?.focus({ preventScroll: true })
 }
 
@@ -278,7 +280,7 @@ function hidFit(): VideoFit {
 function refreshHidCursor(clientX?: number, clientY?: number) {
   const x = clientX ?? lastPointer?.x
   const y = clientY ?? lastPointer?.y
-  if (x == null || y == null || trackpadOn.value) {
+  if (x == null || y == null || trackpadOn.value || props.inputSuspended) {
     hidCursor.value = undefined
     return
   }
@@ -320,7 +322,8 @@ function sourceSize() {
   return { width, height }
 }
 
-function sendTrackpadAbsolute(buttons: number) {
+function sendTrackpadAbsolute(buttons: number, releasing = false) {
+  if (props.inputSuspended && !releasing) return
   const stageEl = stage.value
   const videoEl = inputTarget.value
   const source = sourceSize()
@@ -342,6 +345,7 @@ function sendTrackpadAbsolute(buttons: number) {
 }
 
 function onTrackpadLook(dx: number, dy: number) {
+  if (props.inputSuspended) return
   if (viewOverflows(zoomView.scale)) {
     followLook(dx, dy)
     sendTrackpadAbsolute(trackpadButtons.value)
@@ -352,6 +356,7 @@ function onTrackpadLook(dx: number, dy: number) {
 }
 
 function onTrackpadTap() {
+  if (props.inputSuspended) return
   const held = trackpadButtons.value
   if (viewOverflows(zoomView.scale)) {
     sendTrackpadAbsolute(held | MOUSE_BUTTON_LEFT)
@@ -363,12 +368,14 @@ function onTrackpadTap() {
 }
 
 function onTrackpadWheel(delta: number) {
+  if (props.inputSuspended) return
   sendRelativeMotion(trackpadButtons.value, 0, 0, delta)
 }
 
 function onTrackpadButtons(next: number) {
+  if (props.inputSuspended && (next !== 0 || trackpadButtons.value === 0)) return
   trackpadButtons.value = next
-  if (viewOverflows(zoomView.scale)) sendTrackpadAbsolute(next)
+  if (viewOverflows(zoomView.scale)) sendTrackpadAbsolute(next, next === 0)
   else onekvm.sendRelativeMouse(next)
 }
 
@@ -381,6 +388,7 @@ function onTrackpadChrome(height: number) {
 
 async function prepareTrackpadView() {
   await nextTick()
+  if (props.inputSuspended) return
   const source = sourceSize()
   if (source.width <= 0 || source.height <= 0) return
   const rotated = rotatedVideoSize(source.width, source.height, props.videoRotation)
@@ -462,7 +470,7 @@ watch(() => props.videoRotation, () => {
 })
 
 watch(
-  [() => props.hideLocalCursor, () => props.mouseMode, trackpadOn, () => props.videoFit, () => props.videoRotation],
+  [() => props.hideLocalCursor, () => props.mouseMode, trackpadOn, () => props.videoFit, () => props.videoRotation, () => props.inputSuspended],
   () => refreshHidCursor(),
   { flush: 'post' },
 )
@@ -523,7 +531,8 @@ watch(
       ref="inputSurface"
       class="console-hid-layer"
       :style="hidCursor ? { cursor: hidCursor } : undefined"
-      tabindex="0"
+      :tabindex="inputSuspended ? -1 : 0"
+      :aria-disabled="inputSuspended"
       @pointerenter="onHidPointerMove"
       @pointermove="onHidPointerMove"
       @pointerleave="onHidPointerLeave"
@@ -540,7 +549,7 @@ watch(
       </button>
     </Transition>
     <TrackpadOverlay
-      v-if="trackpadOn"
+      v-if="trackpadOn && !inputSuspended"
       @close="emit('update:trackpad', false)"
       @look="onTrackpadLook"
       @tap="onTrackpadTap"

@@ -232,7 +232,10 @@ export function useMouse(
   })
 
   watch([video, () => surface?.value, () => hidEnabled()], (current) => {
-    if (!current[2]) releaseButtons()
+    if (!current[2]) {
+      releaseButtons()
+      if (document.pointerLockElement === eventTarget()) void document.exitPointerLock()
+    }
     bind()
   }, { immediate: true, flush: 'post' })
   onBeforeUnmount(() => {

@@ -13,6 +13,7 @@ import { useKeyboard } from '@/composables/useKeyboard'
 import ConnectionTrace from './ConnectionTrace.vue'
 import TrackpadOverlay from './TrackpadOverlay.vue'
 import { useVideoFps } from '@/composables/useVideoFps'
+import { useVideoPlaybackState } from '@/composables/useVideoPlaybackState'
 import { useMJPEGStream } from '@/composables/useMJPEGStream'
 import { api } from '@/api/client'
 import { t } from '@/i18n/runtime'
@@ -66,7 +67,7 @@ const stageStyle = computed(() => (
 ))
 let canvasObserver: ResizeObserver | undefined
 let trackpadFramed = false
-const playing = ref(false)
+const { playing, hasFrame, onPlaying, onWaiting: onVideoWaiting, reset: resetPlayback } = useVideoPlaybackState(video)
 const mediaError = ref(false)
 const reconnecting = ref(false)
 const mjpegReload = ref(0)
@@ -142,6 +143,9 @@ useVideoFps(video, (fps) => {
 const loading = computed(
   () => !connectionProblem.value && !playing.value && ['idle', 'connecting', 'connected'].includes(props.state.connection),
 )
+const loadingMessage = computed(() => hasFrame.value
+  ? t('screen.bufferingVideo', 'Buffering video…')
+  : t('screen.connectingVideo', 'Connecting to video…'))
 const frameWidth = ref(0)
 const frameHeight = ref(0)
 const displayPixelRatio = ref(1)
@@ -198,14 +202,6 @@ function updateMetadata() {
   emit('metadata', video.value.videoWidth, video.value.videoHeight)
 }
 
-function onVideoWaiting() {
-  const element = video.value
-  /* High-motion HID drags make WebRTC fire waiting without emptying the
-     element. Treating that as a stall fades the picture and zeros overlay FPS. */
-  if (element && element.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) return
-  playing.value = false
-}
-
 function publishCanvasSize() {
   const target = inputTarget.value ?? stage.value
   if (!target) return
@@ -245,7 +241,7 @@ function updateMJPEGFrame(source: CanvasImageSource, width: number, height: numb
   const context = target.getContext('2d', { alpha: false })
   if (!context) throw new Error('Canvas 2D is unavailable')
   context.drawImage(source, 0, 0, width, height)
-  playing.value = true
+  onPlaying()
   mediaError.value = false
   frameWidth.value = width
   frameHeight.value = height
@@ -253,7 +249,7 @@ function updateMJPEGFrame(source: CanvasImageSource, width: number, height: numb
 }
 
 function handleMJPEGError() {
-  playing.value = false
+  resetPlayback()
   mediaError.value = true
 }
 
@@ -268,12 +264,6 @@ async function reconnect() {
     // The transport publishes the localized modal state; keep it open.
   } finally {
     reconnecting.value = false
-  }
-}
-
-function exitPictureInPicture() {
-  if (document.pictureInPictureElement) {
-    void document.exitPictureInPicture().catch(() => undefined)
   }
 }
 
@@ -423,7 +413,6 @@ onMounted(() => {
   })
   unsubscribeAudioStats = onekvm.subscribeAudioStats((value) => emit('audio-stats', value))
   if (video.value) {
-    video.value.disablePictureInPicture = true
     detachVideo = onekvm.attachVideo(video.value)
   }
   if (remoteAudio.value) detachAudio = onekvm.attachAudio(remoteAudio.value)
@@ -445,7 +434,7 @@ onBeforeUnmount(() => {
 })
 
 watch(isMJPEG, () => {
-  playing.value = false
+  resetPlayback()
   mediaError.value = false
   emit('fps', 0)
   emit('bitrate', 0)
@@ -500,7 +489,7 @@ watch(
       ref="video"
       class="console-video"
       :class="{
-        'console-video-ready': playing && !isMJPEG,
+        'console-video-ready': hasFrame && !isMJPEG,
         'console-video-original': videoFit === 'original' && !trackpadOn,
         'console-video-stretch': videoFit === 'stretch' || trackpadOn,
       }"
@@ -508,15 +497,12 @@ watch(
       playsinline
       muted
       :style="mediaStyle"
-      :disablePictureInPicture="true"
-      controlslist="nopictureinpicture"
       tabindex="-1"
-      @playing="playing = true"
+      @playing="onPlaying"
       @waiting="onVideoWaiting"
-      @emptied="playing = false"
+      @emptied="resetPlayback"
       @loadedmetadata="updateMetadata"
       @resize="updateMetadata"
-      @enterpictureinpicture="exitPictureInPicture"
     />
     <canvas
       v-if="isMJPEG"
@@ -579,9 +565,9 @@ watch(
         <div
           class="console-connect-progress"
           role="progressbar"
-          :aria-label="t('screen.connectingVideo', 'Connecting to video…')"
+          :aria-label="loadingMessage"
         ><span /></div>
-        <span>{{ t('screen.connectingVideo', 'Connecting to video…') }}</span>
+        <span>{{ loadingMessage }}</span>
       </div>
     </Transition>
 

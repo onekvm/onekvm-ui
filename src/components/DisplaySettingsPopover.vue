@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
-import { Cable, Monitor, RotateCcw, SlidersHorizontal, Waypoints } from '@lucide/vue'
-import { useDialog, useMessage, type SelectOption } from 'naive-ui'
+import { Cable, CircleHelp, Monitor, PictureInPicture2, RotateCcw, SlidersHorizontal, Waypoints } from '@lucide/vue'
+import { useMessage, type SelectOption } from 'naive-ui'
 
 import { api, APIError, type ConfigSchema, type EDIDStatus, type OneKVMConfig } from '@/api/client'
 import { useOverlayMount } from '@/composables/useOverlayMount'
+import { usePictureInPicture } from '@/composables/usePictureInPicture'
 import { useVideoCodecSupport } from '@/composables/useVideoCodecSupport'
 import { t } from '@/i18n/runtime'
 import {
@@ -30,6 +32,7 @@ import {
   type QpPresetKey,
 } from '@/lib/video-qp'
 import ControlOverlay from './ControlOverlay.vue'
+import ControlPopoverHeading from './ControlPopoverHeading.vue'
 import DisplaySettingsGroup from './DisplaySettingsGroup.vue'
 
 const props = defineProps<{
@@ -51,8 +54,12 @@ const emit = defineEmits<{
 }>()
 
 const message = useMessage()
-const dialog = useDialog()
+const dialog = useAsyncDialog()
 const overlayTo = useOverlayMount()
+const pictureInPicture = usePictureInPicture(() => props.state.videoMode)
+const { active: pipActive, busy: pipBusy, supported: pipSupported } = pictureInPicture
+const edidHelpHovered = shallowRef(false)
+const edidHelpFocused = shallowRef(false)
 const popoverOpen = ref(false)
 const menuOpen = ref(false)
 const saving = ref(false)
@@ -68,6 +75,11 @@ const resettingHdmi = shallowRef(false)
 const codecTransport = computed(() => switchingProtocol.value || (props.state.videoMode === 'mjpeg'
   ? parseVideoTransport(localStorage.getItem(VIDEO_TRANSPORT_KEY))
   : props.state.videoMode))
+const videoModeLabel = computed(() => {
+  const codec = props.videoCodec.toUpperCase().replace(/^H(\d)/, 'H.$1')
+  const protocol = { webrtc: 'WebRTC', websocket: 'WebSocket', mjpeg: 'HTTP' }[props.state.videoMode]
+  return `${codec} / ${protocol}`
+})
 const { h265WebRTCSupported, h265WebSocketSupported, allCodecOptions } = useVideoCodecSupport(codecTransport)
 
 watch(() => props.videoResolution, (value) => { resolution.value = value })
@@ -263,6 +275,7 @@ async function confirmEdidApply(required: string) {
       negativeText: t('common.later', 'Later'),
       onPositiveClick: () => api.rebootSystem().catch((error: unknown) => {
         message.error(error instanceof APIError ? error.message : String(error))
+        return false
       }),
     })
     return
@@ -346,6 +359,15 @@ function updateFit(value: string | number | null) {
   emit('update:videoFit', value)
 }
 
+async function togglePictureInPicture() {
+  try {
+    await pictureInPicture.toggle()
+    forceClose()
+  } catch {
+    message.error(t('screen.pictureInPictureFailed', 'Could not open picture-in-picture. Make sure the stream is playing.'))
+  }
+}
+
 function updateRotation(value: string | number | null) {
   if (value !== 0 && value !== 90 && value !== 180 && value !== 270) return
   emit('update:videoRotation', value)
@@ -426,6 +448,10 @@ function updateFrameDetect(value: boolean) {
 
 watch(popoverOpen, (open) => {
   if (open) void loadVideo()
+  else {
+    edidHelpHovered.value = false
+    edidHelpFocused.value = false
+  }
 })
 
 onMounted(() => window.addEventListener(DISMISS_CONTROL_OVERLAY_EVENT, forceClose))
@@ -445,8 +471,12 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
     <template #title>{{ t('settings.screen.title', 'Display') }}</template>
     <template #panel>
     <div class="display-status-popover">
-      <header class="control-popover-header">
-        <strong>{{ t('settings.screen.title', 'Display') }}</strong>
+      <header class="control-popover-header control-popover-header-with-heading">
+        <ControlPopoverHeading
+          :icon="Monitor"
+          :title="t('settings.screen.title', 'Display')"
+          :subtitle="`${t('screen.video', 'Video mode')} · ${videoModeLabel}`"
+        />
       </header>
       <DisplaySettingsGroup
         :title="t('screen.groups.display', 'Display')"
@@ -584,7 +614,25 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
         collapsible
       >
         <div>
-          <span>{{ t('screen.edid', 'EDID') }}</span>
+          <span class="display-edid-label">
+            {{ t('screen.edid', 'EDID') }}
+            <n-tooltip :to="overlayTo" :show="edidHelpHovered || edidHelpFocused" style="max-width: 300px">
+              <template #trigger>
+                <button
+                  type="button"
+                  class="display-edid-help"
+                  :aria-label="t('screen.edidHelpTitle', 'What is EDID?')"
+                  aria-describedby="display-edid-help-text"
+                  @mouseenter="edidHelpHovered = true"
+                  @mouseleave="edidHelpHovered = false"
+                  @focus="edidHelpFocused = true"
+                  @blur="edidHelpFocused = false"
+                  @click="edidHelpFocused = true"
+                ><CircleHelp :size="14" aria-hidden="true" /></button>
+              </template>
+              <span id="display-edid-help-text">{{ t('screen.edidHelp', 'EDID tells the remote computer which resolutions, refresh rates, and audio formats the display supports. The computer uses it to choose its HDMI output. Changing EDID can help with resolution and compatibility issues.') }}</span>
+            </n-tooltip>
+          </span>
           <n-select
             v-bind="selectProps"
             :value="edidSelection || null"
@@ -608,6 +656,27 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
           {{ t('screen.resetHdmi', 'Reset HDMI') }}
         </n-button>
       </DisplaySettingsGroup>
+      <hr class="display-pip-divider" />
+      <footer class="display-pip-footer">
+        <n-tooltip :to="overlayTo" :disabled="pipSupported">
+          <template #trigger>
+            <span class="display-pip-action">
+              <n-button
+                block
+                secondary
+                :size="sheet ? 'medium' : 'small'"
+                :disabled="!pipSupported || (!pipActive && state.connection !== 'connected')"
+                :loading="pipBusy"
+                @click="togglePictureInPicture"
+              >
+                <template #icon><PictureInPicture2 :size="16" aria-hidden="true" /></template>
+                {{ pipActive ? t('screen.exitPictureInPicture', 'Exit picture-in-picture') : t('screen.pictureInPicture', 'Picture-in-picture') }}
+              </n-button>
+            </span>
+          </template>
+          {{ t('screen.pictureInPictureUnavailable', 'Picture-in-picture is unavailable in this browser.') }}
+        </n-tooltip>
+      </footer>
     </div>
     </template>
   </ControlOverlay>
@@ -618,4 +687,23 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
   justify-self: stretch;
   margin-top: 4px;
 }
+
+.display-edid-label { display: inline-flex; align-items: center; gap: 4px; }
+.display-edid-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--onekvm-text-secondary);
+  cursor: help;
+}
+.display-edid-help:hover { color: var(--foreground); background: var(--secondary-hover); }
+.display-edid-help:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.display-pip-divider { margin: 12px 0; border: 0; border-top: 1px solid var(--border); }
+.display-pip-action { display: block; }
 </style>

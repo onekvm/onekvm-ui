@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Activity, GripHorizontal, Minus, Square, X } from '@lucide/vue'
+import { Activity, Minus, Square, X } from '@lucide/vue'
 
 import { t } from '@/i18n/runtime'
 import { useLatencyHistory } from '@/composables/useLatencyHistory'
@@ -94,6 +94,54 @@ let dragOffset: OverlayPoint = { x: 0, y: 0 }
 let dragging = false
 let dragHandle: HTMLElement | null = null
 let dragPointerId: number | null = null
+let layoutAnimations: Animation[] = []
+let layoutRevision = 0
+
+function stopLayoutAnimation() {
+  layoutRevision += 1
+  for (const animation of layoutAnimations) animation.cancel()
+  layoutAnimations = []
+}
+
+async function animateCompactChange() {
+  stopLayoutAnimation()
+  const revision = layoutRevision
+  const element = panel.value
+  if (!props.visible || !element) return
+  const previous = element.getBoundingClientRect()
+  await nextTick()
+  if (revision !== layoutRevision || !props.visible) return
+  clampPosition()
+  await nextTick()
+  if (revision !== layoutRevision || !props.visible) return
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  const current = element.getBoundingClientRect()
+  if (!previous.width || !previous.height || !current.width || !current.height) return
+  const scaleX = previous.width / current.width
+  const scaleY = previous.height / current.height
+  const styles = getComputedStyle(element)
+  const duration = styles.getPropertyValue('--win11-enter').trim()
+  const timing = {
+    duration: parseFloat(duration) * (duration.endsWith('ms') ? 1 : 1000) || 250,
+    easing: styles.getPropertyValue('--win11-ease-out').trim() || 'ease-out',
+  }
+  layoutAnimations.push(element.animate([
+    { transformOrigin: 'top left', transform: `translate(${previous.left - current.left}px, ${previous.top - current.top}px) scale(${scaleX}, ${scaleY})` },
+    { transformOrigin: 'top left', transform: 'none' },
+  ], timing))
+  // Sample reciprocal scales so content stays at its normal size throughout
+  // the frame animation, including large height changes when minimizing.
+  const card = element.querySelector<HTMLElement>('.console-floating-card')
+  if (card) layoutAnimations.push(card.animate(Array.from({ length: 61 }, (_, index) => {
+    const progress = index / 60
+    return {
+      offset: progress,
+      transformOrigin: 'top left',
+      transform: `scale(${1 / (scaleX + (1 - scaleX) * progress)}, ${1 / (scaleY + (1 - scaleY) * progress)})`,
+      opacity: 0.6 + 0.4 * progress,
+    }
+  }), timing))
+}
 
 const panelStyle = computed(() => ({
   left: `${position.value.x}px`,
@@ -148,6 +196,7 @@ const compactChart = computed(() => compactChartPaths(
 ))
 
 function startDrag(event: PointerEvent) {
+  stopLayoutAnimation()
   if (event.button !== 0 || !panel.value) return
   const handle = event.currentTarget
   if (!(handle instanceof HTMLElement)) return
@@ -201,18 +250,28 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  stopLayoutAnimation()
   launcherMedia?.removeEventListener('change', syncMobile)
   window.removeEventListener('resize', clampPosition)
   stopDrag()
 })
 
 watch(() => props.visible, (visible) => {
+  stopLayoutAnimation()
   if (visible) void placePanel()
   else stopDrag()
 })
 watch(() => [props.canvasWidth, props.canvasHeight], () => {
   if (props.visible) clampPosition()
 })
+watch(panel, (element, _previous, onCleanup) => {
+  if (!element) return
+  const observer = new ResizeObserver(() => {
+    if (props.visible) clampPosition()
+  })
+  observer.observe(element)
+  onCleanup(() => observer.disconnect())
+}, { flush: 'post' })
 function persistLayout() {
   if (!props.visible) return
   void nextTick().then(() => clampPosition())
@@ -228,7 +287,7 @@ watch(showAudio, (value) => {
 })
 watch(compact, (value) => {
   localStorage.setItem(COMPACT_KEY, String(value))
-  persistLayout()
+  void animateCompactChange()
 })
 watch(() => props.audioEnabled, persistLayout)
 </script>
@@ -255,7 +314,6 @@ watch(() => props.audioEnabled, persistLayout)
       class="performance-compact-bar"
       @pointerdown="startDrag"
     >
-      <GripHorizontal :size="14" class="floating-window-grip" />
       <svg
         class="performance-compact-chart"
         :viewBox="`0 0 ${COMPACT_CHART_WIDTH} ${COMPACT_CHART_HEIGHT}`"
@@ -268,35 +326,24 @@ watch(() => props.audioEnabled, persistLayout)
         <path v-if="compactChart.fps" class="performance-compact-chart-fps" :d="compactChart.fps" />
       </svg>
       <span class="performance-compact-metric">
-        <strong>{{ videoFps }}</strong>
         <span>FPS</span>
+        <strong>{{ videoFps }}</strong>
       </span>
       <span class="performance-compact-sep" />
       <span class="performance-compact-metric">
-        <strong>{{ compactResolution }}</strong>
         <span>{{ t('screen.resolution', 'Resolution') }}</span>
+        <strong>{{ compactResolution }}</strong>
       </span>
       <span class="performance-compact-sep" />
       <span class="performance-compact-metric">
-        <strong>{{ formatCompactBitrate(videoBitrate) }}</strong>
         <span>{{ t('screen.bitrate', 'Bitrate') }}</span>
+        <strong>{{ formatCompactBitrate(videoBitrate) }}</strong>
       </span>
       <span class="performance-compact-sep" />
       <span class="performance-compact-metric">
-        <strong>{{ codec || '—' }}</strong>
         <span>{{ t('screen.codec', 'Codec') }}</span>
+        <strong>{{ codec || '—' }}</strong>
       </span>
-      <template v-if="showAudioColumn">
-        <span class="performance-compact-sep" />
-        <span class="performance-compact-metric">
-          <strong>{{ audioFps || 0 }}</strong>
-          <span>/s</span>
-        </span>
-        <span class="performance-compact-metric">
-          <strong>{{ formatCompactBitrate(audioBitrate || 0) }}</strong>
-          <span>{{ (audioEncoder || '').toUpperCase() || 'AUD' }}</span>
-        </span>
-      </template>
       <div class="performance-window-actions" @pointerdown.stop>
         <n-button
           quaternary

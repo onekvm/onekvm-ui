@@ -19,6 +19,7 @@ let behavior = 'decoded'
 let muxers = 0
 let destroyed = 0
 let feeds = 0
+const feedDurations: number[] = []
 const readyCallbacks: (() => void)[] = []
 class Muxer {
   private feeds = 0
@@ -29,7 +30,8 @@ class Muxer {
     readyCallbacks.push(options.onReady)
     if (behavior !== 'late-ready') queueMicrotask(options.onReady)
   }
-  feed() {
+  feed(frame: { duration?: number } = {}) {
+    feedDurations.push(Math.trunc(frame.duration ?? 0))
     feeds += 1
     this.feeds += 1
     if (behavior === 'throw') throw new Error('Cannot create SourceBuffer')
@@ -149,6 +151,26 @@ try {
     video.dispatchEvent(new Event('error'))
     await Promise.resolve()
     assert.equal(failures.length, behavior === 'decoded' ? 0 : 1, 'Destroyed players cannot report a late failure')
+  }
+  behavior = 'decoded'
+  for (const durationUs of [16667, 33333, 8333]) {
+    const video = new Video()
+    const player = new WebSocketVideo(video, 'wss://example.test/video', 'h265', { bitrate: () => {}, disconnected: () => assert.fail('Continuous video must remain connected') })
+    const connected = player.connect()
+    const socket = sockets.at(-1)!
+    socket.open()
+    await connected
+    const before = feedDurations.length
+    for (let sequence = 0; sequence < 600; sequence++) {
+      const packet = frame.slice(0)
+      const view = new DataView(packet)
+      view.setBigUint64(8, BigInt(sequence))
+      view.setUint32(24, durationUs)
+      socket.onmessage?.({ data: packet })
+    }
+    const duration = feedDurations.slice(before).reduce((sum, value) => sum + value, 0)
+    assert.ok(Math.abs(duration - 600 * durationUs / 1000) < 1, 'Integer millisecond remuxing must not shorten the live video clock')
+    player.destroy()
   }
 } finally {
   await server.close()

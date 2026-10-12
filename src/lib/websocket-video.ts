@@ -36,6 +36,7 @@ export class WebSocketVideo {
   private lastSequence: bigint | null = null
   private sampleStartedAt = 0
   private sampleBytes = 0
+  private durationRemainderUs = 0
   private startupTimer: ReturnType<typeof setTimeout> | undefined
   private decoded = false
   private playbackFailed = false
@@ -183,9 +184,12 @@ export class WebSocketVideo {
 
     const frame: CompleteVideoFrame = {
       video: bytes.subarray(HEADER_SIZE),
-      duration: Math.max(1, durationUsec / 1000),
+      // JMuxer truncates each duration to integer milliseconds. Carry the
+      // remainder so 60 x 16.667ms still supplies a full second of video.
+      duration: Math.floor((Math.max(1000, durationUsec) + this.durationRemainderUs) / 1000),
       isLastVideoFrameComplete: true,
     }
+    this.durationRemainderUs = (Math.max(1000, durationUsec) + this.durationRemainderUs) % 1000
     if (!this.decoded && this.startupTimer === undefined) {
       this.startupTimer = setTimeout(() => {
         this.failPlayback(`The browser could not start ${this.codec.toUpperCase()} playback over WebSocket`, true)

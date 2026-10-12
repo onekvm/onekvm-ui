@@ -33,7 +33,7 @@ import { consumeConsoleBack, lockConsoleHistory } from '@/lib/history-lock'
 import { fullscreenTopInsetPx, isIpadLikeUserAgent, readSafeAreaTop } from '@/lib/fullscreen-inset'
 import { useTransport } from '@/composables/useTransport'
 import { onekvm, type BrowserAudioStats, type BrowserVideoLatencyUs } from '@/lib/onekvm'
-import { videoCodecLabel } from '@/lib/video-transport'
+import { effectiveVideoCodec } from '@/lib/video-transport'
 import { loadLocalShortcuts, saveLocalShortcuts } from '@/lib/keyboard-shortcuts'
 import { statusEvents } from '@/lib/status-events'
 import { t } from '@/i18n/runtime'
@@ -603,7 +603,7 @@ onBeforeUnmount(() => {
           :video-fps="videoFps"
           :video-bitrate="videoBitrate"
           :target-fps="status?.video.fps || 60"
-          :codec="status ? videoCodecLabel(status.video) : ''"
+          :codec="status ? effectiveVideoCodec(status.video).toUpperCase() : ''"
           :transport="state.videoMode"
           :input-width="status?.video.input_width ?? 0"
           :input-height="status?.video.input_height ?? 0"

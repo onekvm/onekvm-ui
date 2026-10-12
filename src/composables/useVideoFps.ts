@@ -25,7 +25,9 @@ export function useVideoFps(
   const framePresented: VideoFrameRequestCallback = (now, metadata) => {
     const element = video.value
     if (!element) return
-    presentedFrames += 1
+    // Callbacks may be coalesced. The browser's frame counter includes all
+    // presentations since this media source started, not just callbacks.
+    presentedFrames = metadata.presentedFrames
     lastFrame = now
     const receive = metadata.receiveTime
     const display = metadata.expectedDisplayTime
@@ -48,6 +50,17 @@ export function useVideoFps(
   }
 
   const currentFrameCount = () => playbackFrameCount(video.value, presentedFrames)
+
+  const resetFrames = () => {
+    presentedFrames = 0
+    previousFrames = 0
+    previousSample = performance.now()
+    lastFrame = 0
+    presentSumUs = 0
+    presentSamples = 0
+    update(0)
+    updatePresent?.(0)
+  }
 
   const sample = () => {
     const now = performance.now()
@@ -75,6 +88,7 @@ export function useVideoFps(
   onMounted(() => {
     const element = video.value
     previousSample = performance.now()
+    element?.addEventListener('emptied', resetFrames)
     usesFrameCallback = Boolean(element?.requestVideoFrameCallback)
     if (element && usesFrameCallback) armFrameCallback(element)
     sampleTimer = window.setInterval(sample, 1_000)
@@ -82,6 +96,7 @@ export function useVideoFps(
 
   onBeforeUnmount(() => {
     const element = video.value
+    element?.removeEventListener('emptied', resetFrames)
     if (element && callbackId) element.cancelVideoFrameCallback(callbackId)
     window.clearInterval(sampleTimer)
     update(0)

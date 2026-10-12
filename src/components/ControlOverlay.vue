@@ -21,7 +21,7 @@ const emit = defineEmits<{
 const overlayTo = useOverlayMount()
 const sheetId = `${Date.now()}-${Math.random()}`
 const compactPopoverTheme = {
-  padding: '4px 12px 10px',
+  padding: '8px 12px',
 }
 
 function updateShow(show: boolean) {

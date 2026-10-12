@@ -153,7 +153,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .connection-trace {
   position: absolute;
-  z-index: 0;
+  z-index: 4;
   left: 0;
   bottom: 0;
   display: flex;

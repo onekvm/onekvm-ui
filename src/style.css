@@ -2505,14 +2505,18 @@ select { font: inherit; }
 
 .performance-compact-metric {
   display: inline-flex;
+  height: 100%;
   flex-direction: column;
   align-items: flex-start;
+  justify-content: center;
   gap: 3px;
   font-feature-settings: "tnum" 1, "zero" 1;
   white-space: nowrap;
 }
 
 .performance-compact-metric strong {
+  display: inline-flex;
+  align-items: center;
   color: var(--foreground);
   font-family: var(--onekvm-font-mono);
   font-size: 12px;
@@ -2521,6 +2525,8 @@ select { font: inherit; }
 }
 
 .performance-compact-metric span {
+  display: inline-flex;
+  align-items: center;
   color: var(--muted-foreground);
   font-size: 10px;
   font-weight: 600;
@@ -2589,6 +2595,9 @@ select { font: inherit; }
 }
 
 .video-performance-overlay .display-status-titlebar strong {
+  display: inline-flex;
+  align-self: stretch;
+  align-items: center;
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -2605,6 +2614,12 @@ select { font: inherit; }
   font-size: 11px;
   cursor: pointer;
   white-space: nowrap;
+}
+
+.performance-advanced-toggle > span {
+  display: inline-flex;
+  align-self: stretch;
+  align-items: center;
 }
 
 .video-performance-overlay.is-mobile-sheet {
@@ -2948,6 +2963,8 @@ select { font: inherit; }
 }
 
 .display-status-column > h2 {
+  display: flex;
+  align-items: center;
   margin: 0 0 8px;
   color: var(--foreground);
   font-size: 11px;
@@ -2980,6 +2997,17 @@ select { font: inherit; }
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.video-performance-overlay .display-status-meta > div > span,
+.video-performance-overlay .display-status-meta > div > strong {
+  display: inline-flex;
+  align-self: stretch;
+  align-items: center;
+}
+
+.video-performance-overlay .display-status-meta > div > strong {
+  justify-content: flex-end;
 }
 
 .display-status-column > .display-status-chart {

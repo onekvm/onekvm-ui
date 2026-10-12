@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { Pencil, Plus, Trash2, UserRound } from '@lucide/vue'
-import { useDialog, useMessage } from 'naive-ui'
+import { useMessage } from 'naive-ui'
 
 import { api, type AuthUser, type AuthUserUpdate } from '@/api/client'
 import { t } from '@/i18n/runtime'
@@ -15,7 +16,7 @@ const props = withDefaults(defineProps<{
   layout: 'compact',
 })
 
-const dialog = useDialog()
+const dialog = useAsyncDialog()
 const message = useMessage()
 const users = ref<AuthUser[]>([])
 const productAssignments = ref<ProductUserAssignment[]>([])
@@ -126,6 +127,7 @@ function remove(user: AuthUser) {
         await load()
       } catch (reason) {
         message.error(reason instanceof Error ? reason.message : String(reason))
+        return false
       }
     },
   })

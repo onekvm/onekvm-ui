@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { computed, ref, watch } from 'vue'
 import { FileCode2, Save } from '@lucide/vue'
-import { useDialog, useMessage } from 'naive-ui'
+import { useMessage } from 'naive-ui'
 
 import type { DeviceFileEntry } from '@/api/client'
 import { MAX_EDITABLE_FILE_BYTES, useFileEditor } from '@/composables/useFileEditor'
@@ -17,7 +18,7 @@ const emit = defineEmits<{
 }>()
 const show = defineModel<boolean>('show', { required: true })
 
-const dialog = useDialog()
+const dialog = useAsyncDialog()
 const message = useMessage()
 const editor = useFileEditor()
 const targetPath = computed(() => {

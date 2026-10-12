@@ -27,7 +27,6 @@ import {
   NMenu,
   NMessageProvider,
   NModal,
-  NPopconfirm,
   NPopover,
   NProgress,
   NQrCode,
@@ -49,6 +48,7 @@ import {
 } from 'naive-ui'
 
 import App from './App.vue'
+import AsyncPopconfirm from './components/AsyncPopconfirm'
 import { api, APIError } from './api/client'
 import { initializeLanguage } from './i18n/runtime'
 import { lockMobileViewport } from './lib/mobile-viewport'
@@ -91,7 +91,7 @@ const naive = create({
     NMenu,
     NMessageProvider,
     NModal,
-    NPopconfirm,
+    AsyncPopconfirm,
     NPopover,
     NProgress,
     NQrCode,

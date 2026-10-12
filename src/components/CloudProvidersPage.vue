@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { computed } from 'vue'
 import { CloudOff, RefreshCw, Store } from '@lucide/vue'
-import { useDialog, useMessage } from 'naive-ui'
+import { useMessage } from 'naive-ui'
 
 import type { ExtensionSummary } from '@/api/client'
 import { useCloudServices } from '@/composables/useCloudServices'
@@ -22,7 +23,7 @@ const emit = defineEmits<{
   openPlugins: []
 }>()
 
-const dialog = useDialog()
+const dialog = useAsyncDialog()
 const message = useMessage()
 const catalogRef = computed(() => props.catalog)
 const {
@@ -76,6 +77,7 @@ async function runInstall(service: CloudServiceEntry) {
     message.success(t('settings.cloudProviders.installedMessage', 'Cloud service installed. Choose Start when you are ready to use it.'))
   } catch (reason) {
     message.error(reason instanceof Error ? reason.message : String(reason))
+    return false
   }
 }
 
@@ -97,6 +99,7 @@ async function runActivate(service: CloudServiceEntry) {
     message.success(t('settings.cloudProviders.startedMessage', 'Cloud service started'))
   } catch (reason) {
     message.error(reason instanceof Error ? reason.message : String(reason))
+    return false
   }
 }
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { computed, onMounted, ref } from 'vue'
-import { useDialog, useMessage } from 'naive-ui'
+import { useMessage } from 'naive-ui'
 
 import { api, APIError, type EDIDApplyRequired, type EDIDStatus } from '@/api/client'
 import { t } from '@/i18n/runtime'
@@ -10,7 +11,7 @@ import SettingsPanel from './SettingsPanel.vue'
 defineProps<{ disabled?: boolean }>()
 
 const message = useMessage()
-const dialog = useDialog()
+const dialog = useAsyncDialog()
 const status = ref<EDIDStatus | null>(null)
 const busy = ref(false)
 const selection = ref('')
@@ -77,6 +78,7 @@ async function confirmApply(required: EDIDApplyRequired) {
       negativeText: t('common.later', 'Later'),
       onPositiveClick: () => api.rebootSystem().catch((error: unknown) => {
         message.error(error instanceof APIError ? error.message : String(error))
+        return false
       }),
     })
     return

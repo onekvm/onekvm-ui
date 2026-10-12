@@ -12,6 +12,7 @@
     "test:toolbox": "node --experimental-strip-types tests/toolbox-pins.test.ts && node --experimental-strip-types tests/toolbox-runtime.test.ts",
     "test:api-error": "node --experimental-strip-types tests/api-error.test.ts",
     "test:async-confirmation": "node --experimental-strip-types tests/async-confirmation.test.ts",
+    "test:extension-host-error": "node --experimental-strip-types tests/extension-host-error.test.ts",
     "test:service-url": "node --experimental-strip-types tests/service-url.test.ts",
     "test:authorized-keys": "node --experimental-strip-types tests/authorized-keys.test.ts",
     "test:network-dns": "node --experimental-strip-types tests/network-dns.test.ts",

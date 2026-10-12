@@ -5,10 +5,12 @@ import { useMessage } from 'naive-ui'
 import {
   api,
   extensionAssetURL,
+  extensionTranslation,
   type ExtensionStatus,
 } from '@/api/client'
 import { uninstallExtension } from '@/composables/useUninstallExtension'
-import { t } from '@/i18n/runtime'
+import { currentLanguage, t } from '@/i18n/runtime'
+import { extensionHostErrorText } from '@/lib/extension-host-error'
 import {
   loadVueExtensionPage,
   validateExtensionSettings,
@@ -82,6 +84,14 @@ async function refreshSettings(reset: boolean) {
   return updated
 }
 
+function hostError(reason: unknown) {
+  const raw = reason instanceof Error ? reason.message : String(reason)
+  return extensionHostErrorText(raw, t, (id) => {
+    if (id !== props.extension.id) return id
+    return extensionTranslation(props.extension, currentLanguage.value).name
+  })
+}
+
 async function save(): Promise<boolean> {
   const adapter = settingsAdapter.value
   if (!adapter || saving.value || !adapter.valid.value) return false
@@ -95,7 +105,7 @@ async function save(): Promise<boolean> {
     message.success(t('settings.success', 'Settings saved'))
     return true
   } catch (reason) {
-    message.error(reason instanceof Error ? reason.message : String(reason))
+    message.error(hostError(reason))
     return false
   } finally {
     saving.value = false
@@ -109,7 +119,7 @@ async function reload() {
     await refreshSettings(true)
     message.success(t('settings.plugins.reloaded', 'Settings reloaded'))
   } catch (reason) {
-    message.error(reason instanceof Error ? reason.message : String(reason))
+    message.error(hostError(reason))
   } finally {
     saving.value = false
   }

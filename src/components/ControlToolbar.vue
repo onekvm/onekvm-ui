@@ -39,6 +39,7 @@ import PinnedTools from './toolbox/PinnedTools.vue'
 import { useToolboxContext } from '@/composables/useToolbox'
 import { toolbarItemsFor } from '@/extensions/pluginUi'
 import { hidIndicatorState } from '@/lib/hid-status'
+import { USB_GAMEPAD_UI_ENABLED } from '@/lib/ui-features'
 import { dismissControlOverlays } from '@/lib/overlay-target'
 import { machineDisplayName } from '@/lib/machine'
 import { onekvm, type InputActivity, type TransportState } from '@/lib/onekvm'
@@ -1468,7 +1469,7 @@ onBeforeUnmount(() => {
       </KeyboardControlPopover>
 
       <GamepadPopover
-        v-if="status?.hid?.gamepad"
+        v-if="USB_GAMEPAD_UI_ENABLED && status?.hid?.gamepad"
         :hid="status?.hid"
         :placement="menuPlacement"
         :sheet="toolbarLauncher"

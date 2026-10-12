@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 
 import type { OneKVMConfig, OneKVMStatus, USBConfig } from '@/api/client'
 import { t } from '@/i18n/runtime'
+import { USB_GAMEPAD_UI_ENABLED } from '@/lib/ui-features'
 
 import AudioSettingsForm from './AudioSettingsForm.vue'
 import USBCapacityBadge from './USBCapacityBadge.vue'
@@ -171,7 +172,7 @@ const keyboardLeds = computed({
         </div>
       </dl>
       <n-alert v-if="overBudget" type="warning" :bordered="false">
-        {{ t('settings.advancedSettings.usbPage.endpointsExceeded', 'Too many functions are on. Turn off audio, the gamepad, virtual storage, file transfer, or keyboard lights.') }}
+        {{ t('settings.advancedSettings.usbPage.endpointsExceeded', 'Too many functions are on. Turn off audio, the microphone, virtual storage, file transfer, or keyboard lights.') }}
       </n-alert>
     </section>
 
@@ -224,7 +225,7 @@ const keyboardLeds = computed({
                   <n-switch v-model:value="audio.enabled" :disabled="props.disabled || audioBlocked" />
                 </span>
               </template>
-              {{ t('settings.advancedSettings.usbPage.audioBlocked', 'Not enough USB capacity. Turn off the gamepad, microphone, virtual storage, or file transfer first.') }}
+              {{ t('settings.advancedSettings.usbPage.audioBlocked', 'Not enough USB capacity. Turn off the microphone, virtual storage, or file transfer first.') }}
             </n-tooltip>
           </div>
         </li>
@@ -241,11 +242,11 @@ const keyboardLeds = computed({
                   <n-switch v-model:value="microphoneOn" :disabled="props.disabled || microphoneBlocked" />
                 </span>
               </template>
-              {{ t('settings.advancedSettings.usbPage.microphoneBlocked', 'Not enough USB capacity. Turn off the speaker, gamepad, virtual storage, or file transfer first.') }}
+              {{ t('settings.advancedSettings.usbPage.microphoneBlocked', 'Not enough USB capacity. Turn off the speaker, virtual storage, or file transfer first.') }}
             </n-tooltip>
           </div>
         </li>
-        <li>
+        <li v-if="USB_GAMEPAD_UI_ENABLED">
           <div>
             <strong>{{ t('settings.advancedSettings.usbPage.gamepad', 'Gamepad') }}</strong>
             <small>{{ t('settings.advancedSettings.usbPage.gamepadHint', 'Forwards a gamepad from this computer to the controlled device through the browser. Turning it on or off disconnects USB briefly.') }}</small>
@@ -275,7 +276,7 @@ const keyboardLeds = computed({
                   <n-switch v-model:value="massStorageOn" :disabled="props.disabled || storageBlocked" />
                 </span>
               </template>
-              {{ t('settings.advancedSettings.usbPage.storageBlocked', 'Not enough USB capacity. Turn off audio, the microphone, the gamepad, or file transfer first.') }}
+              {{ t('settings.advancedSettings.usbPage.storageBlocked', 'Not enough USB capacity. Turn off audio, the microphone, or file transfer first.') }}
             </n-tooltip>
           </div>
         </li>
@@ -292,7 +293,7 @@ const keyboardLeds = computed({
                   <n-switch v-model:value="mtpOn" :disabled="props.disabled || mtpBlocked" />
                 </span>
               </template>
-              {{ t('settings.advancedSettings.usbPage.mtpBlocked', 'Not enough USB capacity. Turn off audio, the microphone, the gamepad, or virtual storage first.') }}
+              {{ t('settings.advancedSettings.usbPage.mtpBlocked', 'Not enough USB capacity. Turn off audio, the microphone, or virtual storage first.') }}
             </n-tooltip>
           </div>
         </li>

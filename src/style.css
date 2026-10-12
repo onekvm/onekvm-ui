@@ -4018,6 +4018,7 @@ select { font: inherit; }
 .role-boot,
 .role-boot_a,
 .role-boot_b { --partition-color: #49a7a1; }
+.role-rootfs,
 .role-rootfs_a { --partition-color: #568fc8; }
 .role-rootfs_b { --partition-color: #c3944f; }
 .role-userdata { --partition-color: #52a66f; }

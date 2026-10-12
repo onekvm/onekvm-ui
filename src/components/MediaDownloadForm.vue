@@ -60,18 +60,21 @@ function submit() {
     :title="t('virtualMedia.onlineDownload', 'Online download')"
   >
     <form class="media-download-form" @submit.prevent="submit">
-      <p class="media-download-hint">{{ t('virtualMedia.downloadDescription', 'Download an ISO directly to the device using an HTTP or HTTPS link.') }}</p>
-      <n-form-item :label="t('virtualMedia.downloadURL', 'Download URL')" label-placement="top" :show-feedback="false">
-        <n-input v-model:value="url" autofocus placeholder="https://example.com/image.iso" :input-props="{ inputmode: 'url', autocomplete: 'off', spellcheck: false, 'aria-label': t('virtualMedia.downloadURL', 'Download URL') }" />
+      <p class="media-download-hint">{{ t('virtualMedia.downloadDescription', 'Download an ISO to the device.') }}</p>
+      <n-form-item :label="t('virtualMedia.downloadURL', 'Download URL (HTTP/HTTPS)')" label-placement="top" :show-feedback="false">
+        <n-input v-model:value="url" autofocus placeholder="https://example.com/image.iso" :input-props="{ inputmode: 'url', autocomplete: 'off', spellcheck: false, 'aria-label': t('virtualMedia.downloadURL', 'Download URL (HTTP/HTTPS)') }" />
       </n-form-item>
       <n-form-item :label="t('virtualMedia.downloadFileName', 'File name')" label-placement="top" :show-feedback="false">
         <n-input v-model:value="name" :placeholder="suggestedName" :input-props="{ 'aria-label': t('virtualMedia.downloadFileName', 'File name') }" />
       </n-form-item>
       <p v-if="url && !validURL" class="media-download-error" role="status">{{ t('virtualMedia.invalidDownloadURL', 'Enter a valid HTTP or HTTPS URL.') }}</p>
       <p v-else-if="name && !validName" class="media-download-error" role="status">{{ t('virtualMedia.invalidDownloadName', 'Enter an ISO file name without directory separators.') }}</p>
-      <div class="media-download-actions">
-        <n-button @click="show = false">{{ t('common.cancel', 'Cancel') }}</n-button>
-        <n-button attr-type="submit" type="primary" :disabled="disabled || !validURL || !validName">{{ t('virtualMedia.startDownload', 'Start download') }}</n-button>
+      <div class="media-download-footer">
+        <p class="media-download-hint media-download-background">{{ t('virtualMedia.downloadBackgroundHint', 'Downloads continue after closing.') }}</p>
+        <div class="media-download-actions">
+          <n-button @click="show = false">{{ t('common.cancel', 'Cancel') }}</n-button>
+          <n-button attr-type="submit" type="primary" :disabled="disabled || !validURL || !validName">{{ t('virtualMedia.startDownload', 'Start download') }}</n-button>
+        </div>
       </div>
     </form>
   </n-modal>
@@ -82,5 +85,7 @@ function submit() {
 .media-download-hint, .media-download-error { margin: 0; font-size: 12px; line-height: 1.5; }
 .media-download-hint { color: var(--n-text-color-3); }
 .media-download-error { color: var(--destructive); }
-.media-download-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.media-download-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.media-download-background { flex: 1 1 120px; min-width: 0; }
+.media-download-actions { display: flex; flex-shrink: 0; justify-content: flex-end; gap: 8px; margin-left: auto; }
 </style>

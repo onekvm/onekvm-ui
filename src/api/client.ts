@@ -786,6 +786,19 @@ export interface MSDDriveTransferProgress {
   done?: boolean
 }
 
+export interface MSDDownloadTask {
+  id: string
+  state: 'running' | 'cancelling' | 'completed' | 'cancelled' | 'failed'
+  error?: string | null
+  status?: number | null
+  name: string
+  transferred: number
+  total: number
+  media?: MSDMedia | null
+  url_name?: string | null
+  server_name?: string | null
+}
+
 export interface ExtensionService {
   id: string
   name: string
@@ -1371,8 +1384,19 @@ export const api = {
   mountMSDMedia: (id: string) => request<MSDStatus>(`/api/msd/media/${encodeURIComponent(id)}/mount`, { method: 'POST' }),
   ejectMSD: (kind: 'iso' | 'drive') => request<MSDStatus>(`/api/msd/eject/${kind}`, { method: 'POST' }),
   deleteMSDMedia: (id: string) => request<void>(`/api/msd/media/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  renameMSDISO: (id: string, name: string) => request<MSDMedia>(`/api/msd/media/${encodeURIComponent(id)}/rename`, {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  }),
   uploadMSDISO: (file: File, onProgress?: (loaded: number, total: number) => void, signal?: AbortSignal) =>
     uploadStoredImage('/api/msd/iso-uploads', file, onProgress, signal),
+  startMSDDownload: (url: string, name: string) => request<MSDDownloadTask>('/api/msd/iso-downloads', {
+    method: 'POST', body: JSON.stringify({ url, name }),
+  }),
+  getMSDDownloads: (signal?: AbortSignal) => request<MSDDownloadTask[]>('/api/msd/iso-downloads', { signal }),
+  cancelMSDDownload: (id: string) => request<MSDDownloadTask>(`/api/msd/iso-downloads/${encodeURIComponent(id)}/cancel`, {
+    method: 'POST',
+  }),
   uploadMSDDriveImage: (file: File, onProgress?: (loaded: number, total: number) => void, signal?: AbortSignal) =>
     uploadStoredImage('/api/msd/drive-uploads', file, onProgress, signal),
   createMSDDrive: (name: string, label: string, sizeMiB: number, filesystem = 'exfat') => request<MSDMedia>('/api/msd/drives', {

@@ -1,36 +1,32 @@
 <script setup lang="ts">
+import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { ArrowLeft, Check, CircleCheck, CirclePlus, ClipboardPaste, Copy, Database, Disc3, Download, File, Folder, FolderOpen, FolderPlus, HardDrive, House, Info, Laptop, LayoutGrid, LoaderCircle, Pencil, Plug, Scissors, Server, Smartphone, Trash2, Unplug, Upload, X } from '@lucide/vue'
-import { useDialog, useMessage } from 'naive-ui'
+import { useMessage } from 'naive-ui'
 
-import { api, APIError, type MSDFileEntry, type MSDMedia, type MSDStatus } from '@/api/client'
+import { api, APIError, type MSDDownloadTask, type MSDFileEntry, type MSDMedia, type MSDStatus } from '@/api/client'
+import { useMSDDownload } from '@/composables/useMSDDownload'
 import { useUploadProgress } from '@/composables/useUploadProgress'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { t } from '@/i18n/runtime'
 import { BrowserISO, type BrowserISOProgress } from '@/lib/browser-iso'
+import type { MediaTransferState } from '@/lib/media-transfer'
 import { nextUploadSpeed, uploadPercentage, uploadRemainingSeconds } from '@/lib/upload-speed'
 
 import XpTransferDialog from './XpTransferDialog.vue'
+import XpProgressCells from './XpProgressCells.vue'
+import MediaDownloadForm from './MediaDownloadForm.vue'
+import StoredISORenameForm from './StoredISORenameForm.vue'
 
-defineProps<{
-  placement?: 'top-end' | 'bottom-end' | 'right-start' | 'left-start'
+const props = withDefaults(defineProps<{
+  consoleActive?: boolean
   sheet?: boolean
-}>()
+}>(), { consoleActive: true })
 
 const emit = defineEmits<{
   status: [status: MSDStatus]
   'update:show': [show: boolean]
-  'upload-state': [state: {
-    minimized: boolean
-    uploading: boolean
-    name: string
-    progress: number
-    transferred: number
-    total: number
-    speed: number
-    remainingSeconds: number
-    title: string
-  }]
+  'upload-state': [state: MediaTransferState]
 }>()
 
 type DriveClipboard = {
@@ -55,7 +51,7 @@ function clearLegacyUploadResume() {
 }
 
 const message = useMessage()
-const dialog = useDialog()
+const dialog = useAsyncDialog()
 const overlayTo = useOverlayMount()
 const loading = ref(false)
 const connecting = ref(false)
@@ -86,6 +82,12 @@ const uploadSpeed = ref(0)
 const uploading = ref(false)
 const uploadStopRequested = ref(false)
 const uploadKind = ref<'iso' | 'drive'>('iso')
+const uploadAction = shallowRef<'upload' | 'download'>('upload')
+const downloadFormOpen = shallowRef(false)
+const downloadFilenameWarning = shallowRef('')
+const isoRenameOpen = shallowRef(false)
+const isoRenameMedia = shallowRef<MSDMedia | null>(null)
+const isoRenameBusy = shallowRef(false)
 const uploadDialogOpen = ref(false)
 const uploadWindow = ref<InstanceType<typeof XpTransferDialog> | null>(null)
 const uploadPosition = ref<{ x: number; y: number } | null>(null)
@@ -209,9 +211,13 @@ const driveUploadStatus = computed(() => t('virtualMedia.uploadingFile', 'Upload
 const driveUploadRemainingLabel = computed(() => driveUpload.uploading.value
   ? formatUploadRemaining(driveUpload.remainingSeconds.value)
   : '')
-const uploadStatusLabel = computed(() => t('virtualMedia.uploadingFile', 'Uploading {name}…')
+const uploadStatusLabel = computed(() => (uploadAction.value === 'download'
+  ? t('virtualMedia.downloadingFile', 'Downloading {name}…')
+  : t('virtualMedia.uploadingFile', 'Uploading {name}…'))
   .replace('{name}', uploadFileName.value))
-const uploadProgressTitle = computed(() => uploadKind.value === 'drive'
+const uploadProgressTitle = computed(() => uploadAction.value === 'download'
+  ? t('virtualMedia.downloadProgressTitle', 'ISO download')
+  : uploadKind.value === 'drive'
   ? t('virtualMedia.driveUploadTitle', 'Disk upload')
   : t('virtualMedia.uploadProgressTitle', 'ISO upload'))
 
@@ -227,6 +233,7 @@ watch(
     speed: uploadSpeed.value,
     remainingSeconds: isoUploadRemainingSeconds.value,
     title: uploadProgressTitle.value,
+    action: uploadAction.value,
   }),
   { immediate: true },
 )
@@ -637,6 +644,8 @@ async function uploadStoredMedia(event: Event, kind: 'iso' | 'drive') {
     return
   }
 
+  downloadFilenameWarning.value = ''
+  uploadAction.value = 'upload'
   uploadKind.value = kind
   uploadFileName.value = file.name
   uploadFileSize.value = file.size
@@ -679,15 +688,109 @@ function minimizeUploadDialog() {
   uploadDialogOpen.value = false
 }
 
+const deviceDownload = useMSDDownload({ onUpdate: updateDeviceDownload })
+
+function resetTransferDialog() {
+  uploadDialogOpen.value = false
+  uploading.value = false
+  uploadStopRequested.value = false
+  uploadSpeed.value = 0
+  uploadProgress.value = 0
+  uploadTransferred.value = 0
+}
+
+function updateDeviceDownload(task: MSDDownloadTask, attached: boolean) {
+  if (attached) {
+    uploadAction.value = 'download'
+    downloadFilenameWarning.value = ''
+    uploadKind.value = 'iso'
+    uploadFileName.value = task.name
+    uploadPosition.value = null
+    uploadDialogOpen.value = props.consoleActive
+    uploading.value = true
+    resetUploadTelemetry(task.transferred, task.total)
+  }
+  uploadStopRequested.value = task.state === 'cancelling'
+  if (task.server_name && task.server_name !== (task.url_name || task.name)) {
+    const warning = t('virtualMedia.downloadFilenameMismatch', 'The URL file name “{url}” differs from the server file name “{server}”. Download continues and saves as “{name}”. After completion, use Rename in Device files to change the name.')
+      .replace('{url}', task.url_name || task.name)
+      .replace('{server}', task.server_name)
+      .replace('{name}', task.name)
+    if (warning !== downloadFilenameWarning.value) {
+      downloadFilenameWarning.value = warning
+      message.warning(warning, { duration: 10000, closable: true })
+    }
+  }
+  uploadFileSize.value = task.total
+  updateUploadTelemetry(task.transferred, task.total)
+  if (task.state === 'running' || task.state === 'cancelling') return
+  if (task.state === 'completed') message.success(t('virtualMedia.downloadSuccess', 'ISO downloaded'))
+  else if (task.state === 'cancelled') message.info(t('virtualMedia.downloadCancelled', 'Download cancelled'))
+  else message.error(`${t('virtualMedia.downloadFailed', 'Download failed')}: ${task.error}`)
+  resetTransferDialog()
+  void refresh()
+}
+
+async function downloadISO(request: { url: string; name: string }) {
+  if (mountBlocked.value) return
+  uploadAction.value = 'download'
+  downloadFilenameWarning.value = ''
+  uploadFileName.value = request.name
+  uploadFileSize.value = 0
+  uploadDialogOpen.value = true
+  updateShow(false)
+  uploading.value = true
+  uploadStopRequested.value = false
+  resetUploadTelemetry(0, 0)
+  try {
+    await deviceDownload.start(request.url, request.name)
+  } catch (error) {
+    message.error(`${t('virtualMedia.downloadFailed', 'Download failed')}: ${error instanceof Error ? error.message : String(error)}`)
+    resetTransferDialog()
+    await refresh()
+  }
+}
+
+function openISORename(item: MSDMedia) {
+  isoRenameMedia.value = item
+  isoRenameOpen.value = true
+}
+
+async function renameISO(name: string) {
+  const item = isoRenameMedia.value
+  if (!item || isoRenameBusy.value) return
+  isoRenameBusy.value = true
+  try {
+    const renamed = await api.renameMSDISO(item.id, name)
+    media.value = media.value.map((entry) => entry.id === renamed.id ? renamed : entry)
+    isoRenameOpen.value = false
+    downloadFilenameWarning.value = ''
+    message.success(t('virtualMedia.renameSuccess', 'Renamed'))
+  } catch (error) {
+    message.error(`${t('virtualMedia.renameFailed', 'Rename failed')}: ${error instanceof Error ? error.message : String(error)}`)
+  } finally {
+    isoRenameBusy.value = false
+  }
+}
+
 function restoreUploadDialog() {
   uploadDialogOpen.value = true
 }
 
-defineExpose({ restoreUploadDialog })
+defineExpose({ restoreUploadDialog, updateShow })
 
-function cancelUpload() {
+async function cancelUpload() {
   if (!uploading.value || uploadStopRequested.value) return
   uploadStopRequested.value = true
+  if (uploadAction.value === 'download') {
+    try {
+      await deviceDownload.cancel()
+    } catch (error) {
+      uploadStopRequested.value = false
+      message.error(`${t('virtualMedia.downloadCancelFailed', 'Could not cancel download')}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+    return
+  }
   abortActiveUploadRequests()
   message.info(t('virtualMedia.uploadCancelled', 'Upload cancelled'))
 }
@@ -772,7 +875,7 @@ async function uploadDriveFile(event: Event) {
 }
 
 async function writeDriveFile(selected: File, overwrite: boolean) {
-  if (!browsingDrive.value || driveUpload.uploading.value || fileTransferActive.value) return
+  if (!browsingDrive.value || driveUpload.uploading.value || fileTransferActive.value) return false
   const controller = driveUpload.begin(selected.name, selected.size)
   try {
     await api.uploadMSDDriveFile(
@@ -784,9 +887,11 @@ async function writeDriveFile(selected: File, overwrite: boolean) {
       controller.signal,
     )
     await refreshFiles()
+    return true
   } catch (error) {
-    if (controller.signal.aborted) return
+    if (controller.signal.aborted) return false
     message.error(error instanceof Error ? error.message : String(error))
+    return false
   } finally {
     driveUpload.finish(controller)
   }
@@ -806,13 +911,14 @@ async function createFolder() {
 
 async function deleteDriveEntry(entry: MSDFileEntry) {
   const drive = browsingDrive.value
-  if (!drive) return
-  fileDeletePopoverPath.value = ''
+  if (!drive) return false
   try {
     await api.deleteMSDDriveFile(drive.id, childPath(entry.name))
     await refreshFiles()
+    return true
   } catch (error) {
     message.error(error instanceof Error ? error.message : String(error))
+    return false
   }
 }
 
@@ -1021,6 +1127,23 @@ onMounted(() => {
   window.addEventListener('resize', clampUploadPosition)
 })
 
+watch(() => props.consoleActive, (active) => {
+  if (active) return
+  updateShow(false)
+  if (uploadAction.value === 'download') minimizeUploadDialog()
+  else {
+    uploadStopRequested.value = true
+    abortActiveUploadRequests()
+    uploadDialogOpen.value = false
+  }
+  driveUpload.cancel()
+  fileTransferController?.abort()
+  fileTransferDialogOpen.value = false
+  browserISO.value?.destroy()
+  browserISO.value = null
+  browserProgress.value = null
+}, { immediate: true })
+
 onBeforeUnmount(() => {
   uploadStopRequested.value = true
   abortActiveUploadRequests()
@@ -1033,7 +1156,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <span class="virtual-media-trigger" @click="updateShow(true)"><slot /></span>
+  <span v-if="$slots.default" class="virtual-media-trigger" @click="updateShow(true)"><slot /></span>
 
   <n-modal
     :show="popoverOpen"
@@ -1144,11 +1267,11 @@ onBeforeUnmount(() => {
                 </div>
               </section>
 
-              <section v-if="isoSource === 'device' && status?.iso_mounted !== 'browser'" class="media-mode-panel">
+              <section v-if="isoSource === 'device' && status?.iso_mounted !== 'browser'" class="media-mode-panel device-images-panel">
                 <header class="media-mode-header">
                   <div class="media-mode-copy">
                     <strong class="media-title"><Server :size="16" />{{ t('virtualMedia.isoMode', 'System images') }}</strong>
-                    <span>{{ t('virtualMedia.isoModeDescription', 'Upload system images to the device and mount them later.') }}</span>
+                    <span>{{ t('virtualMedia.isoModeDescription', 'Upload or download system images to the device and mount them later.') }}</span>
                   </div>
                   <div class="media-mode-header-actions">
                     <small class="storage-free"><Database :size="13" />{{ formatBytes(status?.storage_free || 0) }} {{ t('virtualMedia.free', 'free') }}</small>
@@ -1156,9 +1279,11 @@ onBeforeUnmount(() => {
                       <input type="file" accept=".iso,application/x-iso9660-image" :disabled="uploading" @change="uploadISO" />
                       <n-button :disabled="uploading" tag="span"><template #icon><Upload /></template>{{ t('virtualMedia.uploadISO', 'Upload ISO') }}</n-button>
                     </label>
+                    <n-button :disabled="mountBlocked" @click="downloadFormOpen = true"><template #icon><Download /></template>{{ t('virtualMedia.onlineDownload', 'Online download') }}</n-button>
                     <n-button v-if="status?.iso_mounted && status.iso_mounted !== 'browser'" @click="eject('iso')"><template #icon><Unplug /></template>{{ t('virtualMedia.unmount', 'Eject') }}</n-button>
                   </div>
                 </header>
+                <n-alert v-if="downloadFilenameWarning" type="warning" class="iso-download-notice" closable @close="downloadFilenameWarning = ''">{{ downloadFilenameWarning }}</n-alert>
                 <div v-if="loading && !isoMedia.length" class="iso-list-status" role="status">
                   <LoaderCircle class="spin" :size="18" />
                   <span>{{ t('virtualMedia.loadingImages', 'Loading ISO images…') }}</span>
@@ -1184,6 +1309,7 @@ onBeforeUnmount(() => {
                       {{ mountingID === item.id ? t('virtualMedia.mounting', 'Mounting') : t('virtualMedia.mount', 'Mount') }}
                     </n-button>
                     <n-button v-else-if="item.mounted" size="small" @click="eject('iso')"><template #icon><Unplug /></template>{{ t('virtualMedia.unmount', 'Eject') }}</n-button>
+                    <n-button v-if="!item.external" quaternary circle size="small" :disabled="item.mounted || Boolean(mountingID)" :aria-label="`${t('virtualMedia.rename', 'Rename')} ${item.name}`" :title="t('virtualMedia.rename', 'Rename')" @click="openISORename(item)"><template #icon><Pencil /></template></n-button>
                     <n-button v-if="!item.external" quaternary circle size="small" :disabled="item.mounted || Boolean(mountingID)" @click="confirmDelete(item)"><template #icon><Trash2 /></template></n-button>
                   </div>
                 </div>
@@ -1434,32 +1560,43 @@ onBeforeUnmount(() => {
     </template>
   </n-modal>
 
+  <MediaDownloadForm v-model:show="downloadFormOpen" :disabled="mountBlocked" @submit="downloadISO" />
+  <StoredISORenameForm v-model:show="isoRenameOpen" :name="isoRenameMedia?.name || ''" :busy="isoRenameBusy" @submit="renameISO" />
+
   <XpTransferDialog
     ref="uploadWindow"
     :show="uploadDialogOpen"
+    :minimized="uploading && !uploadDialogOpen"
+    minimize-target="media"
     :dialog-label="uploadProgressTitle"
     :window-style="uploadWindowStyle"
     :status="uploadStatusLabel"
     :transferred="uploadTransferred"
     :total="uploadFileSize"
     :percentage="uploadProgress"
+    :indeterminate="uploadAction === 'download' && uploadFileSize === 0"
+    :source-icon="uploadAction === 'download' ? 'internet' : 'folder'"
     :speed="uploadSpeed"
     :remaining-label="uploading ? uploadRemainingLabel : ''"
     @title-pointerdown="startUploadDrag"
   >
     <template #title>
-      <Upload :size="15" />{{ uploadProgressTitle }}
+      <component :is="uploadAction === 'download' ? Download : Upload" :size="15" />{{ uploadProgressTitle }}
     </template>
     <template #title-actions>
-      <button class="xp-title-minimize" :aria-label="t('virtualMedia.minimizeUpload', 'Minimize upload window')" @click="minimizeUploadDialog" />
+      <button class="xp-title-minimize" :aria-label="uploadAction === 'download' ? t('virtualMedia.minimizeDownload', 'Minimize download window') : t('virtualMedia.minimizeUpload', 'Minimize upload window')" @click="minimizeUploadDialog" />
+    </template>
+    <template #hint>
+      <div v-if="uploadAction === 'download' && deviceDownload.reconnecting.value" class="xp-resume-hint" role="status">{{ t('virtualMedia.downloadReconnecting', 'Reconnecting to download progress. The device continues downloading.') }}</div>
+      <div v-if="uploadAction === 'download' && downloadFilenameWarning" class="xp-resume-hint" role="status">{{ downloadFilenameWarning }}</div>
     </template>
     <template #actions>
-      <button :disabled="!uploading" @click="cancelUpload">{{ t('virtualMedia.cancelUpload', 'Cancel upload') }}</button>
+      <button :disabled="!uploading || uploadStopRequested" @click="cancelUpload">{{ uploadAction === 'download' ? t('virtualMedia.cancelDownload', 'Cancel download') : t('virtualMedia.cancelUpload', 'Cancel upload') }}</button>
     </template>
   </XpTransferDialog>
 
   <XpTransferDialog
-    :show="driveUpload.uploading.value"
+    :show="consoleActive && driveUpload.uploading.value"
     :dialog-label="t('virtualMedia.uploadFile', 'Upload file')"
     :status="driveUploadStatus"
     :transferred="driveUpload.transferred.value"
@@ -1505,7 +1642,7 @@ onBeforeUnmount(() => {
       <p v-else-if="fileTransferDone">{{ t('virtualMedia.transferComplete', 'Transfer complete') }}</p>
       <p v-else>{{ fileTransferOperation === 'copy' ? t('virtualMedia.copyingFiles', 'Copying files…') : t('virtualMedia.movingFiles', 'Moving files…') }}</p>
       <div class="xp-progress-track" role="progressbar" :aria-valuenow="fileTransferPercentage" aria-valuemin="0" aria-valuemax="100">
-        <div class="xp-progress-value" :style="{ width: `${fileTransferPercentage}%` }" />
+        <XpProgressCells :percentage="fileTransferPercentage" />
       </div>
       <div class="xp-upload-stats">
         <span>{{ formatBytes(fileTransferTransferred) }} / {{ formatBytes(fileTransferTotal) }}</span>
@@ -1631,6 +1768,9 @@ onBeforeUnmount(() => {
 .media-mode-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
 .media-mode-copy { display: grid; min-width: 0; gap: 3px; }
 .media-mode-header-actions { display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-end; gap: 8px; }
+.device-images-panel .media-mode-header { flex-wrap: wrap; }
+.device-images-panel .media-mode-header-actions { flex-wrap: wrap; }
+.iso-download-notice { margin-bottom: 12px; }
 .media-mode-header strong { font-size: 13px; }
 .media-mode-copy > span, .media-mode-header small { color: var(--n-text-color-3); font-size: 11px; line-height: 1.45; }
 .media-mode-header small { flex: 0 0 auto; white-space: nowrap; }

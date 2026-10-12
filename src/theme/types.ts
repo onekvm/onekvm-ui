@@ -14,6 +14,7 @@ export const oneKVMThemeTokenNames = [
   'secondaryForeground',
   'muted',
   'mutedForeground',
+  'placeholderForeground',
   'accent',
   'accentForeground',
   'destructive',

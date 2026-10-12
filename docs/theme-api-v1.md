@@ -47,6 +47,7 @@ The token contract is grouped as follows:
 - Core surfaces and text: `background`, `foreground`, `card`,
   `cardForeground`, `popover`, `popoverForeground`, `secondary`,
   `secondaryHover`, `secondaryForeground`, `muted`, `mutedForeground`,
+  `placeholderForeground`,
   `accent`, and `accentForeground`.
 - Actions and state: `primary`, `primaryHover`, `primaryPressed`,
   `primaryForeground`, `destructive`, `destructiveHover`,

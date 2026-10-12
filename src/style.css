@@ -39,6 +39,7 @@
   --secondary-foreground: #dce3ea;
   --muted: #171e26;
   --muted-foreground: #8e9aa7;
+  --placeholder-foreground: #8e9aa7;
   --accent: #202a35;
   --accent-foreground: #f8fafc;
   --destructive: #ef4444;
@@ -145,6 +146,11 @@ button,
 input,
 textarea,
 select { font: inherit; }
+
+:where(input, textarea)::placeholder {
+  color: var(--placeholder-foreground);
+  opacity: 1;
+}
 
 .app-shell {
   display: grid;

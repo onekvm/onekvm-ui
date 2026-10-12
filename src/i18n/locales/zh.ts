@@ -1397,6 +1397,8 @@ const zh = {
         disabledMessage: '插件已禁用',
         systemPlugin: '系统',
         activationConflict: '无法启用 {extension}，因为 {conflict} 已启用；这两个插件在当前机型上互斥。',
+        startRejected: '插件无法启动，系统拒绝了这项服务配置（错误 {code}）。',
+        exitedDuringStartup: '{name} 在启动后立即退出，目前没有在运行。',
         statusAvailable: '可安装',
         statusError: '错误',
         statusDisabled: '已禁用',
@@ -1405,6 +1407,161 @@ const zh = {
         enable: '启用',
         disable: '禁用',
         settings: '设置',
+        providedFeatures: '提供的功能',
+        noProvidedFeatures: '未声明功能',
+        usedCapabilities: '使用的核心能力',
+        featureDetails: {
+          page: {
+            label: '插件页面',
+            description: '在高级设置的插件菜单中打开 {name} 页面。',
+          },
+          toolDrawer: {
+            label: '工具箱 - {name}',
+            description: '从工具箱打开此工具，并在侧边面板中使用。',
+          },
+          toolWindow: {
+            label: '工具箱 - {name}',
+            description: '从工具箱打开此工具，并在浮动窗口中使用。',
+          },
+          toolbar: {
+            label: '工具栏集成',
+            description: '在远程控制工具栏中提供操作入口。',
+          },
+          shell: {
+            label: '界面集成',
+            description: '将插件操作接入 OneKVM 的界面流程。',
+          },
+          authProvider: {
+            label: '身份验证方式',
+            description: '提供用于登录或访问确认的身份验证方式。',
+          },
+          settings: {
+            label: '插件设置',
+            description: '可在此详情弹窗中配置插件参数。',
+          },
+          service: {
+            label: '后台服务 - {name}',
+            description: '在设备后台运行，为插件提供持续服务。',
+          },
+          video: {
+            label: '视频采集',
+            description: '为 OneKVM 提供被控主机的视频采集能力。',
+          },
+          hid: {
+            label: '键盘与鼠标控制',
+            description: '为 OneKVM 提供向被控主机发送键盘和鼠标输入的能力。',
+          },
+          atx: {
+            label: '电源与重置控制',
+            description: '为 OneKVM 提供被控主机电源和重置按钮的控制能力。',
+          },
+          powerLed: {
+            label: '电源状态检测',
+            description: '读取被控主机的电源指示灯，供 OneKVM 显示开关机状态。',
+          },
+          diskLed: {
+            label: '硬盘活动检测',
+            description: '读取被控主机的硬盘活动指示灯状态。',
+          },
+          virtualMedia: {
+            label: '虚拟媒体',
+            description: '为 OneKVM 提供向被控主机挂载虚拟存储媒体的能力。',
+          },
+          npu: {
+            label: '神经网络加速',
+            description: '为 OneKVM 提供设备端神经网络运算加速。',
+          },
+          unknownDescription: '此系统插件声明提供该设备能力，当前版本暂无对应说明。',
+        },
+        capabilityDetails: {
+          webrtc: {
+            label: 'WebRTC 会话',
+            description: '使用 OneKVM 的 WebRTC 会话进行远程视频传输。',
+          },
+          encodedVideo: {
+            label: '读取编码视频流',
+            description: '从 OneKVM 读取已编码的视频数据，用于插件的视频处理或传输。',
+          },
+          mjpeg: {
+            label: '读取 JPEG 画面',
+            description: '从 OneKVM 获取 JPEG 视频帧，用于画面传输、截图或图像处理。',
+          },
+          videoEncoding: {
+            label: '视频录制编码',
+            description: '调用 OneKVM 的编码服务，生成用于录制的视频数据。',
+          },
+          ocr: {
+            label: '画面文字识别',
+            description: '调用 OneKVM 的 OCR 服务，识别被控主机画面中的文字。',
+          },
+          display: {
+            label: '读取本机显示画面',
+            description: '从 OneKVM 获取用于设备屏幕显示的视频画面。',
+          },
+          encodedAudio: {
+            label: '读取编码音频',
+            description: '从 OneKVM 获取已编码的音频数据，用于插件的音频处理或传输。',
+          },
+          hid: {
+            label: '发送键盘和鼠标输入',
+            description: '通过 OneKVM 向被控主机发送键盘和鼠标输入。',
+          },
+          atx: {
+            label: '电源与重置操作',
+            description: '通过 OneKVM 操作被控主机的电源与重置按钮。',
+          },
+          auth: {
+            label: '身份验证接口',
+            description: '调用 OneKVM 的身份验证接口，完成登录或访问确认。',
+          },
+          unknownDescription: '此插件申请使用该 OneKVM 核心能力，当前版本暂无对应说明。',
+        },
+        permissionDetails: {
+          'network': {
+            label: '网络访问',
+            description: '连接网络服务，并监听传入的网络连接。',
+          },
+          'network-info': {
+            label: '网络信息',
+            description: '读取网络接口、IP 地址和路由信息。',
+          },
+          'network-admin': {
+            label: '网络管理',
+            description: '配置网络接口与路由、创建隧道，并发送原始网络数据包。',
+          },
+          'device-video': {
+            label: '视频设备',
+            description: '读取和控制视频采集设备。',
+          },
+          'device-hid': {
+            label: '键盘和鼠标设备',
+            description: '访问 USB HID 设备，发送键盘和鼠标输入。',
+          },
+          'device-i2c': {
+            label: 'I2C 总线访问',
+            description: '访问 I2C 总线和 OneKVM OLED 设备。',
+          },
+          'device-fb': {
+            label: '本机显示',
+            description: '访问屏幕帧缓冲，并调整背光和显示控制。',
+          },
+          'gpio': {
+            label: 'GPIO 与输入设备',
+            description: '读取和控制 GPIO 引脚，并接收输入设备事件。',
+          },
+          'opkg-admin': {
+            label: '软件包管理',
+            description: '管理插件软件源，并通过扩展宿主安装或卸载插件。',
+          },
+          unknownDescription: '插件声明了此权限，当前版本暂无对应说明。',
+        },
+        permissions: '权限',
+        packageDependencies: '依赖的软件包',
+        kernelModules: '依赖的内核模块',
+        noPermissions: '未声明权限',
+        noPackageDependencies: '无软件包依赖',
+        noKernelModules: '未声明内核模块依赖',
+        metadataUnavailable: '暂无信息',
         details: '详情',
         close: '关闭',
         uninstall: '卸载',
@@ -1427,6 +1584,7 @@ const zh = {
         kindProtocol: '协议',
         kindService: '服务',
         kindCloudProvider: '云服务',
+        kindDevice: '设备后端',
         allInterfacesIPv4: '所有接口（IPv4）',
         allInterfacesIPv6: '所有接口（IPv6）',
         loopbackIPv4: '回环地址（IPv4）',

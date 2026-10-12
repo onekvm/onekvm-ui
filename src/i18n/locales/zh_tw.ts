@@ -1402,6 +1402,8 @@ const zh_tw = {
         disabledMessage: '外掛程式已停用',
         systemPlugin: '系統',
         activationConflict: '無法啟用 {extension}，因為 {conflict} 已啟用；這兩個外掛程式在目前機型上互斥。',
+        startRejected: '外掛程式無法啟動，系統拒絕了這項服務設定（錯誤 {code}）。',
+        exitedDuringStartup: '{name} 在啟動後立即結束，目前沒有在執行。',
         statusAvailable: '可安裝',
         statusError: '錯誤',
         statusDisabled: '已停用',
@@ -1410,6 +1412,161 @@ const zh_tw = {
         enable: '啟用',
         disable: '停用',
         settings: '設定',
+        providedFeatures: '提供的功能',
+        noProvidedFeatures: '未宣告功能',
+        usedCapabilities: '使用的核心能力',
+        featureDetails: {
+          page: {
+            label: '外掛程式頁面',
+            description: '在進階設定的外掛程式選單中開啟 {name} 頁面。',
+          },
+          toolDrawer: {
+            label: '工具箱 - {name}',
+            description: '從工具箱開啟此工具，並在側邊面板中使用。',
+          },
+          toolWindow: {
+            label: '工具箱 - {name}',
+            description: '從工具箱開啟此工具，並在浮動視窗中使用。',
+          },
+          toolbar: {
+            label: '工具列整合',
+            description: '在遠端控制工具列中提供操作入口。',
+          },
+          shell: {
+            label: '介面整合',
+            description: '將外掛程式操作接入 OneKVM 的介面流程。',
+          },
+          authProvider: {
+            label: '身分驗證方式',
+            description: '提供用於登入或存取確認的身分驗證方式。',
+          },
+          settings: {
+            label: '外掛程式設定',
+            description: '可在此詳情視窗中設定外掛程式參數。',
+          },
+          service: {
+            label: '背景服務 - {name}',
+            description: '在裝置背景執行，為外掛程式提供持續服務。',
+          },
+          video: {
+            label: '視訊擷取',
+            description: '為 OneKVM 提供被控主機的視訊擷取能力。',
+          },
+          hid: {
+            label: '鍵盤與滑鼠控制',
+            description: '為 OneKVM 提供向被控主機傳送鍵盤和滑鼠輸入的能力。',
+          },
+          atx: {
+            label: '電源與重置控制',
+            description: '為 OneKVM 提供被控主機電源和重置按鈕的控制能力。',
+          },
+          powerLed: {
+            label: '電源狀態偵測',
+            description: '讀取被控主機的電源指示燈，供 OneKVM 顯示開關機狀態。',
+          },
+          diskLed: {
+            label: '硬碟活動偵測',
+            description: '讀取被控主機的硬碟活動指示燈狀態。',
+          },
+          virtualMedia: {
+            label: '虛擬媒體',
+            description: '為 OneKVM 提供向被控主機掛載虛擬儲存媒體的能力。',
+          },
+          npu: {
+            label: '神經網路加速',
+            description: '為 OneKVM 提供裝置端神經網路運算加速。',
+          },
+          unknownDescription: '此系統外掛程式宣告提供該裝置能力，目前版本暫無對應說明。',
+        },
+        capabilityDetails: {
+          webrtc: {
+            label: 'WebRTC 工作階段',
+            description: '使用 OneKVM 的 WebRTC 工作階段進行遠端視訊傳輸。',
+          },
+          encodedVideo: {
+            label: '讀取編碼視訊串流',
+            description: '從 OneKVM 讀取已編碼的視訊資料，用於外掛程式的視訊處理或傳輸。',
+          },
+          mjpeg: {
+            label: '讀取 JPEG 畫面',
+            description: '從 OneKVM 取得 JPEG 視訊影格，用於畫面傳輸、截圖或影像處理。',
+          },
+          videoEncoding: {
+            label: '視訊錄製編碼',
+            description: '呼叫 OneKVM 的編碼服務，產生用於錄製的視訊資料。',
+          },
+          ocr: {
+            label: '畫面文字辨識',
+            description: '呼叫 OneKVM 的 OCR 服務，辨識被控主機畫面中的文字。',
+          },
+          display: {
+            label: '讀取本機顯示畫面',
+            description: '從 OneKVM 取得用於裝置螢幕顯示的視訊畫面。',
+          },
+          encodedAudio: {
+            label: '讀取編碼音訊',
+            description: '從 OneKVM 取得已編碼的音訊資料，用於外掛程式的音訊處理或傳輸。',
+          },
+          hid: {
+            label: '傳送鍵盤和滑鼠輸入',
+            description: '透過 OneKVM 向被控主機傳送鍵盤和滑鼠輸入。',
+          },
+          atx: {
+            label: '電源與重置操作',
+            description: '透過 OneKVM 操作被控主機的電源與重置按鈕。',
+          },
+          auth: {
+            label: '身分驗證介面',
+            description: '呼叫 OneKVM 的身分驗證介面，完成登入或存取確認。',
+          },
+          unknownDescription: '此外掛程式申請使用該 OneKVM 核心能力，目前版本暫無對應說明。',
+        },
+        permissionDetails: {
+          'network': {
+            label: '網路存取',
+            description: '連接網路服務，並監聽傳入的網路連線。',
+          },
+          'network-info': {
+            label: '網路資訊',
+            description: '讀取網路介面、IP 位址和路由資訊。',
+          },
+          'network-admin': {
+            label: '網路管理',
+            description: '設定網路介面與路由、建立通道，並傳送原始網路封包。',
+          },
+          'device-video': {
+            label: '視訊裝置',
+            description: '讀取和控制影像擷取裝置。',
+          },
+          'device-hid': {
+            label: '鍵盤和滑鼠裝置',
+            description: '存取 USB HID 裝置，傳送鍵盤和滑鼠輸入。',
+          },
+          'device-i2c': {
+            label: 'I2C 匯流排存取',
+            description: '存取 I2C 匯流排和 OneKVM OLED 裝置。',
+          },
+          'device-fb': {
+            label: '本機顯示',
+            description: '存取螢幕影格緩衝區，並調整背光和顯示控制。',
+          },
+          'gpio': {
+            label: 'GPIO 與輸入裝置',
+            description: '讀取和控制 GPIO 接腳，並接收輸入裝置事件。',
+          },
+          'opkg-admin': {
+            label: '軟體套件管理',
+            description: '管理外掛程式軟體來源，並透過擴充宿主安裝或解除安裝外掛程式。',
+          },
+          unknownDescription: '外掛程式宣告了此權限，目前版本暫無對應說明。',
+        },
+        permissions: '權限',
+        packageDependencies: '依賴的軟體套件',
+        kernelModules: '依賴的核心模組',
+        noPermissions: '未宣告權限',
+        noPackageDependencies: '無軟體套件依賴',
+        noKernelModules: '未宣告核心模組依賴',
+        metadataUnavailable: '暫無資訊',
         details: '詳情',
         close: '關閉',
         uninstall: '解除安裝',
@@ -1432,6 +1589,7 @@ const zh_tw = {
         kindProtocol: '通訊協定',
         kindService: '服務',
         kindCloudProvider: '雲端服務',
+        kindDevice: '裝置後端',
         allInterfacesIPv4: '所有介面（IPv4）',
         allInterfacesIPv6: '所有介面（IPv6）',
         loopbackIPv4: '迴路位址（IPv4）',

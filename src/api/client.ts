@@ -832,6 +832,9 @@ export interface ManagedService {
 }
 
 export interface ExtensionStatus extends ExtensionSummary {
+  permissions?: string[]
+  kernel_modules?: string[]
+  package_dependencies?: string[] | null
   versions?: string[]
   capabilities?: string[]
   video?: {

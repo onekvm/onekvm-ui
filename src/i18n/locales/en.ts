@@ -1398,6 +1398,8 @@ const en = {
         disabledMessage: 'Plugin disabled',
         systemPlugin: 'System',
         activationConflict: 'Cannot enable {extension} because {conflict} is enabled. These plugins are mutually exclusive on this device.',
+        startRejected: 'The plugin could not be started. The system rejected the service setup (error {code}).',
+        exitedDuringStartup: '{name} exited immediately after starting and is not running.',
         statusAvailable: 'Available',
         statusError: 'Error',
         statusDisabled: 'Disabled',
@@ -1406,6 +1408,161 @@ const en = {
         enable: 'Enable',
         disable: 'Disable',
         settings: 'Settings',
+        providedFeatures: 'Provided features',
+        noProvidedFeatures: 'No features declared',
+        usedCapabilities: 'Core capabilities used',
+        featureDetails: {
+          page: {
+            label: 'Plugin page',
+            description: 'Open the {name} page from the plugins menu in advanced settings.',
+          },
+          toolDrawer: {
+            label: 'Toolbox - {name}',
+            description: 'Opens this tool in a side panel from the toolbox.',
+          },
+          toolWindow: {
+            label: 'Toolbox - {name}',
+            description: 'Opens this tool in a floating window from the toolbox.',
+          },
+          toolbar: {
+            label: 'Toolbar integration',
+            description: 'Adds controls to the remote control toolbar.',
+          },
+          shell: {
+            label: 'Interface integration',
+            description: 'Makes plugin actions available in OneKVM interface flows.',
+          },
+          authProvider: {
+            label: 'Authentication method',
+            description: 'Provides an authentication method for login or access confirmation.',
+          },
+          settings: {
+            label: 'Plugin settings',
+            description: 'Provides configurable options in this details dialog.',
+          },
+          service: {
+            label: 'Background service - {name}',
+            description: 'Runs in the background on the device to support the plugin.',
+          },
+          video: {
+            label: 'Video capture',
+            description: 'Provides OneKVM with video capture from the connected host.',
+          },
+          hid: {
+            label: 'Keyboard and mouse control',
+            description: 'Provides OneKVM with keyboard and mouse input to the connected host.',
+          },
+          atx: {
+            label: 'Power and reset control',
+            description: 'Provides OneKVM with control of the connected host power and reset buttons.',
+          },
+          powerLed: {
+            label: 'Power state detection',
+            description: 'Reads the host power LED so OneKVM can display its power state.',
+          },
+          diskLed: {
+            label: 'Disk activity detection',
+            description: 'Reads the connected host disk activity LED state.',
+          },
+          virtualMedia: {
+            label: 'Virtual media',
+            description: 'Provides OneKVM with virtual storage media for the connected host.',
+          },
+          npu: {
+            label: 'Neural processing',
+            description: 'Provides OneKVM with on-device acceleration for neural network workloads.',
+          },
+          unknownDescription: 'This system plugin declares this device capability. No description is available in this version.',
+        },
+        capabilityDetails: {
+          webrtc: {
+            label: 'WebRTC sessions',
+            description: 'Uses OneKVM WebRTC sessions for remote video streaming.',
+          },
+          encodedVideo: {
+            label: 'Read encoded video',
+            description: 'Reads encoded video from OneKVM for processing or streaming by this plugin.',
+          },
+          mjpeg: {
+            label: 'Read JPEG frames',
+            description: 'Reads JPEG frames from OneKVM for streaming, screenshots or image processing.',
+          },
+          videoEncoding: {
+            label: 'Recording encoder',
+            description: 'Uses the OneKVM encoder service to generate video for recording.',
+          },
+          ocr: {
+            label: 'Screen text recognition',
+            description: 'Uses OneKVM OCR to recognize text on the connected host screen.',
+          },
+          display: {
+            label: 'Read local display frames',
+            description: 'Reads video frames from OneKVM for the device screen.',
+          },
+          encodedAudio: {
+            label: 'Read encoded audio',
+            description: 'Reads encoded audio from OneKVM for processing or streaming by this plugin.',
+          },
+          hid: {
+            label: 'Send keyboard and mouse input',
+            description: 'Sends keyboard and mouse input to the connected host through OneKVM.',
+          },
+          atx: {
+            label: 'Power and reset actions',
+            description: 'Operates the connected host power and reset buttons through OneKVM.',
+          },
+          auth: {
+            label: 'Authentication access',
+            description: 'Uses OneKVM authentication interfaces for login or access confirmation.',
+          },
+          unknownDescription: 'This plugin requests access to this OneKVM capability. No description is available in this version.',
+        },
+        permissionDetails: {
+          'network': {
+            label: 'Network access',
+            description: 'Connect to network services and listen for incoming connections.',
+          },
+          'network-info': {
+            label: 'Network information',
+            description: 'Read network interfaces, IP addresses and routing information.',
+          },
+          'network-admin': {
+            label: 'Network administration',
+            description: 'Configure network interfaces and routes, create tunnels and send raw packets.',
+          },
+          'device-video': {
+            label: 'Video devices',
+            description: 'Read and control video capture devices.',
+          },
+          'device-hid': {
+            label: 'Keyboard and mouse devices',
+            description: 'Access USB HID devices to send keyboard and mouse input.',
+          },
+          'device-i2c': {
+            label: 'I2C bus access',
+            description: 'Access I2C buses and the OneKVM OLED device.',
+          },
+          'device-fb': {
+            label: 'Local display',
+            description: 'Access the display framebuffer and adjust the backlight and display controls.',
+          },
+          'gpio': {
+            label: 'GPIO and input devices',
+            description: 'Read and control GPIO pins and receive input device events.',
+          },
+          'opkg-admin': {
+            label: 'Package management',
+            description: 'Manage plugin package sources and install or remove plugins through the extension host.',
+          },
+          unknownDescription: 'This permission is declared by the plugin. No description is available in this version.',
+        },
+        permissions: 'Permissions',
+        packageDependencies: 'Package dependencies',
+        kernelModules: 'Kernel modules',
+        noPermissions: 'No permissions declared',
+        noPackageDependencies: 'No package dependencies',
+        noKernelModules: 'No kernel modules declared',
+        metadataUnavailable: 'Information unavailable',
         details: 'Details',
         close: 'Close',
         uninstall: 'Uninstall',
@@ -1428,6 +1585,7 @@ const en = {
         kindProtocol: 'Protocol',
         kindService: 'Service',
         kindCloudProvider: 'Cloud service',
+        kindDevice: 'Device backend',
         allInterfacesIPv4: 'All interfaces (IPv4)',
         allInterfacesIPv6: 'All interfaces (IPv6)',
         loopbackIPv4: 'Loopback (IPv4)',

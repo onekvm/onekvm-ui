@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch, type Component } from 'vue'
+import { computed, reactive, ref, shallowRef, watch, type Component } from 'vue'
 import { Box, CheckCircle2, FileUp, Info, PackageCheck, Power, PowerOff, Save, Trash2, Upload, X } from '@lucide/vue'
 import { useMessage } from 'naive-ui'
 
 import {
   api,
   extensionLocalizedText,
-  extensionRouteURL,
   extensionTranslation,
   type ExtensionSettingProperty,
   type ExtensionSettingValue,
@@ -17,7 +16,9 @@ import {
 } from '@/api/client'
 import { uninstallDialog, uninstallExtension } from '@/composables/useUninstallExtension'
 import { currentLanguage, t } from '@/i18n/runtime'
+import { extensionHostErrorText } from '@/lib/extension-host-error'
 import { pluginIcon } from '@/lib/plugin-icons'
+import ExtensionDetailsModal from './ExtensionDetailsModal.vue'
 
 const props = defineProps<{ active: boolean; catalog?: ExtensionSummary[]; catalogLoading?: boolean }>()
 const emit = defineEmits<{ catalog: [value: ExtensionSummary[]] }>()
@@ -34,7 +35,12 @@ const details = reactive<Record<string, ExtensionStatus>>({})
 const drafts = reactive<Record<string, ExtensionDraft>>({})
 const loading = ref(false)
 const detailLoading = ref('')
-const expanded = ref('')
+const selectedId = shallowRef('')
+const detailsOpen = shallowRef(false)
+const detailError = shallowRef('')
+let detailRequest = 0
+const selected = computed(() => extensions.value.find(status => status.id === selectedId.value))
+const selectedDetail = computed(() => selectedId.value ? details[selectedId.value] : undefined)
 const busy = ref('')
 const loadError = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -154,10 +160,6 @@ function secretPlaceholder(status: ExtensionStatus, name: string) {
 
 function settingTitle(property: ExtensionSettingProperty) {
   return extensionLocalizedText(property.i18n, currentLanguage.value, property.title)
-}
-
-function fileRoutes(status: ExtensionStatus) {
-  return (status.routes || []).filter((route) => route.backend === 'file')
 }
 
 function replace(template: string, values: Record<string, string>) {
@@ -324,15 +326,13 @@ function extensionDescription(status: ExtensionSummary) {
   )
 }
 
-function extensionKind(status: ExtensionSummary) {
-  if (status.kind === 'protocol') return t('settings.plugins.kindProtocol', 'Protocol')
-  if (status.kind === 'service') return t('settings.plugins.kindService', 'Service')
-  if (status.kind === 'cloud-provider') return t('settings.plugins.kindCloudProvider', 'Cloud service')
-  return status.kind
-}
-
 function extensionErrorMessage(error: unknown) {
   const raw = error instanceof Error ? error.message : String(error)
+  const explained = extensionHostErrorText(raw, t, (id) => {
+    const status = extensions.value.find((candidate) => candidate.id === id)
+    return status ? extensionName(status) : id
+  })
+  if (explained !== raw) return explained
 	const budget = raw.match(/memory budget is insufficient: required=(\d+) available=(\d+) used=(\d+) total=(\d+)/)
 	if (budget) {
 		return insufficientMemoryBudgetMessage(Number(budget[1]), Number(budget[2]), Number(budget[3]), Number(budget[4]))
@@ -380,23 +380,38 @@ async function setEnabled(status: ExtensionSummary, enabled: boolean) {
   )
 }
 
-async function toggleDetails(status: ExtensionSummary) {
-  if (expanded.value === status.id) {
-    expanded.value = ''
+function closeDetails() {
+  if (busy.value || uninstallDialog.show) return
+  detailsOpen.value = false
+  detailRequest++
+}
+
+function finishClosingDetails() {
+  if (detailsOpen.value) return
+  selectedId.value = ''
+  detailLoading.value = ''
+  detailError.value = ''
+}
+
+async function openDetails(status: ExtensionSummary) {
+  selectedId.value = status.id
+  detailsOpen.value = true
+  detailError.value = ''
+  const request = ++detailRequest
+  if (details[status.id]?.version === status.version) {
+    detailLoading.value = ''
     return
   }
-  expanded.value = status.id
-  if (details[status.id]?.version === status.version) return
   detailLoading.value = status.id
   try {
     const detail = await api.getExtension(status.id)
+    if (request !== detailRequest || selectedId.value !== status.id) return
     details[status.id] = detail
     syncDraft(detail)
   } catch (error) {
-    message.error(extensionErrorMessage(error))
-    expanded.value = ''
+    if (request === detailRequest) detailError.value = extensionErrorMessage(error)
   } finally {
-    detailLoading.value = ''
+    if (request === detailRequest) detailLoading.value = ''
   }
 }
 
@@ -463,7 +478,12 @@ watch(() => props.catalog, (catalog) => {
     if (!summary || summary.version !== detail.version) {
       delete details[id]
       delete drafts[id]
-      if (expanded.value === id) expanded.value = ''
+      if (selectedId.value === id) {
+        detailsOpen.value = false
+        selectedId.value = ''
+        detailLoading.value = ''
+        detailRequest++
+      }
     }
   }
 }, { immediate: true })
@@ -542,142 +562,126 @@ watch(() => props.active, (active) => {
                 secondary
                 :loading="detailLoading === status.id"
                 :disabled="busy !== ''"
-                @click="toggleDetails(status)"
+                @click="openDetails(status)"
               >
                 <template #icon><Info /></template>
-                {{ expanded === status.id ? t('settings.plugins.close', 'Close') : t('settings.plugins.details', 'Details') }}
+                {{ t('settings.plugins.details', 'Details') }}
               </n-button>
             </div>
           </div>
 
-          <div v-if="status.error || expanded === status.id" class="extension-detail">
-            <n-alert v-if="status.error" type="error" :show-icon="false">{{ status.error }}</n-alert>
-
-            <n-spin v-if="expanded === status.id" class="extension-detail-spin" :show="detailLoading === status.id">
-              <dl class="extension-metadata">
-                <div>
-                  <dt>{{ t('settings.plugins.version', 'Version') }}</dt>
-                  <dd>{{ status.version || '—' }}</dd>
-                </div>
-                <div>
-                  <dt>{{ t('settings.plugins.type', 'Type') }}</dt>
-                  <dd>{{ extensionKind(status) }}</dd>
-                </div>
-                <div v-if="status.memory_budget_bytes">
-                  <dt>{{ t('settings.plugins.memoryBudget', 'Plugin memory budget') }}</dt>
-                  <dd>{{ formatMemoryBudget(status.memory_budget_bytes) }}</dd>
-                </div>
-                <div v-if="status.author">
-                  <dt>{{ t('settings.plugins.author', 'Author') }}</dt>
-                  <dd>{{ status.author }}</dd>
-                </div>
-                <div v-if="status.homepage" class="extension-homepage">
-                  <dt>{{ t('settings.plugins.homepage', 'Homepage') }}</dt>
-                  <dd><a :href="status.homepage" target="_blank" rel="noopener noreferrer">{{ status.homepage }}</a></dd>
-                </div>
-                <div v-if="details[status.id] && fileRoutes(details[status.id]).length" class="extension-routes">
-                  <dt>{{ t('settings.plugins.webRoutes', 'Web routes') }}</dt>
-                  <dd class="extension-route-list">
-                    <a
-                      v-for="route in fileRoutes(details[status.id])"
-                      :key="route.path"
-                      :href="extensionRouteURL(status, route)"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >{{ extensionRouteURL(status, route) }}</a>
-                  </dd>
-                </div>
-              </dl>
-
-              <template v-if="details[status.id] && drafts[status.id] && status.has_settings && !status.has_page">
-                <div class="extension-fields">
-                <label v-for="[name, property] in fields(details[status.id])" :key="name" :class="{ 'boolean-field': property.type === 'boolean' }">
-                  <span>{{ settingTitle(property) }}</span>
-                  <n-switch
-                    v-if="property.type === 'boolean'"
-                    :value="booleanValue(status.id, name)"
-                    :disabled="property.readOnly || !settingEnabled(status.id, property)"
-                    size="small"
-                    @update:value="(value: boolean) => setValue(status.id, name, value)"
-                  />
-                  <n-input-number
-                    v-else-if="property.type === 'integer' || property.type === 'number'"
-                    :value="numberValue(status.id, name)"
-                    :min="property.minimum"
-                    :max="property.maximum"
-                    :precision="property.type === 'integer' ? 0 : undefined"
-                    :disabled="property.readOnly || !settingEnabled(status.id, property)"
-                    size="small"
-                    @update:value="(value: number | null) => setValue(status.id, name, value)"
-                  />
-                  <div v-else-if="property.format === 'password'" class="secret-field">
-                    <n-input
-                      :value="textValue(status.id, name)"
-                      type="password"
-                      show-password-on="click"
-                      autocomplete="new-password"
-                      :maxlength="property.maxLength"
-                      :disabled="property.readOnly || !settingEnabled(status.id, property)"
-                      :placeholder="secretPlaceholder(details[status.id], name)"
-                      size="small"
-                      @update:value="(value: string) => setSecretValue(status.id, name, value)"
-                    />
-                    <n-tooltip v-if="secretConfigured(details[status.id], name) && !property.readOnly">
-                      <template #trigger>
-                        <n-button quaternary circle size="small" :aria-label="replace(t('settings.plugins.clearLabel', 'Clear {name}'), { name: settingTitle(property) })" @click="clearSecret(status.id, name)">
-                          <template #icon><X /></template>
-                        </n-button>
-                      </template>
-                      {{ t('settings.plugins.clear', 'Clear') }}
-                    </n-tooltip>
-                  </div>
-                  <n-select
-                    v-else-if="property.enum?.length"
-                    :value="drafts[status.id].settings[name]"
-                    :options="settingEnumOptions(property)"
-                    :disabled="property.readOnly || !settingEnabled(status.id, property)"
-                    size="small"
-                    @update:value="(value: ExtensionSettingValue) => setValue(status.id, name, value)"
-                  />
-                  <n-input
-                    v-else
-                    :value="textValue(status.id, name)"
-                    type="text"
-                    autocomplete="off"
-                    :maxlength="property.maxLength"
-                    :disabled="property.readOnly || !settingEnabled(status.id, property)"
-                    size="small"
-                    @update:value="(value: string) => setValue(status.id, name, value)"
-                  />
-                </label>
-                </div>
-                <footer>
-                  <n-button size="small" type="primary" :loading="busy === `${status.id}:save`" :disabled="busy !== ''" @click="save(details[status.id])">
-                    <template #icon><Save /></template>
-                    {{ t('settings.plugins.save', 'Save') }}
-                  </n-button>
-                </footer>
-              </template>
-
-              <footer v-if="status.installed && !status.system" class="extension-danger-actions">
-                <n-button
-                  size="small"
-                  type="error"
-                  secondary
-                  :loading="uninstallDialog.loading && uninstallDialog.id === status.id"
-                  :disabled="busy !== '' || uninstallDialog.show"
-                  :aria-label="uninstallLabel(status)"
-                  @click="requestUninstall(status)"
-                >
-                  <template #icon><Trash2 /></template>
-                  {{ t('settings.plugins.uninstall', 'Uninstall') }}
-                </n-button>
-              </footer>
-            </n-spin>
+          <div v-if="status.error" class="extension-error">
+            <n-alert type="error" :show-icon="false">{{ status.error }}</n-alert>
           </div>
         </li>
       </ul>
     </n-spin>
+
+    <ExtensionDetailsModal
+      :show="detailsOpen"
+      :status="selected"
+      :detail="selectedDetail"
+      :loading="!!selected && detailLoading === selected.id"
+      :error="detailError"
+      :busy="busy !== '' || uninstallDialog.show"
+      @close="closeDetails"
+      @closed="finishClosingDetails"
+      @retry="selected && openDetails(selected)"
+    >
+      <template #settings>
+        <section v-if="selected && selectedDetail && drafts[selectedId] && selected.has_settings && !selected.has_page" class="extension-settings">
+          <h3>{{ t('settings.plugins.settings', 'Settings') }}</h3>
+          <div class="extension-fields">
+            <label v-for="[name, property] in fields(selectedDetail)" :key="name" :class="{ 'boolean-field': property.type === 'boolean' }">
+              <span>{{ settingTitle(property) }}</span>
+              <n-switch
+                v-if="property.type === 'boolean'"
+                :value="booleanValue(selectedId, name)"
+                :disabled="property.readOnly || !settingEnabled(selectedId, property)"
+                size="small"
+                @update:value="(value: boolean) => setValue(selectedId, name, value)"
+              />
+              <n-input-number
+                v-else-if="property.type === 'integer' || property.type === 'number'"
+                :value="numberValue(selectedId, name)"
+                :min="property.minimum"
+                :max="property.maximum"
+                :precision="property.type === 'integer' ? 0 : undefined"
+                :disabled="property.readOnly || !settingEnabled(selectedId, property)"
+                size="small"
+                @update:value="(value: number | null) => setValue(selectedId, name, value)"
+              />
+              <div v-else-if="property.format === 'password'" class="secret-field">
+                <n-input
+                  :value="textValue(selectedId, name)"
+                  type="password"
+                  show-password-on="click"
+                  autocomplete="new-password"
+                  :maxlength="property.maxLength"
+                  :disabled="property.readOnly || !settingEnabled(selectedId, property)"
+                  :placeholder="secretPlaceholder(selectedDetail, name)"
+                  size="small"
+                  @update:value="(value: string) => setSecretValue(selectedId, name, value)"
+                />
+                <n-tooltip v-if="secretConfigured(selectedDetail, name) && !property.readOnly">
+                  <template #trigger>
+                    <n-button quaternary circle size="small" :aria-label="replace(t('settings.plugins.clearLabel', 'Clear {name}'), { name: settingTitle(property) })" @click="clearSecret(selectedId, name)">
+                      <template #icon><X /></template>
+                    </n-button>
+                  </template>
+                  {{ t('settings.plugins.clear', 'Clear') }}
+                </n-tooltip>
+              </div>
+              <n-select
+                v-else-if="property.enum?.length"
+                :value="drafts[selectedId].settings[name]"
+                :options="settingEnumOptions(property)"
+                :disabled="property.readOnly || !settingEnabled(selectedId, property)"
+                size="small"
+                @update:value="(value: ExtensionSettingValue) => setValue(selectedId, name, value)"
+              />
+              <n-input
+                v-else
+                :value="textValue(selectedId, name)"
+                type="text"
+                autocomplete="off"
+                :maxlength="property.maxLength"
+                :disabled="property.readOnly || !settingEnabled(selectedId, property)"
+                size="small"
+                @update:value="(value: string) => setValue(selectedId, name, value)"
+              />
+            </label>
+          </div>
+        </section>
+      </template>
+      <template #actions>
+        <n-button
+          v-if="selected?.installed && !selected.system"
+          class="extension-uninstall"
+          size="small"
+          type="error"
+          secondary
+          :loading="uninstallDialog.loading && uninstallDialog.id === selected.id"
+          :disabled="busy !== '' || uninstallDialog.show"
+          :aria-label="uninstallLabel(selected)"
+          @click="requestUninstall(selected)"
+        >
+          <template #icon><Trash2 /></template>
+          {{ t('settings.plugins.uninstall', 'Uninstall') }}
+        </n-button>
+        <n-button
+          v-if="selected && selectedDetail && drafts[selected.id] && selected.has_settings && !selected.has_page"
+          size="small"
+          type="primary"
+          :loading="busy === `${selected.id}:save`"
+          :disabled="busy !== '' || !!detailLoading || !!detailError"
+          @click="save(selectedDetail)"
+        >
+          <template #icon><Save /></template>
+          {{ t('settings.plugins.save', 'Save') }}
+        </n-button>
+      </template>
+    </ExtensionDetailsModal>
 
     <n-modal
       :show="installModalOpen"
@@ -932,20 +936,10 @@ watch(() => props.active, (active) => {
 .extension-identity strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .extension-identity p { margin: 0; color: var(--muted-foreground); font-size: 11px; line-height: 1.35; }
 .extension-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 3px; }
-.extension-detail { display: grid; gap: 14px; padding: 14px 16px 16px 53px; background: var(--onekvm-surface-inset); }
-.extension-detail-spin { min-height: 72px; }
-.extension-detail-spin :deep(.n-spin-content) { display: grid; gap: 14px; }
-.extension-metadata { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 7px; background: var(--card); }
-.extension-metadata > div { display: grid; min-width: 0; gap: 4px; padding: 9px 12px; }
-.extension-metadata > div:nth-child(even) { border-left: 1px solid var(--border); }
-.extension-metadata > div:nth-child(n + 3) { border-top: 1px solid var(--border); }
-.extension-metadata dt { color: var(--muted-foreground); font-size: 11px; }
-.extension-metadata dd { min-width: 0; margin: 0; color: var(--foreground); font-size: 12px; overflow-wrap: anywhere; }
-.extension-metadata a { color: var(--success); text-decoration: none; }
-.extension-metadata a:hover { text-decoration: underline; }
-.extension-metadata .extension-homepage { grid-column: 1 / -1; border-left: 0; }
-.extension-metadata .extension-routes { grid-column: 1 / -1; border-left: 0; }
-.extension-route-list { display: grid; gap: 3px; }
+.extension-error { padding: 0 14px 14px; background: var(--card); }
+.extension-settings { display: grid; gap: 12px; padding-top: 16px; border-top: 1px solid var(--border); }
+.extension-settings h3 { margin: 0; color: var(--foreground); font-size: 13px; font-weight: 500; }
+.extension-uninstall { margin-right: auto; }
 .extension-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, .45fr); gap: 9px; }
 .extension-fields label { display: grid; min-width: 0; gap: 5px; }
 .extension-fields label > span { color: var(--muted-foreground); font-size: 11px; }
@@ -956,8 +950,6 @@ watch(() => props.active, (active) => {
   justify-content: space-between;
   grid-column: 1 / -1;
 }
-.extension-detail footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
-.extension-danger-actions { padding-top: 12px; border-top: 1px solid var(--border); }
 @media (max-width: 760px) {
   .extension-manager-heading { flex-wrap: wrap; gap: 10px; }
   .extension-memory-budget { order: 3; width: 100%; margin-left: 0; padding: 0; }
@@ -971,15 +963,7 @@ watch(() => props.active, (active) => {
   .extension-identity { min-width: calc(100% - 50px); }
   .extension-row > .n-tag { margin-left: 41px; }
   .extension-actions { margin-left: auto; }
-  .extension-detail { padding: 16px 12px 18px; }
-  .extension-metadata { grid-template-columns: 1fr; }
-  .extension-metadata > div:nth-child(n + 2) { border-top: 1px solid var(--border); }
-  .extension-metadata > div:nth-child(even) { border-left: 0; }
-  .extension-metadata .extension-homepage { grid-column: 1; }
-  .extension-metadata .extension-routes { grid-column: 1; }
   .extension-fields { grid-template-columns: 1fr; gap: 12px; }
   .extension-fields label { grid-column: 1 !important; }
-  .extension-detail > footer { flex-wrap: wrap; }
-  .extension-detail > footer .n-button { flex: 1; }
 }
 </style>

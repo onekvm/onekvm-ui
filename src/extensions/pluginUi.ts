@@ -42,6 +42,7 @@ import {
 import * as naiveUI from 'naive-ui'
 import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import AsyncPopconfirm from '@/components/AsyncPopconfirm'
+import ExtensionDropdown from '@/components/ExtensionDropdown'
 import ExtensionChildWindow from '@/components/toolbox/ExtensionChildWindow.vue'
 import {
   NCard,
@@ -338,6 +339,7 @@ const naiveRuntime = Object.freeze({
   ...naiveUI,
   useDialog: useAsyncDialog,
   NPopconfirm: AsyncPopconfirm,
+  NDropdown: ExtensionDropdown,
   NCard,
   NCollapse,
   NCollapseItem,

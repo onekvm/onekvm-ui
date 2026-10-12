@@ -32,6 +32,7 @@ import { NIcon, useMessage, type DialogReactive, type DropdownOption } from 'nai
 import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type OneKVMStatus } from '@/api/client'
 import { type MouseMode } from '@/composables/useMouse'
 import { useOverlayMount } from '@/composables/useOverlayMount'
+import { useToolbarPinMotion } from '@/composables/useToolbarPinMotion'
 import type { VideoFit, VideoRotation } from '@/lib/video-fit'
 import { effectiveVideoCodec } from '@/lib/video-transport'
 import { currentLanguage, languageOptions, setLanguage, t } from '@/i18n/runtime'
@@ -164,10 +165,16 @@ const mouseLed = ref<HTMLElement | null>(null)
 const keyboardLed = ref<HTMLElement | null>(null)
 const gamepadLed = ref<HTMLElement | null>(null)
 const toolbarEl = ref<HTMLElement | null>(null)
+const trayEl = shallowRef<HTMLElement | null>(null)
+const brandLogoJelly = ref(false)
+const BRAND_LOGO_CLICK_GAP_MS = 800
+let brandLogoClicks = 0
+let brandLogoLastClick = 0
 const toolbarDock = ref<ToolbarDockState>(parseToolbarDock(localStorage.getItem(TOOLBAR_DOCK_KEY)))
 const toolbarDragging = ref(false)
 const toolbarMorphing = ref(false)
 const toolbarLiftPending = ref(false)
+useToolbarPinMotion(toolbarEl, trayEl, () => toolbox.pinned.map(({ tool }) => tool.id).join(','), () => !toolbarDragging.value && !toolbarMorphing.value)
 const toolbarSnapHint = ref<ToolbarSnapPreview>(null)
 const toolbarSnapHintText = computed(() => {
   if (!toolbarSnapHint.value) return ''
@@ -221,6 +228,11 @@ const launcherAlign = computed(() =>
     viewport.value.height,
   ),
 )
+const launcherLogoStyle = computed(() => ({
+  transformOrigin: launcherPos.value.x + TOOLBAR_LAUNCHER_PX / 2 < viewport.value.width / 2
+    ? 'left bottom'
+    : 'right bottom',
+}))
 const menuPlacement = computed(() => {
   if (!toolbarLauncher.value) return toolbarMenuPlacement(toolbarDock.value.dock)
   return launcherAlign.value.above ? 'top-end' : 'bottom-end'
@@ -364,12 +376,27 @@ function toggleLauncherMenu() {
   setLauncherMenuOpen(!launcherMenuOpen.value)
 }
 
+function recordBrandLogoClick() {
+  const now = performance.now()
+  brandLogoClicks = now - brandLogoLastClick <= BRAND_LOGO_CLICK_GAP_MS ? brandLogoClicks + 1 : 1
+  brandLogoLastClick = now
+  if (brandLogoClicks < 5) return
+  brandLogoClicks = 0
+  brandLogoJelly.value = !brandLogoJelly.value
+}
+
+function onBrandLogoClick(event: MouseEvent) {
+  if (toolbarDragMoved && event.detail !== 0) return
+  recordBrandLogoClick()
+}
+
 function onLauncherClick(event: MouseEvent) {
   if (toolbarDragMoved) {
     event.preventDefault()
     event.stopPropagation()
     return
   }
+  recordBrandLogoClick()
   toggleLauncherMenu()
 }
 
@@ -381,6 +408,9 @@ function isLauncherOverlayTarget(target: EventTarget | null) {
 }
 
 function onLauncherWindowPointerDown(event: PointerEvent) {
+  if (!(event.target instanceof Element) || !event.target.closest('.brand-logo, .toolbar-launcher')) {
+    brandLogoClicks = 0
+  }
   if (!launcherMenuOpen.value) return
   if (isLauncherOverlayTarget(event.target)) return
   event.preventDefault()
@@ -815,6 +845,7 @@ function onToolbarWindowPointerMove(event: PointerEvent) {
     const moveY = event.clientY - toolbarGrab.y
     if (Math.hypot(moveX, moveY) < TOOLBAR_DRAG_THRESHOLD_PX) return
     toolbarDragMoved = true
+    brandLogoClicks = 0
     dismissOverlays()
     if (toolbarLauncher.value) {
       toolbarDragReady = true
@@ -1326,13 +1357,22 @@ onBeforeUnmount(() => {
       @pointerdown="onToolbarHandlePointerDown"
       @click="onLauncherClick"
     >
-      <img class="brand-mark" :src="serviceURL('/brand/onekvm-app-icon.svg')" :alt="brandLabel" draggable="false" />
+      <img class="brand-mark" :class="{ 'is-jelly': brandLogoJelly }" :style="launcherLogoStyle" :src="serviceURL('/brand/onekvm-app-icon.svg')" :alt="brandLabel" draggable="false" />
       <span class="toolbar-launcher-pip" :data-state="screenState" aria-hidden="true" />
     </button>
     <div v-else class="brand">
       <n-tooltip :disabled="!toolbarCompact">
         <template #trigger>
-          <img class="brand-mark" :src="serviceURL('/brand/onekvm-app-icon.svg')" :alt="brandLabel" draggable="false" />
+          <button
+            type="button"
+            class="brand-logo"
+            :aria-label="brandLabel"
+            :aria-pressed="brandLogoJelly"
+            @pointerdown.stop="onToolbarHandlePointerDown"
+            @click="onBrandLogoClick"
+          >
+            <img class="brand-mark" :class="{ 'is-jelly': brandLogoJelly }" :src="serviceURL('/brand/onekvm-app-icon.svg')" alt="" draggable="false" />
+          </button>
         </template>
         <div class="toolbar-brand-tooltip">
           <strong>{{ brandName }}</strong>
@@ -1367,6 +1407,7 @@ onBeforeUnmount(() => {
     <div
       v-show="!toolbarLauncher || launcherMenuOpen"
       class="toolbar-tray"
+      ref="trayEl"
       :class="toolbarLauncher ? launcherTrayClass : undefined"
       :inert="toolbarLauncher && !launcherMenuOpen"
     >

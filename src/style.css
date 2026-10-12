@@ -886,6 +886,40 @@ select { font: inherit; }
   object-fit: contain;
 }
 
+.brand-logo {
+  --brand-logo-squash-x: 1.6;
+  display: grid;
+  flex: 0 0 25px;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+}
+
+.brand-logo:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+.brand-logo .brand-mark { pointer-events: none; }
+.toolbar.is-dragging .brand-logo { cursor: grabbing; }
+
+.brand-mark.is-jelly {
+  transform-origin: center bottom;
+  animation: brand-logo-jelly .5s ease-in-out infinite;
+}
+
+@keyframes brand-logo-jelly {
+  0%, 100% { transform: scale(1.05, .95); }
+  28%, 38% { transform: scale(var(--brand-logo-squash-x, 2.2), .45); }
+  68%, 78% { transform: scale(.92, 1.18); }
+}
+
 .toolbar .n-button { min-width: 30px; height: 30px; }
 .toolbar .n-button__icon { font-size: 16px; }
 
@@ -5163,7 +5197,8 @@ body .n-drawer.slide-in-from-right-transition-leave-active {
   .n-modal.keyboard-text-modal.fade-in-scale-up-transition-leave-active,
   .advanced-settings-page.is-settings-app .advanced-settings-index-pane,
   .advanced-settings-page.is-settings-app .advanced-settings-main { transition: none; }
-  .device-led { animation: none !important; }
+  .device-led,
+  .brand-mark.is-jelly { animation: none !important; }
   .control-sheet-enter-active .control-sheet-card,
   .control-sheet-leave-active .control-sheet-card { animation: none; }
 }

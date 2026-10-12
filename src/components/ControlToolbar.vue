@@ -43,7 +43,6 @@ import { toolbarItemsFor } from '@/extensions/pluginUi'
 import { hidIndicatorState } from '@/lib/hid-status'
 import { USB_GAMEPAD_UI_ENABLED } from '@/lib/ui-features'
 import { dismissControlOverlays } from '@/lib/overlay-target'
-import { machineDisplayName } from '@/lib/machine'
 import { onekvm, type InputActivity, type TransportState } from '@/lib/onekvm'
 import { sendShortcut, shortcutChordLabel } from '@/lib/keyboard-shortcuts'
 import { useOneKVMTheme } from '@/theme/runtime'
@@ -107,6 +106,7 @@ const props = defineProps<{
   canChangeVideo: boolean
   canPower: boolean
   brandBadge: string
+  consoleTitle: string
   username: string
   mouseMode: MouseMode
   scrollInterval: number
@@ -1075,10 +1075,8 @@ const mediaStateLabel = computed(() => {
   return t('virtualMedia.disconnected', 'Disconnected')
 })
 
-const deviceVariant = computed(() => machineDisplayName(props.status))
-
 const brandName = computed(() => (props.brandBadge ? `OneKVM ${props.brandBadge}` : 'OneKVM'))
-const brandLabel = computed(() => `${brandName.value} · ${deviceVariant.value}`)
+const brandLabel = computed(() => `${brandName.value} · ${props.consoleTitle}`)
 
 const icon = (component: typeof Power) => () => h(NIcon, null, { default: () => h(component) })
 
@@ -1380,12 +1378,12 @@ onBeforeUnmount(() => {
         </template>
         <div class="toolbar-brand-tooltip">
           <strong>{{ brandName }}</strong>
-          <span>{{ deviceVariant }}</span>
+          <span>{{ consoleTitle }}</span>
         </div>
       </n-tooltip>
       <div v-if="!toolbarCompact" class="brand-copy">
         <span class="brand-title-row"><span class="brand-name">OneKVM</span><span v-if="brandBadge" class="brand-badge">{{ brandBadge }}</span></span>
-        <span class="brand-device">{{ deviceVariant }}</span>
+        <span class="brand-device">{{ consoleTitle }}</span>
       </div>
     </div>
 
@@ -1417,7 +1415,7 @@ onBeforeUnmount(() => {
     >
       <div v-if="toolbarLauncher" class="toolbar-tray-header">
         <strong>{{ brandName }}</strong>
-        <span>{{ deviceVariant }}</span>
+        <span>{{ consoleTitle }}</span>
       </div>
       <div v-if="toolbarLauncher" class="toolbar-list-title">
         {{ t('deviceStatus.title', 'Device status') }}

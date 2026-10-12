@@ -18,7 +18,7 @@ export type SettingsListGroup<T extends SettingsListItem> = {
 }
 
 const SETTINGS_LIST_GROUPS: { id: string; keys: string[] }[] = [
-  { id: 'device', keys: ['system', 'display', 'keyboard', 'usb'] },
+  { id: 'device', keys: ['system', 'personalization', 'display', 'keyboard', 'usb'] },
   { id: 'network', keys: ['network', 'time'] },
   { id: 'extensions', keys: ['cloud', 'plugins'] },
   { id: 'admin', keys: ['services', 'logs', 'resources', 'sessions', 'users', 'files', 'update'] },

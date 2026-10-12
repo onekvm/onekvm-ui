@@ -30,6 +30,7 @@ import {
   settingsAppActive,
 } from '@/lib/settings-nav'
 import { storedHideLocalCursor } from '@/lib/console-pointer'
+import { resolveConsoleTitle } from '@/lib/console-title'
 import { consumeConsoleBack, lockConsoleHistory } from '@/lib/history-lock'
 import { fullscreenTopInsetPx, isIpadLikeUserAgent, readSafeAreaTop } from '@/lib/fullscreen-inset'
 import { useTransport } from '@/composables/useTransport'
@@ -168,7 +169,11 @@ const fallbackActionError = shallowRef('')
 let unsubscribeKeyboardLED: (() => void) | undefined
 let unsubscribeStatus: (() => void) | undefined
 
-const consoleHostname = computed(() => status.value?.network.hostname || auth.hostname)
+const consoleTitle = computed(() => resolveConsoleTitle(
+  status.value?.identity,
+  status.value?.network.hostname,
+  auth.hostname,
+))
 const audioOverlayChannels = computed(() => {
   const stream = status.value?.audio.stream_channels || 0
   if (stream > 0) return stream
@@ -217,9 +222,9 @@ function setPerformanceOpen(open: boolean, event?: MouseEvent) {
   performanceOpen.value = open
 }
 watch(
-  consoleHostname,
-  (hostname) => {
-    document.title = hostname ? `${hostname} - OneKVM` : 'OneKVM'
+  consoleTitle,
+  (title) => {
+    document.title = title === 'OneKVM' ? title : `${title} - OneKVM`
   },
   { immediate: true },
 )
@@ -568,6 +573,7 @@ onBeforeUnmount(() => {
           :can-change-video="canChangeVideo"
           :can-power="canPower"
           :brand-badge="brandBadge"
+          :console-title="consoleTitle"
           :username="isCloudHosted() ? t('auth.cloudIdentity', 'Cloud account') : auth.username"
           :mouse-mode="mouseMode"
           :scroll-interval="scrollInterval"

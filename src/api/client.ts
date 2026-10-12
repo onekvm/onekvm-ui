@@ -223,9 +223,18 @@ export interface OneKVMConfig {
   ota: Record<string, unknown>
   logging: Record<string, unknown>
   system: { language: 'en' | 'zh' | 'zh_tw'; zram_size_mb?: number }
+  personalization: PersonalizationConfig
   keyboard: KeyboardConfig
   input: InputConfig
   usb: USBConfig
+}
+
+export type ConsoleTitleSource = 'device_name' | 'hostname' | 'custom'
+
+export interface PersonalizationConfig {
+  device_name: string
+  console_title_source: ConsoleTitleSource
+  custom_console_title: string
 }
 
 export interface InputConfig {
@@ -407,6 +416,7 @@ export interface OneKVMStatus {
     wifi_available: boolean
     wifi_connected: boolean
   }
+  identity?: PersonalizationConfig
   system: {
     processor: string
     architecture?: string

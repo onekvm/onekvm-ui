@@ -95,6 +95,7 @@ import AccountDrawer from './AccountDrawer.vue'
 import DNSSettingsForm from './DNSSettingsForm.vue'
 import ActiveRoutesPanel from './ActiveRoutesPanel.vue'
 import DisplaySettingsForm from './DisplaySettingsForm.vue'
+import PersonalizationSettingsForm from './PersonalizationSettingsForm.vue'
 import HostnameSettingsForm from './HostnameSettingsForm.vue'
 import DiscoverySettingsForm from './DiscoverySettingsForm.vue'
 import NetworkInterfaceManager from './NetworkInterfaceManager.vue'
@@ -152,7 +153,7 @@ function sectionFromRoute(route: string): Section {
   }
   if (uiProduct.settingsSections?.some((item) => item.key === normalized)) return normalized
   if (normalized === 'audio') return 'usb'
-  return ['display', 'network', 'keyboard', 'usb', 'cloud', 'plugins', 'services', 'logs', 'resources', 'sessions', 'system', 'files', 'users', 'time', 'update'].includes(normalized) ? normalized : 'system'
+  return ['display', 'personalization', 'network', 'keyboard', 'usb', 'cloud', 'plugins', 'services', 'logs', 'resources', 'sessions', 'system', 'files', 'users', 'time', 'update'].includes(normalized) ? normalized : 'system'
 }
 
 function routeFromSection(value: Section) {
@@ -211,6 +212,7 @@ const loading = ref(true)
 const saving = ref(false)
 const keyboardShortcutsValid = ref(true)
 const usbSettingsValid = ref(true)
+const personalizationValid = ref(true)
 const keyboardLayoutOptions = computed(() => [
 	{ value: 'us', label: t('keyboard.layouts.us', 'English (US)') },
 	{ value: 'uk', label: t('keyboard.layouts.uk', 'English (UK)') },
@@ -487,6 +489,7 @@ const sections = computed<SidebarSection[]>(() => {
     })
   return [
     { key: 'system', label: t('settings.advancedSettings.system', 'System'), icon: ServerCog },
+    { key: 'personalization', label: t('settings.advancedSettings.personalization', 'Personalization'), icon: Palette },
     ...(canManageSettings.value
       ? [{ key: 'files', label: t('settings.advancedSettings.files', 'Files'), icon: FolderOpen }]
       : []),
@@ -1027,6 +1030,11 @@ async function load() {
     loadedConfig.keyboard.shortcuts ||= []
     loadedConfig.system ||= { language: 'en' }
     loadedConfig.system.zram_size_mb ??= 16
+    loadedConfig.personalization ||= {
+      device_name: 'OneKVM',
+      console_title_source: 'hostname',
+      custom_console_title: '',
+    }
     loadedConfig.video.frame_detect ??= false
     loadedConfig.video.bitrate_kbps ??= 0
     loadedConfig.video.initial_qp ??= 0
@@ -1257,6 +1265,8 @@ async function revealActiveSidebarItem() {
 
 async function save() {
   if (!config.value) return
+  config.value.personalization.device_name = config.value.personalization.device_name.trim()
+  config.value.personalization.custom_console_title = config.value.personalization.custom_console_title.trim()
   saving.value = true
   try {
 		const response = await api.saveConfig(config.value, props.videoSessionId)
@@ -1732,6 +1742,22 @@ watch(paneSection, (value) => {
                 </footer>
               </section>
 
+              <section v-else-if="paneSection === 'personalization' && config" class="advanced-settings-section">
+                <PersonalizationSettingsForm
+                  v-model="config.personalization"
+                  :hostname="config.network.hostname || status?.network.hostname || ''"
+                  :disabled="saving"
+                  @validity="personalizationValid = $event"
+                />
+                <footer class="advanced-settings-actions">
+                  <n-button :disabled="saving" @click="load">{{ t('common.refresh', 'Reload') }}</n-button>
+                  <n-button type="primary" :loading="saving" :disabled="!personalizationValid" @click="save">
+                    <template #icon><Save /></template>
+                    {{ t('common.save', 'Save') }}
+                  </n-button>
+                </footer>
+              </section>
+
               <section v-else-if="paneSection === 'keyboard' && config" class="advanced-settings-section">
 				<div class="system-control-list keyboard-layout-setting">
 					<div>
@@ -1929,7 +1955,7 @@ watch(paneSection, (value) => {
                   <header class="system-device-overview">
                     <div class="system-device-icon"><ServerCog :size="30" /></div>
                     <div class="system-device-identity">
-                      <h2>{{ status.network.hostname || 'OneKVM' }}</h2>
+                      <h2>{{ status.identity?.device_name || status.network.hostname || 'OneKVM' }}</h2>
                       <p>{{ deviceVariant }}</p>
                     </div>
                     <span class="system-online-state">

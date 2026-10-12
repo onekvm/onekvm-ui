@@ -27,6 +27,7 @@ assert.equal(settingsGroupTone('other'), 'device')
 
 const grouped = groupSettingsSections([
   { key: 'system' },
+  { key: 'personalization' },
   { key: 'files' },
   { key: 'display' },
   { key: 'keyboard' },
@@ -47,7 +48,7 @@ const grouped = groupSettingsSections([
 ])
 
 assert.deepEqual(grouped.map((group) => group.id), ['device', 'network', 'extensions', 'admin'])
-assert.deepEqual(grouped[0].items.map((item) => item.key), ['system', 'display', 'keyboard', 'usb'])
+assert.deepEqual(grouped[0].items.map((item) => item.key), ['system', 'personalization', 'display', 'keyboard', 'usb'])
 assert.deepEqual(grouped[1].items.map((item) => item.key), ['network', 'time'])
 assert.deepEqual(grouped[2].items.map((item) => item.key), [
   'cloud',

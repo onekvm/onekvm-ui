@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
 import { NAlert, NButton, NEmpty, NSpin, type DropdownOption } from 'naive-ui'
-import { Pin, PinOff, Wrench } from '@lucide/vue'
+import { Pin, PinOff, Toolbox } from '@lucide/vue'
 import { useToolboxContext } from '@/composables/useToolbox'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { DISMISS_CONTROL_OVERLAY_EVENT } from '@/lib/overlay-target'
@@ -20,7 +20,10 @@ const options = computed<DropdownOption[]>(() => {
       default: () => [toolbox.error, h(NButton, { size: 'small', loading: toolbox.loading, onClick: () => toolbox.refresh() }, { default: () => t('toolbox.retry') })],
     }),
   })
-  if (toolbox.loading && !toolbox.tools.length) rows.push({ type: 'render', key: 'catalog-loading', render: () => h(NSpin, { size: 'small' }) })
+  if (toolbox.loading && !toolbox.tools.length) rows.push({
+    type: 'render', key: 'catalog-loading',
+    render: () => h('div', { class: 'toolbox-menu-loading' }, [h(NSpin, { size: 'small' })]),
+  })
   else if (!toolbox.tools.length && !toolbox.error) rows.push({ type: 'render', key: 'catalog-empty', render: () => h(NEmpty, { description: t('toolbox.empty') }) })
   if (toolbox.pinned.length) rows.push({ type: 'render', key: 'pinned-tools', render: () => h(PinnedToolList) })
   const otherTools = toolbox.tools.filter(tool => !pinned(tool.id))
@@ -84,7 +87,7 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
     <n-tooltip :disabled="mobile || toolbox.menuOpen" :to="mountTo" style="pointer-events: none">
       <template #trigger>
         <n-button quaternary size="small" :aria-label="t('toolbox.title')" :aria-expanded="toolbox.menuOpen" aria-haspopup="menu" data-toolbox-local data-toolbox-trigger @keydown="triggerKeydown">
-          <template #icon><Wrench /></template>
+          <template #icon><Toolbox /></template>
           <span v-if="mobile" class="toolbar-action-label">{{ t('toolbox.title') }}</span>
         </n-button>
       </template>
@@ -94,6 +97,7 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
 </template>
 <style>
 .toolbox-dropdown { min-width: min(300px, calc(100vw - 24px)); }
+.toolbox-menu-loading { display: grid; min-height: 96px; place-items: center; padding: 24px; }
 .toolbox-dropdown-row { display: flex; align-items: center; gap: 16px; height: 100%; min-height: 44px; line-height: 1.35; }
 .toolbox-dropdown-label { display: grid; flex: 1; min-width: 0; }
 .toolbox-dropdown-label strong { font-weight: 500; overflow: hidden; text-overflow: ellipsis; }

@@ -30,3 +30,7 @@ export function resolveConsoleTitle(
       : resolvedHostname
   return selected || resolvedHostname || deviceName || DEFAULT_DEVICE_NAME
 }
+
+export function shouldShowDeviceModel(identity: ConsoleIdentity) {
+  return identity?.show_device_model !== false
+}

@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict'
 
-import { resolveConsoleTitle, validPersonalizationText } from '../src/lib/console-title.ts'
+import { resolveConsoleTitle, shouldShowDeviceModel, validPersonalizationText } from '../src/lib/console-title.ts'
 
 const identity = {
   device_name: 'Lab KVM',
   console_title_source: 'device_name' as const,
   custom_console_title: 'Rack 3',
+  show_device_model: true,
 }
 
 assert.equal(resolveConsoleTitle(identity, 'onekvm-107'), 'Lab KVM')
@@ -14,6 +15,10 @@ assert.equal(resolveConsoleTitle({ ...identity, console_title_source: 'custom' }
 assert.equal(resolveConsoleTitle({ ...identity, console_title_source: 'custom', custom_console_title: '' }, 'onekvm-107'), 'onekvm-107')
 assert.equal(resolveConsoleTitle(undefined, '', 'setup-host'), 'setup-host')
 assert.equal(resolveConsoleTitle(undefined, ''), 'OneKVM')
+
+assert.equal(shouldShowDeviceModel(undefined), true)
+assert.equal(shouldShowDeviceModel(identity), true)
+assert.equal(shouldShowDeviceModel({ ...identity, show_device_model: false }), false)
 
 assert.equal(validPersonalizationText('设备 107'), true)
 assert.equal(validPersonalizationText(''), false)

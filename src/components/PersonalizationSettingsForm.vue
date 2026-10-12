@@ -1,18 +1,22 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
-import { Monitor } from '@lucide/vue'
+import { Activity, GripHorizontal, Keyboard, Monitor, MousePointer2, Settings } from '@lucide/vue'
 
 import type { ConsoleTitleSource, PersonalizationConfig } from '@/api/client'
+import { serviceURL } from '@/api/service-url'
 import { t } from '@/i18n/runtime'
 import {
   MAX_PERSONALIZATION_TEXT_LENGTH,
   resolveConsoleTitle,
+  shouldShowDeviceModel,
   validPersonalizationText,
 } from '@/lib/console-title'
+import ConsoleBrandCopy from './ConsoleBrandCopy.vue'
 
 const props = defineProps<{
   modelValue: PersonalizationConfig
   hostname: string
+  deviceModel: string
   disabled?: boolean
 }>()
 
@@ -46,6 +50,7 @@ const customTitleValid = computed(() => validPersonalizationText(
 ))
 const valid = computed(() => deviceNameValid.value && customTitleValid.value)
 const previewTitle = computed(() => resolveConsoleTitle(props.modelValue, props.hostname))
+const previewShowsDeviceModel = computed(() => shouldShowDeviceModel(props.modelValue))
 
 watch(valid, value => emit('validity', value), { immediate: true })
 
@@ -94,7 +99,7 @@ function updateSource(value: string | number | boolean) {
     <section class="personalization-section">
       <header>
         <h2>{{ t('settings.advancedSettings.personalizationPage.consoleTitle', 'Console title') }}</h2>
-        <p>{{ t('settings.advancedSettings.personalizationPage.consoleTitleHint', 'Choose the name shown in the console header and browser tab.') }}</p>
+        <p>{{ t('settings.advancedSettings.personalizationPage.consoleTitleHint', 'Choose what replaces OneKVM as the main toolbar title. The browser tab follows it.') }}</p>
       </header>
       <n-radio-group
         :value="modelValue.console_title_source"
@@ -132,17 +137,57 @@ function updateSource(value: string | number | boolean) {
           </n-form-item>
         </n-form>
       </n-collapse-transition>
+
+      <div class="personalization-model-setting">
+        <span>
+          <strong>{{ t('settings.advancedSettings.personalizationPage.showDeviceModel', 'Show device model') }}</strong>
+          <small>{{ t('settings.advancedSettings.personalizationPage.showDeviceModelHint', 'Show the detected device model below the main title.') }}</small>
+        </span>
+        <n-switch
+          :value="previewShowsDeviceModel"
+          :disabled="disabled"
+          :aria-label="t('settings.advancedSettings.personalizationPage.showDeviceModel', 'Show device model')"
+          @update:value="update({ show_device_model: $event })"
+        />
+      </div>
     </section>
 
     <section class="personalization-preview" aria-live="polite">
       <span class="personalization-preview-label">{{ t('settings.advancedSettings.personalizationPage.preview', 'Preview') }}</span>
-      <div class="personalization-preview-bar">
-        <span class="personalization-preview-icon"><Monitor :size="17" aria-hidden="true" /></span>
-        <strong>OneKVM</strong>
-        <i aria-hidden="true" />
-        <span>{{ previewTitle }}</span>
+      <div class="toolbar personalization-preview-toolbar">
+        <div class="brand">
+          <span class="brand-logo" aria-hidden="true">
+            <img class="brand-mark" :src="serviceURL('/brand/onekvm-app-icon.svg')" alt="" draggable="false" />
+          </span>
+          <ConsoleBrandCopy
+            :title="previewTitle"
+            :device-model="deviceModel"
+            :show-device-model="previewShowsDeviceModel"
+          />
+        </div>
+        <span class="toolbar-spacer personalization-preview-spacer" aria-hidden="true">
+          <span class="toolbar-handle"><GripHorizontal :size="14" /></span>
+        </span>
+        <div class="device-controls personalization-preview-devices" aria-hidden="true">
+          <n-button quaternary size="small" class="device-indicator" data-state="ready" tabindex="-1">
+            <template #icon><Monitor /></template>
+            <span class="device-led" />
+          </n-button>
+          <n-button quaternary size="small" class="device-indicator personalization-preview-optional" data-state="ready" tabindex="-1">
+            <template #icon><MousePointer2 /></template>
+            <span class="device-led" />
+          </n-button>
+          <n-button quaternary size="small" class="device-indicator personalization-preview-optional" data-state="ready" tabindex="-1">
+            <template #icon><Keyboard /></template>
+            <span class="device-led" />
+          </n-button>
+        </div>
+        <div class="toolbar-actions personalization-preview-actions" aria-hidden="true">
+          <n-button quaternary size="small" tabindex="-1"><template #icon><Activity /></template></n-button>
+          <n-button quaternary size="small" tabindex="-1"><template #icon><Settings /></template></n-button>
+        </div>
       </div>
-      <small>{{ previewTitle }} - OneKVM</small>
+      <small>{{ t('settings.advancedSettings.personalizationPage.browserTab', 'Browser tab') }} · {{ previewTitle }} - OneKVM</small>
     </section>
   </div>
 </template>
@@ -166,17 +211,26 @@ function updateSource(value: string | number | boolean) {
 .personalization-source strong { color: var(--foreground); font-size: 13px; line-height: 1.35; }
 .personalization-source small { margin-top: 4px; color: var(--muted-foreground); font-size: 11px; line-height: 1.45; }
 .personalization-custom-form { padding-top: 14px; }
+.personalization-model-setting { display: flex; min-height: 54px; align-items: center; justify-content: space-between; gap: 20px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+.personalization-model-setting > span { display: grid; gap: 3px; }
+.personalization-model-setting strong { color: var(--foreground); font-size: 13px; }
+.personalization-model-setting small { color: var(--muted-foreground); font-size: 11px; line-height: 1.45; }
 .personalization-preview { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--onekvm-surface-inset); }
 .personalization-preview-label { color: var(--muted-foreground); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
-.personalization-preview-bar { display: flex; min-width: 0; min-height: 38px; align-items: center; gap: 9px; padding: 0 11px; border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px); background: var(--card); }
-.personalization-preview-icon { display: inline-flex; color: var(--primary); }
-.personalization-preview-bar strong { color: var(--foreground); font-size: 13px; }
-.personalization-preview-bar i { width: 1px; height: 14px; background: var(--border-strong); }
-.personalization-preview-bar > span:last-child { min-width: 0; overflow: hidden; color: var(--onekvm-text-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.personalization-preview-toolbar { z-index: auto; width: 100%; height: var(--onekvm-toolbar-bar); overflow: hidden; border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px); pointer-events: none; }
+.personalization-preview-toolbar .brand { min-width: 0; cursor: default; touch-action: auto; }
+.personalization-preview-toolbar .brand-logo { cursor: default; touch-action: auto; }
+.personalization-preview-spacer { min-width: 8px; cursor: default; touch-action: auto; }
+.personalization-preview-spacer .toolbar-handle { cursor: default; }
+.personalization-preview-devices,
+.personalization-preview-actions { flex: 0 0 auto; }
 .personalization-preview > small { overflow: hidden; color: var(--muted-foreground); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 720px) {
   .personalization-source-list { grid-template-columns: 1fr; }
   .personalization-source { min-height: 0; }
+  .personalization-preview-toolbar { padding-inline: 7px; }
+  .personalization-preview-toolbar :deep(.brand-copy) { display: grid; max-width: min(180px, 42vw); }
+  .personalization-preview-optional { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .personalization-source { transition: none; }

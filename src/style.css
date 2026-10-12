@@ -862,12 +862,18 @@ select { font: inherit; }
 .brand-copy {
   display: grid;
   min-width: 0;
+  max-width: min(240px, 28vw);
   gap: 1px;
   line-height: 1;
 }
 
-.brand-name { white-space: nowrap; }
-.brand-title-row { display: flex; align-items: center; }
+.brand-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.brand-title-row { display: flex; min-width: 0; align-items: center; }
 .brand-device {
   overflow: hidden;
   color: var(--muted-foreground);
@@ -3321,6 +3327,7 @@ select { font: inherit; }
 }
 .advanced-settings-header strong { font-size: 14px; }
 .brand-badge {
+  flex: 0 0 auto;
   margin-left: 5px;
   padding: 1px 4px;
   border: 1px solid color-mix(in srgb, var(--primary) 45%, var(--border));

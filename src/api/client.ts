@@ -235,6 +235,7 @@ export interface PersonalizationConfig {
   device_name: string
   console_title_source: ConsoleTitleSource
   custom_console_title: string
+  show_device_model: boolean
 }
 
 export interface InputConfig {

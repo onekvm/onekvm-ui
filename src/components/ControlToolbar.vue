@@ -43,6 +43,8 @@ import { toolbarItemsFor } from '@/extensions/pluginUi'
 import { hidIndicatorState } from '@/lib/hid-status'
 import { USB_GAMEPAD_UI_ENABLED } from '@/lib/ui-features'
 import { dismissControlOverlays } from '@/lib/overlay-target'
+import { shouldShowDeviceModel } from '@/lib/console-title'
+import { machineDisplayName } from '@/lib/machine'
 import { onekvm, type InputActivity, type TransportState } from '@/lib/onekvm'
 import { sendShortcut, shortcutChordLabel } from '@/lib/keyboard-shortcuts'
 import { useOneKVMTheme } from '@/theme/runtime'
@@ -96,6 +98,7 @@ import USBAudioPopover from './USBAudioPopover.vue'
 import MediaTransferIndicator from './MediaTransferIndicator.vue'
 import type { MediaTransferState } from '@/lib/media-transfer'
 import ControlOverlay from './ControlOverlay.vue'
+import ConsoleBrandCopy from './ConsoleBrandCopy.vue'
 
 const props = defineProps<{
   state: TransportState
@@ -1075,8 +1078,14 @@ const mediaStateLabel = computed(() => {
   return t('virtualMedia.disconnected', 'Disconnected')
 })
 
-const brandName = computed(() => (props.brandBadge ? `OneKVM ${props.brandBadge}` : 'OneKVM'))
-const brandLabel = computed(() => `${brandName.value} · ${props.consoleTitle}`)
+const deviceModel = computed(() => machineDisplayName(props.status))
+const showDeviceModel = computed(() => shouldShowDeviceModel(props.status?.identity))
+const brandedConsoleTitle = computed(() => (
+  props.brandBadge ? `${props.consoleTitle} ${props.brandBadge}` : props.consoleTitle
+))
+const brandLabel = computed(() => showDeviceModel.value
+  ? `${brandedConsoleTitle.value} · ${deviceModel.value}`
+  : brandedConsoleTitle.value)
 
 const icon = (component: typeof Power) => () => h(NIcon, null, { default: () => h(component) })
 
@@ -1377,14 +1386,17 @@ onBeforeUnmount(() => {
           </button>
         </template>
         <div class="toolbar-brand-tooltip">
-          <strong>{{ brandName }}</strong>
-          <span>{{ consoleTitle }}</span>
+          <strong>{{ brandedConsoleTitle }}</strong>
+          <span v-if="showDeviceModel">{{ deviceModel }}</span>
         </div>
       </n-tooltip>
-      <div v-if="!toolbarCompact" class="brand-copy">
-        <span class="brand-title-row"><span class="brand-name">OneKVM</span><span v-if="brandBadge" class="brand-badge">{{ brandBadge }}</span></span>
-        <span class="brand-device">{{ consoleTitle }}</span>
-      </div>
+      <ConsoleBrandCopy
+        v-if="!toolbarCompact"
+        :title="consoleTitle"
+        :device-model="deviceModel"
+        :show-device-model="showDeviceModel"
+        :badge="brandBadge"
+      />
     </div>
 
     <div
@@ -1414,8 +1426,8 @@ onBeforeUnmount(() => {
       :inert="toolbarLauncher && !launcherMenuOpen"
     >
       <div v-if="toolbarLauncher" class="toolbar-tray-header">
-        <strong>{{ brandName }}</strong>
-        <span>{{ consoleTitle }}</span>
+        <strong>{{ brandedConsoleTitle }}</strong>
+        <span v-if="showDeviceModel">{{ deviceModel }}</span>
       </div>
       <div v-if="toolbarLauncher" class="toolbar-list-title">
         {{ t('deviceStatus.title', 'Device status') }}

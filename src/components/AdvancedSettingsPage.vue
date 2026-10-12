@@ -1034,7 +1034,9 @@ async function load() {
       device_name: 'OneKVM',
       console_title_source: 'hostname',
       custom_console_title: '',
+      show_device_model: true,
     }
+    loadedConfig.personalization.show_device_model ??= true
     loadedConfig.video.frame_detect ??= false
     loadedConfig.video.bitrate_kbps ??= 0
     loadedConfig.video.initial_qp ??= 0
@@ -1746,6 +1748,7 @@ watch(paneSection, (value) => {
                 <PersonalizationSettingsForm
                   v-model="config.personalization"
                   :hostname="config.network.hostname || status?.network.hostname || ''"
+                  :device-model="deviceVariant"
                   :disabled="saving"
                   @validity="personalizationValid = $event"
                 />

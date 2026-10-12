@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { Mouse } from '@lucide/vue'
 
 import { type MouseMode } from '@/composables/useMouse'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { t } from '@/i18n/runtime'
 import { DISMISS_CONTROL_OVERLAY_EVENT } from '@/lib/overlay-target'
 import ControlOverlay from './ControlOverlay.vue'
+import ControlPopoverHeading from './ControlPopoverHeading.vue'
 import HidHostAlert from './HidHostAlert.vue'
 
 const props = defineProps<{
@@ -36,6 +38,7 @@ const mouseModeOptions = computed(() => [
   { label: t('mouse.absolute', 'Absolute'), value: 'absolute' as const },
   { label: t('mouse.relative', 'Relative'), value: 'relative' as const },
 ])
+const mouseModeLabel = computed(() => mouseModeOptions.value.find((option) => option.value === props.mouseMode)?.label || '')
 const scrollOptions = Array.from({ length: 16 }, (_, index) => {
   const value = index * 10
   return { label: `${value} ms`, value }
@@ -129,8 +132,12 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
     <template #title>{{ t('settings.mouse.title', 'Mouse') }}</template>
     <template #panel>
     <div class="display-status-popover">
-      <header class="control-popover-header">
-        <strong>{{ t('settings.mouse.title', 'Mouse') }}</strong>
+      <header class="control-popover-header control-popover-header-with-heading">
+        <ControlPopoverHeading
+          :icon="Mouse"
+          :title="t('settings.mouse.title', 'Mouse')"
+          :subtitle="`${t('mouse.mode', 'Mouse mode')} · ${mouseModeLabel}`"
+        />
       </header>
       <HidHostAlert :hid="hid" />
       <div class="display-status-values">

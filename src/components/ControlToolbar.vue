@@ -1122,7 +1122,6 @@ const keyboardOptions = computed<DropdownOption[]>(() => [
     key: 'right-control-as-meta',
     label: t('keyboard.rightControlAsWin', 'Right Ctrl as remote Win'),
     icon: props.rightControlAsMeta ? icon(Check) : undefined,
-    extra: props.rightControlAsMeta ? t('keyboard.lockOn', 'On') : t('keyboard.lockOff', 'Off'),
   },
 ])
 

@@ -335,8 +335,13 @@ function persistLauncherPos() {
   localStorage.setItem(TOOLBAR_LAUNCHER_KEY, JSON.stringify(launcherPos.value))
 }
 
+const keyboardTextModal = ref(false)
 function emitToolbarOverlay() {
-  emit('overlay', openMenu.value !== null || launcherMenuOpen.value || toolbox.menuOpen || pinnedOverflowOpen.value)
+  emit('overlay', openMenu.value !== null || launcherMenuOpen.value || toolbox.menuOpen || pinnedOverflowOpen.value || keyboardTextModal.value)
+}
+function onKeyboardTextModal(open: boolean) {
+  keyboardTextModal.value = open
+  emitToolbarOverlay()
 }
 
 function setLauncherMenuOpen(open: boolean) {
@@ -1449,6 +1454,7 @@ onBeforeUnmount(() => {
         :sheet="toolbarLauncher"
         @select="selectKeyboard"
         @update:show="updateMenu('keyboard', $event)"
+        @text-modal="onKeyboardTextModal"
       >
         <n-tooltip :disabled="toolbarLauncher || openMenu === 'keyboard'">
           <template #trigger>

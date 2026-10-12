@@ -583,7 +583,6 @@ export interface AuthStatus {
   username: string
   hostname: string
   language: DeviceLanguage
-  edition?: string
   role?: string
   permissions: string[]
   mfa_required?: boolean

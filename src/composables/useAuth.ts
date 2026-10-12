@@ -10,7 +10,6 @@ const state = reactive<AuthStatus & { loading: boolean }>({
   username: '',
   hostname: 'onekvm',
   language: 'en',
-  edition: '',
   permissions: [],
   mfa_required: false,
   pending_token: '',

@@ -1,4 +1,4 @@
-import { resolveServiceURL, serviceBaseUrl, serviceURL, serviceWebSocketURL } from './service-url'
+import { resolveServiceURL, serviceBaseUrl, serviceURL, serviceWebSocketURL } from './service-url.ts'
 export type IPv4Mode = 'disabled' | 'dhcp' | 'dhcp-static' | 'static'
 export type IPv6Mode = 'disabled' | 'slaac' | 'dhcp' | 'static'
 export type DeviceLanguage = 'en' | 'zh' | 'zh_tw'

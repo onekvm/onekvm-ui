@@ -41,7 +41,7 @@ export function useMJPEGStream(
   let sampleTimer = 0
 
   const decodeFrame = async (frame: Uint8Array) => {
-    const blob = new Blob([frame], { type: 'image/jpeg' })
+    const blob = new Blob([Uint8Array.from(frame)], { type: 'image/jpeg' })
     if (typeof createImageBitmap === 'function') {
       const bitmap = await createImageBitmap(blob)
       return {

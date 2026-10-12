@@ -769,7 +769,7 @@ class OneKVMTransport {
 	  }
 	}
     if (this.control?.readyState !== 'open') return false
-    this.control.send(report)
+    this.control.send(Uint8Array.from(report))
     this.emitHIDReport(report)
     return true
   }

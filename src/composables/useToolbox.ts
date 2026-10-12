@@ -1,11 +1,12 @@
-import { computed, inject, onBeforeUnmount, onMounted, provide, reactive, ref, shallowRef, watch, type InjectionKey } from 'vue'
+import { computed, inject, markRaw, onBeforeUnmount, onMounted, provide, reactive, ref, shallowRef, watch, type InjectionKey } from 'vue'
 import { useMessage } from 'naive-ui'
 import { api, extensionLocalizedText, type ExtensionStatus, type ExtensionSummary, type ExtensionToolboxItem } from '@/api/client'
 import { toolbarLauncherActive } from '@/lib/toolbar-dock'
 import { useAuth } from './useAuth'
 import { hasPermission } from '@/build'
 import { currentLanguage, t } from '@/i18n/runtime'
-import { invalidateToolResources, toolCacheKey } from '@/extensions/toolboxRuntime'
+import { invalidateToolResources, toolCacheKey, type HIDRecordingActivity } from '@/extensions/toolboxRuntime'
+import { createToolChildWindows, type ToolChildWindow } from '@/lib/tool-child-windows'
 import { parseToolboxPins, reorderToolboxPins, toolboxPinStorageKey, type ToolboxPin } from '@/lib/toolbox-pins'
 
 export interface ToolboxTool {
@@ -23,8 +24,10 @@ export interface ToolInstance {
   sequence: number
   trigger: HTMLElement | null
   windowSize?: { width: number; height: number }
+  windowState?: 'normal' | 'maximized' | 'minimized'
+  restoreState?: 'normal' | 'maximized'
 }
-export interface ToolActions { closeCheck: () => Promise<boolean> }
+export interface ToolActions { closeCheck: () => Promise<boolean>; cancelClose?: () => void }
 const key: InjectionKey<ReturnType<typeof useToolbox>> = Symbol('toolbox')
 
 export function useToolbox() {
@@ -40,6 +43,9 @@ export function useToolbox() {
   const error = ref('')
   const activeId = ref('')
   const minimizedId = ref('')
+  const recording = shallowRef<HIDRecordingActivity | null>(null)
+  const childWindowIds = shallowRef<string[]>([])
+  const childWindows = createToolChildWindows(ids => { childWindowIds.value = ids })
   const mobile = ref(toolbarLauncherActive(window.innerWidth, window.innerHeight))
   const allowed = computed(() => auth.authenticated && hasPermission(auth, 'settings.view'))
   const namespace = computed(() => toolboxPinStorageKey(window.location.origin, auth.username))
@@ -56,9 +62,10 @@ export function useToolbox() {
     return tool ? [{ pin, tool }] : []
   }).sort((a, b) => a.pin.order - b.pin.order || a.tool.id.localeCompare(b.tool.id)))
   const inputBlocked = computed(() => menuOpen.value || localFocus.value ||
-    (mobile.value ? Boolean(activeId.value) : instances.value.some(i => i.tool.item.presentation === 'drawer')))
+    (mobile.value ? Boolean(activeId.value) : instances.value.some(i => i.tool.item.presentation === 'drawer' && i.windowState !== 'minimized')))
   const actions = new Map<string, ToolActions>()
   const opening = new Map<string, Promise<void>>()
+  const closing = new Map<string, Promise<boolean>>()
   let generation = 0
   let sequence = 0
   let refreshTimer = 0
@@ -80,11 +87,13 @@ export function useToolbox() {
     savePins()
   }
   function focus(id: string) {
+    if (!instances.value.some(instance => instance.id === id) || (recording.value && minimizedId.value === id)) return
     activeId.value = id
     if (minimizedId.value === id) minimizedId.value = ''
-    instances.value = instances.value.map(i => i.id === id ? { ...i, sequence: ++sequence } : i)
+    instances.value = instances.value.map(i => i.id === id ? { ...i, windowState: i.windowState === 'minimized' ? i.restoreState || 'normal' : i.windowState, sequence: ++sequence } : i)
     localFocus.value = true
     if (document.pointerLockElement) void document.exitPointerLock()
+    if (!childWindows.focus(id)) childWindows.activate(id)
   }
   function minimizeForRecording(id: string) {
     if (!mobile.value || activeId.value !== id || !instances.value.some(instance => instance.id === id)) return
@@ -97,24 +106,104 @@ export function useToolbox() {
     if (!instances.value.some(instance => instance.id === id)) return
     instances.value = instances.value.map(instance => instance.id === id ? { ...instance, windowSize: size } : instance)
   }
+  function showRecordingStatus(id: string, activity: HIDRecordingActivity) {
+    if (!allowed.value || !instances.value.some(instance => instance.id === id) || recording.value) {
+      throw new Error(t('toolbox.invalidated'))
+    }
+    const current = markRaw(activity)
+    recording.value = current
+    minimizedId.value = id
+    activeId.value = ''
+    localFocus.value = false
+    document.querySelector<HTMLElement>('.console-hid-layer')?.focus({ preventScroll: true })
+    return () => {
+      if (recording.value !== current) return
+      recording.value = null
+      if (instances.value.some(instance => instance.id === id) && minimizedId.value === id) focus(id)
+    }
+  }
+  function registerChildWindow(id: string, child: ToolChildWindow) {
+    if (!allowed.value || closing.has(id) || !instances.value.some(instance => instance.id === id)) throw new Error(t('toolbox.invalidated'))
+    const unregister = childWindows.register(id, markRaw(child))
+    let disposed = false
+    return {
+      layer: computed(() => { childWindowIds.value; return windowLayer(id) + (childWindows.index(id, child) + 1) * 2 }),
+      active: computed(() => { childWindowIds.value; return activeId.value === id && childWindows.active(id) === child }),
+      blocked: computed(() => { childWindowIds.value; return childWindows.blocked(id, child) }),
+      visible: computed(() => instances.value.some(instance => instance.id === id && instance.windowState !== 'minimized') && minimizedId.value !== id && (!mobile.value || activeId.value === id)),
+      activate: () => {
+        if (disposed || closing.has(id)) return
+        if (childWindows.focus(id, false, child)) return
+        const raise = activeId.value !== id || childWindows.active(id) !== child
+        activeId.value = id
+        localFocus.value = true
+        if (raise) {
+          instances.value = instances.value.map(instance => instance.id === id ? { ...instance, sequence: ++sequence } : instance)
+          childWindows.activate(id, child)
+        }
+      },
+      attention: () => { childWindows.focus(id, true, child) },
+      closeChildren: (force = false) => childWindows.close(id, child, force),
+      dispose: () => {
+        if (disposed) return
+        disposed = true
+        unregister()
+        if (!closing.has(id) && minimizedId.value !== id && instances.value.some(instance => instance.id === id)) {
+          if (child.owner) child.owner.focus(false)
+          else focus(id)
+        }
+      },
+    }
+  }
+  function windowBlocked(id: string) { childWindowIds.value; return childWindows.blocked(id) }
+  function childWindowFocused(id: string) { childWindowIds.value; return Boolean(childWindows.active(id)) }
+  function windowLayer(id: string) {
+    let layer = 2300
+    for (const instance of [...instances.value].sort((a, b) => a.sequence - b.sequence)) {
+      if (instance.id === id) return layer
+      layer += 2 + childWindowIds.value.filter(owner => owner === instance.id).length * 2
+    }
+    return layer
+  }
+  function setWindowState(id: string, state: 'normal' | 'maximized' | 'minimized') {
+    if (windowBlocked(id)) { childWindows.focus(id, true); return }
+    instances.value = instances.value.map(instance => instance.id === id ? { ...instance, windowState: state, restoreState: state === 'minimized' ? instance.windowState === 'maximized' ? 'maximized' : 'normal' : instance.restoreState } : instance)
+    if (state === 'minimized') {
+      if (activeId.value === id) activeId.value = [...instances.value].filter(instance => instance.windowState !== 'minimized').sort((a, b) => b.sequence - a.sequence)[0]?.id || ''
+      localFocus.value = false
+      document.querySelector<HTMLElement>('.console-hid-layer')?.focus({ preventScroll: true })
+    } else focus(id)
+  }
   function finishOpening(id: string) {
     openingIds.value = openingIds.value.filter(openingId => openingId !== id)
   }
-  async function close(id: string, force = false) {
+  async function closeNow(id: string, force: boolean) {
     const instance = instances.value.find(i => i.id === id)
     if (!instance) return true
     if (!force && actions.has(id) && !await actions.get(id)!.closeCheck()) return false
+    if (!await childWindows.close(id, null, force)) return false
     instances.value = instances.value.filter(i => i.id !== id)
     finishOpening(id)
     if (minimizedId.value === id) minimizedId.value = ''
     actions.delete(id)
-    if (activeId.value === id) activeId.value = [...instances.value].sort((a, b) => b.sequence - a.sequence)[0]?.id || ''
+    if (activeId.value === id) activeId.value = [...instances.value].filter(instance => instance.windowState !== 'minimized' && minimizedId.value !== instance.id).sort((a, b) => b.sequence - a.sequence)[0]?.id || ''
     localFocus.value = false
     if (!force) {
       if (instance.trigger?.isConnected) instance.trigger.focus()
       else document.querySelector<HTMLElement>('.console-hid-layer')?.focus()
     }
     return true
+  }
+  function close(id: string, force = false): Promise<boolean> {
+    const pending = closing.get(id)
+    if (pending && !force) return pending
+    if (pending && force) actions.get(id)?.cancelClose?.()
+    const request = closeNow(id, force).finally(() => { if (closing.get(id) === request) closing.delete(id) })
+    closing.set(id, request)
+    return request
+  }
+  function closeAll() {
+    for (const id of instances.value.map(instance => instance.id)) void close(id, true)
   }
   function acceptCatalog(next: ExtensionSummary[]) {
     catalog.value = next
@@ -214,6 +303,8 @@ export function useToolbox() {
     instances.value = []
     openingIds.value = []
     minimizedId.value = ''
+    recording.value = null
+    childWindows.clear()
     actions.clear()
     catalog.value = []
     menuOpen.value = localFocus.value = false
@@ -233,6 +324,8 @@ export function useToolbox() {
   onBeforeUnmount(() => {
     window.clearInterval(refreshTimer)
     generation++
+    recording.value = null
+    childWindows.clear()
     invalidateToolResources([])
     document.removeEventListener('visibilitychange', resume)
     window.removeEventListener('online', resume)
@@ -241,8 +334,9 @@ export function useToolbox() {
     document.removeEventListener('pointerdown', onLocalFocus, true)
     document.removeEventListener('focusin', onLocalFocus, true)
   })
-  const toolbox = reactive({ allowed, tools, instances, pins, pinned, menuOpen, localFocus, inputBlocked, loading, openingIds, error, activeId, minimizedId,
-    refresh, acceptCatalog, togglePin, reorderPin, open, focus, close, minimizeForRecording, resizeWindow, finishOpening, registerActions })
+  const toolbox = reactive({ allowed, tools, instances, pins, pinned, menuOpen, localFocus, inputBlocked, loading, openingIds, error, activeId, minimizedId, recording, childWindowIds,
+    refresh, acceptCatalog, togglePin, reorderPin, open, focus, close, closeAll, minimizeForRecording, showRecordingStatus, registerChildWindow,
+    focusChildWindow: childWindows.focus, windowLayer, windowBlocked, childWindowFocused, setWindowState, resizeWindow, finishOpening, registerActions })
   provide(key, toolbox)
   return toolbox
 }

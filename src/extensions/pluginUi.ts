@@ -34,11 +34,15 @@ import {
   vModelCheckbox,
   vModelSelect,
   vModelText,
+  Transition,
   type Component,
   type ComputedRef,
   type Ref,
 } from 'vue'
 import * as naiveUI from 'naive-ui'
+import { useAsyncDialog } from '@/composables/useAsyncDialog'
+import AsyncPopconfirm from '@/components/AsyncPopconfirm'
+import ExtensionChildWindow from '@/components/toolbox/ExtensionChildWindow.vue'
 import {
   NCard,
   NCollapse,
@@ -146,7 +150,7 @@ interface PluginUIRuntimeV1 {
   register: (id: string, definition: VueExtensionPageDefinitionV1) => void
   toolbar: { register: (id: string, definition: ToolbarRegistrationV1) => void }
   shell: { register: (id: string, definition: ExtensionShellRegistrationV1) => void }
-  toolbox: { register: (extensionId: string, toolId: string, definition: VueExtensionPageDefinitionV1) => void }
+  toolbox: { register: (extensionId: string, toolId: string, definition: VueExtensionPageDefinitionV1) => void; Window: Component }
 }
 
 type PluginMessageValuesV1 = Record<string, string | number>
@@ -324,6 +328,7 @@ const vueRuntime = Object.freeze({
   vModelCheckbox,
   vModelSelect,
   vModelText,
+  Transition,
 })
 
 // Extension pages are loaded as independent Vue bundles. Expose the complete
@@ -331,6 +336,8 @@ const vueRuntime = Object.freeze({
 // without silently failing when a component is not in a hand-maintained list.
 const naiveRuntime = Object.freeze({
   ...naiveUI,
+  useDialog: useAsyncDialog,
+  NPopconfirm: AsyncPopconfirm,
   NCard,
   NCollapse,
   NCollapseItem,
@@ -354,7 +361,7 @@ window.OneKVMPluginUI = {
     register,
     toolbar: Object.freeze({ register: registerToolbar }),
     shell: Object.freeze({ register: registerShell }),
-    toolbox: Object.freeze({ register: registerTool }),
+    toolbox: Object.freeze({ register: registerTool, Window: markRaw(ExtensionChildWindow) }),
   }),
 }
 

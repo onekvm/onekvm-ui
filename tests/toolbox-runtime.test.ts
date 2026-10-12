@@ -20,6 +20,7 @@ const scripts: Script[] = []
 const timers = new Map<number, () => void>()
 let timerId = 0
 const documentMock = {
+  querySelector: () => null,
   currentScript: null as Script | null,
   createElement: (tag: string) => tag === 'script' ? new Script() : new Element(),
   head: { append: (element: Element) => { appended.push(element); if (element instanceof Script) scripts.push(element) } },
@@ -33,7 +34,7 @@ Object.assign(globalThis, {
     clearTimeout: (id: number) => timers.delete(id),
   },
 })
-const server = await createServer({ server: { middlewareMode: true }, appType: 'custom' })
+const server = await createServer({ server: { middlewareMode: true }, appType: 'custom', optimizeDeps: { noDiscovery: true, include: [] } })
 try {
   const runtime = await server.ssrLoadModule('/src/extensions/toolboxRuntime.ts')
   const tool = (id: string) => ({ id, title: id, presentation: 'window', view: { renderer: 'vue', entrypoint: `web/${id}.js` } })

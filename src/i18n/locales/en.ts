@@ -1,7 +1,16 @@
 const en = {
   translation: {
     toolbox: {
+    restoreWindow: 'Restore',
+    minimizeWindow: 'Minimize',
+    maximizeWindow: 'Maximize',
+    move: 'Move',
+    size: 'Size',
+    macroRecording: 'Macro recording',
+    recordingCount: '{total} reports · {kept} HID actions',
+    stopRecording: 'Stop recording',
     macroExclusive: 'Macro running · manual HID paused',
+    macroLine: 'Line {current} / {total}',
     stopMacro: 'Stop macro',
     returnToRecording: 'Recording · Return to HID Macros',
   "title": "Toolbox",

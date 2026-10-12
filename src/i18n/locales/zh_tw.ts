@@ -1,7 +1,16 @@
 const zh_tw = {
   translation: {
     toolbox: {
+    restoreWindow: '還原',
+    minimizeWindow: '最小化',
+    maximizeWindow: '最大化',
+    move: '移動',
+    size: '調整大小',
+    macroRecording: 'HID 巨集錄製中',
+    recordingCount: '收到 {total} 筆報告 · 保留 {kept} 筆 HID 操作',
+    stopRecording: '停止錄製',
     macroExclusive: '巨集執行中 · 手動輸入已暫停',
+    macroLine: '第 {current} / {total} 行',
     stopMacro: '停止巨集',
     returnToRecording: '錄製中 · 返回 HID 巨集',
   "title": "工具箱",

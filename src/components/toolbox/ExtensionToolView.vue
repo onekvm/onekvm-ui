@@ -1,17 +1,20 @@
 <script setup lang="ts">
+import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { computed, h, markRaw, onErrorCaptured, onBeforeUnmount, onUnmounted, shallowRef, watch, type Component } from 'vue'
-import { NButton, NSpace, useDialog, useMessage } from 'naive-ui'
+import { NButton, NSpace, useMessage } from 'naive-ui'
 import { api, extensionAssetURL, type ExtensionStatus } from '@/api/client'
 import { validateExtensionSettings, type ExtensionPageSettingsAdapterV1 } from '@/extensions/pluginUi'
 import { loadExtensionTool, type ExtensionToolHostV1, type ToolPresentation } from '@/extensions/toolboxRuntime'
 import { useToolboxContext, type ToolInstance } from '@/composables/useToolbox'
 import { t } from '@/i18n/runtime'
-import { onekvm, type HIDReportListener } from '@/lib/onekvm'
+import { onekvm, type HIDReportListener, type KeyboardTextListener } from '@/lib/onekvm'
+import { useOverlayMount } from '@/composables/useOverlayMount'
 
 const props = defineProps<{ instance: ToolInstance; presentation: ToolPresentation }>()
 const toolbox = useToolboxContext()
+const overlayTarget = useOverlayMount()
 const message = useMessage()
-const dialog = useDialog()
+const dialog = useAsyncDialog()
 const component = shallowRef<Component | null>(null)
 const extension = shallowRef<ExtensionStatus>(props.instance.extension)
 const adapter = shallowRef<ExtensionPageSettingsAdapterV1 | null>(null)
@@ -71,8 +74,8 @@ function closeCheck(): Promise<boolean> {
   }).finally(() => { pendingClose = null; cancelClose = null })
   return pendingClose
 }
-const unregister = toolbox.registerActions(props.instance.id, { closeCheck })
-const host = markRaw<ExtensionToolHostV1>(Object.freeze({
+const unregister = toolbox.registerActions(props.instance.id, { closeCheck, cancelClose: () => cancelClose?.() })
+const host = markRaw(Object.freeze<ExtensionToolHostV1>({
   apiVersion: 1,
   toolId: props.instance.id,
   extension: computed(() => extension.value),
@@ -92,12 +95,26 @@ const host = markRaw<ExtensionToolHostV1>(Object.freeze({
     }
     return onekvm.subscribeHIDReports(listener)
   },
+  subscribeKeyboardText: (listener: KeyboardTextListener) => {
+    if (extension.value.id !== 'hid-macro' || !toolbox.allowed ||
+        !toolbox.instances.some(instance => instance.cacheKey === props.instance.cacheKey)) {
+      throw new Error(t('toolbox.invalidated'))
+    }
+    return onekvm.subscribeKeyboardText(listener)
+  },
   showConsoleWhileRecording: () => {
     if (extension.value.id !== 'hid-macro') throw new Error(t('toolbox.invalidated'))
     toolbox.minimizeForRecording(props.instance.id)
     return () => { if (toolbox.minimizedId === props.instance.id) toolbox.focus(props.instance.id) }
   },
   resizeWindow: (size: { width: number; height: number }) => toolbox.resizeWindow(props.instance.id, size),
+  showRecordingStatus: activity => {
+    if (extension.value.id !== 'hid-macro') throw new Error(t('toolbox.invalidated'))
+    return toolbox.showRecordingStatus(props.instance.id, activity)
+  },
+  registerChildWindow: child => toolbox.registerChildWindow(props.instance.id, child),
+  setWindowState: state => toolbox.setWindowState(props.instance.id, state),
+  overlayTarget,
   close: () => toolbox.close(props.instance.id),
   saveSettings: save,
   registerSettings: (value: ExtensionPageSettingsAdapterV1) => {

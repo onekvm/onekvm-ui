@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
-import { useDialog, useMessage } from 'naive-ui'
+import { useMessage } from 'naive-ui'
 
 import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type OneKVMStatus } from '@/api/client'
 import { isCloudHosted } from '@/api/service-url'
@@ -78,10 +79,10 @@ function advancedRouteFromHash(hash: string) {
 const { state } = useTransport()
 const { auth, logout, refresh } = useAuth()
 const toolbox = useToolbox()
+const dialog = useAsyncDialog()
+const message = useMessage()
 const keyboardLockOverlay = useKeyboardLockOverlay()
 const keyboardLockChanges = keyboardLockOverlay.changes
-const dialog = useDialog()
-const message = useMessage()
 const canSettings = computed(() => hasPermission(auth, 'settings.view'))
 const canChangeVideo = computed(() =>
   canSettings.value && (state.value.videoMode !== 'webrtc' || state.value.videoPrimary),
@@ -115,6 +116,11 @@ const advancedSettingsRoute = ref(advancedRouteFromHash(window.location.hash))
 const consoleWorkspace = ref<HTMLElement | null>(null)
 const controlToolbar = ref<{ dismissOverlays: () => void } | null>(null)
 const remoteConsole = ref<InstanceType<typeof RemoteConsole> | null>(null)
+watch(() => toolbox.recording, activity => {
+  if (!activity) return
+  controlToolbar.value?.dismissOverlays()
+  focusConsole()
+})
 const fullscreen = ref(false)
 const performanceOpen = ref(localStorage.getItem(PERFORMANCE_OVERLAY_KEY) !== 'false')
 const performanceOrigin = ref<{ x: number, y: number } | null>(null)
@@ -448,7 +454,10 @@ function navigateAdvancedSettings(route: string) {
 }
 
 watch(advancedSettingsOpen, (open) => {
-  if (open) return
+  if (open) {
+    toolbox.closeAll()
+    return
+  }
   void nextTick(applyFullscreenInset)
 })
 
@@ -588,7 +597,7 @@ onBeforeUnmount(() => {
           @update:trackpad="trackpadOpen = $event"
         />
 
-        <MacroRunBanner :owner="status?.hid.macro_owner" />
+        <MacroRunBanner :owner="status?.hid.macro_owner" :recording="toolbox.recording" />
     <ToolboxWorkspace />
 
         <RemoteConsole

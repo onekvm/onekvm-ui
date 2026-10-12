@@ -1,9 +1,24 @@
-import { markRaw, type Component, type ComputedRef } from 'vue'
+import { markRaw, type Component, type ComputedRef, type Ref } from 'vue'
+import type { ToolChildWindow } from '@/lib/tool-child-windows'
 import { extensionAssetURL, type ExtensionStatus, type ExtensionSummary, type ExtensionToolboxItem, type OneKVMStatus } from '@/api/client'
 import type { ExtensionPageSettingsAdapterV1, VueExtensionPageDefinitionV1 } from './pluginUi'
-import type { HIDReportListener } from '@/lib/onekvm'
+import type { HIDReportListener, KeyboardTextListener } from '@/lib/onekvm'
 
 export type ToolPresentation = 'drawer' | 'window' | 'fullscreen'
+export interface HIDRecordingActivity {
+  readonly stats: Readonly<Ref<{ receivedReports: number; writtenActions: number }>>
+  readonly stop: () => void
+}
+export interface ChildWindowRegistration {
+  readonly layer: Readonly<ComputedRef<number>>
+  readonly active: Readonly<ComputedRef<boolean>>
+  readonly blocked: Readonly<ComputedRef<boolean>>
+  readonly visible: Readonly<ComputedRef<boolean>>
+  readonly activate: () => void
+  readonly attention: () => void
+  readonly closeChildren: (force?: boolean) => Promise<boolean>
+  readonly dispose: () => void
+}
 export interface ExtensionToolHostV1 {
   readonly apiVersion: 1
   readonly toolId: string
@@ -13,7 +28,12 @@ export interface ExtensionToolHostV1 {
   readonly assetURL: (path: string) => string
   readonly invoke: <T = unknown>(method: string, payload?: unknown) => Promise<T>
   readonly subscribeHIDReports: (listener: HIDReportListener) => () => void
+  readonly subscribeKeyboardText: (listener: KeyboardTextListener) => () => void
   readonly showConsoleWhileRecording: () => () => void
+  readonly showRecordingStatus: (activity: HIDRecordingActivity) => () => void
+  readonly registerChildWindow: (child: ToolChildWindow) => ChildWindowRegistration
+  readonly setWindowState: (state: 'normal' | 'maximized' | 'minimized') => void
+  readonly overlayTarget: Readonly<Ref<string | HTMLElement>>
   readonly resizeWindow: (size: { width: number; height: number }) => void
   readonly close: () => Promise<boolean>
   readonly saveSettings: () => Promise<boolean>

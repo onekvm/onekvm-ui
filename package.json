@@ -9,7 +9,7 @@
     "build": "vue-tsc --noEmit && vite build && vite build --config vite.recovery.config.ts",
     "build:recovery": "vite build --config vite.recovery.config.ts",
     "check": "vue-tsc --noEmit",
-    "test:toolbox": "node --experimental-strip-types tests/toolbox-pins.test.ts && node --experimental-strip-types tests/toolbox-runtime.test.ts",
+    "test:toolbox": "node --experimental-strip-types tests/toolbox-pins.test.ts && node --experimental-strip-types tests/toolbox-runtime.test.ts && node --experimental-strip-types tests/tool-child-windows.test.ts",
     "test:api-error": "node --experimental-strip-types tests/api-error.test.ts",
     "test:async-confirmation": "node --experimental-strip-types tests/async-confirmation.test.ts",
     "test:extension-host-error": "node --experimental-strip-types tests/extension-host-error.test.ts",

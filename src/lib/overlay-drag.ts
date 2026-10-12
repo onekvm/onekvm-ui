@@ -131,9 +131,10 @@ export function overlayPercentToPosition(
 }
 
 export type OverlayResizeCorner = 'nw' | 'ne' | 'se' | 'sw'
+export type OverlayResizeHandle = OverlayResizeCorner | 'n' | 'e' | 's' | 'w'
 
 export function resizeAnchoredBox(
-  corner: OverlayResizeCorner,
+  corner: OverlayResizeHandle,
   x: number,
   y: number,
   start: OverlayPoint & { width: number; height: number },
@@ -142,8 +143,8 @@ export function resizeAnchoredBox(
   host: Pick<OverlayBox, 'width' | 'height'>,
   margin = VIEWPORT_MARGIN,
 ): OverlayPoint & { width: number; height: number } {
-  const west = corner === 'nw' || corner === 'sw'
-  const north = corner === 'nw' || corner === 'ne'
+  const west = corner.includes('w')
+  const north = corner.includes('n')
   const startRight = start.x + start.width
   const startBottom = start.y + start.height
   const maxRight = host.width - margin
@@ -153,9 +154,9 @@ export function resizeAnchoredBox(
   let right = startRight
   let bottom = startBottom
   if (west) left = Math.min(Math.max(x, margin), startRight - minWidth)
-  else right = Math.max(Math.min(x, maxRight), start.x + minWidth)
+  else if (corner.includes('e')) right = Math.max(Math.min(x, maxRight), start.x + minWidth)
   if (north) top = Math.min(Math.max(y, margin), startBottom - minHeight)
-  else bottom = Math.max(Math.min(y, maxBottom), start.y + minHeight)
+  else if (corner.includes('s')) bottom = Math.max(Math.min(y, maxBottom), start.y + minHeight)
   return {
     x: left,
     y: top,

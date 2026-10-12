@@ -67,6 +67,13 @@ const tooSmall = resizeAnchoredBox('se', 120, 110, start, 80, 80, host)
 assert.equal(tooSmall.width, 80)
 assert.equal(tooSmall.height, 80)
 
+assert.deepEqual(resizeAnchoredBox('n', 900, 50, start, 80, 80, host), { x: 100, y: 50, width: 200, height: 200 })
+assert.deepEqual(resizeAnchoredBox('w', 20, 900, start, 80, 80, host), { x: 20, y: 100, width: 280, height: 150 })
+assert.deepEqual(resizeAnchoredBox('e', 5000, -50, start, 80, 80, host), { x: 100, y: 100, width: host.width - 108, height: 150 })
+assert.deepEqual(resizeAnchoredBox('s', -50, 5000, start, 80, 80, host), { x: 100, y: 100, width: 200, height: host.height - 108 })
+assert.deepEqual(resizeAnchoredBox('w', 1000, 0, start, 80, 80, host), { x: 220, y: 100, width: 80, height: 150 })
+assert.deepEqual(resizeAnchoredBox('n', 0, 1000, start, 80, 80, host), { x: 100, y: 170, width: 200, height: 80 })
+
 const percent = overlayPositionToPercent({ x: 8, y: 8 }, panel, host)
 assert.equal(Math.round(percent.x), 0)
 assert.equal(Math.round(percent.y), 0)

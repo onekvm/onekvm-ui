@@ -91,7 +91,13 @@ interface ExtensionToolHostV1 {
   readonly assetURL: (path: string) => string
   readonly invoke: <T = unknown>(method: string, payload?: unknown) => Promise<T>
   readonly subscribeHIDReports: (listener: (report: Uint8Array, timestamp: number) => void) => () => void
+  readonly subscribeKeyboardText: (listener: (text: string, timestamp: number) => void) => () => void
   readonly showConsoleWhileRecording: () => () => void
+  readonly showRecordingStatus: (activity: HIDRecordingActivity) => () => void
+  readonly overlayTarget: Readonly<Ref<string | HTMLElement>>
+  readonly registerChildWindow: (child: ToolChildWindow) => ChildWindowRegistration
+  readonly setWindowState: (state: 'normal' | 'maximized' | 'minimized') => void
+  readonly resizeWindow: (size: { width: number; height: number }) => void
   readonly close: () => Promise<boolean>
   readonly saveSettings: () => Promise<boolean>
   readonly registerSettings: (adapter: ExtensionPageSettingsAdapterV1) => () => void
@@ -102,10 +108,14 @@ interface ExtensionToolHostV1 {
 keyboard and mouse reports sent from this browser to the controlled device,
 with a monotonic timestamp. The tool must unsubscribe when recording stops or
 unmounts. It does not expose incoming reports or reports from other clients.
-`showConsoleWhileRecording` is also reserved for `hid-macro`: on a narrow
-viewport it hides the full-screen tool without unmounting it, lets manual input
-reach the console and shows a return control to stop recording. Its returned
-function restores the tool if it is still hidden.
+`showRecordingStatus` is reserved for `hid-macro`. Pass
+`{ stats: Ref<{ receivedReports, writtenActions }>, stop: () => void }` to hide
+the tool without unmounting it and show the same global banner used for playback.
+This releases manual console input on desktop and mobile. The returned cleanup
+removes that activity and restores the tool; call it when capture stops or the
+component unmounts. A second simultaneous recording is rejected. The older
+`showConsoleWhileRecording` API retains its narrow-screen return control for
+compatibility. Recording is browser-local; playback timing is device-owned.
 
 `invoke` and `assetURL` are scoped to the extension. Settings adapters follow
 [Vue Page API v1](extension-vue-page-v1.md). The host validates/saves settings
@@ -124,6 +134,52 @@ drawer is open. Narrow viewports show the active tool fullscreen while retaining
 the same Vue instance. All surfaces follow the browser fullscreen mount target.
 Focus in a local tool/menu/pin releases remote input and pointer lock. Clicking
 uncovered video resumes control unless a device macro owns HID.
+
+Windows share normal, maximized and minimized states. Maximization retains normal
+placement; restoring, including after minimization, retains the previous state.
+Double-clicking the title toggles maximization; dragging a maximized title restores
+it under the pointer. All eight edges/corners resize within the visual viewport
+and safe area. Alt+Space opens the system menu; Alt+F4 closes. Its Move and Size
+commands accept arrows (16 px, Shift for 1 px), Enter to commit and Escape to
+cancel. Focused titles and the bottom-right resize handle also accept arrows.
+Menus are mounted in the fullscreen-aware overlay, outside the clipped window.
+
+## Owned windows
+
+Use the shared `toolbox.Window` component instead of implementing window chrome:
+
+```js
+const { vue: { h, ref }, toolbox } = window.OneKVMPluginUI.v1
+const editing = ref(false)
+// Inside the registered tool component's render function:
+h(toolbox.Window, {
+  host, open: editing.value, title: 'Edit script', width: 440, height: 430,
+  modal: true, resizable: true, maximizable: true,
+  beforeClose: async () => true,
+  onClose: () => { editing.value = false },
+}, { default: () => h('textarea') })
+```
+
+`host`, `open` and `title` are required; `modal`, `resizable` and `maximizable`
+default to true. Owned windows do not minimize independently. Nesting a Window
+inside another Window assigns that immediate owner automatically. Owned windows
+stay above their owner and hide with a minimized owner. A modal window disables
+its immediate owner; attempts to activate that owner focus the deepest blocking
+dialog and flash its title bar. Other tools remain usable. Set `modal: false` for
+a modeless owned window whose owner remains interactive.
+
+Ordinary close awaits `beforeClose`, if supplied; false vetoes close. Descendants
+close before their owner, and each leave transition finishes before the owner is
+removed. Focus returns to the opener when it is still available. Forced extension
+invalidation bypasses close vetoes. Always handle `close` by setting `open` false.
+
+Custom wrappers may use `host.registerChildWindow({ owner?, modal?, focus, close })`.
+It returns reactive `layer`, `active`, `blocked`, `visible` refs and `activate`,
+`attention`, `closeChildren(force?)`, `dispose` callbacks. `focus(attention)` must
+focus the window and optionally indicate attention; `close(force?)` returns a
+promise that resolves after removal (false vetoes). Call `dispose` exactly when
+the window leaves or unmounts; disposal is idempotent. Prefer the shared component
+so ownership, focus, transitions and teardown stay consistent.
 
 Pinned launchers occupy a separate section of the existing console toolbar.
 They follow its position and visibility. Closing a tool retains its pin;

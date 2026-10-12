@@ -1,4 +1,4 @@
-import { readonly, shallowRef } from 'vue'
+import { shallowReadonly, shallowRef } from 'vue'
 
 import { overlayMountTarget } from '@/lib/overlay-target'
 
@@ -15,5 +15,5 @@ export function useOverlayMount() {
     document.addEventListener('fullscreenchange', syncOverlayMount)
     syncOverlayMount()
   }
-  return readonly(mountTo)
+  return shallowReadonly(mountTo)
 }

@@ -2511,6 +2511,8 @@ select { font: inherit; }
   justify-content: center;
   gap: 3px;
   font-feature-settings: "tnum" 1, "zero" 1;
+  /* The larger, heavier value pulls the two-line block's visual center down. */
+  transform: translateY(-2px);
   white-space: nowrap;
 }
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { serviceURL } from '@/api/service-url'
 import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import {
@@ -26,7 +27,7 @@ import {
   UserRound,
   Volume2,
 } from '@lucide/vue'
-import { NIcon, useDialog, useMessage, type DialogReactive, type DropdownOption } from 'naive-ui'
+import { NIcon, useMessage, type DialogReactive, type DropdownOption } from 'naive-ui'
 
 import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type OneKVMStatus } from '@/api/client'
 import { type MouseMode } from '@/composables/useMouse'
@@ -151,7 +152,7 @@ const emit = defineEmits<{
 
 type DeviceState = 'ready' | 'waiting' | 'error'
 type MenuName = 'display' | 'mouse' | 'keyboard' | 'gamepad' | 'power' | 'audio' | 'media' | 'language' | 'account'
-const dialog = useDialog()
+const dialog = useAsyncDialog()
 const overlayTo = useOverlayMount()
 const message = useMessage()
 type PowerAction = 'on' | 'off' | 'reset'

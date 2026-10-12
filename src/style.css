@@ -999,19 +999,6 @@ select { font: inherit; }
   pointer-events: none;
 }
 
-.console-stage::before {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(var(--onekvm-chart-grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--onekvm-chart-grid) 1px, transparent 1px);
-  background-size: 24px 24px;
-  content: "";
-  opacity: 0.18;
-}
-
-.console-stage:has(.console-video-ready)::before { opacity: 0; }
-
 .console-video {
   position: absolute;
   inset: 0;
@@ -2475,6 +2462,7 @@ select { font: inherit; }
   width: max-content;
   max-width: calc(100% - 16px);
   overflow: hidden;
+  background: color-mix(in srgb, var(--card) 65%, transparent);
 }
 
 .performance-compact-bar {
@@ -2517,8 +2505,9 @@ select { font: inherit; }
 
 .performance-compact-metric {
   display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
   font-feature-settings: "tnum" 1, "zero" 1;
   white-space: nowrap;
 }
@@ -2535,6 +2524,7 @@ select { font: inherit; }
   color: var(--muted-foreground);
   font-size: 10px;
   font-weight: 600;
+  line-height: 1;
   letter-spacing: .02em;
   text-transform: uppercase;
 }
@@ -2628,17 +2618,16 @@ select { font: inherit; }
   display: grid;
   height: auto;
   min-height: 48px;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-areas:
-    "grip icon title actions"
-    "toggles toggles toggles toggles";
+    "icon title actions"
+    "toggles toggles toggles";
   gap: 8px;
   padding: 8px 10px;
   cursor: grab;
 }
 
-.video-performance-overlay.is-mobile-sheet .display-status-titlebar > :nth-child(1) { grid-area: grip; }
-.video-performance-overlay.is-mobile-sheet .display-status-titlebar > :nth-child(2) { grid-area: icon; }
+.video-performance-overlay.is-mobile-sheet .console-floating-title-icon { grid-area: icon; }
 .video-performance-overlay.is-mobile-sheet .display-status-titlebar > strong { grid-area: title; }
 .video-performance-overlay.is-mobile-sheet .performance-window-actions { grid-area: actions; }
 .video-performance-overlay.is-mobile-sheet .performance-toggle-row {
@@ -5426,13 +5415,7 @@ body {
   color: color-mix(in srgb, var(--primary) 72%, var(--foreground));
 }
 
-.console-stage::before {
-  background-image:
-    linear-gradient(var(--onekvm-chart-grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--onekvm-chart-grid) 1px, transparent 1px);
-}
-
-/* Letterbox stays clear so .connection-trace (z-index 0) shows under the picture. */
+/* Keep video letterboxing transparent. */
 .console-video { background: transparent; }
 .console-state { color: var(--onekvm-text-tertiary); }
 .console-state strong { color: var(--foreground); }

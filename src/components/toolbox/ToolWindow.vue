@@ -17,7 +17,8 @@ const frame = useTemplateRef<InstanceType<typeof ConsoleFloatingWindow>>('frame'
 const root = computed(() => frame.value?.element || null)
 const viewport = reactive({ width: window.innerWidth, height: window.innerHeight, x: 0, y: 0 })
 const box = reactive({ x: props.ownedModal ? (viewport.width - (props.width || 720)) / 2 : 48, y: props.ownedModal ? (viewport.height - (props.height || 480)) / 2 : 64, width: props.width || 720, height: props.height || 480 })
-let gesture: { kind: 'move' | OverlayResizeHandle; id: number; x: number; y: number; box: typeof box } | null = null
+let gesture: { kind: 'move' | OverlayResizeHandle; id: number; x: number; y: number; box: typeof box; restoreOnMove: boolean } | null = null
+const RESTORE_DRAG_THRESHOLD_PX = 4
 let stateAnimation: Animation | null = null
 const fullLayout = computed(() => props.presentation !== 'window')
 const modal = computed(() => fullLayout.value || props.ownedModal)
@@ -52,13 +53,7 @@ function updateViewport() {
 function start(event: PointerEvent, kind: 'move' | OverlayResizeHandle) {
   if (props.childWindowActive || fullLayout.value || event.button !== 0 || (kind !== 'move' && (!props.resizable || maximized.value)) || (kind === 'move' && (event.target as Element).closest('button'))) return
   stateAnimation?.cancel()
-  if (maximized.value) {
-    box.x = event.clientX - viewport.x - box.width * ((event.clientX - viewport.x) / viewport.width)
-    box.y = event.clientY - viewport.y - 20
-    clamp()
-    emit('update:state', 'normal')
-  }
-  gesture = { kind, id: event.pointerId, x: event.clientX, y: event.clientY, box: { ...box } }
+  gesture = { kind, id: event.pointerId, x: event.clientX, y: event.clientY, box: { ...box }, restoreOnMove: maximized.value }
   ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
   event.preventDefault()
 }
@@ -67,6 +62,19 @@ function move(event: PointerEvent) {
   const dx = event.clientX - gesture.x
   const dy = event.clientY - gesture.y
   if (gesture.kind === 'move') {
+    if (gesture.restoreOnMove) {
+      if (Math.hypot(dx, dy) < RESTORE_DRAG_THRESHOLD_PX) return
+      // Keep the original grab point while restoring, then continue from here.
+      box.x = event.clientX - viewport.x - gesture.box.width * ((gesture.x - viewport.x) / viewport.width)
+      box.y = event.clientY - gesture.y
+      clamp()
+      gesture.x = event.clientX
+      gesture.y = event.clientY
+      gesture.box = { ...box }
+      gesture.restoreOnMove = false
+      emit('update:state', 'normal')
+      return
+    }
     Object.assign(box, clampOverlayPosition({ x: gesture.box.x + dx, y: gesture.box.y + dy }, box, { left: 0, top: 0, ...viewport }))
   } else {
     const x = (gesture.kind.includes('w') ? gesture.box.x : gesture.box.x + gesture.box.width) + dx

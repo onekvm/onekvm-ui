@@ -1,20 +1,24 @@
 <script setup lang="ts">
-import { computed, onMounted, shallowRef } from 'vue'
+import { useAsyncDialog } from '@/composables/useAsyncDialog'
+import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue'
 import { AlertTriangle, FileUp } from '@lucide/vue'
-import { useDialog, useMessage } from 'naive-ui'
+import { useMessage } from 'naive-ui'
 
 import type { DeviceFileEntry } from '@/api/client'
 import { useFileManager } from '@/composables/useFileManager'
 import { t } from '@/i18n/runtime'
+import { emptyMediaTransfer, type MediaTransferState } from '@/lib/media-transfer'
 
 import FileManagerList from './FileManagerList.vue'
 import FileManagerToolbar from './FileManagerToolbar.vue'
 import FileEditorModal from './FileEditorModal.vue'
 import XpTransferDialog from '../XpTransferDialog.vue'
 
-const dialog = useDialog()
+const dialog = useAsyncDialog()
 const message = useMessage()
 const manager = useFileManager()
+const emit = defineEmits<{ 'upload-state': [state: MediaTransferState] }>()
+const uploadMinimized = shallowRef(false)
 const editorOpen = shallowRef(false)
 const editorMode = shallowRef<'create' | 'rename'>('create')
 const editorName = shallowRef('')
@@ -40,6 +44,26 @@ const uploadRemainingLabel = computed(() => {
   return t('virtualMedia.remainingMinutes', '{count} minutes remaining')
     .replace('{count}', String(Math.ceil(seconds / 60)))
 })
+watch(manager.uploading, () => { uploadMinimized.value = false })
+watch(() => ({
+  minimized: uploadMinimized.value,
+  uploading: manager.uploading.value,
+  name: manager.uploadName.value,
+  progress: manager.uploadPercentage.value,
+  transferred: manager.uploadLoaded.value,
+  total: manager.uploadTotal.value,
+  speed: manager.uploadSpeed.value,
+  remainingSeconds: manager.uploadRemainingSeconds.value,
+  title: uploadTitle.value,
+  action: 'upload' as const,
+}), (state) => emit('upload-state', state), { immediate: true })
+onBeforeUnmount(() => emit('upload-state', emptyMediaTransfer()))
+
+function restoreUploadDialog() {
+  uploadMinimized.value = false
+}
+
+defineExpose({ restoreUploadDialog })
 const validEditorName = computed(() => {
   const name = editorName.value.trim()
   return Boolean(name && name !== '.' && name !== '..' && !name.includes('/') && !name.includes('\\'))
@@ -89,17 +113,21 @@ function confirmDelete(entry: DeviceFileEntry) {
     positiveText: t('common.delete', 'Delete'),
     negativeText: t('common.cancel', 'Cancel'),
     async onPositiveClick() {
-      if (await manager.deleteEntry(entry)) {
+      const success = await manager.deleteEntry(entry)
+      if (success) {
         message.success(t('settings.advancedSettings.fileManager.deleted', 'Item deleted'))
       }
+      return success
     },
   })
 }
 
 async function runUpload(file: File, overwrite: boolean) {
-  if (await manager.upload(file, overwrite)) {
+  const success = await manager.upload(file, overwrite)
+  if (success) {
     message.success(t('settings.advancedSettings.fileManager.uploaded', 'Upload complete'))
   }
+  return success
 }
 
 function selectUpload(file: File) {
@@ -150,7 +178,10 @@ function dropFiles(event: DragEvent) {
     </n-alert>
 
     <XpTransferDialog
-      :show="manager.uploading.value"
+      :show="manager.uploading.value && !uploadMinimized"
+      :minimized="manager.uploading.value && uploadMinimized"
+      minimize-target="files"
+      draggable
       :dialog-label="uploadTitle"
       :status="uploadStatus"
       :transferred="manager.uploadLoaded.value"
@@ -161,6 +192,13 @@ function dropFiles(event: DragEvent) {
     >
       <template #title>
         <FileUp :size="15" />{{ uploadTitle }}
+      </template>
+      <template #title-actions>
+        <button
+          class="xp-title-minimize"
+          :aria-label="t('virtualMedia.minimizeUpload', 'Minimize upload window')"
+          @click="uploadMinimized = true"
+        />
       </template>
       <template #actions>
         <button @click="manager.cancelUpload">

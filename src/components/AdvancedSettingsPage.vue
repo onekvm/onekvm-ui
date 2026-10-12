@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch, type Component } from 'vue'
 import {
   ArrowLeft,
@@ -39,7 +40,7 @@ import {
   Wifi,
   icons,
 } from '@lucide/vue'
-import { NIcon, useDialog, useMessage, type DropdownOption } from 'naive-ui'
+import { NIcon, useMessage, type DropdownOption } from 'naive-ui'
 
 import { useOneKVMTheme } from '@/theme/runtime'
 import { isCloudHosted } from '@/api/service-url'
@@ -83,6 +84,8 @@ import {
   settingsGroupTone,
 } from '@/lib/settings-nav'
 import { uiProduct } from '@/product'
+import { useStorageStatus } from '@/composables/useStorageStatus'
+import { statusEvents } from '@/lib/status-events'
 
 import ExtensionLayoutPage from './ExtensionLayoutPage.vue'
 import ExtensionServiceRecovery from './ExtensionServiceRecovery.vue'
@@ -110,6 +113,8 @@ import KeyboardShortcutEditor from './KeyboardShortcutEditor.vue'
 import UserManagement from './UserManagement.vue'
 import USBSettingsForm from './USBSettingsForm.vue'
 import AdvancedSettingsLoading from './AdvancedSettingsLoading.vue'
+import MediaTransferIndicator from './MediaTransferIndicator.vue'
+import { emptyMediaTransfer, type MediaTransferState } from '@/lib/media-transfer'
 import DiagnosticsCollectModal from './DiagnosticsCollectModal.vue'
 import FileManagerPage from './file-manager/FileManagerPage.vue'
 import SettingsAppList from './SettingsAppList.vue'
@@ -167,19 +172,24 @@ const props = defineProps<{
   route: string
   canChangeVideo: boolean
   videoSessionId: string
+  mediaTransfer: MediaTransferState
 }>()
-const emit = defineEmits<{ close: []; navigate: [route: string] }>()
+const emit = defineEmits<{ close: []; navigate: [route: string]; 'restore-media-transfer': [] }>()
+const fileManagerPage = shallowRef<InstanceType<typeof FileManagerPage> | null>(null)
+const fileTransfer = shallowRef(emptyMediaTransfer())
 
 const storagePartitions = computed(() =>
-  (props.status?.system?.storage_partitions || []).filter((partition) => partition.total_bytes > 0),
+  (storageStatus.value?.storage_partitions || props.status?.system?.storage_partitions || []).filter((partition) => partition.total_bytes > 0),
 )
-const storageCapacityBytes = computed(() => {
-  const partitionTotal = storagePartitions.value.reduce((total, partition) => total + partition.total_bytes, 0)
-  return partitionTotal || props.status?.system?.storage_total_bytes || 0
-})
+const storagePartitionBytes = computed(() => storagePartitions.value.reduce((total, partition) => total + partition.total_bytes, 0))
+const storageCapacityBytes = computed(() =>
+  storageStatus.value?.storage_device_bytes || props.status?.system?.storage_device_bytes
+  || storagePartitionBytes.value || storageStatus.value?.storage_total_bytes || props.status?.system?.storage_total_bytes || 0,
+)
+const storageUnallocatedBytes = computed(() => Math.max(0, storageCapacityBytes.value - storagePartitionBytes.value))
 const highlightedStoragePartition = ref('')
 
-const dialog = useDialog()
+const dialog = useAsyncDialog()
 const message = useMessage()
 const { auth, logout, refresh: refreshAuth } = useAuth()
 const canManageUsers = computed(() => hasPermission(auth, 'users.manage'))
@@ -509,7 +519,12 @@ const sections = computed<SidebarSection[]>(() => {
 
 const visibleSections = computed(() => sections.value.filter((item) => !item.parent || pluginsExpanded.value))
 const paneSection = computed(() => (isSettingsIndex(section.value) ? lastDetailSection.value : section.value))
+const deviceUptime = computed(() => {
+  clockTick.value
+  return statusEvents.currentUptime() ?? props.status?.uptime_seconds ?? 0
+})
 const mobileDetail = computed(() => mobileSettings.value && !isSettingsIndex(section.value))
+const { status: storageStatus } = useStorageStatus(computed(() => paneSection.value === 'system' && (!mobileSettings.value || mobileDetail.value)))
 const activeExtensionParent = computed(() => {
   const sidebarParent = sections.value.find((item) => item.key === paneSection.value)?.parent
   if (sidebarParent) return sidebarParent
@@ -695,6 +710,7 @@ function partitionRoleLabel(role: StoragePartitionStatus['role']) {
     boot: t('settings.advancedSettings.systemPage.partitionBoot', 'Boot'),
     boot_a: t('settings.advancedSettings.systemPage.partitionBootA', 'Boot A'),
     boot_b: t('settings.advancedSettings.systemPage.partitionBootB', 'Boot B'),
+    rootfs: t('settings.advancedSettings.systemPage.partitionRootFS', 'Root filesystem'),
     rootfs_a: t('settings.advancedSettings.systemPage.partitionRootFSA', 'RootFS A'),
     rootfs_b: t('settings.advancedSettings.systemPage.partitionRootFSB', 'RootFS B'),
     userdata: t('settings.advancedSettings.systemPage.partitionUserData', 'User data'),
@@ -808,6 +824,7 @@ function confirmSlotSwitch(slot: SystemUpdateSlot) {
         message.success(t('settings.advancedSettings.systemPage.slotSwitched', 'Next boot slot updated'))
       } catch (reason) {
         message.error(reason instanceof Error ? reason.message : String(reason))
+        return false
       } finally {
         slotSwitching.value = ''
       }
@@ -906,6 +923,7 @@ function confirmOnlineUpdate() {
       } catch (reason) {
         updateInstalling.value = false
         onlineUpdateError.value = reason instanceof Error ? reason.message : String(reason)
+        return false
       }
     },
   })
@@ -929,6 +947,7 @@ function confirmSourceUpdate(source: SystemUpdateSource) {
       } catch (reason) {
         updateInstalling.value = false
         onlineUpdateError.value = reason instanceof Error ? reason.message : String(reason)
+        return false
       }
     },
   })
@@ -978,6 +997,7 @@ function confirmSystemUpdate() {
       } catch (reason) {
         updateInstalling.value = false
         message.error(reason instanceof Error ? reason.message : String(reason))
+        return false
       }
     },
   })
@@ -1600,6 +1620,19 @@ watch(paneSection, (value) => {
         <span v-if="!mobileDetail" class="advanced-settings-device">{{ deviceVariant }}</span>
       </div>
       <div class="advanced-settings-account">
+        <MediaTransferIndicator
+          :state="fileTransfer"
+          task-id="files"
+          :tooltip-disabled="mobileSettings"
+          always-visible
+          @restore="fileManagerPage?.restoreUploadDialog()"
+        />
+        <MediaTransferIndicator
+          :state="mediaTransfer"
+          :tooltip-disabled="mobileSettings"
+          always-visible
+          @restore="emit('restore-media-transfer')"
+        />
         <n-dropdown trigger="click" placement="bottom-end" :options="accountOptions" @select="selectAccount">
           <n-tooltip>
             <template #trigger>
@@ -1876,7 +1909,7 @@ watch(paneSection, (value) => {
               </section>
 
               <section v-else-if="paneSection === 'files' && canManageSettings" class="advanced-settings-section">
-                <FileManagerPage />
+                <FileManagerPage ref="fileManagerPage" @upload-state="fileTransfer = $event" />
               </section>
 
               <section v-else-if="paneSection === 'users' && canManageUsers" class="advanced-settings-section">
@@ -1938,6 +1971,10 @@ watch(paneSection, (value) => {
                         </dt>
                         <dd>
                           {{ formatStorageCapacity(storageCapacityBytes) }}
+                          <small v-if="storagePartitions.length && storageUnallocatedBytes > 1024 * 1024" class="system-spec-detail">
+                            {{ t('settings.advancedSettings.systemPage.storagePartitioned', 'Partitioned') }} {{ formatStorageBytes(storagePartitionBytes) }}
+                            · {{ t('settings.advancedSettings.systemPage.storageUnallocated', 'Unallocated') }} {{ formatStorageBytes(storageUnallocatedBytes) }}
+                          </small>
                         </dd>
                       </div>
                       <div>
@@ -2036,7 +2073,7 @@ watch(paneSection, (value) => {
                       </div>
                       <div>
                         <dt>{{ t('settings.advancedSettings.systemPage.uptime', 'Uptime') }}</dt>
-                        <dd>{{ formatUptime(status.uptime_seconds) }}</dd>
+                        <dd>{{ formatUptime(deviceUptime) }}</dd>
                       </div>
                     </dl>
                   </section>
@@ -2097,7 +2134,7 @@ watch(paneSection, (value) => {
                         {{ t('settings.factoryReset.action', 'Restore') }}
                       </n-button>
                     </div>
-                    <div v-if="status.machine === 'nanokvm'" class="system-recovery-row">
+                    <div v-if="status.machine === 'nanokvm' || status.machine === 'nanokvm-pro'" class="system-recovery-row">
                       <strong>{{ t('settings.recoveryMode.title', 'Recovery') }}</strong>
                       <n-button type="warning" secondary :loading="enteringRecovery" :disabled="systemAction !== null" @click="confirmEnterRecovery">
                         <template #icon><LifeBuoy /></template>

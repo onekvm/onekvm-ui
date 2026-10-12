@@ -10,6 +10,7 @@ type StatusWaiter = {
 class StatusEvents {
   private source: EventSource | null = null
   private current: OneKVMStatus | null = null
+  private receivedAt = 0
   private readonly listeners = new Map<StatusListener, ErrorListener | undefined>()
   private readonly waiters = new Set<StatusWaiter>()
 
@@ -31,6 +32,12 @@ class StatusEvents {
     })
   }
 
+  currentUptime() {
+    return this.current
+      ? this.current.uptime_seconds + Math.max(0, Math.floor((Date.now() - this.receivedAt) / 1000))
+      : null
+  }
+
   private start() {
     if (this.source) return
     const source = new EventSource(api.getStatusEventsURL(), {
@@ -42,6 +49,7 @@ class StatusEvents {
       try {
         const status = JSON.parse((event as MessageEvent<string>).data) as OneKVMStatus
         this.current = status
+        this.receivedAt = Date.now()
         for (const waiter of this.waiters) waiter.resolve(status)
         this.waiters.clear()
         for (const listener of this.listeners.keys()) listener(status)

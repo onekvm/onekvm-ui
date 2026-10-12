@@ -419,6 +419,7 @@ export interface OneKVMStatus {
     memory_hardware_reserved_bytes?: number | null
     memory_linux_reserved_bytes?: number | null
     storage_total_bytes: number
+    storage_device_bytes?: number
     storage_available_bytes: number
     storage_type: string
     storage_partitions: StoragePartitionStatus[]
@@ -427,12 +428,15 @@ export interface OneKVMStatus {
 
 export interface StoragePartitionStatus {
   device: string
-  role: 'boot' | 'boot_a' | 'boot_b' | 'rootfs_a' | 'rootfs_b' | 'userdata' | 'config' | 'partition'
+  role: 'boot' | 'boot_a' | 'boot_b' | 'rootfs' | 'rootfs_a' | 'rootfs_b' | 'userdata' | 'config' | 'partition'
   filesystem?: string
   total_bytes: number
   used_bytes: number
   active?: boolean
 }
+
+export type StorageStatus = Pick<OneKVMStatus['system'],
+  'storage_total_bytes' | 'storage_device_bytes' | 'storage_available_bytes' | 'storage_type' | 'storage_partitions'>
 
 export interface ResourceSample {
   timestamp: number
@@ -1531,6 +1535,7 @@ export const api = {
     }
   },
   getStatus: () => request<OneKVMStatus>('/api/status', { cache: 'no-store' }),
+  getStorageStatusEventsURL: () => `${serviceBaseUrl()}/api/system/storage/events`,
   getResources: () => request<ResourceHistory>('/api/resources'),
   getSessions: () => request<OnlineSession[]>('/api/sessions', { cache: 'no-store' }),
   getLogs: async (lines = 250) =>

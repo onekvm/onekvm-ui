@@ -22,7 +22,6 @@ import {
   Power,
   Settings,
   TextCursorInput,
-  Upload,
   Server,
   UserRound,
   Volume2,
@@ -92,7 +91,8 @@ import GamepadPopover from './GamepadPopover.vue'
 import MouseSettingsPopover from './MouseSettingsPopover.vue'
 import PowerControlPopover from './PowerControlPopover.vue'
 import USBAudioPopover from './USBAudioPopover.vue'
-import VirtualMediaPopover from './VirtualMediaPopover.vue'
+import MediaTransferIndicator from './MediaTransferIndicator.vue'
+import type { MediaTransferState } from '@/lib/media-transfer'
 import ControlOverlay from './ControlOverlay.vue'
 
 const props = defineProps<{
@@ -111,6 +111,8 @@ const props = defineProps<{
   videoRotation: VideoRotation
   status: OneKVMStatus | null
   msdStatus: MSDStatus | null
+  mediaTransfer: MediaTransferState
+  mediaPopoverOpen: boolean
   canvasWidth: number
   canvasHeight: number
   videoFps: number
@@ -129,7 +131,8 @@ const emit = defineEmits<{
   account: []
   logout: []
   keyboard: []
-  'media-status': [status: MSDStatus]
+  media: [sheet: boolean]
+  'restore-media-transfer': []
   fullscreen: []
   'update:performanceOpen': [open: boolean, event?: MouseEvent]
   'update:rightControlAsMeta': [enabled: boolean]
@@ -147,18 +150,6 @@ const emit = defineEmits<{
 
 type DeviceState = 'ready' | 'waiting' | 'error'
 type MenuName = 'display' | 'mouse' | 'keyboard' | 'gamepad' | 'power' | 'audio' | 'media' | 'language' | 'account'
-type MediaUploadState = {
-  minimized: boolean
-  uploading: boolean
-  name: string
-  progress: number
-  transferred: number
-  total: number
-  speed: number
-  remainingSeconds: number
-  title: string
-}
-
 const dialog = useDialog()
 const overlayTo = useOverlayMount()
 const message = useMessage()
@@ -170,7 +161,6 @@ const pinnedOverflowOpen = ref(false)
 const mouseLed = ref<HTMLElement | null>(null)
 const keyboardLed = ref<HTMLElement | null>(null)
 const gamepadLed = ref<HTMLElement | null>(null)
-const virtualMediaPopover = ref<{ restoreUploadDialog: () => void } | null>(null)
 const toolbarEl = ref<HTMLElement | null>(null)
 const toolbarDock = ref<ToolbarDockState>(parseToolbarDock(localStorage.getItem(TOOLBAR_DOCK_KEY)))
 const toolbarDragging = ref(false)
@@ -965,17 +955,6 @@ function onToolbarWindowResize() {
   }
   setToolbarDock({ dock: 'float', ...next })
 }
-const mediaUpload = ref<MediaUploadState>({
-  minimized: false,
-  uploading: false,
-  name: '',
-  progress: 0,
-  transferred: 0,
-  total: 0,
-  speed: 0,
-  remainingSeconds: 0,
-  title: '',
-})
 let unsubscribeActivity: (() => void) | undefined
 let mousePulseTimer = 0
 let keyboardPulseTimer = 0
@@ -1053,28 +1032,6 @@ const mediaStateLabel = computed(() => {
   if (props.msdStatus.mtp) return t('virtualMedia.mtpOn', 'File transfer on')
   return t('virtualMedia.disconnected', 'Disconnected')
 })
-
-function formatBytes(value: number) {
-  if (!Number.isFinite(value) || value <= 0) return '0 B'
-  const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
-  const index = Math.min(units.length - 1, Math.floor(Math.log(value) / Math.log(1024)))
-  return `${(value / 1024 ** index).toFixed(index > 1 ? 1 : 0)} ${units[index]}`
-}
-
-function formatUploadRemaining(seconds: number) {
-  if (seconds <= 0) return t('virtualMedia.remainingCalculating', 'Calculating time remaining…')
-  if (seconds < 60) return t('virtualMedia.remainingLessThanMinute', 'Less than 1 minute remaining')
-  return t('virtualMedia.remainingMinutes', '{count} minutes remaining')
-    .replace('{count}', String(Math.ceil(seconds / 60)))
-}
-
-const mediaUploadLabel = computed(() =>
-  `${t('virtualMedia.uploadingFile', 'Uploading {name}…').replace('{name}', mediaUpload.value.name)} · ${mediaUpload.value.progress}% · ${formatBytes(mediaUpload.value.speed)}/s · ${formatUploadRemaining(mediaUpload.value.remainingSeconds)}`)
-
-function restoreMediaUpload() {
-  virtualMediaPopover.value?.restoreUploadDialog()
-}
-
 
 const deviceVariant = computed(() => machineDisplayName(props.status))
 
@@ -1264,6 +1221,8 @@ function updateMenu(name: MenuName, visible: boolean) {
   else if (openMenu.value === name) openMenu.value = null
   emitToolbarOverlay()
 }
+
+watch(() => props.mediaPopoverOpen, (visible) => updateMenu('media', visible), { immediate: true })
 
 function onTrackpadToggle(open: boolean) {
   emit('update:trackpad', open)
@@ -1587,31 +1546,23 @@ onBeforeUnmount(() => {
         </n-tooltip>
       </USBAudioPopover>
 
-      <VirtualMediaPopover
-        ref="virtualMediaPopover"
-        :placement="menuPlacement"
-        :sheet="toolbarLauncher"
-        @status="emit('media-status', $event)"
-        @upload-state="mediaUpload = $event"
-        @update:show="updateMenu('media', $event)"
-      >
-        <n-tooltip :disabled="toolbarLauncher || openMenu === 'media'">
-          <template #trigger>
-            <n-button
-              quaternary
-              size="small"
-              class="device-indicator"
-              :data-state="mediaState"
-              :aria-label="`${t('virtualMedia.title', 'Virtual Media')}: ${mediaStateLabel}`"
-            >
-              <template #icon><Disc3 /></template>
-              <span class="device-led" />
-              <span class="toolbar-action-label">{{ t('virtualMedia.title', 'Virtual Media') }}</span>
-            </n-button>
-          </template>
-          {{ t('virtualMedia.title', 'Virtual Media') }}: {{ mediaStateLabel }}
-        </n-tooltip>
-      </VirtualMediaPopover>
+      <n-tooltip :disabled="toolbarLauncher || openMenu === 'media'">
+        <template #trigger>
+          <n-button
+            quaternary
+            size="small"
+            class="device-indicator"
+            :data-state="mediaState"
+            :aria-label="`${t('virtualMedia.title', 'Virtual Media')}: ${mediaStateLabel}`"
+            @click="emit('media', toolbarLauncher)"
+          >
+            <template #icon><Disc3 /></template>
+            <span class="device-led" />
+            <span class="toolbar-action-label">{{ t('virtualMedia.title', 'Virtual Media') }}</span>
+          </n-button>
+        </template>
+        {{ t('virtualMedia.title', 'Virtual Media') }}: {{ mediaStateLabel }}
+      </n-tooltip>
 
       <component
         v-for="item in deviceControlExtensions"
@@ -1620,23 +1571,11 @@ onBeforeUnmount(() => {
         v-bind="extensionHostProps"
       />
 
-      <n-tooltip v-if="mediaUpload.minimized" :disabled="toolbarLauncher">
-        <template #trigger>
-          <n-button
-            quaternary
-            size="small"
-            class="device-indicator upload-task-indicator"
-            :data-state="mediaUpload.uploading ? 'uploading' : 'paused'"
-            :aria-label="`${mediaUpload.title || t('virtualMedia.uploadProgressTitle', 'ISO upload')}: ${mediaUploadLabel}`"
-            @click="restoreMediaUpload"
-          >
-            <template #icon><Upload /></template>
-            <span class="device-led" />
-            <span class="toolbar-action-label">{{ t('virtualMedia.uploadProgressTitle', 'ISO upload') }}</span>
-          </n-button>
-        </template>
-        {{ mediaUpload.title || t('virtualMedia.uploadProgressTitle', 'ISO upload') }}: {{ mediaUploadLabel }}
-      </n-tooltip>
+      <MediaTransferIndicator
+        :state="mediaTransfer"
+        :tooltip-disabled="toolbarLauncher"
+        @restore="emit('restore-media-transfer')"
+      />
     </div>
 
     <PinnedTools :mobile="toolbarLauncher" :vertical="toolbarVertical" :placement="menuPlacement" @overlay="pinnedOverflowOpen = $event" />

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import { useDialog, useMessage } from 'naive-ui'
 
 import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type OneKVMStatus } from '@/api/client'
@@ -41,6 +41,8 @@ import { loadExtensionShells, loadExtensionToolbars } from '@/extensions/pluginU
 import { uiProduct } from '@/product'
 
 import ControlToolbar from './ControlToolbar.vue'
+import VirtualMediaPopover from './VirtualMediaPopover.vue'
+import { emptyMediaTransfer } from '@/lib/media-transfer'
 import RemoteConsole from './RemoteConsole.vue'
 import VideoPerformanceOverlay from './VideoPerformanceOverlay.vue'
 import AdvancedSettingsLoading from './AdvancedSettingsLoading.vue'
@@ -95,6 +97,10 @@ watch(virtualKeyboardOpen, (open) => {
 })
 const shortcutDialogOpen = ref(false)
 const toolbarOverlayOpen = ref(false)
+const mediaPopoverOpen = shallowRef(false)
+const mediaSheet = shallowRef(false)
+const mediaTransfer = shallowRef(emptyMediaTransfer())
+const virtualMediaPopover = useTemplateRef<InstanceType<typeof VirtualMediaPopover>>('virtualMediaPopover')
 const toolbarDock = ref<ToolbarDock>(
   toolbarLauncherActive(window.innerWidth, window.innerHeight)
     ? 'float'
@@ -401,6 +407,11 @@ function openAdvancedSettings() {
   window.location.hash = advancedSettingsHash(phoneSettingsActive() ? '' : 'system')
 }
 
+function openMedia(sheet: boolean) {
+  mediaSheet.value = sheet
+  virtualMediaPopover.value?.updateShow(true)
+}
+
 function confirmAdvancedSettings() {
   if (advancedSettingsOpen.value || !canSettings.value) return
   dialog.warning({
@@ -495,6 +506,14 @@ onBeforeUnmount(() => {
 <template>
   <div class="app-shell">
     <KeyboardLockOverlay :changes="keyboardLockChanges" />
+    <VirtualMediaPopover
+      ref="virtualMediaPopover"
+      :console-active="!advancedSettingsOpen"
+      :sheet="mediaSheet"
+      @status="msdStatus = $event"
+      @upload-state="mediaTransfer = $event"
+      @update:show="mediaPopoverOpen = $event"
+    />
     <Transition name="onekvm-page-loading" @after-leave="focusConsole">
       <div v-if="advancedSettingsOpen" class="advanced-settings-layer">
         <AdvancedSettingsPage
@@ -502,6 +521,8 @@ onBeforeUnmount(() => {
           :route="advancedSettingsRoute"
           :can-change-video="canChangeVideo"
           :video-session-id="state.webRTCSessionId"
+          :media-transfer="mediaTransfer"
+          @restore-media-transfer="virtualMediaPopover?.restoreUploadDialog()"
           @close="closeAdvancedSettings"
           @navigate="navigateAdvancedSettings"
         />
@@ -533,6 +554,8 @@ onBeforeUnmount(() => {
           :video-rotation="videoRotation"
           :status="status"
           :msd-status="msdStatus"
+          :media-transfer="mediaTransfer"
+          :media-popover-open="mediaPopoverOpen"
           :canvas-width="canvasWidth"
           :canvas-height="canvasHeight"
           :video-fps="videoFps"
@@ -548,7 +571,8 @@ onBeforeUnmount(() => {
           @account="accountOpen = true"
           @logout="logout"
           @keyboard="virtualKeyboardOpen = true"
-          @media-status="msdStatus = $event"
+          @media="openMedia"
+          @restore-media-transfer="virtualMediaPopover?.restoreUploadDialog()"
           @edit-user-shortcuts="shortcutDialogOpen = true"
           @fullscreen="toggleFullscreen"
           @update:performance-open="setPerformanceOpen"

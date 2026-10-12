@@ -4,6 +4,11 @@ import { Globe2, MonitorPlay, PlugZap, RadioTower, UserRound } from '@lucide/vue
 
 import { api, type OnlineSession } from '@/api/client'
 import { t } from '@/i18n/runtime'
+import { videoCodecLabel } from '@/lib/video-transport'
+
+const props = defineProps<{
+  actualCodec?: string
+}>()
 
 const sessions = ref<OnlineSession[]>([])
 const loading = ref(true)
@@ -13,8 +18,20 @@ let refreshTimer: number | null = null
 let clockTimer: number | null = null
 let refreshing = false
 
-const browserCount = computed(() => sessions.value.filter(({ source }) => source === 'browser').length)
+function isBrowser(source: OnlineSession['source']) {
+	return source === 'web' || source === 'browser'
+}
+
+const browserCount = computed(() => sessions.value.filter(({ source }) => isBrowser(source)).length)
 const extensionCount = computed(() => sessions.value.filter(({ source }) => source === 'extension').length)
+
+function codecLabel(session: OnlineSession) {
+	if (!session.codec) return '-'
+	return videoCodecLabel({
+		codec: session.codec,
+		actual_codec: session.codec.toLowerCase() === 'auto' ? props.actualCodec : undefined,
+	})
+}
 
 function protocolLabel(session: OnlineSession) {
 	const labels: Record<string, string> = {
@@ -25,7 +42,7 @@ function protocolLabel(session: OnlineSession) {
 }
 
 function sourceLabel(source: OnlineSession['source']) {
-	return source === 'browser'
+	return isBrowser(source)
 		? t('settings.advancedSettings.sessionsPage.browser', 'Web console')
 		: t('settings.advancedSettings.sessionsPage.extension', 'Protocol plugin')
 }
@@ -47,7 +64,7 @@ async function refresh() {
 	if (refreshing) return
 	refreshing = true
 	try {
-		sessions.value = await api.getSessions()
+		sessions.value = (await api.getSessions()).filter(({ kind }) => kind === 'video')
 		error.value = ''
 	} catch (reason) {
 		error.value = reason instanceof Error ? reason.message : String(reason)
@@ -114,7 +131,7 @@ onBeforeUnmount(() => {
                 </td>
                 <td>
                   <span class="session-detail">
-                    <MonitorPlay v-if="session.source === 'browser'" :size="16" />
+                    <MonitorPlay v-if="isBrowser(session.source)" :size="16" />
                     <PlugZap v-else :size="16" />
                     <span>{{ sourceLabel(session.source) }}<small v-if="session.transport">{{ session.transport }}</small></span>
                   </span>
@@ -125,7 +142,7 @@ onBeforeUnmount(() => {
                 <td>
                   <span class="session-detail"><UserRound :size="16" /><span>{{ session.username || '-' }}</span></span>
                 </td>
-                <td><span class="session-codec">{{ session.codec?.toUpperCase() || '-' }}</span></td>
+                <td><span class="session-codec">{{ codecLabel(session) }}</span></td>
                 <td class="session-duration">{{ formatDuration(session.connected_at) }}</td>
               </tr>
             </tbody>
@@ -135,7 +152,7 @@ onBeforeUnmount(() => {
           <li v-for="session in sessions" :key="`card-${session.id}`">
             <header>
               <span class="session-protocol"><i />{{ protocolLabel(session) }}</span>
-              <span class="session-codec">{{ session.codec?.toUpperCase() || '-' }}</span>
+              <span class="session-codec">{{ codecLabel(session) }}</span>
             </header>
             <dl>
               <div>

@@ -203,16 +203,6 @@ export class AdaptiveJitterBuffer {
   }
 }
 
-/* Drain Chrome NetEq when it has ratcheted. playbackRate > 1 pulls PCM
- * faster than realtime so jitterBufferDelay falls; preservesPitch keeps
- * pitch. Thresholds are ms of inbound-rtp jitterBufferDelay. */
-export function audioCatchUpRate(jitterBufferUs: number): number {
-  const delayMs = jitterBufferUs / 1000
-  if (delayMs >= 160) return 1.08
-  if (delayMs >= 80) return 1.04
-  return 1
-}
-
 export function applyJitterBufferTargets(
   receivers: Iterable<RTCRtpReceiver>,
   targets: JitterBufferTargets,

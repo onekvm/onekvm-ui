@@ -3,7 +3,6 @@ import assert from 'node:assert/strict'
 import {
   AdaptiveJitterBuffer,
   applyJitterBufferTargets,
-  audioCatchUpRate,
   readInboundJitterSamples,
 } from '../src/lib/adaptive-jitter-buffer.ts'
 
@@ -116,9 +115,5 @@ assert.equal(applyJitterBufferTargets([chromiumAudioReceiver], { video: 18, audi
 assert.equal(chromiumAudioReceiver.jitterBufferTarget, 24)
 assert.equal(chromiumAudioReceiver.playoutDelayHint, 0)
 
-assert.equal(audioCatchUpRate(0), 1)
-assert.equal(audioCatchUpRate(40_000), 1)
-assert.equal(audioCatchUpRate(80_000), 1.04)
-assert.equal(audioCatchUpRate(200_000), 1.08)
 
 console.log('adaptive jitter buffer tests passed')

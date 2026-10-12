@@ -461,8 +461,8 @@ export interface ResourceHistory {
 
 export interface OnlineSession {
 	id: string
-	kind: 'video'
-	source: 'browser' | 'extension'
+	kind: 'video' | 'audio'
+	source: 'web' | 'browser' | 'extension'
 	protocol: string
 	transport: string
 	client_ip?: string
@@ -1357,6 +1357,7 @@ export const api = {
   resetVideoEDID: () => request<{ status: string; apply_required: EDIDApplyRequired }>('/api/video/edid/reset', { method: 'POST' }),
   getMJPEGStreamURL: () => `${serviceBaseUrl()}/api/stream`,
   getVideoWebSocketURL: () => serviceWebSocketURL('/api/stream/ws'),
+  getAudioWebSocketURL: () => serviceWebSocketURL('/api/audio/ws'),
   getHIDWebSocketURL: () => serviceWebSocketURL('/api/hid/ws'),
   resetUSB: () => request<{ status: string }>('/api/hid/reset', { method: 'POST' }),
   getMSDWebSocketURL: () => serviceWebSocketURL('/api/msd/ws'),
@@ -1642,10 +1643,10 @@ export const api = {
       body: JSON.stringify({ delete_data: Boolean(options?.deleteData) }),
     }),
   getWebRTCIce: () => request<{ ice_servers: IceServer[] }>('/api/webrtc/ice', { cache: 'no-store' }),
-  createWebRTCSession: (sdp: string, microphone = false) =>
+  createWebRTCSession: (sdp: string, microphone = false, media: 'audio_video' | 'video' | 'audio' = 'audio_video') =>
     request<WebRTCAnswer>('/api/webrtc/offer', {
       method: 'POST',
-      body: JSON.stringify({ type: 'offer', sdp, microphone }),
+      body: JSON.stringify({ type: 'offer', sdp, microphone, media }),
     }),
   closeWebRTCSession: (sessionId: string, keepalive = false) =>
     request<{ status: string }>('/api/webrtc/close', {

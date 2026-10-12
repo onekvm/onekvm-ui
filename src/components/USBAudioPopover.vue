@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, shallowRef, watch } from 'vue'
+import { computed, onBeforeUnmount, shallowRef, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 
 import { api, type ConfigSchema, type OneKVMStatus } from '@/api/client'
@@ -23,8 +23,12 @@ const popoverOpen = shallowRef(false)
 const saving = shallowRef<'microphone' | null>(null)
 const schema = shallowRef<ConfigSchema | null>(null)
 const speakerVolume = shallowRef(Math.round(onekvm.speakerGain() * 100))
+const microphoneVolume = shallowRef(Math.round(onekvm.microphoneGain() * 100))
 const speakerOn = shallowRef(onekvm.speakerEnabled())
 const microphoneOverride = shallowRef<boolean | null>(null)
+const audioError = shallowRef('')
+const unsubscribe = onekvm.subscribe(state => { audioError.value = state.audioError })
+onBeforeUnmount(unsubscribe)
 
 const audioAvailable = computed(() => schema.value?.capabilities?.audio === true)
 const microphoneAvailable = computed(() => Boolean(props.status?.audio.microphone_available))
@@ -32,7 +36,7 @@ const microphoneOn = computed(() => microphoneOverride.value
   ?? Boolean(props.status?.audio.microphone && onekvm.microphoneGranted()))
 const microphoneBusy = computed(() => {
   const owner = props.status?.audio.microphone_session
-  return Boolean(owner && owner !== onekvm.sessionID())
+  return Boolean(owner && owner !== onekvm.audioSessionID())
 })
 
 watch(popoverOpen, (open) => {
@@ -63,6 +67,11 @@ function updateShow(open: boolean) {
 function updateSpeakerVolume(value: number) {
   speakerVolume.value = value
   onekvm.setSpeakerGain(value / 100)
+}
+
+function updateMicrophoneVolume(value: number) {
+  microphoneVolume.value = value
+  onekvm.setMicrophoneGain(value / 100)
 }
 
 function requestSpeaker(value: boolean) {
@@ -139,8 +148,10 @@ async function applyMicrophone(value: boolean) {
         </div>
         <div>
           <span>{{ t('usbAudio.volume', 'Volume') }}</span>
+          <!-- Mount tooltips outside the scrollable panel, including in fullscreen. -->
           <n-slider
             class="usb-audio-slider"
+            :to="true"
             :value="speakerVolume"
             :min="0"
             :max="100"
@@ -160,12 +171,28 @@ async function applyMicrophone(value: boolean) {
             @update:value="requestMicrophone"
           />
         </div>
+        <div>
+          <span>{{ t('usbAudio.microphoneVolume', 'Microphone volume') }}</span>
+          <n-slider
+            class="usb-audio-slider"
+            :to="true"
+            :value="microphoneVolume"
+            :min="0"
+            :max="100"
+            :step="1"
+            :disabled="!microphoneOn || saving !== null"
+            :aria-label="t('usbAudio.microphoneVolume', 'Microphone volume')"
+            placement="bottom"
+            @update:value="updateMicrophoneVolume"
+          />
+        </div>
       </div>
       <p class="usb-audio-hint">
         {{ microphoneBusy
           ? t('usbAudio.microphoneBusy', 'Another session already owns the USB microphone.')
           : t('usbAudio.hint', 'Speaker lets you hear the target. Turning on Microphone asks for browser permission first and is exclusive to this session.') }}
       </p>
+      <p v-if="audioError" class="usb-audio-hint" role="status">{{ audioError === 'latency-recovery' ? t('usbAudio.latencyRecovery', 'Audio latency increased. Restoring live playback…') : t('usbAudio.connectionFailed', 'Audio connection lost. Reconnecting…') }}</p>
     </div>
     </template>
   </ControlOverlay>

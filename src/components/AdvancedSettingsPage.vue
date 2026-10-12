@@ -1864,7 +1864,7 @@ watch(paneSection, (value) => {
               </section>
 
               <section v-else-if="paneSection === 'sessions'" class="advanced-settings-section">
-                <OnlineSessionsPage />
+                <OnlineSessionsPage :actual-codec="status?.video.actual_codec" />
               </section>
 
               <section v-else-if="paneSection === 'services'" class="advanced-settings-section">

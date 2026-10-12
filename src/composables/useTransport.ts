@@ -12,6 +12,7 @@ export function useTransport() {
     websocketFallbackAvailable: false,
     fallbackPrompt: '',
     error: '',
+    audioError: '',
   })
   let unsubscribe: (() => void) | undefined
 

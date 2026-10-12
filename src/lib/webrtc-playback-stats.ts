@@ -5,6 +5,7 @@ export type BrowserVideoLatencyUs = {
 }
 
 export type BrowserAudioStats = {
+  codec?: 'opus' | 'pcm'
   bitrateKbps: number
   packetsPerSecond: number
   jitterBufferUs: number

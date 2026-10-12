@@ -145,6 +145,7 @@ const jitterBufferUs = ref(0)
 const decodeUs = ref(0)
 const presentUs = ref(0)
 const audioBitrate = ref(0)
+const websocketAudioCodec = shallowRef<'opus' | 'pcm'>('pcm')
 const audioPacketsPerSecond = ref(0)
 const audioJitterBufferUs = ref(0)
 const switchingTransport = shallowRef<'websocket' | 'webrtc' | 'h264' | ''>('')
@@ -266,6 +267,7 @@ function setBrowserLatency(latency: BrowserVideoLatencyUs & { presentUs: number 
 
 function setAudioStats(stats: BrowserAudioStats) {
   audioBitrate.value = stats.bitrateKbps
+  if (stats.codec) websocketAudioCodec.value = stats.codec
   audioPacketsPerSecond.value = stats.packetsPerSecond
   audioJitterBufferUs.value = stats.jitterBufferUs
 }
@@ -612,14 +614,14 @@ onBeforeUnmount(() => {
           :decode-us="decodeUs"
           :present-us="presentUs"
           :audio-enabled="status?.audio.enabled ?? false"
-          :audio-encoder="status?.audio.encoder ?? ''"
+          :audio-encoder="state.videoMode === 'websocket' ? websocketAudioCodec : status?.audio.encoder ?? ''"
           :audio-quality="status?.audio.quality ?? ''"
           :audio-sample-rate="status?.audio.sample_rate ?? 0"
           :audio-channels="audioOverlayChannels"
           :audio-fps="audioPacketsPerSecond || status?.audio.actual_fps || 0"
           :audio-bitrate="audioBitrate || status?.audio.bitrate_kbps || 0"
           :audio-capture-latency-us="status?.audio.capture_latency_us ?? 0"
-          :audio-encode-latency-us="status?.audio.encode_latency_us ?? 0"
+          :audio-encode-latency-us="state.videoMode === 'websocket' && websocketAudioCodec === 'pcm' ? 0 : status?.audio.encode_latency_us ?? 0"
           :audio-jitter-buffer-us="audioJitterBufferUs"
           @close="performanceOpen = false"
         />

@@ -27,6 +27,32 @@ class FakeStream {
 }
 
 const peers: FakePeer[] = []
+const sockets: FakeSocket[] = []
+class FakeSocket {
+  static OPEN = 1
+  static CLOSING = 2
+  readyState = 0
+  binaryType = ''
+  onopen: (() => void) | null = null
+  onclose: (() => void) | null = null
+  onmessage: ((event: { data: ArrayBuffer }) => void) | null = null
+  onerror: (() => void) | null = null
+  readonly url: string
+  readonly protocol: string
+  constructor(url: string, protocol: string) {
+    this.url = url
+    this.protocol = protocol
+    sockets.push(this)
+    queueMicrotask(() => {
+      if (this.readyState !== 0) return
+      this.readyState = FakeSocket.OPEN
+      this.onopen?.()
+    })
+  }
+  close() { this.readyState = 3; this.onclose?.() }
+  receive(bytes: number[]) { this.onmessage?.({ data: Uint8Array.from(bytes).buffer }) }
+}
+
 class FakePeer {
   connectionState = 'new'
   iceGatheringState = 'complete'
@@ -42,6 +68,8 @@ class FakePeer {
       onopen: null as (() => void) | null,
       onclose: null as (() => void) | null,
       onmessage: null as ((event: { data: ArrayBuffer }) => void) | null,
+      sent: [] as Uint8Array[],
+      send(report: Uint8Array) { this.sent.push(new Uint8Array(report)) },
       close() { this.readyState = 'closed'; this.onclose?.() },
     }
     this.control = channel
@@ -78,10 +106,11 @@ class FakePeer {
 
 const browserGlobals = {
   localStorage: { getItem: () => null, setItem: () => {} },
-  window: { setTimeout, clearTimeout, setInterval, clearInterval },
+  window: { setTimeout, clearTimeout, setInterval, clearInterval, location: new URL('https://onekvm.test/') },
   document: { querySelector: () => null },
   MediaStream: FakeStream,
   RTCPeerConnection: FakePeer,
+  WebSocket: FakeSocket,
   RTCRtpReceiver: { getCapabilities: () => ({ codecs: [{ mimeType: 'video/H264' }, { mimeType: 'video/H265' }] }) },
 }
 const originalGlobals = Object.keys(browserGlobals).map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)] as const)
@@ -109,6 +138,7 @@ try {
   statusEvents.waitForStatus = async () => snapshot('h264')
   api.getStatus = async () => { statusReads += 1; return snapshot(codec) }
   api.getWebRTCIce = async () => ({ ice_servers: [] })
+  api.getConfigSchema = async () => ({ capabilities: { audio: false } })
   const closedSessions: string[] = []
   api.closeWebRTCSession = async (id: string) => { closedSessions.push(id) }
   const offers: { id: string; codec: string; sdp: string }[] = []
@@ -128,6 +158,39 @@ try {
   await onekvm.connect()
   assert.equal(state?.connection, 'connected')
   const oldPeer = peers.findLast((peer) => peer.control)!
+  assert.equal(sockets.length, 1, 'WebRTC must also open the HID WebSocket for LED notifications')
+  assert.equal(sockets[0]?.protocol, 'onekvm.hid.v1')
+  const ledReports: { known: boolean; capsLock: boolean; numLock: boolean; scrollLock: boolean }[] = []
+  sockets[0]!.receive([0x81, 1, 0x02])
+  const unsubscribeLED = onekvm.subscribeKeyboardLED((led: typeof ledReports[number]) => ledReports.push(led))
+  assert.deepEqual(ledReports.at(-1), { known: true, capsLock: true, numLock: false, scrollLock: false }, 'Late subscribers must receive the initial LED snapshot')
+  ledReports.at(-1)!.capsLock = false
+  const replayed: typeof ledReports = []
+  const unsubscribeReplay = onekvm.subscribeKeyboardLED((led: typeof ledReports[number]) => replayed.push(led))
+  assert.equal(replayed.at(-1)?.capsLock, true, 'Subscriber mutations must not change the retained snapshot')
+  unsubscribeReplay()
+  sockets[0]!.receive([0x81, 1, 0x07])
+  assert.deepEqual(ledReports.at(-1), { known: true, capsLock: true, numLock: true, scrollLock: true })
+  onekvm.sendKeyboard([57])
+  assert.equal(oldPeer.control!.sent.length, 1, 'WebRTC HID input must still use its data channel')
+
+  // A dropped notification socket must not interrupt the video or HID input.
+  const droppedSocket = sockets[0]!
+  droppedSocket.close()
+  assert.equal(ledReports.at(-1)?.known, false)
+  const disconnectedReports: typeof ledReports = []
+  const unsubscribeDisconnected = onekvm.subscribeKeyboardLED((led: typeof ledReports[number]) => disconnectedReports.push(led))
+  assert.equal(disconnectedReports.at(-1)?.known, false, 'A new subscriber must not receive a stale snapshot after disconnect')
+  unsubscribeDisconnected()
+  assert.equal(state?.connection, 'connected')
+  assert.equal(state?.controlReady, true)
+  await new Promise((resolve) => setTimeout(resolve, 1100))
+  assert.equal(sockets.length, 2, 'The LED WebSocket must reconnect independently')
+  sockets[1]!.receive([0x81, 1, 0x01])
+  const reportsBeforeStaleMessage = ledReports.length
+  droppedSocket.receive([0x81, 1, 0x07])
+  assert.equal(ledReports.length, reportsBeforeStaleMessage, 'Old sockets must not revert LED state')
+  assert.deepEqual(ledReports.at(-1), { known: true, capsLock: false, numLock: true, scrollLock: false })
   const oldConnectionCallback = oldPeer.onconnectionstatechange!
   const oldTrackCallback = oldPeer.ontrack!
   const oldControlClose = oldPeer.control!.onclose!
@@ -220,6 +283,8 @@ try {
   await closedBeforeStatus
   assert.equal(peers.length, countBeforeClose, 'Closing while status loads must prevent a new peer')
   assert.equal(state?.connection, 'closed')
+  assert.ok(sockets.every((socket) => socket.readyState === 3), 'Closing a session must close its LED socket')
+  unsubscribeLED()
   unsubscribe()
   console.log('transport-reconnect tests passed')
 } finally {

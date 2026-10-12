@@ -115,6 +115,7 @@ class OneKVMTransport {
   private video: HTMLVideoElement | null = null
   private audio: HTMLAudioElement | null = null
   private hidSocket: WebSocket | null = null
+  private hidReconnectTimer = 0
   private websocketVideo: WebSocketVideo | null = null
   private sessionId = ''
   private preferredVideoTransport = parseVideoTransport(localStorage.getItem(VIDEO_TRANSPORT_KEY))
@@ -129,6 +130,7 @@ class OneKVMTransport {
   private browserLatencyListeners = new Set<BrowserLatencyListener>()
   private audioStatsListeners = new Set<AudioStatsListener>()
   private keyboardLEDListeners = new Set<KeyboardLEDListener>()
+  private keyboardLEDState: KeyboardLEDState = { known: false, capsLock: false, numLock: false, scrollLock: false }
   private playbackStats = new PlaybackStatsSampler()
   private adaptiveJitterBuffer = new AdaptiveJitterBuffer()
   private state: TransportState = {
@@ -193,6 +195,7 @@ class OneKVMTransport {
 
   subscribeKeyboardLED(listener: KeyboardLEDListener) {
     this.keyboardLEDListeners.add(listener)
+    listener({ ...this.keyboardLEDState })
     return () => this.keyboardLEDListeners.delete(listener)
   }
 
@@ -508,6 +511,9 @@ class OneKVMTransport {
     }
 
     this.setState({ videoMode: 'webrtc', websocketFallbackAvailable })
+    // LED state uses the HID WebSocket in every video mode. Its connection
+    // runs independently so status notifications do not delay WebRTC setup.
+    void this.openHIDWebSocket().catch(() => this.scheduleHIDSocketReconnect(generation))
     await this.startWebRTC(
       generation,
       codec,
@@ -817,10 +823,12 @@ class OneKVMTransport {
       capsLock: Boolean(payload[2] & (1 << 1)),
       scrollLock: Boolean(payload[2] & (1 << 2)),
     }
-    this.keyboardLEDListeners.forEach((listener) => listener(state))
+    this.keyboardLEDState = state
+    this.keyboardLEDListeners.forEach((listener) => listener({ ...state }))
   }
 
   private openHIDWebSocket() {
+	const generation = this.connectionGeneration
 	return new Promise<void>((resolve, reject) => {
 	  const socket = new WebSocket(api.getHIDWebSocketURL(), 'onekvm.hid.v1')
 	  socket.binaryType = 'arraybuffer'
@@ -842,19 +850,42 @@ class OneKVMTransport {
 	  }
 	  socket.onclose = () => {
 		const active = this.hidSocket === socket
-		if (active) this.hidSocket = null
+		if (active) {
+		  this.hidSocket = null
+		  this.resetKeyboardLED()
+		  if (this.state.videoMode === 'webrtc') this.scheduleHIDSocketReconnect(generation)
+		}
 		if (!opened) {
 		  reject(new Error('HID WebSocket connection closed'))
-		} else if (active) {
+		} else if (active && this.state.videoMode !== 'webrtc') {
 		  this.setState({ connection: 'disconnected', controlReady: false, error: 'HID WebSocket connection closed' })
 		}
 	  }
 	})
   }
 
+  private scheduleHIDSocketReconnect(generation: number) {
+    if (generation !== this.connectionGeneration || this.hidReconnectTimer || this.state.videoMode !== 'webrtc') return
+    if (!['connecting', 'connected', 'disconnected'].includes(this.state.connection)) return
+    this.hidReconnectTimer = window.setTimeout(() => {
+      this.hidReconnectTimer = 0
+      if (generation !== this.connectionGeneration) return
+      void this.openHIDWebSocket().catch(() => this.scheduleHIDSocketReconnect(generation))
+    }, 1000)
+  }
+
+  private resetKeyboardLED() {
+    const unknown: KeyboardLEDState = { known: false, capsLock: false, numLock: false, scrollLock: false }
+    this.keyboardLEDState = unknown
+    this.keyboardLEDListeners.forEach((listener) => listener({ ...unknown }))
+  }
+
   private disposeHIDSocket() {
+	window.clearTimeout(this.hidReconnectTimer)
+	this.hidReconnectTimer = 0
 	const socket = this.hidSocket
 	this.hidSocket = null
+	this.resetKeyboardLED()
 	if (socket && socket.readyState < WebSocket.CLOSING) socket.close()
   }
 

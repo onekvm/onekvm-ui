@@ -24,6 +24,7 @@ const child: ToolChildWindow = { owner, get modal() { return props.modal }, focu
 provide(toolWindowOwnerKey, child)
 
 function focus(flash = false) {
+  if (registration.value?.blocked.value) { registration.value.attention(); return }
   registration.value?.activate()
   const root = frame.value?.element
   if (!root) return
@@ -52,11 +53,11 @@ function release() {
   else returnFocus = null
 }
 function close(force = false): Promise<boolean> {
-  if (!props.open && !frame.value?.element?.isConnected) return Promise.resolve(true)
   if (closing) {
     if (force) void registration.value?.closeChildren(true).then(() => emit('close'))
     return closing
   }
+  if (!props.open && !frame.value?.element?.isConnected) return Promise.resolve(true)
   closing = new Promise(resolve => { resolveClose = resolve })
   void (async () => {
     if ((!force && props.beforeClose && !await props.beforeClose()) || (registration.value && !await registration.value.closeChildren(force))) {
@@ -75,6 +76,19 @@ watch(() => props.open, async open => {
   if (props.open) focus()
 }, { immediate: true })
 onBeforeUnmount(() => { window.clearTimeout(attentionTimer); release() })
+function setState(next: 'normal' | 'maximized') {
+  if (registration.value?.blocked.value) { registration.value.attention(); return false }
+  if (next === 'maximized' && !props.maximizable) return false
+  state.value = next
+  return true
+}
+defineExpose({
+  focus, close,
+  state: computed(() => state.value),
+  setState,
+  getBounds: () => frame.value?.getBounds() || null,
+  setBounds: (bounds: Partial<{ x: number; y: number; width: number; height: number }>) => frame.value?.setBounds(bounds) || false,
+})
 </script>
 
 <template>

@@ -192,7 +192,26 @@ function toggleMaximize(event?: MouseEvent) {
   if (event && (!(event.target instanceof Element) || !event.target.closest('.display-status-titlebar') || event.target.closest('button'))) return
   emit('update:state', maximized.value ? 'normal' : 'maximized')
 }
-defineExpose({ element: root, focus: () => root.value?.focus() })
+function getBounds() {
+  if (!root.value?.getClientRects().length) return null
+  const rect = root.value.getBoundingClientRect()
+  return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+}
+function setBounds(bounds: Partial<{ x: number; y: number; width: number; height: number }>) {
+  if (props.childWindowActive) { emit('childAttention'); return false }
+  if (fullLayout.value) return false
+  for (const name of ['x', 'y', 'width', 'height'] as const) {
+    if (bounds[name] !== undefined && !Number.isFinite(bounds[name])) throw new TypeError(`Invalid window ${name}`)
+  }
+  if (maximized.value) emit('update:state', 'normal')
+  if (bounds.x !== undefined) box.x = bounds.x - viewport.x
+  if (bounds.y !== undefined) box.y = bounds.y - viewport.y
+  if (bounds.width !== undefined) box.width = bounds.width
+  if (bounds.height !== undefined) box.height = bounds.height
+  clamp()
+  return true
+}
+defineExpose({ element: root, focus: () => root.value?.focus(), getBounds, setBounds })
 watch(() => [props.width, props.height], applyRequestedSize)
 onMounted(() => {
   updateViewport()

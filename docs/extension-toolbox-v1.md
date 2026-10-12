@@ -173,6 +173,14 @@ close before their owner, and each leave transition finishes before the owner is
 removed. Focus returns to the opener when it is still available. Forced extension
 invalidation bypasses close vetoes. Always handle `close` by setting `open` false.
 
+A component ref exposes `focus(attention?)`, `close(force?)`, a readonly `state`,
+`setState('normal' | 'maximized')`, `getBounds()` and `setBounds({ x?, y?, width?,
+height? })`. Bounds use CSS pixels in the visual viewport's client coordinates;
+`getBounds` returns null when hidden. Setting bounds restores a maximized window
+and clamps its normal placement. State/bounds commands return false when blocked
+by a modal child or unavailable for that window. Closing returns a promise that
+resolves to true after its leave transition, or false after a close veto.
+
 Custom wrappers may use `host.registerChildWindow({ owner?, modal?, focus, close })`.
 It returns reactive `layer`, `active`, `blocked`, `visible` refs and `activate`,
 `attention`, `closeChildren(force?)`, `dispose` callbacks. `focus(attention)` must

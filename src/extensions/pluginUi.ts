@@ -150,7 +150,7 @@ interface PluginUIRuntimeV1 {
   register: (id: string, definition: VueExtensionPageDefinitionV1) => void
   toolbar: { register: (id: string, definition: ToolbarRegistrationV1) => void }
   shell: { register: (id: string, definition: ExtensionShellRegistrationV1) => void }
-  toolbox: { register: (extensionId: string, toolId: string, definition: VueExtensionPageDefinitionV1) => void; Window: Component }
+  toolbox: { register: (extensionId: string, toolId: string, definition: VueExtensionPageDefinitionV1) => void; Window: typeof ExtensionChildWindow }
 }
 
 type PluginMessageValuesV1 = Record<string, string | number>

@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { GripHorizontal, Keyboard, Pin, PinOff } from '@lucide/vue'
+import { Keyboard, Pin, PinOff } from '@lucide/vue'
 import { useMessage, type DropdownOption, type InputInst } from 'naive-ui'
 
 import { api, type KeyboardLayout } from '@/api/client'
+import { onekvm } from '@/lib/onekvm'
 import { t } from '@/i18n/runtime'
 import { filterKeyboardText } from '@/input/keyboard-text'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import ControlOverlay from './ControlOverlay.vue'
+import ControlPopoverHeading from './ControlPopoverHeading.vue'
 import HidHostAlert from './HidHostAlert.vue'
+import KeyboardQuickActions from './KeyboardQuickActions.vue'
 
 const props = defineProps<{
   options: DropdownOption[]
@@ -24,6 +27,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   select: [key: string | number]
   'update:show': [show: boolean]
+  'text-modal': [open: boolean]
 }>()
 
 const popoverOpen = ref(false)
@@ -41,7 +45,6 @@ let dragging = false
 let unsupportedWarningAt = 0
 const message = useMessage()
 
-const actionOptions = computed(() => props.options.slice(0, 1))
 const remainingOptions = computed(() => props.options.slice(1))
 
 const panelStyle = computed(() => ({
@@ -109,7 +112,7 @@ function selectOption(key: string | number) {
     return
   }
   emit('select', key)
-  if (!pinned.value) updateShow(false)
+  if (!pinned.value && key !== 'right-control-as-meta') updateShow(false)
 }
 
 function updateText(value: string) {
@@ -120,12 +123,21 @@ function updateText(value: string) {
   message.warning(t('keyboard.unsupportedRemoved', 'Characters unavailable on this keyboard layout were removed.'))
 }
 
+function resumeConsole() {
+  onekvm.sendKeyboard([])
+  document.querySelector<HTMLElement>('.console-hid-layer')?.focus({ preventScroll: true })
+}
+
+watch(textModalOpen, (open) => emit('text-modal', open))
+
 async function sendText() {
   if (!text.value || sendingText.value) return
   sendingText.value = true
   try {
-    const result = await api.sendKeyboardText(text.value, props.layout)
+    const sent = text.value
+    const result = await api.sendKeyboardText(sent, props.layout)
     text.value = ''
+    onekvm.notifyKeyboardText(sent)
     textModalOpen.value = false
     message.success(t('keyboard.textSent', 'Sent {count} characters').replace('{count}', String(result.characters)))
   } catch (error) {
@@ -187,14 +199,12 @@ onBeforeUnmount(() => {
     <template #title>{{ t('keyboard.title', 'Keyboard') }}</template>
     <template #panel>
     <div class="keyboard-control-panel">
-      <header class="control-popover-header">
-        <div class="keyboard-control-heading">
-          <span class="keyboard-control-heading-icon"><Keyboard :size="16" /></span>
-          <span>
-            <strong>{{ t('keyboard.title', 'Keyboard') }}</strong>
-            <small>{{ t('keyboard.layout', 'Keyboard layout') }} · {{ layoutLabel(layout) }}</small>
-          </span>
-        </div>
+      <header class="control-popover-header control-popover-header-with-heading">
+        <ControlPopoverHeading
+          :icon="Keyboard"
+          :title="t('keyboard.title', 'Keyboard')"
+          :subtitle="`${t('keyboard.layout', 'Keyboard layout')} · ${layoutLabel(layout)}`"
+        />
         <div v-if="!sheet" class="control-popover-header-actions">
           <n-tooltip :to="overlayTo" :z-index="4000">
             <template #trigger>
@@ -224,8 +234,8 @@ onBeforeUnmount(() => {
           <strong>{{ lockLabel(scrollLock) }}</strong>
         </span>
       </div>
-      <n-menu accordion :value="null" :options="actionOptions" :indent="16" class="keyboard-control-menu keyboard-action-menu" @update:value="selectOption" />
-      <n-menu accordion :value="null" :options="remainingOptions" :indent="16" class="keyboard-control-menu keyboard-secondary-menu" @update:value="selectOption" />
+      <KeyboardQuickActions @select="selectOption" />
+      <n-menu accordion :value="null" :options="remainingOptions" :indent="12" class="keyboard-control-menu keyboard-secondary-menu" @update:value="selectOption" />
     </div>
     </template>
   </ControlOverlay>
@@ -238,6 +248,7 @@ onBeforeUnmount(() => {
     :title="t('keyboard.paste', 'Send text')"
     :mask-closable="!sendingText"
     :close-on-esc="!sendingText"
+    @after-leave="resumeConsole"
   >
     <div class="keyboard-text-modal-content">
       <p class="keyboard-text-modal-hint">
@@ -277,7 +288,6 @@ onBeforeUnmount(() => {
       :aria-label="t('keyboard.title', 'Keyboard')"
     >
       <header class="display-status-titlebar" @pointerdown="startDrag">
-        <GripHorizontal :size="15" class="floating-window-grip" />
         <Keyboard :size="15" />
         <strong>{{ t('keyboard.title', 'Keyboard') }}</strong>
         <span class="display-status-pinned-label">{{ t('keyboard.pinned', 'Pinned') }}</span>
@@ -315,8 +325,8 @@ onBeforeUnmount(() => {
             <strong>{{ lockLabel(scrollLock) }}</strong>
           </span>
         </div>
-        <n-menu accordion :value="null" :options="actionOptions" :indent="16" class="keyboard-control-menu keyboard-action-menu" @update:value="selectOption" />
-        <n-menu accordion :value="null" :options="remainingOptions" :indent="16" class="keyboard-control-menu keyboard-secondary-menu" @update:value="selectOption" />
+        <KeyboardQuickActions @select="selectOption" />
+        <n-menu accordion :value="null" :options="remainingOptions" :indent="12" class="keyboard-control-menu keyboard-secondary-menu" @update:value="selectOption" />
       </div>
     </section>
     </Transition>

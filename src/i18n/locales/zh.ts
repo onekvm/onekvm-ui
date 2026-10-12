@@ -246,6 +246,12 @@ const zh = {
       unsupportedRemoved: '已移除当前键盘布局上不存在的字符。',
       virtual: '虚拟键盘',
       virtualKeyboard: '虚拟键盘',
+      mode: '键盘模式',
+      keyNames: {
+        Backspace: '退格', Enter: '回车', Space: '空格', Shift: 'Shift',
+        ArrowUp: '向上', ArrowDown: '向下', ArrowLeft: '向左', ArrowRight: '向右',
+        PrintScreen: '打印屏幕', Pause: '暂停',
+      },
       rightControlAsWin: '右 Ctrl 映射为远端 Win',
       ctrlaltdel: 'Ctrl+Alt+Del',
       cadShort: 'CAD',

@@ -9,6 +9,7 @@ import MacroRunBanner from './toolbox/MacroRunBanner.vue'
 import { useToolbox } from '@/composables/useToolbox'
 import { useAuth } from '@/composables/useAuth'
 import { useDeviceInputSettings } from '@/composables/useDeviceInputSettings'
+import { useKeyboardLockOverlay } from '@/composables/useKeyboardLockOverlay'
 import { hasPermission } from '@/build'
 import { type MouseMode } from '@/composables/useMouse'
 import { parseVideoFit, parseVideoRotation, VIDEO_FIT_KEY, VIDEO_ROTATION_KEY, type VideoFit, type VideoRotation } from '@/lib/video-fit'
@@ -44,6 +45,7 @@ import RemoteConsole from './RemoteConsole.vue'
 import VideoPerformanceOverlay from './VideoPerformanceOverlay.vue'
 import AdvancedSettingsLoading from './AdvancedSettingsLoading.vue'
 import VideoFallbackModal from './VideoFallbackModal.vue'
+import KeyboardLockOverlay from './KeyboardLockOverlay.vue'
 
 const AccountDrawer = defineAsyncComponent(() => import('./AccountDrawer.vue'))
 const AdvancedSettingsPage = defineAsyncComponent({
@@ -74,6 +76,8 @@ function advancedRouteFromHash(hash: string) {
 const { state } = useTransport()
 const { auth, logout, refresh } = useAuth()
 const toolbox = useToolbox()
+const keyboardLockOverlay = useKeyboardLockOverlay()
+const keyboardLockChanges = keyboardLockOverlay.changes
 const dialog = useDialog()
 const message = useMessage()
 const canSettings = computed(() => hasPermission(auth, 'settings.view'))
@@ -84,6 +88,11 @@ const canPower = computed(() => hasPermission(auth, 'power.control'))
 const brandBadge = computed(() => uiProduct.badge(auth))
 const accountOpen = ref(false)
 const virtualKeyboardOpen = ref(false)
+const virtualKeyboardMounted = shallowRef(false)
+watch(virtualKeyboardOpen, (open) => {
+  if (open) virtualKeyboardMounted.value = true
+  focusConsole()
+})
 const shortcutDialogOpen = ref(false)
 const toolbarOverlayOpen = ref(false)
 const toolbarDock = ref<ToolbarDock>(
@@ -159,7 +168,7 @@ watch(() => status.value?.hid.macro_generation, async (generation, previous) => 
   macroInputReset.value = false
 })
 const keyboardBlocked = computed(
-  () => macroInputReset.value || Boolean(status.value?.hid.macro_owner) || toolbox.inputBlocked || advancedSettingsOpen.value || accountOpen.value || virtualKeyboardOpen.value || shortcutDialogOpen.value || toolbarOverlayOpen.value || Boolean(state.value.fallbackPrompt),
+  () => macroInputReset.value || Boolean(status.value?.hid.macro_owner) || toolbox.inputBlocked || advancedSettingsOpen.value || accountOpen.value || shortcutDialogOpen.value || toolbarOverlayOpen.value || Boolean(state.value.fallbackPrompt),
 )
 watch(mouseMode, (value) => localStorage.setItem(MOUSE_MODE_KEY, value))
 watch(videoFit, (value) => localStorage.setItem(VIDEO_FIT_KEY, value))
@@ -433,7 +442,7 @@ watch(advancedSettingsOpen, (open) => {
 onMounted(() => {
 	unsubscribeStatus = statusEvents.subscribe(
 		(next) => {
-			status.value = next
+			status.value = { ...next, hid: keyboardLockOverlay.applyStatus(next.hid) }
 			serverUnavailable.value = false
 		},
 		() => {
@@ -442,14 +451,13 @@ onMounted(() => {
 		},
 	)
 	unsubscribeKeyboardLED = onekvm.subscribeKeyboardLED((led) => {
-		if (!status.value?.hid || !led.known) return
+		const locks = keyboardLockOverlay.applyLED(led)
+		if (!status.value?.hid) return
 		status.value = {
 			...status.value,
 			hid: {
 				...status.value.hid,
-				num_lock: led.numLock,
-				caps_lock: led.capsLock,
-				scroll_lock: led.scrollLock,
+				...locks,
 			},
 		}
 	})
@@ -484,6 +492,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="app-shell">
+    <KeyboardLockOverlay :changes="keyboardLockChanges" />
     <Transition name="onekvm-page-loading" @after-leave="focusConsole">
       <div v-if="advancedSettingsOpen" class="advanced-settings-layer">
         <AdvancedSettingsPage
@@ -626,7 +635,7 @@ onBeforeUnmount(() => {
         />
 
         <AccountDrawer v-model:show="accountOpen" />
-        <VirtualKeyboard v-if="virtualKeyboardOpen" v-model:show="virtualKeyboardOpen" :layout="keyboardLayout" />
+        <VirtualKeyboard v-if="virtualKeyboardMounted" v-model:show="virtualKeyboardOpen" :layout="keyboardLayout" :blocked="keyboardBlocked" @focus-console="focusConsole" />
         <KeyboardShortcutDrawer
           v-model:show="shortcutDialogOpen"
           :shortcuts="userShortcuts"

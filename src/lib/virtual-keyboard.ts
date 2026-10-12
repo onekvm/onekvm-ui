@@ -1,6 +1,12 @@
 import type { KeyboardLayout } from '@/api/client'
 
 export type KeyboardLayer = 'letters' | 'numbers' | 'fn'
+export type VirtualKeyboardMode = 'win' | 'mac'
+export const VIRTUAL_KEYBOARD_MODE_KEY = 'onekvm-virtual-keyboard-mode'
+
+export function parseVirtualKeyboardMode(value: string | null): VirtualKeyboardMode {
+  return value === 'mac' ? 'mac' : 'win'
+}
 
 export type VirtualKey = {
   label: string
@@ -26,8 +32,8 @@ export const functionRow: VirtualKey[] = [
   key('Esc', 'Escape', 1, undefined, true),
   key('F1', 'F1'), key('F2', 'F2'), key('F3', 'F3'), key('F4', 'F4', 1, undefined, true),
   key('F5', 'F5'), key('F6', 'F6'), key('F7', 'F7'), key('F8', 'F8', 1, undefined, true),
-  key('F9', 'F9'), key('F10', 'F10'), key('F11', 'F11'), key('F12', 'F12', 1, undefined, true),
-  key('PrtSc', 'PrintScreen'), key('Pause', 'Pause'),
+  key('F9', 'F9'), key('F10', 'F10'), key('F11', 'F11'), key('F12', 'F12'),
+  key('PrtSc', 'PrintScreen'), key('ScrLk', 'ScrollLock'), key('Pause', 'Pause'),
 ]
 
 export const baseMainRows: VirtualKey[][] = [
@@ -55,16 +61,30 @@ export const baseMainRows: VirtualKey[][] = [
     key(',', 'Comma'), key('.', 'Period'), key('/', 'Slash'), key('Shift', 'ShiftRight', 2.75, 32),
   ],
   [
-    key('Ctrl', 'ControlLeft', 1.5, 1), key('Meta', 'MetaLeft', 1.25, 8),
+    key('Ctrl', 'ControlLeft', 1.25, 1), key('Win', 'MetaLeft', 1.25, 8),
     key('Alt', 'AltLeft', 1.25, 4), key('Space', 'Space', 6.25),
-    key('Alt', 'AltRight', 1.25, 64), key('Menu', 'Menu', 1.25),
-    key('Ctrl', 'ControlRight', 1.5, 16),
+    key('Alt', 'AltRight', 1.25, 64), key('Win', 'MetaRight', 1.25, 128), key('Menu', 'Menu', 1.25),
+    key('Ctrl', 'ControlRight', 1.25, 16),
   ],
 ]
+
+export function desktopKeyboardRows(mode: VirtualKeyboardMode): VirtualKey[][] {
+  if (mode === 'win') return baseMainRows
+  return [
+    ...baseMainRows.slice(0, -1),
+    [
+      key('Ctrl', 'ControlLeft', 1.5, 1), key('Opt', 'AltLeft', 1.5, 4),
+      key('Cmd', 'MetaLeft', 1.5, 8), key('Space', 'Space', 6),
+      key('Cmd', 'MetaRight', 1.5, 128), key('Opt', 'AltRight', 1.5, 64),
+      key('Ctrl', 'ControlRight', 1.5, 16),
+    ],
+  ]
+}
 
 export const navigationRows: VirtualKey[][] = [
   [key('Ins', 'Insert'), key('Home', 'Home'), key('PgUp', 'PageUp')],
   [key('Del', 'Delete'), key('End', 'End'), key('PgDn', 'PageDown')],
+  [],
   [key('↑', 'ArrowUp')],
   [key('←', 'ArrowLeft'), key('↓', 'ArrowDown'), key('→', 'ArrowRight')],
 ]
@@ -115,6 +135,14 @@ export const mobileModifierRow: VirtualKey[] = [
   mobileKey('Tab', 'Tab'),
   mobileKey('Fn', 'LayerFn', { kind: 'layer', layer: 'fn' }),
 ]
+
+export function mobileKeyboardModifiers(mode: VirtualKeyboardMode): VirtualKey[] {
+  if (mode === 'win') return mobileModifierRow
+  return mobileModifierRow.map((item) => ({
+    ...item,
+    label: item.code === 'AltLeft' ? 'Opt' : item.code === 'MetaLeft' ? 'Cmd' : item.label,
+  }))
+}
 
 export function applyKeyLabels(rows: VirtualKey[][], labels: Record<string, string>): VirtualKey[][] {
   return rows.map((row) => row.map((item) => (
@@ -200,8 +228,8 @@ const mobileFnRows: VirtualKey[][] = [
   ],
   [
     mobileKey('ABC', 'LayerLetters', { kind: 'layer', layer: 'letters', flex: 1.3 }),
-    mobileKey('PrtSc', 'PrintScreen'),
-    mobileKey('Pause', 'Pause'),
+    mobileKey('PrtSc', 'PrintScreen', { flex: 1.4 }),
+    mobileKey('Pause', 'Pause', { flex: 1.4 }),
     mobileKey('←', 'ArrowLeft'),
     mobileKey('↓', 'ArrowDown'),
     mobileKey('↑', 'ArrowUp'),

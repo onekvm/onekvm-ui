@@ -246,6 +246,12 @@ const zh_tw = {
       unsupportedRemoved: '已移除目前鍵盤配置上不存在的字元。',
       virtual: '虛擬鍵盤',
       virtualKeyboard: '虛擬鍵盤',
+      mode: '鍵盤模式',
+      keyNames: {
+        Backspace: '退格', Enter: '換行', Space: '空白', Shift: 'Shift',
+        ArrowUp: '向上', ArrowDown: '向下', ArrowLeft: '向左', ArrowRight: '向右',
+        PrintScreen: '列印螢幕', Pause: '暫停',
+      },
       rightControlAsWin: '右 Ctrl 映射為遠端 Win',
       ctrlaltdel: 'Ctrl+Alt+Del',
       cadShort: 'CAD',

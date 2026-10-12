@@ -14,13 +14,13 @@ export function useKeyboard(
   const modifierMask = () =>
     Array.from(pressedModifiers.values()).reduce((mask, modifier) => mask | modifier, 0)
 
-  const sendState = () => onekvm.sendKeyboard(Array.from(pressedKeys), modifierMask())
+  const sendState = () => onekvm.keyboardState.set('physical', Array.from(pressedKeys), modifierMask())
 
   const releaseAll = () => {
     if (pressedKeys.size === 0 && pressedModifiers.size === 0) return
     pressedKeys.clear()
     pressedModifiers.clear()
-    onekvm.sendKeyboard([])
+    onekvm.keyboardState.release('physical')
   }
 
   const acceptsText = () => {

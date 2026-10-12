@@ -247,6 +247,12 @@ const en = {
       unsupportedRemoved: 'Characters unavailable on this keyboard layout were removed.',
       virtual: 'Keyboard',
       virtualKeyboard: 'Virtual Keyboard',
+      mode: 'Keyboard mode',
+      keyNames: {
+        Backspace: 'Backspace', Enter: 'Enter', Space: 'Space', Shift: 'Shift',
+        ArrowUp: 'Up arrow', ArrowDown: 'Down arrow', ArrowLeft: 'Left arrow', ArrowRight: 'Right arrow',
+        PrintScreen: 'Print Screen', Pause: 'Pause',
+      },
       rightControlAsWin: 'Right Ctrl as remote Win',
       ctrlaltdel: 'Ctrl+Alt+Del',
       cadShort: 'CAD',

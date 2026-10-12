@@ -24,6 +24,7 @@ import {
 import { applyOpusStereoPreference, preferLowDelayOpus } from '@/lib/webrtc-opus-sdp'
 import { AdaptiveJitterBuffer, applyJitterBufferTargets, audioCatchUpRate } from '@/lib/adaptive-jitter-buffer'
 import { activateBrowserMicrophone } from '@/lib/microphone-access'
+import { KeyboardReportState } from '@/lib/keyboard-report-state'
 
 export type ConnectionState =
   | 'idle'
@@ -59,6 +60,7 @@ export interface GamepadReport {
 }
 type ActivityListener = (activity: InputActivity) => void
 export type HIDReportListener = (report: Uint8Array, timestamp: number) => void
+export type KeyboardTextListener = (text: string, timestamp: number) => void
 type BitrateListener = (kbps: number) => void
 type BrowserLatencyListener = (latency: BrowserVideoLatencyUs) => void
 type AudioStatsListener = (stats: BrowserAudioStats) => void
@@ -95,6 +97,7 @@ function readStoredBoolean(key: string, fallback: boolean) {
 }
 
 class OneKVMTransport {
+  readonly keyboardState = new KeyboardReportState((keys, modifiers) => this.sendKeyboard(keys, modifiers))
   private peer: RTCPeerConnection | null = null
   private control: RTCDataChannel | null = null
   private stream: MediaStream | null = null
@@ -121,6 +124,7 @@ class OneKVMTransport {
   private listeners = new Set<StateListener>()
   private activityListeners = new Set<ActivityListener>()
   private hidReportListeners = new Set<HIDReportListener>()
+  private keyboardTextListeners = new Set<KeyboardTextListener>()
   private bitrateListeners = new Set<BitrateListener>()
   private browserLatencyListeners = new Set<BrowserLatencyListener>()
   private audioStatsListeners = new Set<AudioStatsListener>()
@@ -156,6 +160,17 @@ class OneKVMTransport {
   subscribeHIDReports(listener: HIDReportListener) {
     this.hidReportListeners.add(listener)
     return () => this.hidReportListeners.delete(listener)
+  }
+
+  subscribeKeyboardText(listener: KeyboardTextListener) {
+    this.keyboardTextListeners.add(listener)
+    return () => this.keyboardTextListeners.delete(listener)
+  }
+
+  notifyKeyboardText(text: string) {
+    if (!text) return
+    const timestamp = performance.now()
+    this.keyboardTextListeners.forEach(listener => listener(text, timestamp))
   }
 
   subscribeVideoBitrate(listener: BitrateListener) {

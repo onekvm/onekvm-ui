@@ -13,6 +13,7 @@ import {
 import { t } from '@/i18n/runtime'
 import { defaultManagedTunnel, networkKindLabel } from '@/lib/network'
 
+import ExpandablePanel from './ExpandablePanel.vue'
 import NetworkSettingsForm from './NetworkSettingsForm.vue'
 import TunnelSettingsForm from './TunnelSettingsForm.vue'
 import VLANSettingsForm from './VLANSettingsForm.vue'
@@ -507,7 +508,7 @@ watch(() => props.disabled, (disabled, previous) => {
             </div>
           </div>
 
-          <n-collapse-transition :show="expanded === networkInterface.name">
+          <ExpandablePanel :show="expanded === networkInterface.name">
             <div class="settings-list-detail">
               <dl v-if="networkInterface.kind === 'physical'" class="interface-facts">
                 <div>
@@ -529,8 +530,8 @@ watch(() => props.disabled, (disabled, previous) => {
                 </div>
               </dl>
 
-              <WifiOnboarding v-if="networkInterface.kind === 'wifi_ap' && expanded === networkInterface.name" interface-name="ap0" @changed="load" />
-              <WifiOnboarding v-else-if="networkInterface.kind === 'wifi_station' && expanded === networkInterface.name" interface-name="wlan0" @changed="load" />
+              <WifiOnboarding v-if="networkInterface.kind === 'wifi_ap'" interface-name="ap0" :active="expanded === networkInterface.name" @changed="load" />
+              <WifiOnboarding v-else-if="networkInterface.kind === 'wifi_station'" interface-name="wlan0" :active="expanded === networkInterface.name" @changed="load" />
 
               <n-form v-else-if="networkInterface.kind === 'wireguard'" label-placement="top" :show-feedback="false">
                 <WireGuardSettingsForm
@@ -580,7 +581,7 @@ watch(() => props.disabled, (disabled, previous) => {
                 </n-button>
               </div>
             </div>
-          </n-collapse-transition>
+          </ExpandablePanel>
         </li>
       </ul>
     </n-spin>

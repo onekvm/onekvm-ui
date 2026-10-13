@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, shallowRef } from 'vue'
+import { computed, onUnmounted, shallowRef, watch } from 'vue'
 import { RefreshCw, Wifi } from '@lucide/vue'
 
 import { api, type WifiNetwork, type WifiStatus } from '@/api/client'
@@ -7,7 +7,7 @@ import { t } from '@/i18n/runtime'
 import WifiApSettings from './WifiApSettings.vue'
 
 const status = shallowRef<WifiStatus | null>(null)
-const props = defineProps<{ initialSetup?: boolean; interfaceName?: 'ap0' | 'wlan0' }>()
+const props = withDefaults(defineProps<{ initialSetup?: boolean; interfaceName?: 'ap0' | 'wlan0'; active?: boolean }>(), { active: true })
 const emit = defineEmits<{ changed: [] }>()
 const networks = shallowRef<WifiNetwork[]>([])
 const selected = shallowRef<WifiNetwork | null>(null)
@@ -204,12 +204,15 @@ async function selectMode(mode: WifiStatus['mode']) {
   }
 }
 
-onMounted(() => {
+watch(() => props.active, (active) => {
+  if (timer) clearInterval(timer)
+  timer = undefined
+  if (!active) { showConnectModal.value = false; return }
   void refresh().then(() => {
-    if (status.value?.available && showStation.value && stationEnabled.value) void scan()
+    if (props.active && !scanned.value && status.value?.available && showStation.value && stationEnabled.value) void scan()
   })
   timer = setInterval(() => { void refresh() }, 5000)
-})
+}, { immediate: true })
 onUnmounted(() => { if (timer) clearInterval(timer) })
 </script>
 

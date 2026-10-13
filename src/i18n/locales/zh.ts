@@ -457,7 +457,11 @@ const zh = {
       status: '电源状态',
       atxStatus: 'ATX 状态',
       pwrLed: '电源指示灯',
-      hddLed: '硬盘指示灯'
+      hddLed: '硬盘指示灯',
+      showHddIndicator: '独立显示硬盘指示灯',
+      hddActive: '活动',
+      hddIdle: '空闲',
+      hddUnavailable: '不可用'
     },
     settings: {
       title: '设置',

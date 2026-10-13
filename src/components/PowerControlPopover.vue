@@ -12,6 +12,7 @@ const props = defineProps<{
   canPower: boolean
   pwrLed?: boolean
   hddLed?: boolean
+  showHddIndicator: boolean
   loadingAction: PowerAction | null
   placement?: 'top-end' | 'bottom-end' | 'right-start' | 'left-start'
   sheet?: boolean
@@ -20,6 +21,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   action: [action: PowerAction]
   'update:show': [show: boolean]
+  'update:showHddIndicator': [show: boolean]
 }>()
 
 const popoverOpen = ref(false)
@@ -76,6 +78,18 @@ function ledLabel(value: boolean | undefined | null) {
         <div v-if="available && hasLed(hddLed)">
           <span><i class="power-status-led hdd" :data-on="hddLed === true" />{{ t('power.hddLed', 'HDD LED') }}</span>
           <strong>{{ ledLabel(hddLed) }}</strong>
+        </div>
+      </div>
+
+      <div class="power-status-values power-display-options">
+        <div>
+          <span>{{ t('power.showHddIndicator', 'Show HDD LED separately') }}</span>
+          <n-switch
+            size="small"
+            :value="showHddIndicator"
+            :aria-label="t('power.showHddIndicator', 'Show HDD LED separately')"
+            @update:value="emit('update:showHddIndicator', $event)"
+          />
         </div>
       </div>
 

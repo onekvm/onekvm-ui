@@ -458,7 +458,11 @@ const en = {
       status: 'Power Status',
       atxStatus: 'ATX status',
       pwrLed: 'PWR LED',
-      hddLed: 'HDD LED'
+      hddLed: 'HDD LED',
+      showHddIndicator: 'Show HDD LED separately',
+      hddActive: 'Active',
+      hddIdle: 'Idle',
+      hddUnavailable: 'Unavailable'
     },
     settings: {
       title: 'Settings',

@@ -94,6 +94,7 @@ import KeyboardControlPopover from './KeyboardControlPopover.vue'
 import GamepadPopover from './GamepadPopover.vue'
 import MouseSettingsPopover from './MouseSettingsPopover.vue'
 import PowerControlPopover from './PowerControlPopover.vue'
+import HddActivityIndicator from './HddActivityIndicator.vue'
 import USBAudioPopover from './USBAudioPopover.vue'
 import MediaTransferIndicator from './MediaTransferIndicator.vue'
 import type { MediaTransferState } from '@/lib/media-transfer'
@@ -165,6 +166,18 @@ const overlayTo = useOverlayMount()
 const message = useMessage()
 type PowerAction = 'on' | 'off' | 'reset'
 const powerAction = ref<PowerAction | null>(null)
+const HDD_INDICATOR_KEY = 'onekvm.hddIndicator'
+const showHddIndicator = shallowRef(readHddIndicatorPreference())
+
+function readHddIndicatorPreference() {
+  try { return localStorage.getItem(HDD_INDICATOR_KEY) === '1' } catch { return false }
+}
+
+function updateHddIndicatorPreference(show: boolean) {
+  showHddIndicator.value = show
+  try { localStorage.setItem(HDD_INDICATOR_KEY, show ? '1' : '0') } catch { /* Display remains usable without browser storage. */ }
+}
+
 const openMenu = ref<MenuName | null>(null)
 const toolbox = useToolboxContext()
 const pinnedOverflowOpen = ref(false)
@@ -1570,11 +1583,13 @@ onBeforeUnmount(() => {
         :can-power="canPower && Boolean(status?.atx?.available)"
         :pwr-led="status?.atx?.pwr_led"
         :hdd-led="status?.atx?.hdd_led"
+        :show-hdd-indicator="showHddIndicator"
         :loading-action="powerAction"
         :placement="menuPlacement"
         :sheet="toolbarLauncher"
         @action="selectPower"
         @update:show="updateMenu('power', $event)"
+        @update:show-hdd-indicator="updateHddIndicatorPreference"
       >
         <n-tooltip :disabled="toolbarLauncher || openMenu === 'power'">
           <template #trigger>
@@ -1594,6 +1609,13 @@ onBeforeUnmount(() => {
           {{ t('power.title', 'Power') }}: {{ powerStateLabel }}
         </n-tooltip>
       </PowerControlPopover>
+
+      <HddActivityIndicator
+        v-if="showHddIndicator"
+        :available="Boolean(status?.atx?.available)"
+        :led="status?.atx?.hdd_led"
+        :expanded="toolbarLauncher"
+      />
 
       <USBAudioPopover
         :status="status"

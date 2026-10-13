@@ -457,7 +457,11 @@ const zh_tw = {
       status: '電源狀態',
       atxStatus: 'ATX 狀態',
       pwrLed: '電源指示燈',
-      hddLed: '硬碟指示燈'
+      hddLed: '硬碟指示燈',
+      showHddIndicator: '獨立顯示硬碟指示燈',
+      hddActive: '活動',
+      hddIdle: '閒置',
+      hddUnavailable: '無法使用'
     },
     settings: {
       title: '設定',

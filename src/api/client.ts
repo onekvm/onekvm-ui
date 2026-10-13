@@ -1463,6 +1463,11 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(keyboard),
     }),
+  savePersonalizationConfig: (personalization: PersonalizationConfig) =>
+    request<PersonalizationConfig>('/api/config/personalization', {
+      method: 'PUT',
+      body: JSON.stringify(personalization),
+    }),
   getInputConfig: () => request<InputConfig>('/api/config/input', { cache: 'no-store' }),
   saveInputConfig: (input: InputConfig) =>
     request<InputConfig>('/api/config/input', {

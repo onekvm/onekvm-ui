@@ -1305,6 +1305,25 @@ async function save() {
   }
 }
 
+async function savePersonalization() {
+  if (!config.value || !personalizationValid.value) return
+  const personalization = config.value.personalization
+  personalization.device_name = personalization.device_name.trim()
+  personalization.custom_console_title = personalization.custom_console_title.trim()
+  personalization.console_subtitle_parts = normalizeConsoleSubtitleParts(personalization)
+  personalization.custom_console_subtitle = personalization.custom_console_subtitle.trim()
+  delete (personalization as typeof personalization & { show_device_model?: boolean }).show_device_model
+  saving.value = true
+  try {
+    config.value.personalization = await api.savePersonalizationConfig(personalization)
+    message.success(t('settings.success', 'Settings saved'))
+  } catch (reason) {
+    message.error(reason instanceof Error ? reason.message : String(reason))
+  } finally {
+    saving.value = false
+  }
+}
+
 async function saveKeyboardShortcuts() {
   if (!config.value || !keyboardShortcutsValid.value) return
   saving.value = true
@@ -1766,7 +1785,7 @@ watch(paneSection, (value) => {
                 />
                 <footer class="advanced-settings-actions">
                   <n-button :disabled="saving" @click="load">{{ t('common.refresh', 'Reload') }}</n-button>
-                  <n-button type="primary" :loading="saving" :disabled="!personalizationValid" @click="save">
+                  <n-button type="primary" :loading="saving" :disabled="!personalizationValid" @click="savePersonalization">
                     <template #icon><Save /></template>
                     {{ t('common.save', 'Save') }}
                   </n-button>

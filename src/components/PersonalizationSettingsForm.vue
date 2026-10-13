@@ -189,13 +189,17 @@ function updateSubtitleParts(values: Array<string | number>) {
         :aria-label="t('settings.advancedSettings.personalizationPage.consoleSubtitle', 'Second line')"
         @update:value="updateSubtitleParts"
       >
-        <label v-for="option in subtitleOptions" :key="option.value" class="personalization-source" :class="{ active: subtitleParts.includes(option.value) }">
-          <n-checkbox :value="option.value" :disabled="disabled" />
-          <span>
-            <strong>{{ option.label }}</strong>
-            <small>{{ option.description }}</small>
-          </span>
-        </label>
+        <n-checkbox
+          v-for="option in subtitleOptions"
+          :key="option.value"
+          :value="option.value"
+          :disabled="disabled"
+          class="personalization-source"
+          :class="{ active: subtitleParts.includes(option.value) }"
+        >
+          <strong>{{ option.label }}</strong>
+          <small>{{ option.description }}</small>
+        </n-checkbox>
       </n-checkbox-group>
 
       <p v-if="!subtitleParts.length" class="personalization-subtitle-hidden" role="status">
@@ -278,6 +282,9 @@ function updateSubtitleParts(values: Array<string | number>) {
 .personalization-source { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 10px; min-height: 76px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); cursor: pointer; transition: border-color var(--win11-fast), background-color var(--win11-fast); }
 .personalization-source:hover { border-color: var(--border-strong); background: var(--secondary); }
 .personalization-source.active { border-color: color-mix(in srgb, var(--primary) 60%, var(--border)); background: color-mix(in srgb, var(--primary) 8%, var(--card)); }
+.personalization-source:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.personalization-source.n-checkbox--disabled { cursor: not-allowed; }
+.personalization-source :deep(.n-checkbox__label) { min-width: 0; padding: 0; }
 .personalization-source strong, .personalization-source small { display: block; }
 .personalization-source strong { color: var(--foreground); font-size: 13px; line-height: 1.35; }
 .personalization-source small { margin-top: 4px; color: var(--muted-foreground); font-size: 11px; line-height: 1.45; }

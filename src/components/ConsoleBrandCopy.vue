@@ -1,12 +1,10 @@
 <script setup lang="ts">
 withDefaults(defineProps<{
   title: string
-  deviceModel?: string
-  showDeviceModel?: boolean
+  subtitle?: string
   badge?: string
 }>(), {
-  deviceModel: '',
-  showDeviceModel: true,
+  subtitle: '',
   badge: '',
 })
 </script>
@@ -17,8 +15,8 @@ withDefaults(defineProps<{
       <span class="brand-name" :title="title">{{ title }}</span>
       <span v-if="badge" class="brand-badge">{{ badge }}</span>
     </span>
-    <span v-if="showDeviceModel && deviceModel" class="brand-device" :title="deviceModel">
-      {{ deviceModel }}
+    <span v-if="subtitle" class="brand-device" :title="subtitle">
+      {{ subtitle }}
     </span>
   </div>
 </template>

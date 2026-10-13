@@ -2,13 +2,14 @@
 import { computed, watch } from 'vue'
 import { Activity, GripHorizontal, Keyboard, Monitor, MousePointer2, Settings } from '@lucide/vue'
 
-import type { ConsoleTitleSource, PersonalizationConfig } from '@/api/client'
+import type { ConsoleSubtitlePart, ConsoleTitleSource, PersonalizationConfig } from '@/api/client'
 import { serviceURL } from '@/api/service-url'
 import { t } from '@/i18n/runtime'
 import {
   MAX_PERSONALIZATION_TEXT_LENGTH,
+  normalizeConsoleSubtitleParts,
+  resolveConsoleSubtitle,
   resolveConsoleTitle,
-  shouldShowDeviceModel,
   validPersonalizationText,
 } from '@/lib/console-title'
 import ConsoleBrandCopy from './ConsoleBrandCopy.vue'
@@ -43,14 +44,42 @@ const sources = computed(() => [
   },
 ])
 
+const subtitleOptions = computed(() => [
+  {
+    value: 'hostname' as const,
+    label: t('settings.advancedSettings.personalizationPage.subtitleHostname', 'Hostname'),
+    description: t('settings.advancedSettings.personalizationPage.subtitleHostnameHint', 'Show the current network hostname.'),
+  },
+  {
+    value: 'device_model' as const,
+    label: t('settings.advancedSettings.personalizationPage.subtitleDeviceModel', 'Device model'),
+    description: t('settings.advancedSettings.personalizationPage.subtitleDeviceModelHint', 'Show the detected device model.'),
+  },
+  {
+    value: 'custom' as const,
+    label: t('settings.advancedSettings.personalizationPage.subtitleCustom', 'Custom'),
+    description: t('settings.advancedSettings.personalizationPage.subtitleCustomHint', 'Append your own short description.'),
+  },
+])
+
 const deviceNameValid = computed(() => validPersonalizationText(props.modelValue.device_name))
 const customTitleValid = computed(() => validPersonalizationText(
   props.modelValue.custom_console_title,
   props.modelValue.console_title_source === 'custom',
 ))
-const valid = computed(() => deviceNameValid.value && customTitleValid.value)
+const subtitleParts = computed(() => normalizeConsoleSubtitleParts(props.modelValue))
+const customSubtitleSelected = computed(() => subtitleParts.value.includes('custom'))
+const customSubtitleValid = computed(() => validPersonalizationText(
+  props.modelValue.custom_console_subtitle || '',
+  customSubtitleSelected.value,
+))
+const valid = computed(() => deviceNameValid.value && customTitleValid.value && customSubtitleValid.value)
 const previewTitle = computed(() => resolveConsoleTitle(props.modelValue, props.hostname))
-const previewShowsDeviceModel = computed(() => shouldShowDeviceModel(props.modelValue))
+const previewSubtitle = computed(() => resolveConsoleSubtitle(
+  props.modelValue,
+  props.hostname,
+  props.deviceModel,
+))
 
 watch(valid, value => emit('validity', value), { immediate: true })
 
@@ -60,6 +89,15 @@ function update(patch: Partial<PersonalizationConfig>) {
 
 function updateSource(value: string | number | boolean) {
   update({ console_title_source: value as ConsoleTitleSource })
+}
+
+function updateSubtitleParts(values: Array<string | number>) {
+  const selected = new Set(values.map(String))
+  update({
+    console_subtitle_parts: subtitleOptions.value
+      .map(option => option.value)
+      .filter(value => selected.has(value)) as ConsoleSubtitlePart[],
+  })
 }
 </script>
 
@@ -138,18 +176,52 @@ function updateSource(value: string | number | boolean) {
         </n-form>
       </n-collapse-transition>
 
-      <div class="personalization-model-setting">
-        <span>
-          <strong>{{ t('settings.advancedSettings.personalizationPage.showDeviceModel', 'Show device model') }}</strong>
-          <small>{{ t('settings.advancedSettings.personalizationPage.showDeviceModelHint', 'Show the detected device model below the main title.') }}</small>
-        </span>
-        <n-switch
-          :value="previewShowsDeviceModel"
-          :disabled="disabled"
-          :aria-label="t('settings.advancedSettings.personalizationPage.showDeviceModel', 'Show device model')"
-          @update:value="update({ show_device_model: $event })"
-        />
-      </div>
+    </section>
+
+    <section class="personalization-section">
+      <header>
+        <h2>{{ t('settings.advancedSettings.personalizationPage.consoleSubtitle', 'Second line') }}</h2>
+        <p>{{ t('settings.advancedSettings.personalizationPage.consoleSubtitleHint', 'Choose the details shown below the main title. Leave all options unselected to hide the second line.') }}</p>
+      </header>
+      <n-checkbox-group
+        :value="subtitleParts"
+        class="personalization-source-list"
+        :aria-label="t('settings.advancedSettings.personalizationPage.consoleSubtitle', 'Second line')"
+        @update:value="updateSubtitleParts"
+      >
+        <label v-for="option in subtitleOptions" :key="option.value" class="personalization-source" :class="{ active: subtitleParts.includes(option.value) }">
+          <n-checkbox :value="option.value" :disabled="disabled" />
+          <span>
+            <strong>{{ option.label }}</strong>
+            <small>{{ option.description }}</small>
+          </span>
+        </label>
+      </n-checkbox-group>
+
+      <p v-if="!subtitleParts.length" class="personalization-subtitle-hidden" role="status">
+        {{ t('settings.advancedSettings.personalizationPage.subtitleHidden', 'The second line is hidden.') }}
+      </p>
+
+      <n-collapse-transition :show="customSubtitleSelected">
+        <n-form label-placement="top" class="personalization-custom-form">
+          <n-form-item
+            :label="t('settings.advancedSettings.personalizationPage.customSubtitle', 'Custom second-line text')"
+            :validation-status="customSubtitleValid ? undefined : 'error'"
+            :feedback="customSubtitleValid ? undefined : t('settings.advancedSettings.personalizationPage.nameInvalid', 'Enter 1–64 visible characters.')"
+            :show-feedback="!customSubtitleValid"
+          >
+            <n-input
+              :value="modelValue.custom_console_subtitle"
+              :disabled="disabled"
+              :maxlength="MAX_PERSONALIZATION_TEXT_LENGTH"
+              show-count
+              :placeholder="t('settings.advancedSettings.personalizationPage.customSubtitlePlaceholder', 'Primary rack')"
+              :input-props="{ 'aria-label': t('settings.advancedSettings.personalizationPage.customSubtitle', 'Custom second-line text') }"
+              @update:value="update({ custom_console_subtitle: $event })"
+            />
+          </n-form-item>
+        </n-form>
+      </n-collapse-transition>
     </section>
 
     <section class="personalization-preview" aria-live="polite">
@@ -161,8 +233,7 @@ function updateSource(value: string | number | boolean) {
           </span>
           <ConsoleBrandCopy
             :title="previewTitle"
-            :device-model="deviceModel"
-            :show-device-model="previewShowsDeviceModel"
+            :subtitle="previewSubtitle"
           />
         </div>
         <span class="toolbar-spacer personalization-preview-spacer" aria-hidden="true">
@@ -211,10 +282,7 @@ function updateSource(value: string | number | boolean) {
 .personalization-source strong { color: var(--foreground); font-size: 13px; line-height: 1.35; }
 .personalization-source small { margin-top: 4px; color: var(--muted-foreground); font-size: 11px; line-height: 1.45; }
 .personalization-custom-form { padding-top: 14px; }
-.personalization-model-setting { display: flex; min-height: 54px; align-items: center; justify-content: space-between; gap: 20px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
-.personalization-model-setting > span { display: grid; gap: 3px; }
-.personalization-model-setting strong { color: var(--foreground); font-size: 13px; }
-.personalization-model-setting small { color: var(--muted-foreground); font-size: 11px; line-height: 1.45; }
+.personalization-subtitle-hidden { margin: -2px 0 0; color: var(--muted-foreground); font-size: 11px; line-height: 1.45; }
 .personalization-preview { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--onekvm-surface-inset); }
 .personalization-preview-label { color: var(--muted-foreground); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
 .personalization-preview-toolbar { z-index: auto; width: 100%; height: var(--onekvm-toolbar-bar); overflow: hidden; border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px); pointer-events: none; }

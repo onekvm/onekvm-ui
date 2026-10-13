@@ -69,6 +69,7 @@ import {
 import { hasPermission } from '@/build'
 import { useAuth } from '@/composables/useAuth'
 import { currentLanguage, languageOptions, setLanguage, t } from '@/i18n/runtime'
+import { normalizeConsoleSubtitleParts } from '@/lib/console-title'
 import { machineDisplayName } from '@/lib/machine'
 import { brandPluginIconUrl } from '@/lib/plugin-icons'
 import { DEFAULT_DISCOVERY_URL, configuredStaticAddresses, isNetworkConfigDirty, isNetworkConfigValid, networkConfigSnapshot, usesCustomDNS, usesCustomDiscoveryURL, validHostname } from '@/lib/network'
@@ -1034,9 +1035,15 @@ async function load() {
       device_name: 'OneKVM',
       console_title_source: 'hostname',
       custom_console_title: '',
-      show_device_model: true,
+      console_subtitle_parts: ['device_model'],
+      custom_console_subtitle: '',
     }
-    loadedConfig.personalization.show_device_model ??= true
+    const legacyPersonalization = loadedConfig.personalization as typeof loadedConfig.personalization & {
+      show_device_model?: boolean
+    }
+    loadedConfig.personalization.console_subtitle_parts = normalizeConsoleSubtitleParts(legacyPersonalization)
+    loadedConfig.personalization.custom_console_subtitle ??= ''
+    delete legacyPersonalization.show_device_model
     loadedConfig.video.frame_detect ??= false
     loadedConfig.video.bitrate_kbps ??= 0
     loadedConfig.video.initial_qp ??= 0
@@ -1269,6 +1276,11 @@ async function save() {
   if (!config.value) return
   config.value.personalization.device_name = config.value.personalization.device_name.trim()
   config.value.personalization.custom_console_title = config.value.personalization.custom_console_title.trim()
+  config.value.personalization.console_subtitle_parts = normalizeConsoleSubtitleParts(config.value.personalization)
+  config.value.personalization.custom_console_subtitle = config.value.personalization.custom_console_subtitle.trim()
+  delete (config.value.personalization as typeof config.value.personalization & {
+    show_device_model?: boolean
+  }).show_device_model
   saving.value = true
   try {
 		const response = await api.saveConfig(config.value, props.videoSessionId)

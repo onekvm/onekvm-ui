@@ -43,7 +43,7 @@ import { toolbarItemsFor } from '@/extensions/pluginUi'
 import { hidIndicatorState } from '@/lib/hid-status'
 import { USB_GAMEPAD_UI_ENABLED } from '@/lib/ui-features'
 import { dismissControlOverlays } from '@/lib/overlay-target'
-import { shouldShowDeviceModel } from '@/lib/console-title'
+import { resolveConsoleSubtitle } from '@/lib/console-title'
 import { machineDisplayName } from '@/lib/machine'
 import { onekvm, type InputActivity, type TransportState } from '@/lib/onekvm'
 import { sendShortcut, shortcutChordLabel } from '@/lib/keyboard-shortcuts'
@@ -1079,12 +1079,16 @@ const mediaStateLabel = computed(() => {
 })
 
 const deviceModel = computed(() => machineDisplayName(props.status))
-const showDeviceModel = computed(() => shouldShowDeviceModel(props.status?.identity))
+const consoleSubtitle = computed(() => resolveConsoleSubtitle(
+  props.status?.identity,
+  props.status?.network.hostname,
+  deviceModel.value,
+))
 const brandedConsoleTitle = computed(() => (
   props.brandBadge ? `${props.consoleTitle} ${props.brandBadge}` : props.consoleTitle
 ))
-const brandLabel = computed(() => showDeviceModel.value
-  ? `${brandedConsoleTitle.value} · ${deviceModel.value}`
+const brandLabel = computed(() => consoleSubtitle.value
+  ? `${brandedConsoleTitle.value} · ${consoleSubtitle.value}`
   : brandedConsoleTitle.value)
 
 const icon = (component: typeof Power) => () => h(NIcon, null, { default: () => h(component) })
@@ -1387,14 +1391,13 @@ onBeforeUnmount(() => {
         </template>
         <div class="toolbar-brand-tooltip">
           <strong>{{ brandedConsoleTitle }}</strong>
-          <span v-if="showDeviceModel">{{ deviceModel }}</span>
+          <span v-if="consoleSubtitle">{{ consoleSubtitle }}</span>
         </div>
       </n-tooltip>
       <ConsoleBrandCopy
         v-if="!toolbarCompact"
         :title="consoleTitle"
-        :device-model="deviceModel"
-        :show-device-model="showDeviceModel"
+        :subtitle="consoleSubtitle"
         :badge="brandBadge"
       />
     </div>
@@ -1427,7 +1430,7 @@ onBeforeUnmount(() => {
     >
       <div v-if="toolbarLauncher" class="toolbar-tray-header">
         <strong>{{ brandedConsoleTitle }}</strong>
-        <span v-if="showDeviceModel">{{ deviceModel }}</span>
+        <span v-if="consoleSubtitle">{{ consoleSubtitle }}</span>
       </div>
       <div v-if="toolbarLauncher" class="toolbar-list-title">
         {{ t('deviceStatus.title', 'Device status') }}

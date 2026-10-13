@@ -230,12 +230,14 @@ export interface OneKVMConfig {
 }
 
 export type ConsoleTitleSource = 'device_name' | 'hostname' | 'custom'
+export type ConsoleSubtitlePart = 'hostname' | 'device_model' | 'custom'
 
 export interface PersonalizationConfig {
   device_name: string
   console_title_source: ConsoleTitleSource
   custom_console_title: string
-  show_device_model: boolean
+  console_subtitle_parts: ConsoleSubtitlePart[]
+  custom_console_subtitle: string
 }
 
 export interface InputConfig {

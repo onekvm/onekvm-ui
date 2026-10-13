@@ -194,7 +194,7 @@ const toolbarDock = ref<ToolbarDockState>(parseToolbarDock(localStorage.getItem(
 const toolbarDragging = ref(false)
 const toolbarMorphing = ref(false)
 const toolbarLiftPending = ref(false)
-useToolbarPinMotion(toolbarEl, trayEl, () => toolbox.pinned.map(({ tool }) => tool.id).join(','), () => !toolbarDragging.value && !toolbarMorphing.value)
+useToolbarPinMotion(toolbarEl, trayEl, () => `${showHddIndicator.value}:${toolbox.pinned.map(({ tool }) => tool.id).join(',')}`, () => !toolbarDragging.value && !toolbarMorphing.value)
 const toolbarSnapHint = ref<ToolbarSnapPreview>(null)
 const toolbarSnapHintText = computed(() => {
   if (!toolbarSnapHint.value) return ''

@@ -2,6 +2,7 @@ import { nextTick, onBeforeUnmount, watch, type Ref } from 'vue'
 
 type Bounds = Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>
 type Snapshot = { rect: Bounds; ghost: HTMLElement }
+const motionItems = 'button, .hdd-activity-indicator'
 const easing = 'cubic-bezier(0.23, 1, 0.32, 1)'
 
 // Measure before Vue updates, then animate from the displayed layout to the new
@@ -33,7 +34,7 @@ export function useToolbarPinMotion(
     if (!root || !enabled() || window.matchMedia('(prefers-reduced-motion: reduce)').matches || !root.getClientRects().length) { cancel(); return }
     const first = root.getBoundingClientRect()
     const before = new Map<HTMLElement, Snapshot>()
-    for (const button of root.querySelectorAll<HTMLElement>('button')) {
+    for (const button of root.querySelectorAll<HTMLElement>(motionItems)) {
       if (!button.getClientRects().length) continue
       const ghost = button.cloneNode(true) as HTMLElement
       const css = getComputedStyle(button)
@@ -52,7 +53,7 @@ export function useToolbarPinMotion(
     const base = baseTransform === 'none' ? '' : baseTransform
     // Measure the final layout before any animation affects its rectangles.
     const after = new Map<HTMLElement, Bounds>()
-    for (const button of root.querySelectorAll<HTMLElement>('button')) {
+    for (const button of root.querySelectorAll<HTMLElement>(motionItems)) {
       if (button.getClientRects().length) after.set(button, button.getBoundingClientRect())
     }
     if (Math.abs(first.width - last.width) > 0.5 || Math.abs(first.height - last.height) > 0.5) {
@@ -72,12 +73,12 @@ export function useToolbarPinMotion(
           animate(button, [{ transform: `translate(${dx}px, ${dy}px) scale(${1 / sx}, ${1 / sy})`, transformOrigin: '0 0' }, { transform: 'none', transformOrigin: '0 0' }])
         }
         before.delete(button)
-      } else if (button.closest('.toolbar-pinned-tools')) {
+      } else if (button.closest('.toolbar-pinned-tools') || button.matches('.hdd-activity-indicator')) {
         animate(button, [{ opacity: 0, transform: `translateY(4px) scale(${0.85 / sx}, ${0.85 / sy})` }, { opacity: 1, transform: 'none' }])
       }
     }
     for (const [button, { rect, ghost }] of before) {
-      if (!button.classList.contains('toolbar-pin-button')) continue
+      if (!button.matches('.toolbar-pin-button, .hdd-activity-indicator')) continue
       ghost.setAttribute('aria-hidden', 'true')
       ghost.inert = true
       Object.assign(ghost.style, { position: 'fixed', left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`, pointerEvents: 'none', zIndex: '2000' })

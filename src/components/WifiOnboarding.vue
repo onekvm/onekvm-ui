@@ -19,9 +19,10 @@ const apPassword = shallowRef('')
 const apChannel = shallowRef(6)
 const apBand = shallowRef<'2.4' | '5'>('2.4')
 const apAddress = shallowRef(defaultWifiApNetwork.address)
+const apDhcpEnabled = shallowRef(true)
 const apDhcpStart = shallowRef(defaultWifiApNetwork.dhcp_start)
 const apDhcpEnd = shallowRef(defaultWifiApNetwork.dhcp_end)
-const apNetwork = computed(() => ({ address: apAddress.value, dhcp_start: apDhcpStart.value, dhcp_end: apDhcpEnd.value }))
+const apNetwork = computed(() => ({ address: apAddress.value, dhcp_enabled: apDhcpEnabled.value, dhcp_start: apDhcpStart.value, dhcp_end: apDhcpEnd.value }))
 const apDirty = shallowRef(false)
 const loading = shallowRef(false)
 const initialLoading = shallowRef(true)
@@ -102,6 +103,7 @@ async function refresh() {
       apBand.value = status.value.ap_band || (apChannel.value > 14 ? '5' : '2.4')
       const network = status.value.ap_network || defaultWifiApNetwork
       apAddress.value = network.address
+      apDhcpEnabled.value = network.dhcp_enabled !== false
       apDhcpStart.value = network.dhcp_start
       apDhcpEnd.value = network.dhcp_end
     }
@@ -251,13 +253,14 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
     <WifiApSettings
       v-if="showAp && !props.initialSetup"
       :status="status" :ssid="apSsid" :password="apPassword" :channel="apChannel" :band="apBand"
-      :address="apAddress" :dhcp-start="apDhcpStart" :dhcp-end="apDhcpEnd"
+      :address="apAddress" :dhcp-enabled="apDhcpEnabled" :dhcp-start="apDhcpStart" :dhcp-end="apDhcpEnd"
       :busy="loading" :can-save="canSaveAp"
       @update:ssid="apSsid = $event; apDirty = true"
       @update:password="apPassword = $event; apDirty = true"
       @update:channel="apChannel = $event; apDirty = true"
       @update:band="apBand = $event; apDirty = true"
       @update:address="apAddress = $event; apDirty = true"
+      @update:dhcp-enabled="apDhcpEnabled = $event; apDirty = true"
       @update:dhcp-start="apDhcpStart = $event; apDirty = true"
       @update:dhcp-end="apDhcpEnd = $event; apDirty = true"
       @toggle="toggleAp" @save="saveApConfig"

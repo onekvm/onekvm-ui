@@ -1,11 +1,13 @@
 export interface WifiApNetwork {
   address: string
+  dhcp_enabled?: boolean
   dhcp_start: string
   dhcp_end: string
 }
 
 export const defaultWifiApNetwork: WifiApNetwork = {
   address: '192.168.77.1/24',
+  dhcp_enabled: true,
   dhcp_start: '192.168.77.100',
   dhcp_end: '192.168.77.199',
 }
@@ -34,6 +36,7 @@ export function wifiApNetworkError(network: WifiApNetwork): 'apAddressInvalid' |
   const broadcast = subnet + size - 1
   if (!privateAddress(subnet) || !privateAddress(broadcast)
     || address <= subnet || address >= broadcast) return 'apAddressInvalid'
+  if (network.dhcp_enabled === false) return null
   const start = ipv4(network.dhcp_start)
   const end = ipv4(network.dhcp_end)
   if (start === null || end === null || start <= subnet || end >= broadcast || start > end) return 'apRangeInvalid'

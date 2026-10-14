@@ -498,7 +498,9 @@ watch(() => props.disabled, (disabled, previous) => {
                 {{ t('network.interfaces.configured', 'Configured') }}
               </n-tag>
               <n-tag class="port-type-tag" size="small" :bordered="false">
-                {{ networkInterface.port_type === 'physical'
+                {{ networkInterface.kind === 'wifi_ap'
+                  ? t('network.wifi.apInterface', 'Wireless access point')
+                  : networkInterface.port_type === 'physical'
                   ? t('network.interfaces.physicalPort', 'Physical')
                   : t('network.interfaces.virtualPort', 'Virtual') }}
               </n-tag>

@@ -11,4 +11,9 @@ for (const [dhcp_start, dhcp_end] of [['192.168.76.200', '192.168.77.199'], ['19
   assert.equal(wifiApNetworkError({ ...defaultWifiApNetwork, dhcp_start, dhcp_end }), 'apRangeInvalid')
 }
 assert.equal(wifiApNetworkError({ ...defaultWifiApNetwork, dhcp_start: '192.168.77.1' }), 'apRangeIncludesAddress')
-console.log('AP address and DHCP range validation passed')
+
+assert.equal(wifiApNetworkError({ ...defaultWifiApNetwork, dhcp_enabled: false, address: '10.42.3.129/25' }), null)
+assert.equal(wifiApNetworkError({ ...defaultWifiApNetwork, dhcp_enabled: false, dhcp_start: 'invalid', dhcp_end: '' }), null)
+assert.equal(wifiApNetworkError({ ...defaultWifiApNetwork, dhcp_enabled: true, address: '10.42.3.129/25' }), 'apRangeInvalid')
+assert.equal(wifiApNetworkError({ ...defaultWifiApNetwork, dhcp_enabled: false, address: '8.8.8.1/24' }), 'apAddressInvalid')
+console.log('AP address, DHCP range and DHCP toggle validation passed')

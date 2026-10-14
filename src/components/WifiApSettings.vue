@@ -12,6 +12,7 @@ const props = defineProps<{
   channel: number
   band: '2.4' | '5'
   address: string
+  dhcpEnabled: boolean
   dhcpStart: string
   dhcpEnd: string
   busy: boolean
@@ -23,6 +24,7 @@ const emit = defineEmits<{
   'update:channel': [value: number]
   'update:band': [value: '2.4' | '5']
   'update:address': [value: string]
+  'update:dhcpEnabled': [value: boolean]
   'update:dhcpStart': [value: string]
   'update:dhcpEnd': [value: string]
   toggle: [enabled: boolean]
@@ -30,7 +32,7 @@ const emit = defineEmits<{
 }>()
 
 const networkError = computed(() => wifiApNetworkError({
-  address: props.address, dhcp_start: props.dhcpStart, dhcp_end: props.dhcpEnd,
+  address: props.address, dhcp_enabled: props.dhcpEnabled, dhcp_start: props.dhcpStart, dhcp_end: props.dhcpEnd,
 }))
 const addressChanged = computed(() => props.address !== (props.status.ap_network?.address || defaultWifiApNetwork.address))
 
@@ -66,10 +68,10 @@ function changeBand(value: '2.4' | '5') {
     </div>
 
     <n-form label-placement="top" :show-feedback="false" class="wifi-ap-form">
-      <n-form-item label="SSID">
+      <n-form-item label="SSID" class="wifi-ap-full-row">
         <n-input :value="ssid" :disabled="busy" @update:value="emit('update:ssid', $event)" />
       </n-form-item>
-      <n-form-item :label="t('network.wifi.apPassword', 'Access point password')">
+      <n-form-item :label="t('network.wifi.apPassword', 'Access point password')" class="wifi-ap-full-row">
         <n-input :value="password" type="password" show-password-on="click" :disabled="busy" @update:value="emit('update:password', $event)" />
       </n-form-item>
       <n-form-item :label="t('network.wifi.band', 'Band')">
@@ -83,18 +85,25 @@ function changeBand(value: '2.4' | '5') {
           </span>
         </div>
       </n-form-item>
-      <n-form-item :label="t('network.wifi.apAddress', 'AP IPv4 address / prefix')" class="wifi-ap-address">
+      <n-form-item :label="t('network.wifi.apAddress', 'AP IPv4 address / prefix')" class="wifi-ap-full-row">
         <n-input :value="address" placeholder="192.168.77.1/24" :disabled="busy" :status="networkError === 'apAddressInvalid' ? 'error' : undefined" @update:value="emit('update:address', $event)" />
       </n-form-item>
-      <n-form-item :label="t('network.wifi.apDhcpStart', 'DHCP start address')">
+      <div class="wifi-setting-row wifi-ap-full-row">
+        <div class="wifi-setting-copy">
+          <strong>{{ t('network.wifi.apDhcpEnabled', 'DHCP server') }}</strong>
+          <span>{{ t('network.wifi.apDhcpEnabledHint', 'Assign IP addresses to connected devices automatically. When disabled, configure a static address in the AP subnet on each device.') }}</span>
+        </div>
+        <n-switch :value="dhcpEnabled" :disabled="busy" :aria-label="t('network.wifi.apDhcpEnabled', 'DHCP server')" @update:value="emit('update:dhcpEnabled', $event)" />
+      </div>
+      <n-form-item v-if="dhcpEnabled" :label="t('network.wifi.apDhcpStart', 'DHCP start address')">
         <n-input :value="dhcpStart" placeholder="192.168.77.100" :disabled="busy" :status="networkError && networkError !== 'apAddressInvalid' ? 'error' : undefined" @update:value="emit('update:dhcpStart', $event)" />
       </n-form-item>
-      <n-form-item :label="t('network.wifi.apDhcpEnd', 'DHCP end address')">
+      <n-form-item v-if="dhcpEnabled" :label="t('network.wifi.apDhcpEnd', 'DHCP end address')">
         <n-input :value="dhcpEnd" placeholder="192.168.77.199" :disabled="busy" :status="networkError && networkError !== 'apAddressInvalid' ? 'error' : undefined" @update:value="emit('update:dhcpEnd', $event)" />
       </n-form-item>
     </n-form>
     <p v-if="networkError" class="wifi-ap-error" role="alert">{{ t(`network.wifi.${networkError}`) }}</p>
-    <p v-else class="wifi-muted wifi-ap-network-hint">{{ t('network.wifi.apNetworkHint', 'Use a private subnet that differs from your wired and Wi-Fi networks. The DHCP range must exclude the AP address.') }}</p>
+    <p v-else class="wifi-muted wifi-ap-network-hint">{{ dhcpEnabled ? t('network.wifi.apNetworkHint', 'Use a private subnet that differs from your wired and Wi-Fi networks. The DHCP range must exclude the AP address.') : t('network.wifi.apStaticHint', 'DHCP is off. Configure a static address in this subnet on connected devices, then open the AP address.') }}</p>
     <p v-if="status.ap_enabled" class="wifi-muted wifi-ap-network-hint">{{ t('network.wifi.apReconnectHint', 'Saving restarts the access point and disconnects its clients.') }}<template v-if="addressChanged"> {{ t('network.wifi.apNewAddressHint', 'Reconnect and open the new AP address: {address}').replace('{address}', address.split('/')[0] || '') }}</template></p>
 
     <div class="wifi-ap-footer">
@@ -112,7 +121,7 @@ function changeBand(value: '2.4' | '5') {
 .wifi-setting-copy span, .wifi-muted { color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
 .wifi-ap-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
 .wifi-ap-form :deep(.n-form-item) { min-width: 0; }
-.wifi-ap-address { grid-column: 1 / -1; }
+.wifi-ap-full-row { grid-column: 1 / -1; }
 .wifi-ap-error, .wifi-ap-network-hint { margin: 0; }
 .wifi-ap-error { color: var(--destructive, #d95757); font-size: 12px; line-height: 1.5; }
 .wifi-channel-field { width: 100%; min-width: 0; }

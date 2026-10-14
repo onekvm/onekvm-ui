@@ -328,6 +328,7 @@ function updateShow(show: boolean) {
   emit('update:show', show)
   featureNavAnimated.value = false
   if (!show) return
+  deviceDownload.discover()
   browserISO.value?.requestStatus()
   void refresh().then(() => {
     if (!feature.value) feature.value = featureFromStatus()

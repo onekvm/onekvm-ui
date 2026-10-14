@@ -1,6 +1,6 @@
 import type { IPv4Mode, ManagedNetworkInterface, NetworkConfig } from '@/api/client'
 
-export type ManagedTunnelKind = Exclude<ManagedNetworkInterface['kind'], 'vlan'>
+export type ManagedTunnelKind = Exclude<ManagedNetworkInterface['kind'], 'vlan' | 'physical'>
 
 export const DEFAULT_FALLBACK_IPV4 = '192.168.233.1/24'
 export const DEFAULT_DISCOVERY_URL = 'https://find.onekvm.org'
@@ -89,6 +89,43 @@ export function defaultNetworkConfig(): NetworkConfig {
     proxy: { http: '', https: '', no_proxy: '' },
     webrtc: {},
   }
+}
+
+/** Project one physical link into the existing address/MAC form. */
+export function physicalInterfaceConfig(config: NetworkConfig, name: string): NetworkConfig {
+  if (name === config.device) return config
+  const link = config.interfaces.find((item) => item.kind === 'physical' && item.name === name)
+  return {
+    ...config,
+    device: name,
+    mac_address: link?.mac_address || '',
+    ipv4_mode: link?.ipv4_mode || 'dhcp',
+    ipv4_address: link?.ipv4_address || '',
+    ipv4_gateway: link?.ipv4_gateway || '',
+    ipv6_mode: link?.ipv6_mode || 'slaac',
+    ipv6_enabled: link?.ipv6_mode !== 'disabled',
+    ipv6_address: link?.ipv6_address || '',
+    ipv6_gateway: link?.ipv6_gateway || '',
+    route_metric: link?.route_metric ?? 100,
+  }
+}
+
+/** Editing another port must not replace the primary link or move its VLANs. */
+export function updatePhysicalInterface(config: NetworkConfig, name: string, value: NetworkConfig): NetworkConfig {
+  if (name === config.device) return { ...value, device: config.device }
+  const existing = config.interfaces.find((item) => item.name === name)
+  const link: ManagedNetworkInterface = {
+    ...existing,
+    kind: 'physical', name, parent: '', vlan_id: 0,
+    mac_address: value.mac_address,
+    ipv4_mode: value.ipv4_mode, ipv4_address: value.ipv4_address, ipv4_gateway: value.ipv4_gateway,
+    ipv6_mode: value.ipv6_mode, ipv6_address: value.ipv6_address, ipv6_gateway: value.ipv6_gateway,
+    route_metric: value.route_metric,
+  }
+  const interfaces = config.interfaces.some((item) => item.name === name)
+    ? config.interfaces.map((item) => item.name === name ? link : item)
+    : [...config.interfaces, link]
+  return { ...config, interfaces }
 }
 
 export function cloneNetworkConfig(config: NetworkConfig): NetworkConfig {
@@ -283,8 +320,11 @@ export function isNetworkConfigValid(config: NetworkConfig) {
     if (!/^[A-Za-z0-9_.:@-]+$/.test(networkInterface.name) ||
         names.has(networkInterface.name) || networkInterface.name === config.device) return false
     names.add(networkInterface.name)
-    if (networkInterface.kind === 'vlan') {
-      if (networkInterface.parent !== config.device || networkInterface.vlan_id < 1 || networkInterface.vlan_id > 4094) return false
+    if (networkInterface.kind === 'physical') {
+      if (!validMACAddress(networkInterface.mac_address || '')) return false
+    } else if (networkInterface.kind === 'vlan') {
+      const managedParent = networkInterface.parent === config.device || config.interfaces.some((item) => item.kind === 'physical' && item.name === networkInterface.parent)
+      if (!managedParent || networkInterface.vlan_id < 1 || networkInterface.vlan_id > 4094) return false
     } else if (networkInterface.kind === 'gre' || networkInterface.kind === 'ipip' || networkInterface.kind === 'sit' || networkInterface.kind === 'gretap') {
       if (!isIPv4(networkInterface.local || '') && !isIPv6(networkInterface.local || '')) return false
       if (!isIPv4(networkInterface.remote || '') && !isIPv6(networkInterface.remote || '')) return false
@@ -314,6 +354,9 @@ export function isNetworkConfigValid(config: NetworkConfig) {
         (networkInterface.ipv4_gateway && !isIPv4(networkInterface.ipv4_gateway)))) return false
     if (networkInterface.ipv6_mode === 'static' && (!validCIDR(networkInterface.ipv6_address, 6) ||
         (networkInterface.ipv6_gateway && !isIPv6(networkInterface.ipv6_gateway)))) return false
+    if (networkInterface.use_custom_dns ?? Boolean(networkInterface.dns?.length)) {
+      if (!networkInterface.dns?.length || !networkInterface.dns.every(isDNSServer)) return false
+    }
 		if (networkInterface.route_metric < 0) return false
 	}
   for (const client of config.vpn || []) {

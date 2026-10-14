@@ -11,7 +11,7 @@ import {
   type WireGuardConfig,
 } from '@/api/client'
 import { t } from '@/i18n/runtime'
-import { defaultManagedTunnel, networkKindLabel } from '@/lib/network'
+import { defaultManagedTunnel, networkKindLabel, physicalInterfaceConfig, updatePhysicalInterface } from '@/lib/network'
 
 import ExpandablePanel from './ExpandablePanel.vue'
 import NetworkSettingsForm from './NetworkSettingsForm.vue'
@@ -160,11 +160,11 @@ const visibleInterfaces = computed(() => {
       name: configuration.name,
       up: status?.up || false,
       configured: true,
-      mac: '',
+      mac: status?.mac || '',
       addresses: status?.addresses.length ? status.addresses : addresses,
       kind: configuration.kind,
-      port_type: 'virtual' as const,
-      link_speed_mbps: 0,
+      port_type: configuration.kind === 'physical' ? 'physical' as const : 'virtual' as const,
+      link_speed_mbps: status?.link_speed_mbps || 0,
       configuration,
       managedIndex,
     }
@@ -224,12 +224,12 @@ function toggle(name: string) {
 }
 
 function selectInterface(name: string) {
-  emit('update:modelValue', { ...props.modelValue, device: name })
+  emit('update:modelValue', updatePhysicalInterface(props.modelValue, name, physicalInterfaceConfig(props.modelValue, name)))
   expanded.value = name
 }
 
-function updateConfig(value: NetworkConfig) {
-  emit('update:modelValue', value)
+function updateConfig(name: string, value: NetworkConfig) {
+  emit('update:modelValue', updatePhysicalInterface(props.modelValue, name, value))
 }
 
 function addWireGuard() {
@@ -571,10 +571,10 @@ watch(() => props.disabled, (disabled, previous) => {
               </n-form>
               <n-form v-else-if="networkInterface.configured" label-placement="top" :show-feedback="false">
                 <NetworkSettingsForm
-                  :model-value="modelValue"
+                  :model-value="physicalInterfaceConfig(modelValue, networkInterface.name)"
                   :disabled="disabled"
                   :show-device="false"
-                  @update:model-value="updateConfig"
+                  @update:model-value="updateConfig(networkInterface.name, $event)"
                 />
               </n-form>
               <div v-else class="interface-select-action">

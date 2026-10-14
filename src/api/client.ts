@@ -112,8 +112,11 @@ export interface VpnClientConfig {
 }
 
 export interface ManagedNetworkInterface {
-  kind: 'vlan' | 'gre' | 'ipip' | 'sit' | 'vxlan' | 'geneve' | 'fou' | 'bareudp' | 'gretap'
+  kind: 'physical' | 'vlan' | 'gre' | 'ipip' | 'sit' | 'vxlan' | 'geneve' | 'fou' | 'bareudp' | 'gretap'
   name: string
+  mac_address?: string
+  dns?: string[]
+  use_custom_dns?: boolean
   parent: string
   vlan_id: number
   local?: string

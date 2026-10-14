@@ -9,6 +9,8 @@ import {
   isNetworkConfigValid,
   networkConfigSnapshot,
   usesCustomDiscoveryURL,
+  physicalInterfaceConfig,
+  updatePhysicalInterface,
 } from '../src/lib/network.ts'
 
 const base = defaultNetworkConfig()
@@ -156,5 +158,23 @@ assert.equal(
 const dirty = { ...base, interfaces: [{ ...vxlan, remote: '198.51.100.20' }] }
 assert.equal(isNetworkConfigDirty(dirty, networkConfigSnapshot(base)), true, 'added interface is dirty')
 assert.equal(isNetworkConfigDirty(base, ''), false, 'empty snapshot is not dirty')
+
+const secondary = updatePhysicalInterface(base, 'eth1', {
+  ...physicalInterfaceConfig(base, 'eth1'),
+  ipv4_mode: 'static', ipv4_address: '192.0.2.20/24', route_metric: 250,
+})
+assert.equal(secondary.device, 'eth0', 'configuring another port preserves the primary')
+assert.equal(secondary.ipv4_address, base.ipv4_address, 'primary address is preserved')
+assert.equal(secondary.interfaces[0]?.ipv4_address, '192.0.2.20/24')
+assert.equal(isNetworkConfigValid(secondary), true, 'multiple physical ports are valid')
+const editedPrimary = updatePhysicalInterface(secondary, 'eth0', { ...secondary, route_metric: 90 })
+assert.equal(editedPrimary.interfaces[0]?.route_metric, 250, 'primary edits preserve the second port')
+assert.equal(isNetworkConfigValid({ ...secondary, interfaces: [{ ...secondary.interfaces[0]!, mac_address: 'invalid' }] }), false)
+assert.equal(isNetworkConfigValid({ ...secondary, interfaces: [...secondary.interfaces, secondary.interfaces[0]!] }), false)
+assert.equal(isNetworkConfigValid({ ...secondary, interfaces: [...secondary.interfaces, {
+  kind: 'vlan', name: 'vlan20', parent: 'eth1', vlan_id: 20,
+  ipv4_mode: 'dhcp', ipv4_address: '', ipv4_gateway: '',
+  ipv6_mode: 'disabled', ipv6_address: '', ipv6_gateway: '', route_metric: 250,
+}] }), true, 'VLANs may attach to a secondary physical port')
 
 console.log('network-config tests passed')

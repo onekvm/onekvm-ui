@@ -106,7 +106,9 @@ export function physicalInterfaceConfig(config: NetworkConfig, name: string): Ne
     ipv6_enabled: link?.ipv6_mode !== 'disabled',
     ipv6_address: link?.ipv6_address || '',
     ipv6_gateway: link?.ipv6_gateway || '',
-    route_metric: link?.route_metric ?? 100,
+    route_metric: link?.route_metric ?? 200,
+    dns: link?.dns?.length || link?.use_custom_dns !== undefined ? [...(link?.dns || [])] : [...config.dns],
+    use_custom_dns: link?.use_custom_dns ?? (link?.dns?.length ? true : config.use_custom_dns),
   }
 }
 
@@ -121,6 +123,8 @@ export function updatePhysicalInterface(config: NetworkConfig, name: string, val
     ipv4_mode: value.ipv4_mode, ipv4_address: value.ipv4_address, ipv4_gateway: value.ipv4_gateway,
     ipv6_mode: value.ipv6_mode, ipv6_address: value.ipv6_address, ipv6_gateway: value.ipv6_gateway,
     route_metric: value.route_metric,
+    dns: [...value.dns],
+    use_custom_dns: value.use_custom_dns,
   }
   const interfaces = config.interfaces.some((item) => item.name === name)
     ? config.interfaces.map((item) => item.name === name ? link : item)
@@ -320,6 +324,8 @@ export function isNetworkConfigValid(config: NetworkConfig) {
     if (!/^[A-Za-z0-9_.:@-]+$/.test(networkInterface.name) ||
         names.has(networkInterface.name) || networkInterface.name === config.device) return false
     names.add(networkInterface.name)
+    if (networkInterface.use_custom_dns === true && !(networkInterface.dns || []).length) return false
+    if ((networkInterface.dns || []).some(server => !isDNSServer(server))) return false
     if (networkInterface.kind === 'physical') {
       if (!validMACAddress(networkInterface.mac_address || '')) return false
     } else if (networkInterface.kind === 'vlan') {

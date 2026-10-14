@@ -7,9 +7,10 @@ import { t } from '@/i18n/runtime'
 import { defaultWifiApNetwork, wifiApNetworkError } from '@/lib/wifi-ap-network'
 import { normalizeApChannel, validApChannel } from '@/lib/wifi-radio'
 import WifiApSettings from './WifiApSettings.vue'
+import WifiSavedNetworks from './WifiSavedNetworks.vue'
 
 const status = shallowRef<WifiStatus | null>(null)
-const props = withDefaults(defineProps<{ initialSetup?: boolean; interfaceName?: 'ap0' | 'wlan0'; active?: boolean }>(), { active: true })
+const props = withDefaults(defineProps<{ initialSetup?: boolean; interfaceName?: string; active?: boolean; disabled?: boolean }>(), { active: true })
 const emit = defineEmits<{ changed: [] }>()
 const networks = shallowRef<WifiNetwork[]>([])
 const selected = shallowRef<WifiNetwork | null>(null)
@@ -37,7 +38,9 @@ let refreshing = false
 let scanTask: Promise<void> | null = null
 
 const showAp = computed(() => !props.interfaceName || props.interfaceName === 'ap0')
-const showStation = computed(() => !props.interfaceName || props.interfaceName === 'wlan0')
+const showStation = computed(() => !props.interfaceName || props.interfaceName !== 'ap0')
+const stationInterface = computed(() => props.interfaceName && props.interfaceName !== 'ap0' ? props.interfaceName : 'wlan0')
+const savedSelection = computed(() => status.value?.saved_networks?.find(network => network.ssid === selected.value?.ssid))
 const stationEnabled = computed(() => status.value?.mode !== 'ap')
 const canSaveAp = computed(() => apDirty.value && !loading.value
   && !wifiApNetworkError(apNetwork.value)
@@ -49,8 +52,9 @@ const canSaveAp = computed(() => apDirty.value && !loading.value
   && validApChannel(status.value, apBand.value, apChannel.value))
 
 const canConnect = computed(() =>
-  !!selected.value && !loading.value && !status.value?.connecting
-    && (!selected.value.secure || password.value.length >= 8),
+  !props.disabled && !!selected.value && !loading.value && !status.value?.connecting
+    && (!selected.value.secure || !!savedSelection.value || (new TextEncoder().encode(password.value).length >= 8
+      && new TextEncoder().encode(password.value).length <= 63 && !/[\x00-\x1f\x7f-\x9f]/.test(password.value))),
 )
 
 const displayNetworks = computed(() => networks.value.map((network) => ({
@@ -92,7 +96,7 @@ async function refresh() {
   refreshing = true
   try {
     const recovering = status.value === null
-    status.value = await api.getWifiStatus()
+    status.value = await api.getWifiStatus(stationInterface.value)
     if (recovering) error.value = ''
     if (!apDirty.value) {
       apSsid.value = status.value.ap_ssid
@@ -124,7 +128,7 @@ function scan() {
   let task: Promise<void> = Promise.resolve()
   task = (async () => {
     try {
-      networks.value = await api.scanWifi()
+      networks.value = await api.scanWifi(stationInterface.value)
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : String(reason)
     } finally {
@@ -149,7 +153,7 @@ async function connect() {
   loading.value = true
   connectError.value = ''
   try {
-    status.value = await api.connectWifi(selected.value.ssid, password.value)
+    status.value = await api.connectWifi(selected.value.ssid, savedSelection.value && !password.value ? undefined : password.value, stationInterface.value)
     password.value = ''
   } catch (reason) {
     connectError.value = reason instanceof Error ? reason.message : String(reason)
@@ -272,14 +276,14 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
     <div v-if="showStation && !props.initialSetup" class="wifi-control-row">
       <div>
         <strong>{{ t('network.wifi.stationEnabled', '启用 Wi-Fi') }}</strong>
-        <p class="wifi-muted">{{ t('network.wifi.stationEnabledHint', '连接附近的无线网络，通过 wlan0 获取地址。') }}</p>
+        <p class="wifi-muted">{{ t('network.wifi.stationInterfaceHint', 'Connect nearby networks using {interface}.').replace('{interface}', stationInterface) }}</p>
       </div>
       <n-switch :value="stationEnabled" :disabled="loading || status.connecting || (stationEnabled && !validApChannel(status, status.ap_band, status.ap_channel))" @update:value="toggleStation" />
     </div>
 
-    <div v-if="showStation && (stationEnabled || props.initialSetup)" class="wifi-station">
-      <div class="wifi-setup-label">{{ t('network.wifi.connected', '已连接') }}</div>
-      <section :class="props.initialSetup ? 'ios-group' : 'wifi-current-wrap'">
+    <div v-if="showStation" class="wifi-station">
+      <div v-if="stationEnabled || props.initialSetup" class="wifi-setup-label">{{ t('network.wifi.connected', '已连接') }}</div>
+      <section v-if="stationEnabled || props.initialSetup" :class="props.initialSetup ? 'ios-group' : 'wifi-current-wrap'">
         <div v-if="status.connected" class="wifi-network wifi-network--current">
           <n-tooltip v-if="connectedHit" trigger="hover">
             <template #trigger>
@@ -307,14 +311,17 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
         <p v-else class="wifi-muted wifi-setup-empty">{{ t('network.wifi.notConnected', '未连接') }}</p>
       </section>
 
-      <div class="wifi-scan-heading">
+      <WifiSavedNetworks v-if="!props.initialSetup" :status="status" :interface-name="stationInterface"
+        :disabled="props.disabled || loading || status.connecting" @updated="status = $event; emit('changed')" />
+
+      <div v-if="stationEnabled || props.initialSetup" class="wifi-scan-heading">
         <strong>{{ t('network.wifi.available', '可用网络') }}</strong>
         <n-button size="small" :loading="scanning" @click="scan">
           <template #icon><RefreshCw /></template>
           {{ t('network.wifi.scan', '扫描') }}
         </n-button>
       </div>
-      <section :class="props.initialSetup ? 'ios-group' : undefined">
+      <section v-if="stationEnabled || props.initialSetup" :class="props.initialSetup ? 'ios-group' : undefined">
         <div v-if="listedNetworks.length" class="wifi-networks" role="listbox" :aria-label="t('network.wifi.available', '可用网络')">
           <button
             v-for="network in listedNetworks"
@@ -342,6 +349,7 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
             <span class="wifi-network-details">
               <strong>{{ network.ssid }}</strong>
               <span class="wifi-network-badges">
+                <span v-if="status.saved_networks?.some(saved => saved.ssid === network.ssid)" class="wifi-network-badge">{{ t('network.wifi.saved', 'Saved') }}</span>
                 <span v-if="network.bandLabel" class="wifi-network-badge">{{ network.bandLabel }}</span>
                 <span v-for="generation in network.generations" :key="generation" class="wifi-network-badge">{{ generation }}</span>
                 <span class="wifi-network-badge">{{ securityBadge(network) }}</span>
@@ -370,7 +378,7 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
           :value="password"
           type="password"
           show-password-on="click"
-          :placeholder="t('network.wifi.networkPassword', '接入点密码')"
+          :placeholder="savedSelection ? t('network.wifi.keepPassword', 'Leave blank to use the saved password') : t('network.wifi.networkPassword', '接入点密码')"
           @update:value="password = $event"
           @keyup.enter="connect"
         />

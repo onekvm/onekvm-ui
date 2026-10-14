@@ -48,7 +48,30 @@ export interface WifiNetwork {
   bands?: { band: string; generation: string | null }[]
 }
 
+export interface SavedWifiNetwork {
+  ssid: string
+  secure: boolean
+  auto_connect: boolean
+  priority: number
+  hidden: boolean
+  band: string
+  bssid: string
+}
+
+export interface WifiProfileSettings {
+  interface: string
+  ssid: string
+  password?: string
+  auto_connect: boolean
+  priority: number
+  hidden: boolean
+  band: string
+  bssid: string
+}
+
 export interface WifiStatus {
+  interface?: string
+  saved_networks?: SavedWifiNetwork[]
   available: boolean
   mode: 'ap' | 'ap_station' | 'station'
   ap_enabled: boolean
@@ -1283,16 +1306,14 @@ export interface EDIDStatus {
   }[]
 }
 
-let wifiScanFlight: Promise<WifiNetwork[]> | null = null
-
-/** One scan at a time. Callers that arrive while it runs wait and receive that result. */
-function scanWifi(): Promise<WifiNetwork[]> {
-  if (!wifiScanFlight) {
-    wifiScanFlight = request<WifiNetwork[]>('/api/network/wifi/scan', { cache: 'no-store' }).finally(() => {
-      wifiScanFlight = null
-    })
-  }
-  return wifiScanFlight
+const wifiScanFlights = new Map<string, Promise<WifiNetwork[]>>()
+function scanWifi(interfaceName = 'wlan0'): Promise<WifiNetwork[]> {
+  const existing = wifiScanFlights.get(interfaceName)
+  if (existing) return existing
+  const task = request<WifiNetwork[]>(`/api/network/wifi/scan?interface=${encodeURIComponent(interfaceName)}`, { cache: 'no-store' })
+    .finally(() => { wifiScanFlights.delete(interfaceName) })
+  wifiScanFlights.set(interfaceName, task)
+  return task
 }
 
 export const api = {
@@ -1607,9 +1628,11 @@ export const api = {
 			body: JSON.stringify(settings),
 		}),
 	getNetworkInterfaces: () => request<NetworkInterfaceStatus[]>('/api/network/interfaces'),
-	getWifiStatus: () => request<WifiStatus>('/api/network/wifi', { cache: 'no-store' }),
+	getWifiStatus: (interfaceName = 'wlan0') => request<WifiStatus>(`/api/network/wifi?interface=${encodeURIComponent(interfaceName)}`, { cache: 'no-store' }),
 	scanWifi,
-	connectWifi: (ssid: string, password: string) => request<WifiStatus>('/api/network/wifi/connect', { method: 'POST', body: JSON.stringify({ ssid, password }) }),
+	connectWifi: (ssid: string, password?: string, interfaceName = 'wlan0') => request<WifiStatus>('/api/network/wifi/connect', { method: 'POST', body: JSON.stringify({ interface: interfaceName, ssid, password }) }),
+  saveWifiNetwork: (profile: WifiProfileSettings) => request<WifiStatus>('/api/network/wifi/saved', { method: 'POST', body: JSON.stringify(profile) }),
+  forgetWifiNetwork: (ssid: string, interfaceName = 'wlan0') => request<WifiStatus>('/api/network/wifi/saved', { method: 'DELETE', body: JSON.stringify({ interface: interfaceName, ssid }) }),
 	setWifiAp: (enabled: boolean) => request<WifiStatus>('/api/network/wifi/ap', { method: 'POST', body: JSON.stringify({ enabled }) }),
 	setWifiApConfig: (ssid: string, password: string, channel: number, band: '2.4' | '5', network: WifiApNetwork) => request<WifiStatus>('/api/network/wifi/ap/config', { method: 'POST', body: JSON.stringify({ ssid, password, channel, band, network }) }),
 	setWifiMode: (mode: WifiStatus['mode']) => request<WifiStatus>('/api/network/wifi/mode', { method: 'POST', body: JSON.stringify({ mode }) }),

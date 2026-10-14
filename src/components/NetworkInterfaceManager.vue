@@ -19,6 +19,7 @@ import TunnelSettingsForm from './TunnelSettingsForm.vue'
 import VLANSettingsForm from './VLANSettingsForm.vue'
 import VpnSettingsForm from './VpnSettingsForm.vue'
 import WifiOnboarding from './WifiOnboarding.vue'
+import WifiIpSettings from './WifiIpSettings.vue'
 import WireGuardSettingsForm from './WireGuardSettingsForm.vue'
 
 const TUNNEL_KINDS = ['gre', 'ipip', 'sit', 'vxlan', 'geneve', 'fou', 'bareudp', 'gretap'] as const
@@ -112,7 +113,7 @@ const visibleInterfaces = computed(() => {
     .map((networkInterface) => ({
       ...networkInterface,
       kind: props.wifiAvailable && networkInterface.name === 'ap0' ? 'wifi_ap' as const
-        : props.wifiAvailable && networkInterface.name === 'wlan0' ? 'wifi_station' as const : 'physical' as const,
+        : props.wifiAvailable && /^wlan\d+$/.test(networkInterface.name) ? 'wifi_station' as const : 'physical' as const,
       configured: networkInterface.name === props.modelValue.device,
     }))
   if (props.wifiAvailable) {
@@ -162,7 +163,7 @@ const visibleInterfaces = computed(() => {
       configured: true,
       mac: status?.mac || '',
       addresses: status?.addresses.length ? status.addresses : addresses,
-      kind: configuration.kind,
+      kind: configuration.kind === 'physical' && props.wifiAvailable && /^wlan\d+$/.test(configuration.name) ? 'wifi_station' as const : configuration.kind,
       port_type: configuration.kind === 'physical' ? 'physical' as const : 'virtual' as const,
       link_speed_mbps: status?.link_speed_mbps || 0,
       configuration,
@@ -533,7 +534,17 @@ watch(() => props.disabled, (disabled, previous) => {
               </dl>
 
               <WifiOnboarding v-if="networkInterface.kind === 'wifi_ap'" interface-name="ap0" :active="expanded === networkInterface.name" @changed="load" />
-              <WifiOnboarding v-else-if="networkInterface.kind === 'wifi_station'" interface-name="wlan0" :active="expanded === networkInterface.name" @changed="load" />
+              <div v-else-if="networkInterface.kind === 'wifi_station'" class="wifi-interface-settings">
+                <WifiOnboarding :interface-name="networkInterface.name" :active="expanded === networkInterface.name" :disabled="disabled" @changed="load" />
+                <n-collapse>
+                  <n-collapse-item :title="t('network.wifi.ipAdvanced', 'IP and DNS settings')" name="ip-settings">
+                    <n-form v-if="networkInterface.configured" label-placement="top" :show-feedback="false">
+                      <WifiIpSettings :model-value="physicalInterfaceConfig(modelValue, networkInterface.name)" :disabled="disabled" @update:model-value="updateConfig(networkInterface.name, $event)" />
+                    </n-form>
+                    <n-button v-else secondary :disabled="disabled" @click="selectInterface(networkInterface.name)">{{ t('network.interfaces.configure', 'Configure this interface') }}</n-button>
+                  </n-collapse-item>
+                </n-collapse>
+              </div>
 
               <n-form v-else-if="networkInterface.kind === 'wireguard'" label-placement="top" :show-feedback="false">
                 <WireGuardSettingsForm
@@ -591,6 +602,7 @@ watch(() => props.disabled, (disabled, previous) => {
 </template>
 
 <style scoped>
+.wifi-interface-settings { display: grid; gap: 18px; }
 .network-interface-manager { display: grid; gap: 16px; }
 .list-toolbar {
   display: flex;

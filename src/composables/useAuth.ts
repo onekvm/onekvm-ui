@@ -1,6 +1,6 @@
 import { reactive, readonly } from 'vue'
 
-import { api, type AuthStatus, type NetworkConfig, type SetupSystemSettings } from '@/api/client'
+import { api, invalidateExtensionCaches, type AuthStatus, type NetworkConfig, type SetupSystemSettings } from '@/api/client'
 import { isCloudHosted } from '@/api/service-url'
 
 const state = reactive<AuthStatus & { loading: boolean }>({
@@ -24,6 +24,8 @@ let refreshRetryTimer: number | null = null
 let statusKnown = false
 
 function assign(status: AuthStatus) {
+  if (state.username !== status.username || state.authenticated !== status.authenticated
+    || state.permissions.join(',') !== (status.permissions || []).join(',')) invalidateExtensionCaches()
   state.mfa_required = false
   state.pending_token = ''
   state.factors = []
@@ -108,6 +110,7 @@ async function logout() {
     return
   }
   await api.authLogout()
+  invalidateExtensionCaches()
   state.authenticated = false
   state.required = true
   state.mfa_required = false
@@ -121,6 +124,7 @@ export function useAuth() {
     initialized = true
     window.addEventListener('onekvm:permissions-changed', () => { void refresh() })
     window.addEventListener('onekvm:unauthorized', () => {
+      invalidateExtensionCaches()
       if (isCloudHosted()) {
         window.parent.postMessage({ type: 'onekvm-cloud-expired' }, window.location.origin)
         return

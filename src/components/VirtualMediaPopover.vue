@@ -4,7 +4,7 @@ import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vu
 import { ArrowLeft, Check, CircleCheck, CirclePlus, ClipboardPaste, Copy, Database, Disc3, Download, File, Folder, FolderOpen, FolderPlus, HardDrive, House, Info, Laptop, LayoutGrid, LoaderCircle, Pencil, Plug, Scissors, Server, Smartphone, Trash2, Unplug, Upload, X } from '@lucide/vue'
 import { useMessage } from 'naive-ui'
 
-import { api, APIError, type MSDDownloadTask, type MSDFileEntry, type MSDMedia, type MSDStatus } from '@/api/client'
+import { api, APIError, type MSDDownloadTask, type MSDFileEntry, type MSDMedia, type MSDSource, type MSDStatus } from '@/api/client'
 import { useMSDDownload } from '@/composables/useMSDDownload'
 import { useUploadProgress } from '@/composables/useUploadProgress'
 import { useOverlayMount } from '@/composables/useOverlayMount'
@@ -17,6 +17,7 @@ import XpTransferDialog from './XpTransferDialog.vue'
 import XpProgressCells from './XpProgressCells.vue'
 import MediaDownloadForm from './MediaDownloadForm.vue'
 import StoredISORenameForm from './StoredISORenameForm.vue'
+import NetworkMediaBrowser from './NetworkMediaBrowser.vue'
 
 const props = withDefaults(defineProps<{
   consoleActive?: boolean
@@ -59,8 +60,10 @@ const disconnecting = ref(false)
 const mtpBusy = ref(false)
 const status = ref<MSDStatus | null>(null)
 const media = ref<MSDMedia[]>([])
+const networkSources = ref<MSDSource[]>([])
+const sourceRevision = ref(0)
 type MediaTab = 'iso' | 'drive' | 'mtp'
-type IsoSource = 'local' | 'device'
+type IsoSource = 'local' | 'device' | 'network'
 const tab = ref<MediaTab>('iso')
 const feature = ref<MediaTab | null>(null)
 type FeatureNavDirection = 'forward' | 'back'
@@ -135,8 +138,8 @@ let uploadDragging = false
 const storageAvailable = computed(() => Boolean(status.value?.available))
 const mtpAvailable = computed(() => Boolean(status.value?.mtp_available))
 const mediaOpen = computed(() => storageAvailable.value || mtpAvailable.value)
-const isoMedia = computed(() => media.value.filter((item) => item.kind === 'iso'))
-const driveMedia = computed(() => media.value.filter((item) => item.kind === 'drive'))
+const isoMedia = computed(() => media.value.filter((item) => item.kind === 'iso' && !item.external))
+const driveMedia = computed(() => media.value.filter((item) => item.kind === 'drive' && !item.external))
 const driveSizeUnitOptions = [
   { label: 'MiB', value: 'MiB' },
   { label: 'GiB', value: 'GiB' }
@@ -240,6 +243,7 @@ watch(
 
 const isoSourceLocked = computed<IsoSource | null>(() => {
   if (status.value?.iso_mounted === 'browser') return 'local'
+  if (status.value?.iso_mounted?.startsWith('external-')) return 'network'
   if (status.value?.iso_mounted) return 'device'
   return null
 })
@@ -328,6 +332,7 @@ function updateShow(show: boolean) {
   void refresh().then(() => {
     if (!feature.value) feature.value = featureFromStatus()
     if (status.value?.iso_mounted === 'browser') isoSource.value = 'local'
+    else if (status.value?.iso_mounted?.startsWith('external-')) isoSource.value = 'network'
     else if (status.value?.iso_mounted) isoSource.value = 'device'
   })
 }
@@ -429,29 +434,41 @@ function validDriveImage(file: File) {
     && file.size % 512 === 0
 }
 
-async function refresh() {
+function onExtensionsChanged() {
+  if (popoverOpen.value) void refresh()
+}
+
+let refreshGeneration = 0
+async function refresh(forceSources = false) {
+  const generation = ++refreshGeneration
   loading.value = true
   try {
     const nextStatus = await api.getMSDStatus()
+    if (generation !== refreshGeneration) return
     status.value = nextStatus
     emit('status', nextStatus)
     if (!nextStatus.available) {
       media.value = []
+      networkSources.value = []
       browsingDrive.value = null
       currentPath.value = ''
       files.value = []
       return
     }
-    const nextMedia = await api.getMSDMedia()
+    const [nextMedia, sources] = await Promise.all([api.getMSDMedia(), api.getMSDSources(forceSources)])
+    if (generation !== refreshGeneration) return
+    networkSources.value = sources
+    sourceRevision.value += 1
     media.value = Array.isArray(nextMedia) ? nextMedia : []
     if (browsingDrive.value) {
       browsingDrive.value = nextMedia.find((item) => item.id === browsingDrive.value?.id) || null
       if (browsingDrive.value && !browsingDrive.value.mounted) await refreshFiles()
     }
   } catch (error) {
+    if (generation !== refreshGeneration) return
     message.error(error instanceof Error ? error.message : String(error))
   } finally {
-    loading.value = false
+    if (generation === refreshGeneration) loading.value = false
   }
 }
 
@@ -1123,6 +1140,7 @@ function closeFileTransferDialog() {
 }
 
 onMounted(() => {
+  window.addEventListener('onekvm:extensions-changed', onExtensionsChanged)
   clearLegacyUploadResume()
   window.addEventListener('resize', clampUploadPosition)
 })
@@ -1149,6 +1167,8 @@ onBeforeUnmount(() => {
   abortActiveUploadRequests()
   driveUpload.cancel()
   fileTransferController?.abort()
+  refreshGeneration++
+  window.removeEventListener('onekvm:extensions-changed', onExtensionsChanged)
   window.removeEventListener('resize', clampUploadPosition)
   window.removeEventListener('pointermove', dragUploadWindow)
   browserISO.value?.destroy()
@@ -1233,8 +1253,12 @@ onBeforeUnmount(() => {
               <n-radio-group v-model:value="isoSource" :disabled="Boolean(isoSourceLocked)" name="iso-source" class="iso-source-radios">
                 <n-radio value="local"><span class="iso-source-option"><Laptop :size="16" />{{ t('virtualMedia.isoSourceLocal', 'This computer') }}</span></n-radio>
                 <n-radio value="device"><span class="iso-source-option"><Server :size="16" />{{ t('virtualMedia.isoSourceDevice', 'Device files') }}</span></n-radio>
+                <n-radio v-if="networkSources.length || status?.iso_mounted?.startsWith('external-')" value="network"><span class="iso-source-option"><Server :size="16" />{{ t('virtualMedia.networkShares') }}</span></n-radio>
               </n-radio-group>
-              <p class="iso-source-hint"><Info :size="14" />{{ t('virtualMedia.isoSourceHint', 'This computer mounts an ISO without uploading. Device files are stored on the device and can be mounted later.') }}</p>
+              <p class="iso-source-hint"><Info :size="14" />{{ isoSource === 'network' ? t('virtualMedia.networkSourceHint') : t('virtualMedia.isoSourceHint', 'This computer mounts an ISO without uploading. Device files are stored on the device and can be mounted later.') }}</p>
+              <NetworkMediaBrowser v-if="isoSource === 'network'" kind="iso" :sources="networkSources" :revision="sourceRevision" :refreshing="loading"
+                :mounted-id="status?.iso_mounted || ''" :mounting-id="mountingID" :blocked="hostMountBlocked"
+                @mount="mount" @eject="eject('iso')" @refresh="refresh(true)" />
               <section v-if="isoSource === 'local' && (!status?.iso_mounted || status.iso_mounted === 'browser')" class="media-mode-panel direct-mount-panel">
                 <header class="media-mode-header">
                   <div class="media-mode-copy">
@@ -1329,6 +1353,9 @@ onBeforeUnmount(() => {
                 </div>
                 <section class="virtual-media-workspace">
                   <div class="virtual-drive-panel">
+                    <NetworkMediaBrowser v-if="networkSources.length || status?.drive_mounted?.startsWith('external-')" kind="drive" :sources="networkSources" :revision="sourceRevision" :refreshing="loading"
+                      :mounted-id="status?.drive_mounted || ''" :mounting-id="mountingID" :blocked="hostMountBlocked"
+                      @mount="mount" @eject="eject('drive')" @refresh="refresh(true)" />
                     <div class="virtual-drive-toolbar">
                       <n-button size="small" @click="openCreateDrive"><template #icon><CirclePlus /></template>{{ t('virtualMedia.createDriveTab', 'Create disk') }}</n-button>
                       <label class="file-picker">
@@ -1361,8 +1388,8 @@ onBeforeUnmount(() => {
                           <n-tag v-if="item.mounted" type="success" size="small"><CircleCheck :size="12" />{{ t('virtualMedia.mountedStatus', 'Mounted') }}</n-tag>
                           <n-button v-if="!item.mounted && !status?.drive_mounted" size="small" type="primary" :loading="mountingID === item.id" :disabled="hostMountBlocked || Boolean(mountingID && mountingID !== item.id)" @click="mount(item)"><template #icon><HardDrive /></template>{{ mountingID === item.id ? t('virtualMedia.mounting', 'Mounting') : t('virtualMedia.mount', 'Mount') }}</n-button>
                           <n-button v-else-if="item.mounted" size="small" @click="eject('drive')"><template #icon><Unplug /></template>{{ t('virtualMedia.unmount', 'Eject') }}</n-button>
-                          <n-button v-if="!item.imported" size="small" :type="browsingDrive?.id === item.id ? 'primary' : 'default'" :disabled="item.mounted" @click="openDrive(item)"><template #icon><FolderOpen /></template>{{ browsingDrive?.id === item.id ? t('virtualMedia.closeFiles', 'Close') : t('virtualMedia.files', 'Files') }}</n-button>
-                          <n-button quaternary circle size="small" :loading="deletingID === item.id" :disabled="item.mounted || Boolean(deletingID)" @click="confirmDelete(item)"><template #icon><Trash2 /></template></n-button>
+                          <n-button v-if="!item.imported && !item.external" size="small" :type="browsingDrive?.id === item.id ? 'primary' : 'default'" :disabled="item.mounted" @click="openDrive(item)"><template #icon><FolderOpen /></template>{{ browsingDrive?.id === item.id ? t('virtualMedia.closeFiles', 'Close') : t('virtualMedia.files', 'Files') }}</n-button>
+                          <n-button v-if="!item.external" quaternary circle size="small" :loading="deletingID === item.id" :disabled="item.mounted || Boolean(deletingID)" @click="confirmDelete(item)"><template #icon><Trash2 /></template></n-button>
                         </div>
                     </div>
 

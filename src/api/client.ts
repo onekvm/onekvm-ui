@@ -1,3 +1,4 @@
+import { createPersistentQuery } from '../lib/persistent-query.ts'
 import type { WifiApNetwork } from '../lib/wifi-ap-network'
 import { resolveServiceURL, serviceBaseUrl, serviceURL, serviceWebSocketURL } from './service-url.ts'
 export type IPv4Mode = 'disabled' | 'dhcp' | 'dhcp-static' | 'static'
@@ -793,6 +794,25 @@ export interface MSDMedia {
   filesystem?: 'exfat' | 'fat32' | string
 }
 
+export interface MSDSource {
+  extension: string
+  directory: string
+  name: string
+  available: boolean
+}
+
+export interface MSDSourceEntry {
+  name: string
+  path: string
+  directory: boolean
+  media?: MSDMedia
+}
+
+export interface MSDSourceListing {
+  entries: MSDSourceEntry[]
+  truncated: boolean
+}
+
 export interface MSDISOUpload {
   id: string
   name: string
@@ -992,6 +1012,19 @@ export function isUnauthorizedError(error: unknown): boolean {
   return error instanceof APIError && error.status === 401
 }
 
+const msdSources = createPersistentQuery<MSDSource[]>()
+
+export function invalidateExtensionCaches() {
+  msdSources.invalidate()
+}
+
+function changesExtensions(path: string, method: string | undefined) {
+  if (!path.startsWith('/api/extensions') || !method || method.toUpperCase() === 'GET') return false
+  const invoke = path.match(/\/invoke\/([^/?]+)/)
+  return !invoke || !['status', 'list_packages', 'list_sources', 'install_progress',
+    'set_source', 'set_source_enabled', 'remove_source'].includes(decodeURIComponent(invoke[1]!))
+}
+
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(resolveServiceURL(serviceBaseUrl(), path), {
     credentials: import.meta.env.VITE_WITH_CREDENTIALS === 'false' ? 'omit' : 'include',
@@ -1012,7 +1045,8 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
     throw new APIError(body?.error || `HTTP ${response.status}`, response.status)
   }
 
-  if (path.startsWith('/api/extensions') && options.method && options.method !== 'GET' && !path.includes('/invoke/')) {
+  if (changesExtensions(path, options.method)) {
+    invalidateExtensionCaches()
     window.dispatchEvent(new Event('onekvm:extensions-changed'))
   }
   if (response.status === 204) return undefined as T
@@ -1427,6 +1461,11 @@ export const api = {
   connectMSDMTP: () => request<MSDStatus>('/api/msd/mtp/connect', { method: 'POST' }),
   disconnectMSDMTP: () => request<MSDStatus>('/api/msd/mtp/disconnect', { method: 'POST' }),
   getMSDMedia: () => request<MSDMedia[]>('/api/msd/media', { cache: 'no-store' }),
+  getMSDSources: (refresh = false) => msdSources.get(serviceBaseUrl(), () => request<MSDSource[]>(`/api/msd/sources${refresh ? '?refresh=true' : ''}`, { cache: 'no-store' }), refresh),
+  browseMSDSource: (source: MSDSource, path: string, kind: MSDMedia['kind'], signal?: AbortSignal) => {
+    const query = new URLSearchParams({ extension: source.extension, directory: source.directory, path, kind })
+    return request<MSDSourceListing>(`/api/msd/sources/browse?${query}`, { cache: 'no-store', signal })
+  },
   mountMSDMedia: (id: string) => request<MSDStatus>(`/api/msd/media/${encodeURIComponent(id)}/mount`, { method: 'POST' }),
   ejectMSD: (kind: 'iso' | 'drive') => request<MSDStatus>(`/api/msd/eject/${kind}`, { method: 'POST' }),
   deleteMSDMedia: (id: string) => request<void>(`/api/msd/media/${encodeURIComponent(id)}`, { method: 'DELETE' }),

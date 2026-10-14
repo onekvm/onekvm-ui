@@ -1685,6 +1685,8 @@ const zh = {
         apAddress: 'AP IPv4 地址 / 前缀',
         apInterface: '无线热点',
         apDhcpEnabled: 'DHCP 服务',
+        apNoChannels: '没有检测到可用的热点信道，请检查无线驱动和监管区域设置。',
+        apSettingsAdjusted: '保存的热点频段或信道不适用于此网卡。请先保存当前可用的选项，再开启热点。',
         apDhcpEnabledHint: '自动为连接设备分配 IP 地址。关闭后，需要在连接设备上手动设置 AP 网段内的静态地址。',
         apStaticHint: 'DHCP 已关闭。请在连接设备上设置同网段的静态地址，然后访问 AP 地址。',
         apDhcpStart: 'DHCP 起始地址',

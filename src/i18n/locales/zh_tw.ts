@@ -1690,6 +1690,8 @@ const zh_tw = {
         apAddress: 'AP IPv4 位址 / 前綴',
         apInterface: '無線熱點',
         apDhcpEnabled: 'DHCP 服務',
+        apNoChannels: '沒有偵測到可用的熱點頻道，請檢查無線驅動和管制區域設定。',
+        apSettingsAdjusted: '儲存的熱點頻段或頻道不適用於此網卡。請先儲存目前可用的選項，再開啟熱點。',
         apDhcpEnabledHint: '自動為連接裝置分配 IP 位址。關閉後，需要在連接裝置上手動設定 AP 網段內的靜態位址。',
         apStaticHint: 'DHCP 已關閉。請在連接裝置上設定同網段的靜態位址，然後存取 AP 位址。',
         apDhcpStart: 'DHCP 起始位址',

@@ -3,6 +3,7 @@ import { computed } from 'vue'
 
 import type { WifiStatus } from '@/api/client'
 import { t } from '@/i18n/runtime'
+import { apBands, apChannels, validApChannel } from '@/lib/wifi-radio'
 import { defaultWifiApNetwork, wifiApNetworkError } from '@/lib/wifi-ap-network'
 
 const props = defineProps<{
@@ -36,18 +37,14 @@ const networkError = computed(() => wifiApNetworkError({
 }))
 const addressChanged = computed(() => props.address !== (props.status.ap_network?.address || defaultWifiApNetwork.address))
 
-const supportedChannels = computed(() => props.status.ap_channels?.length
-  ? props.status.ap_channels
-  : [1, 6, 11])
-const bandOptions = computed(() => [
-  { label: '2.4 GHz', value: '2.4' },
-  ...(supportedChannels.value.some((channel) => channel > 14) ? [{ label: '5 GHz', value: '5' }] : []),
-])
+const supportedChannels = computed(() => apChannels(props.status))
+const bandOptions = computed(() => apBands(props.status).map((band) => ({ label: `${band} GHz`, value: band })))
+const savedChannelValid = computed(() => validApChannel(props.status, props.status.ap_band, props.status.ap_channel))
 const channelOptions = computed(() => supportedChannels.value
   .filter((channel) => (channel > 14 ? '5' : '2.4') === props.band)
   .map((channel) => ({ label: String(channel), value: channel })))
 const availableChannelOptions = computed(() => [
-  { label: t('network.wifi.autoChannel', 'Auto'), value: 0 },
+  ...(channelOptions.value.length ? [{ label: t('network.wifi.autoChannel', 'Auto'), value: 0 }] : []),
   ...channelOptions.value,
 ])
 
@@ -64,8 +61,11 @@ function changeBand(value: '2.4' | '5') {
         <strong>{{ t('network.wifi.apEnabled', 'Enable access point') }}</strong>
         <span>{{ t('network.wifi.apEnabledHint', 'Devices connected through this access point will disconnect when it is turned off.') }}</span>
       </div>
-      <n-switch :value="status.ap_enabled" :disabled="busy || status.connecting" @update:value="emit('toggle', $event)" />
+      <n-switch :value="status.ap_enabled" :disabled="busy || status.connecting || (!status.ap_enabled && !savedChannelValid)" @update:value="emit('toggle', $event)" />
     </div>
+
+    <p v-if="!supportedChannels.length" class="wifi-ap-error" role="alert">{{ t('network.wifi.apNoChannels') }}</p>
+    <p v-else-if="!savedChannelValid" class="wifi-muted wifi-ap-network-hint">{{ t('network.wifi.apSettingsAdjusted') }}</p>
 
     <n-form label-placement="top" :show-feedback="false" class="wifi-ap-form">
       <n-form-item label="SSID" class="wifi-ap-full-row">
@@ -75,11 +75,11 @@ function changeBand(value: '2.4' | '5') {
         <n-input :value="password" type="password" show-password-on="click" :disabled="busy" @update:value="emit('update:password', $event)" />
       </n-form-item>
       <n-form-item :label="t('network.wifi.band', 'Band')">
-        <n-select :value="band" :options="bandOptions" :disabled="busy" @update:value="changeBand" />
+        <n-select :value="bandOptions.length ? band : null" :options="bandOptions" :disabled="busy || bandOptions.length <= 1" @update:value="changeBand" />
       </n-form-item>
       <n-form-item :label="t('network.wifi.channel', 'Channel')">
         <div class="wifi-channel-field">
-          <n-select :value="channel" :options="availableChannelOptions" :disabled="busy" @update:value="emit('update:channel', $event)" />
+          <n-select :value="supportedChannels.length ? channel : null" :options="availableChannelOptions" :disabled="busy || !supportedChannels.length" @update:value="emit('update:channel', $event)" />
           <span v-if="channel === 0 && status.ap_channel === 0 && status.ap_band === band && status.ap_operating_channel" class="wifi-channel-hint">
             {{ t('network.wifi.currentChannel', 'Current channel: {channel}').replace('{channel}', String(status.ap_operating_channel)) }}
           </span>

@@ -5,6 +5,7 @@ import { RefreshCw, Wifi } from '@lucide/vue'
 import { api, type WifiNetwork, type WifiStatus } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { defaultWifiApNetwork, wifiApNetworkError } from '@/lib/wifi-ap-network'
+import { normalizeApChannel, validApChannel } from '@/lib/wifi-radio'
 import WifiApSettings from './WifiApSettings.vue'
 
 const status = shallowRef<WifiStatus | null>(null)
@@ -45,10 +46,7 @@ const canSaveAp = computed(() => apDirty.value && !loading.value
   && !/[\x00-\x1f\x7f]/.test(apSsid.value)
   && /^[\x20-\x7e]{8,63}$/.test(apPassword.value)
   && apPassword.value.trim() === apPassword.value
-  && (apChannel.value === 0
-    ? (status.value?.ap_channels || [1, 6, 11]).some((channel) => (channel > 14 ? '5' : '2.4') === apBand.value)
-    : (status.value?.ap_channels || [1, 6, 11]).includes(apChannel.value)
-      && (apChannel.value > 14 ? '5' : '2.4') === apBand.value))
+  && validApChannel(status.value, apBand.value, apChannel.value))
 
 const canConnect = computed(() =>
   !!selected.value && !loading.value && !status.value?.connecting
@@ -100,7 +98,11 @@ async function refresh() {
       apSsid.value = status.value.ap_ssid
       apPassword.value = status.value.ap_password
       apChannel.value = status.value.ap_channel
-      apBand.value = status.value.ap_band || (apChannel.value > 14 ? '5' : '2.4')
+      const savedBand = status.value.ap_band || (apChannel.value > 14 ? '5' : '2.4')
+      const selection = normalizeApChannel(status.value, savedBand, apChannel.value)
+      apBand.value = selection.band
+      apChannel.value = selection.channel
+      apDirty.value = selection.band !== savedBand || selection.channel !== status.value.ap_channel
       const network = status.value.ap_network || defaultWifiApNetwork
       apAddress.value = network.address
       apDhcpEnabled.value = network.dhcp_enabled !== false
@@ -166,6 +168,7 @@ function selectNetwork(network: WifiNetwork) {
 
 async function toggleAp(enabled: boolean) {
   if (!status.value) return
+  if (enabled && !validApChannel(status.value, status.value.ap_band, status.value.ap_channel)) return
   if (enabled && status.value.mode !== 'station' && !status.value.ap_enabled) {
     loading.value = true
     error.value = ''
@@ -271,7 +274,7 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
         <strong>{{ t('network.wifi.stationEnabled', '启用 Wi-Fi') }}</strong>
         <p class="wifi-muted">{{ t('network.wifi.stationEnabledHint', '连接附近的无线网络，通过 wlan0 获取地址。') }}</p>
       </div>
-      <n-switch :value="stationEnabled" :disabled="loading || status.connecting" @update:value="toggleStation" />
+      <n-switch :value="stationEnabled" :disabled="loading || status.connecting || (stationEnabled && !validApChannel(status, status.ap_band, status.ap_channel))" @update:value="toggleStation" />
     </div>
 
     <div v-if="showStation && (stationEnabled || props.initialSetup)" class="wifi-station">

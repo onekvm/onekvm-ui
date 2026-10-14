@@ -1686,6 +1686,8 @@ const en = {
         apAddress: 'AP IPv4 address / prefix',
         apInterface: 'Wireless access point',
         apDhcpEnabled: 'DHCP server',
+        apNoChannels: 'No usable AP channels were detected. Check the wireless driver and regulatory settings.',
+        apSettingsAdjusted: 'The saved AP band or channel is unavailable on this radio. Save the supported selection before enabling the hotspot.',
         apDhcpEnabledHint: 'Assign IP addresses to connected devices automatically. When disabled, configure a static address in the AP subnet on each device.',
         apStaticHint: 'DHCP is off. Configure a static address in this subnet on connected devices, then open the AP address.',
         apDhcpStart: 'DHCP start address',

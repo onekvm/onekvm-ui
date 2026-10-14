@@ -63,7 +63,7 @@ import {
   extensionLocalizedText,
   type ExtensionSettingValue,
   type ExtensionStatus,
-  type ExtensionSummary,
+  type ConsoleExtension,
   type OneKVMStatus,
   type RemoveExtensionOptions,
 } from '@/api/client'
@@ -114,7 +114,7 @@ export interface ToolbarRegistrationV1 {
 
 export interface ExtensionShellHostV1 {
   readonly apiVersion: 1
-  readonly extension: Readonly<ExtensionSummary>
+  readonly extension: Readonly<ConsoleExtension>
   readonly invoke: <T = unknown>(method: string, payload?: unknown) => Promise<T>
 }
 
@@ -171,7 +171,7 @@ declare global {
 const registrations = new Map<string, VueExtensionPageDefinitionV1>()
 const toolbarRegistrations = new Map<string, ToolbarRegistrationV1>()
 const shellRegistrations = new Map<string, ExtensionShellRegistrationV1>()
-const shellExtensions = new Map<string, ExtensionSummary>()
+const shellExtensions = new Map<string, ConsoleExtension>()
 const toolbarItemsState = shallowRef<LoadedToolbarItem[]>([])
 let loadingToolbarId: string | null = null
 let loadingPageId: string | null = null
@@ -377,7 +377,7 @@ const loadedShellScripts = new Map<string, HTMLScriptElement>()
 const pendingShellLoads = new Map<string, Promise<void>>()
 let shellLoadQueue: Promise<void> = Promise.resolve()
 
-async function loadExtensionShell(extension: ExtensionSummary) {
+async function loadExtensionShell(extension: ConsoleExtension) {
   if (!extension.version || !extension.shell?.entrypoint) {
     throw new Error(`Extension ${extension.id} does not register shell methods`)
   }
@@ -414,7 +414,7 @@ async function loadExtensionShell(extension: ExtensionSummary) {
   }
 }
 
-export function ensureExtensionShell(extension: ExtensionSummary): Promise<void> {
+export function ensureExtensionShell(extension: ConsoleExtension): Promise<void> {
   const key = `${extension.id}@${extension.version || ''}`
   const pending = pendingShellLoads.get(key)
   if (pending) return pending
@@ -428,7 +428,7 @@ export function ensureExtensionShell(extension: ExtensionSummary): Promise<void>
   return load
 }
 
-export async function loadExtensionShells(extensions: ExtensionSummary[]) {
+export async function loadExtensionShells(extensions: ConsoleExtension[]) {
   const wanted = extensions.filter((extension) => extension.installed && extension.version && extension.shell?.entrypoint)
   const wantedIds = new Set(wanted.map((extension) => extension.id))
   const wantedKeys = new Set(wanted.map((extension) => `${extension.id}@${extension.version}`))
@@ -451,7 +451,7 @@ export async function loadExtensionShells(extensions: ExtensionSummary[]) {
   }
 }
 
-export async function loadExtensionToolbars(extensions: ExtensionSummary[]) {
+export async function loadExtensionToolbars(extensions: ConsoleExtension[]) {
   const wantedIds = new Set<string>()
   const wantedKeys = new Set<string>()
   for (const extension of extensions) {

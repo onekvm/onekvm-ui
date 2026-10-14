@@ -1,6 +1,6 @@
 import { computed, inject, markRaw, onBeforeUnmount, onMounted, provide, reactive, ref, shallowRef, watch, type InjectionKey } from 'vue'
 import { useMessage } from 'naive-ui'
-import { api, extensionLocalizedText, type ExtensionStatus, type ExtensionSummary, type ExtensionToolboxItem } from '@/api/client'
+import { api, extensionLocalizedText, type ExtensionStatus, type ConsoleExtension, type ExtensionToolboxItem } from '@/api/client'
 import { toolbarLauncherActive } from '@/lib/toolbar-dock'
 import { useAuth } from './useAuth'
 import { hasPermission } from '@/build'
@@ -13,7 +13,7 @@ export interface ToolboxTool {
   id: string
   title: string
   extensionName: string
-  extension: ExtensionSummary
+  extension: ConsoleExtension
   item: ExtensionToolboxItem
 }
 export interface ToolInstance {
@@ -33,7 +33,7 @@ const key: InjectionKey<ReturnType<typeof useToolbox>> = Symbol('toolbox')
 export function useToolbox() {
   const { auth, refresh: refreshAuth } = useAuth()
   const message = useMessage()
-  const catalog = shallowRef<ExtensionSummary[]>([])
+  const catalog = shallowRef<ConsoleExtension[]>([])
   const instances = shallowRef<ToolInstance[]>([])
   const pins = ref<ToolboxPin[]>([])
   const menuOpen = ref(false)
@@ -205,7 +205,7 @@ export function useToolbox() {
   function closeAll() {
     for (const id of instances.value.map(instance => instance.id)) void close(id, true)
   }
-  function acceptCatalog(next: ExtensionSummary[]) {
+  function acceptCatalog(next: ConsoleExtension[]) {
     catalog.value = next
     invalidateToolResources(allowed.value ? next : [])
     error.value = ''
@@ -229,7 +229,7 @@ export function useToolbox() {
     loading.value = true
     refreshPromise = (async () => {
       try {
-        const next = await api.getExtensions()
+        const next = await api.getConsoleExtensions()
         if (generation === current) acceptCatalog(next)
       } catch (reason) {
         if (generation === current) error.value = reason instanceof Error ? reason.message : String(reason)
@@ -313,7 +313,7 @@ export function useToolbox() {
     void refresh()
   }, { immediate: true })
   onMounted(() => {
-    refreshTimer = window.setInterval(resume, 15000)
+    refreshTimer = window.setInterval(() => { if (document.visibilityState === 'visible') void refreshAuth() }, 15000)
     document.addEventListener('visibilitychange', resume)
     window.addEventListener('online', resume)
     window.addEventListener('resize', resize)

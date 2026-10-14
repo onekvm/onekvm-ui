@@ -202,10 +202,10 @@ watch(
   () => { fallbackActionError.value = '' },
 )
 watch(
-  () => auth.authenticated,
-  (authenticated) => {
+  () => `${auth.authenticated}:${auth.username}:${auth.permissions.join(',')}`,
+  () => {
     void refreshExtensionContributions()
-    if (authenticated) return
+    if (auth.authenticated) return
     void onekvm.close()
   },
 )
@@ -229,16 +229,20 @@ watch(
   { immediate: true },
 )
 
+let contributionGeneration = 0
 async function refreshExtensionContributions() {
-  if (!auth.authenticated) {
+  const generation = ++contributionGeneration
+  if (!auth.authenticated || !hasPermission(auth, 'settings.view')) {
     await Promise.all([loadExtensionToolbars([]), loadExtensionShells([])])
     return
   }
   try {
-    const extensions = await api.getExtensions()
+    const extensions = await api.getConsoleExtensions()
+    if (generation !== contributionGeneration) return
     toolbox.acceptCatalog(extensions)
     await Promise.all([loadExtensionToolbars(extensions), loadExtensionShells(extensions)])
   } catch {
+    if (generation !== contributionGeneration) return
     await Promise.all([loadExtensionToolbars([]), loadExtensionShells([])])
   }
 }
@@ -503,6 +507,7 @@ onMounted(() => {
 	void refreshMSDStatus()
   void refreshDeviceShortcuts()
   void refreshExtensionContributions()
+  window.addEventListener('onekvm:extensions-changed', refreshExtensionContributions)
   window.addEventListener('pagehide', closeSession)
   window.addEventListener('hashchange', syncRoute)
   window.addEventListener('popstate', onPopState)
@@ -518,6 +523,7 @@ onBeforeUnmount(() => {
 	document.title = 'OneKVM'
 	unsubscribeStatus?.()
 	unsubscribeKeyboardLED?.()
+  window.removeEventListener('onekvm:extensions-changed', refreshExtensionContributions)
   window.removeEventListener('pagehide', closeSession)
   window.removeEventListener('hashchange', syncRoute)
   window.removeEventListener('popstate', onPopState)

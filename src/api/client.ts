@@ -696,6 +696,9 @@ export interface ExtensionToolboxItem {
   view: { renderer: 'vue'; entrypoint: string }
 }
 
+export type ConsoleExtension = Pick<ExtensionSummary,
+  'id' | 'name' | 'i18n' | 'version' | 'installed' | 'enabled' | 'error' | 'toolbox' | 'toolbar' | 'shell' | 'icon'>
+
 export interface ExtensionSummary {
   id: string
   name: string
@@ -1012,9 +1015,11 @@ export function isUnauthorizedError(error: unknown): boolean {
   return error instanceof APIError && error.status === 401
 }
 
+const consoleExtensions = createPersistentQuery<ConsoleExtension[]>()
 const msdSources = createPersistentQuery<MSDSource[]>()
 
 export function invalidateExtensionCaches() {
+  consoleExtensions.invalidate()
   msdSources.invalidate()
 }
 
@@ -1713,6 +1718,7 @@ export const api = {
       headers: { 'Content-Type': 'application/vnd.onekvm.firmware-update' },
     }),
   getExtensions: () => request<ExtensionSummary[]>('/api/extensions'),
+  getConsoleExtensions: () => consoleExtensions.get(serviceBaseUrl(), () => request<ConsoleExtension[]>('/api/extensions/console', { cache: 'no-store' })),
   getExtension,
   getExtensionLayout: (extension: ExtensionStatus) => {
     if (!extension.page || extension.page.renderer !== 'layout') {

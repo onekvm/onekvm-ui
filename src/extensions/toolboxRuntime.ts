@@ -1,6 +1,6 @@
 import { markRaw, type Component, type ComputedRef, type Ref } from 'vue'
 import type { ToolChildWindow } from '@/lib/tool-child-windows'
-import { extensionAssetURL, type ExtensionStatus, type ExtensionSummary, type ExtensionToolboxItem, type OneKVMStatus } from '@/api/client'
+import { extensionAssetURL, type ExtensionStatus, type ConsoleExtension, type ExtensionToolboxItem, type OneKVMStatus } from '@/api/client'
 import type { ExtensionPageSettingsAdapterV1, VueExtensionPageDefinitionV1 } from './pluginUi'
 import type { HIDReportListener, KeyboardTextListener } from '@/lib/onekvm'
 
@@ -58,7 +58,7 @@ const contexts = new WeakMap<HTMLScriptElement, Entry>()
 const pending = new Map<string, Promise<Entry>>()
 let allowedKeys: Set<string> | null = null
 let queue: Promise<unknown> = Promise.resolve()
-export const toolCacheKey = (extension: Pick<ExtensionSummary, 'id' | 'version'>, tool: ExtensionToolboxItem) =>
+export const toolCacheKey = (extension: Pick<ConsoleExtension, 'id' | 'version'>, tool: ExtensionToolboxItem) =>
   JSON.stringify([extension.id, extension.version, tool.id, tool.view.entrypoint])
 
 export function registerTool(extensionId: string, toolId: string, definition: VueExtensionPageDefinitionV1) {
@@ -81,7 +81,7 @@ function remove(entry: Entry) {
   entry.styles = []
 }
 
-async function load(extension: ExtensionSummary, tool: ExtensionToolboxItem, key: string): Promise<Entry> {
+async function load(extension: ConsoleExtension, tool: ExtensionToolboxItem, key: string): Promise<Entry> {
   if (allowedKeys && !allowedKeys.has(key)) throw new Error('Tool resource was invalidated')
   const existing = entries.get(key)
   if (existing && !existing.retired && existing.definition) return existing
@@ -119,7 +119,7 @@ async function load(extension: ExtensionSummary, tool: ExtensionToolboxItem, key
   }
 }
 
-export async function loadExtensionTool(extension: ExtensionSummary, tool: ExtensionToolboxItem): Promise<{ component: Component; dispose: () => void }> {
+export async function loadExtensionTool(extension: ConsoleExtension, tool: ExtensionToolboxItem): Promise<{ component: Component; dispose: () => void }> {
   if (!extension.installed || !extension.enabled || !extension.version || tool.view.renderer !== 'vue') {
     throw new Error('Tool is unavailable')
   }
@@ -155,7 +155,7 @@ export async function loadExtensionTool(extension: ExtensionSummary, tool: Exten
 }
 
 // Call only with an authoritative successful catalog (or at logout).
-export function invalidateToolResources(extensions: ExtensionSummary[]) {
+export function invalidateToolResources(extensions: ConsoleExtension[]) {
   const wanted = new Set(extensions.filter(e => e.installed && e.enabled && e.version)
     .flatMap(e => (e.toolbox?.items || []).map(t => toolCacheKey(e, t))))
   allowedKeys = wanted

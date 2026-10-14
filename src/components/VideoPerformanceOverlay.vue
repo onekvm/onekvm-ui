@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Activity, Minus, Square, X } from '@lucide/vue'
 
 import { t } from '@/i18n/runtime'
+import { usePerformanceContentMotion } from '@/composables/usePerformanceContentMotion'
 import { useLatencyHistory } from '@/composables/useLatencyHistory'
 import { useVideoStreamHistory } from '@/composables/useVideoStreamHistory'
 import {
@@ -94,55 +95,6 @@ let dragOffset: OverlayPoint = { x: 0, y: 0 }
 let dragging = false
 let dragHandle: HTMLElement | null = null
 let dragPointerId: number | null = null
-let layoutAnimations: Animation[] = []
-let layoutRevision = 0
-
-function stopLayoutAnimation() {
-  layoutRevision += 1
-  for (const animation of layoutAnimations) animation.cancel()
-  layoutAnimations = []
-}
-
-async function animateCompactChange() {
-  stopLayoutAnimation()
-  const revision = layoutRevision
-  const element = panel.value
-  if (!props.visible || !element) return
-  const previous = element.getBoundingClientRect()
-  await nextTick()
-  if (revision !== layoutRevision || !props.visible) return
-  clampPosition()
-  await nextTick()
-  if (revision !== layoutRevision || !props.visible) return
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-  const current = element.getBoundingClientRect()
-  if (!previous.width || !previous.height || !current.width || !current.height) return
-  const scaleX = previous.width / current.width
-  const scaleY = previous.height / current.height
-  const styles = getComputedStyle(element)
-  const duration = styles.getPropertyValue('--win11-enter').trim()
-  const timing = {
-    duration: parseFloat(duration) * (duration.endsWith('ms') ? 1 : 1000) || 250,
-    easing: styles.getPropertyValue('--win11-ease-out').trim() || 'ease-out',
-  }
-  layoutAnimations.push(element.animate([
-    { transformOrigin: 'top left', transform: `translate(${previous.left - current.left}px, ${previous.top - current.top}px) scale(${scaleX}, ${scaleY})` },
-    { transformOrigin: 'top left', transform: 'none' },
-  ], timing))
-  // Sample reciprocal scales so content stays at its normal size throughout
-  // the frame animation, including large height changes when minimizing.
-  const card = element.querySelector<HTMLElement>('.console-floating-card')
-  if (card) layoutAnimations.push(card.animate(Array.from({ length: 61 }, (_, index) => {
-    const progress = index / 60
-    return {
-      offset: progress,
-      transformOrigin: 'top left',
-      transform: `scale(${1 / (scaleX + (1 - scaleX) * progress)}, ${1 / (scaleY + (1 - scaleY) * progress)})`,
-      opacity: 0.6 + 0.4 * progress,
-    }
-  }), timing))
-}
-
 const panelStyle = computed(() => ({
   left: `${position.value.x}px`,
   top: `${position.value.y}px`,
@@ -187,6 +139,19 @@ async function placePanel() {
 }
 
 const showAudioColumn = computed(() => performanceAudioVisible(Boolean(props.audioEnabled), showAudio.value))
+const contentMotion = usePerformanceContentMotion({
+  panel,
+  content: () => ({ advanced: advanced.value, audio: showAudioColumn.value, compact: compact.value }),
+  visible: () => props.visible,
+  place: size => { position.value = clampOverlayPosition(position.value, size, hostRect()) },
+})
+const renderedContent = contentMotion.rendered
+
+function onWindowResize() {
+  contentMotion.cancel()
+  clampPosition()
+}
+watch(mobile, onWindowResize)
 const compactResolution = computed(() => formatCompactResolution(props.inputWidth, props.inputHeight))
 const compactChart = computed(() => compactChartPaths(
   samples.value,
@@ -196,7 +161,7 @@ const compactChart = computed(() => compactChartPaths(
 ))
 
 function startDrag(event: PointerEvent) {
-  stopLayoutAnimation()
+  contentMotion.cancel()
   if (event.button !== 0 || !panel.value) return
   const handle = event.currentTarget
   if (!(handle instanceof HTMLElement)) return
@@ -245,19 +210,19 @@ function syncMobile() {
 onMounted(() => {
   launcherMedia = window.matchMedia(TOOLBAR_LAUNCHER_QUERY)
   launcherMedia.addEventListener('change', syncMobile)
-  window.addEventListener('resize', clampPosition)
+  window.addEventListener('resize', onWindowResize)
   if (props.visible) void placePanel()
 })
 
 onBeforeUnmount(() => {
-  stopLayoutAnimation()
+  contentMotion.cancel()
   launcherMedia?.removeEventListener('change', syncMobile)
-  window.removeEventListener('resize', clampPosition)
+  window.removeEventListener('resize', onWindowResize)
   stopDrag()
 })
 
 watch(() => props.visible, (visible) => {
-  stopLayoutAnimation()
+  contentMotion.cancel()
   if (visible) void placePanel()
   else stopDrag()
 })
@@ -272,24 +237,15 @@ watch(panel, (element, _previous, onCleanup) => {
   observer.observe(element)
   onCleanup(() => observer.disconnect())
 }, { flush: 'post' })
-function persistLayout() {
-  if (!props.visible) return
-  void nextTick().then(() => clampPosition())
-}
-
 watch(advanced, (value) => {
   localStorage.setItem(ADVANCED_KEY, String(value))
-  persistLayout()
 })
 watch(showAudio, (value) => {
   localStorage.setItem(AUDIO_KEY, String(value))
-  persistLayout()
 })
 watch(compact, (value) => {
   localStorage.setItem(COMPACT_KEY, String(value))
-  void animateCompactChange()
 })
-watch(() => props.audioEnabled, persistLayout)
 </script>
 
 <template>
@@ -297,19 +253,20 @@ watch(() => props.audioEnabled, persistLayout)
     ref="frame"
     :title="t('screen.performance', 'Performance')"
     :show="visible"
+    :chrome-visible="renderedContent.compact"
     :close-label="t('screen.hidePerformance', 'Hide performance overlay')"
     class="video-performance-overlay"
     :class="{
-      'is-advanced': advanced && !compact,
-      'has-audio': showAudioColumn && !compact,
-      'is-compact': compact,
+      'is-advanced': renderedContent.advanced && !renderedContent.compact,
+      'has-audio': renderedContent.audio && !renderedContent.compact,
+      'is-compact': renderedContent.compact,
       'is-mobile-sheet': mobile,
     }"
     :style="panelStyle"
     @close="emit('close')"
     @header-pointerdown="startDrag"
   >
-    <template v-if="compact" #chrome>
+    <template #chrome>
     <div
       class="performance-compact-bar"
       @pointerdown="startDrag"
@@ -387,7 +344,7 @@ watch(() => props.audioEnabled, persistLayout)
         </label>
       </div>
     </template>
-    <div v-if="!compact" class="display-status-content">
+    <div v-if="!renderedContent.compact" class="display-status-content">
       <DisplayStatusValues
         :canvas-width="canvasWidth"
         :canvas-height="canvasHeight"
@@ -406,8 +363,9 @@ watch(() => props.audioEnabled, persistLayout)
         :jitter-buffer-us="jitterBufferUs"
         :decode-us="decodeUs"
         :present-us="presentUs"
-        :show-latency="advanced"
-        :audio-enabled="showAudioColumn"
+        :show-latency="renderedContent.advanced"
+        :animate-panels="false"
+        :audio-enabled="renderedContent.audio"
         :audio-encoder="audioEncoder"
         :audio-quality="audioQuality"
         :audio-sample-rate="audioSampleRate"

@@ -28,6 +28,7 @@ const props = defineProps<{
   presentUs: number
   showLatency?: boolean
   audioEnabled?: boolean
+  animatePanels?: boolean
   audioEncoder?: string
   audioQuality?: string
   audioSampleRate?: number
@@ -106,8 +107,8 @@ const audioLatencyTotal = computed(() => formatLatencyUs(
 </script>
 
 <template>
-  <div class="display-status-values">
-    <section class="display-status-column">
+  <TransitionGroup :name="animatePanels === false ? 'performance-panel-static' : 'performance-panel'" :css="animatePanels !== false" tag="div" class="display-status-values">
+    <section key="stream" class="display-status-column" data-performance-panel="stream">
       <h2>{{ t('screen.streamColumn', 'Stream') }}</h2>
       <div class="display-status-meta">
         <div>
@@ -144,7 +145,7 @@ const audioLatencyTotal = computed(() => formatLatencyUs(
       </div>
     </section>
 
-    <section v-if="showLatency" class="display-status-column">
+    <section v-if="showLatency" key="latency" class="display-status-column" data-performance-panel="latency">
       <h2>{{ t('screen.latencyColumn', 'Latency') }}</h2>
       <div class="display-status-meta">
         <div>
@@ -186,7 +187,7 @@ const audioLatencyTotal = computed(() => formatLatencyUs(
       </div>
     </section>
 
-    <section v-if="audioEnabled" class="display-status-column">
+    <section v-if="audioEnabled" key="audio" class="display-status-column" data-performance-panel="audio">
       <h2>{{ t('screen.audioColumn', 'Audio') }}</h2>
       <div class="display-status-meta">
         <div>
@@ -227,7 +228,7 @@ const audioLatencyTotal = computed(() => formatLatencyUs(
       </div>
     </section>
 
-    <section v-if="showLatency && audioEnabled" class="display-status-column">
+    <section v-if="showLatency && audioEnabled" key="audio-latency" class="display-status-column" data-performance-panel="audio-latency">
       <h2>{{ t('screen.audioLatencyColumn', 'Audio latency') }}</h2>
       <div class="display-status-meta">
         <div>
@@ -253,5 +254,38 @@ const audioLatencyTotal = computed(() => formatLatencyUs(
         <VideoLatencyChart :samples="audioLatencySamples || []" />
       </div>
     </section>
-  </div>
+  </TransitionGroup>
 </template>
+
+<style scoped>
+.display-status-values { position: relative; }
+
+.performance-panel-enter-active,
+.performance-panel-leave-active,
+.performance-panel-move {
+  transition:
+    opacity var(--win11-enter) var(--win11-ease-out),
+    transform var(--win11-enter) var(--win11-ease-out);
+}
+
+.performance-panel-leave-active {
+  position: absolute;
+  pointer-events: none;
+}
+
+.performance-panel-enter-from {
+  opacity: 0;
+  transform: translateY(8px) scale(.98);
+}
+
+.performance-panel-leave-to {
+  opacity: 0;
+  transform: translateY(-6px) scale(.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .performance-panel-enter-active,
+  .performance-panel-leave-active,
+  .performance-panel-move { transition: none; }
+}
+</style>

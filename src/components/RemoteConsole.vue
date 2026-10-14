@@ -6,6 +6,7 @@ import { useMouse, type MouseMode } from '@/composables/useMouse'
 import { consolePointerCursor } from '@/lib/console-pointer'
 import { useViewportZoom } from '@/composables/useViewportZoom'
 import { useZoomBadge } from '@/composables/useZoomBadge'
+import { useVideoDisplayMotion } from '@/composables/useVideoDisplayMotion'
 import { canvasDeviceSize, mapAbsoluteMouse, originalCssSize, paintedCssSize, rotatedVideoSize, unrotateMouseDelta, type VideoFit, type VideoRotation } from '@/lib/video-fit'
 import { MOUSE_BUTTON_LEFT, sendRelativeMotion } from '@/lib/hid-mouse'
 import { cursorToScreen, viewOverflows } from '@/lib/viewport-zoom'
@@ -56,7 +57,7 @@ const remoteAudio = ref<HTMLAudioElement | null>(null)
 const canvas = ref<HTMLCanvasElement | null>(null)
 const inputSurface = ref<HTMLElement | null>(null)
 const trackpadOn = computed(() => Boolean(props.trackpad))
-const hidEnabled = computed(() => !trackpadOn.value && !props.keyboardBlocked)
+const hidEnabled = computed(() => !trackpadOn.value && !props.keyboardBlocked && !displayMotion.rotating.value)
 const hidCursor = ref<string | undefined>(undefined)
 let lastPointer: { x: number; y: number } | null = null
 const trackpadChrome = shallowRef(0)
@@ -112,16 +113,6 @@ const connectionProblem = computed(
   ),
 )
 
-useMouse(
-  inputTarget,
-  toRef(props, 'mouseMode'),
-  toRef(props, 'scrollInterval'),
-  toRef(props, 'mouseReportRate'),
-  toRef(props, 'videoFit'),
-  inputSurface,
-  hidEnabled,
-  toRef(props, 'videoRotation'),
-)
 const {
   view: zoomView,
   cursor: zoomCursor,
@@ -195,6 +186,29 @@ const mediaStyle = computed(() => {
     transform: `translate(-50%, -50%) rotate(${props.videoRotation}deg)`,
   }
 })
+
+const displayMotion = useVideoDisplayMotion({
+  target: inputTarget,
+  fit: () => props.videoFit,
+  rotation: () => props.videoRotation,
+  ready: () => hasFrame.value,
+  settle: () => {
+    stageWidth.value = stage.value?.clientWidth ?? 0
+    stageHeight.value = stage.value?.clientHeight ?? 0
+  },
+  settled: () => { publishCanvasSize(); refreshHidCursor() },
+})
+
+useMouse(
+  inputTarget,
+  toRef(props, 'mouseMode'),
+  toRef(props, 'scrollInterval'),
+  toRef(props, 'mouseReportRate'),
+  toRef(props, 'videoFit'),
+  inputSurface,
+  hidEnabled,
+  toRef(props, 'videoRotation'),
+)
 
 function updateMetadata() {
   if (!video.value) return

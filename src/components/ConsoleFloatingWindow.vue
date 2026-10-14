@@ -10,12 +10,13 @@ withDefaults(defineProps<{
   title: string
   show?: boolean
   animate?: boolean
+  chromeVisible?: boolean
   draggable?: boolean
   titleTabindex?: number
   titleLabel?: string
   closeLabel?: string
   headerClass?: string
-}>(), { show: true, animate: true, draggable: true })
+}>(), { show: true, animate: true, chromeVisible: true, draggable: true })
 const emit = defineEmits<{
   close: []
   'header-pointerdown': [event: PointerEvent]
@@ -34,8 +35,8 @@ defineExpose({ element })
   <Transition name="win11-window" :css="animate" appear>
     <section v-if="show" ref="element" class="console-floating-window" role="dialog" :aria-label="title" v-bind="$attrs">
       <NCard :bordered="false" class="console-floating-card" :content-style="{ padding: '0', display: 'flex', flexDirection: 'column', minHeight: '0' }">
-        <slot name="chrome">
-          <header class="display-status-titlebar" :class="[headerClass, { 'is-static': !draggable }]" @pointerdown="emit('header-pointerdown', $event)" @pointermove="emit('header-pointermove', $event)" @pointerup="emit('header-pointerup', $event)" @pointercancel="emit('header-pointercancel', $event)" @lostpointercapture="emit('header-pointercancel', $event)">
+        <div v-if="slots.chrome" v-show="chromeVisible" class="console-floating-chrome"><slot name="chrome" /></div>
+          <header v-show="!slots.chrome || !chromeVisible" class="display-status-titlebar" :class="[headerClass, { 'is-static': !draggable }]" @pointerdown="emit('header-pointerdown', $event)" @pointermove="emit('header-pointermove', $event)" @pointerup="emit('header-pointerup', $event)" @pointercancel="emit('header-pointercancel', $event)" @lostpointercapture="emit('header-pointercancel', $event)">
             <span v-if="slots['title-icon']" class="console-floating-title-icon"><slot name="title-icon" /></span>
             <strong class="console-floating-title" :tabindex="titleTabindex" :aria-label="titleLabel" @keydown="emit('title-keydown', $event)">{{ title }}</strong>
             <slot name="header-extra" />
@@ -49,7 +50,6 @@ defineExpose({ element })
               </NTooltip>
             </div>
           </header>
-        </slot>
         <slot />
       </NCard>
     </section>

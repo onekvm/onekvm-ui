@@ -4,6 +4,7 @@ import { RefreshCw, Wifi } from '@lucide/vue'
 
 import { api, type WifiNetwork, type WifiStatus } from '@/api/client'
 import { t } from '@/i18n/runtime'
+import { defaultWifiApNetwork, wifiApNetworkError } from '@/lib/wifi-ap-network'
 import WifiApSettings from './WifiApSettings.vue'
 
 const status = shallowRef<WifiStatus | null>(null)
@@ -17,6 +18,10 @@ const apSsid = shallowRef('')
 const apPassword = shallowRef('')
 const apChannel = shallowRef(6)
 const apBand = shallowRef<'2.4' | '5'>('2.4')
+const apAddress = shallowRef(defaultWifiApNetwork.address)
+const apDhcpStart = shallowRef(defaultWifiApNetwork.dhcp_start)
+const apDhcpEnd = shallowRef(defaultWifiApNetwork.dhcp_end)
+const apNetwork = computed(() => ({ address: apAddress.value, dhcp_start: apDhcpStart.value, dhcp_end: apDhcpEnd.value }))
 const apDirty = shallowRef(false)
 const loading = shallowRef(false)
 const initialLoading = shallowRef(true)
@@ -33,6 +38,7 @@ const showAp = computed(() => !props.interfaceName || props.interfaceName === 'a
 const showStation = computed(() => !props.interfaceName || props.interfaceName === 'wlan0')
 const stationEnabled = computed(() => status.value?.mode !== 'ap')
 const canSaveAp = computed(() => apDirty.value && !loading.value
+  && !wifiApNetworkError(apNetwork.value)
   && new TextEncoder().encode(apSsid.value).length >= 1
   && new TextEncoder().encode(apSsid.value).length <= 32
   && !/[\x00-\x1f\x7f]/.test(apSsid.value)
@@ -94,6 +100,10 @@ async function refresh() {
       apPassword.value = status.value.ap_password
       apChannel.value = status.value.ap_channel
       apBand.value = status.value.ap_band || (apChannel.value > 14 ? '5' : '2.4')
+      const network = status.value.ap_network || defaultWifiApNetwork
+      apAddress.value = network.address
+      apDhcpStart.value = network.dhcp_start
+      apDhcpEnd.value = network.dhcp_end
     }
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : String(reason)
@@ -179,7 +189,7 @@ async function saveApConfig() {
   loading.value = true
   error.value = ''
   try {
-    status.value = await api.setWifiApConfig(apSsid.value, apPassword.value, apChannel.value, apBand.value)
+    status.value = await api.setWifiApConfig(apSsid.value, apPassword.value, apChannel.value, apBand.value, apNetwork.value)
     apDirty.value = false
     emit('changed')
   } catch (reason) {
@@ -241,11 +251,15 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
     <WifiApSettings
       v-if="showAp && !props.initialSetup"
       :status="status" :ssid="apSsid" :password="apPassword" :channel="apChannel" :band="apBand"
+      :address="apAddress" :dhcp-start="apDhcpStart" :dhcp-end="apDhcpEnd"
       :busy="loading" :can-save="canSaveAp"
       @update:ssid="apSsid = $event; apDirty = true"
       @update:password="apPassword = $event; apDirty = true"
       @update:channel="apChannel = $event; apDirty = true"
       @update:band="apBand = $event; apDirty = true"
+      @update:address="apAddress = $event; apDirty = true"
+      @update:dhcp-start="apDhcpStart = $event; apDirty = true"
+      @update:dhcp-end="apDhcpEnd = $event; apDirty = true"
       @toggle="toggleAp" @save="saveApConfig"
     />
 

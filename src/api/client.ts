@@ -1,3 +1,4 @@
+import type { WifiApNetwork } from '../lib/wifi-ap-network'
 import { resolveServiceURL, serviceBaseUrl, serviceURL, serviceWebSocketURL } from './service-url.ts'
 export type IPv4Mode = 'disabled' | 'dhcp' | 'dhcp-static' | 'static'
 export type IPv6Mode = 'disabled' | 'slaac' | 'dhcp' | 'static'
@@ -54,6 +55,7 @@ export interface WifiStatus {
   ap_ssid: string
   ap_password: string
   ap_address: string
+  ap_network?: WifiApNetwork
   ap_channel: number
   ap_band: '2.4' | '5'
   ap_operating_channel: number | null
@@ -1605,7 +1607,7 @@ export const api = {
 	scanWifi,
 	connectWifi: (ssid: string, password: string) => request<WifiStatus>('/api/network/wifi/connect', { method: 'POST', body: JSON.stringify({ ssid, password }) }),
 	setWifiAp: (enabled: boolean) => request<WifiStatus>('/api/network/wifi/ap', { method: 'POST', body: JSON.stringify({ enabled }) }),
-	setWifiApConfig: (ssid: string, password: string, channel: number, band: '2.4' | '5') => request<WifiStatus>('/api/network/wifi/ap/config', { method: 'POST', body: JSON.stringify({ ssid, password, channel, band }) }),
+	setWifiApConfig: (ssid: string, password: string, channel: number, band: '2.4' | '5', network: WifiApNetwork) => request<WifiStatus>('/api/network/wifi/ap/config', { method: 'POST', body: JSON.stringify({ ssid, password, channel, band, network }) }),
 	setWifiMode: (mode: WifiStatus['mode']) => request<WifiStatus>('/api/network/wifi/mode', { method: 'POST', body: JSON.stringify({ mode }) }),
 	getNetworkApplyStatus: () => request<NetworkApplyStatus>('/api/network/apply', { cache: 'no-store' }),
 	confirmNetworkApply: () => request<{ status: string }>('/api/network/apply/confirm', { method: 'POST' }),

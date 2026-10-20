@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
 import { NAlert, NButton, NEmpty, NSpin, type DropdownOption } from 'naive-ui'
-import { Pin, PinOff, Toolbox } from '@lucide/vue'
+import { Pin, PinOff, Toolbox } from '@/icons'
 import { useToolboxContext } from '@/composables/useToolbox'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { DISMISS_CONTROL_OVERLAY_EVENT } from '@/lib/overlay-target'

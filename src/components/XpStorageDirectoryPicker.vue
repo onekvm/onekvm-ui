@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue'
-import { FolderOpen, FolderPlus, RefreshCw, X } from '@lucide/vue'
+import { FolderOpen, FolderPlus, RefreshCw, X } from '@/icons'
 
 import { api, type DeviceFileEntry } from '@/api/client'
 

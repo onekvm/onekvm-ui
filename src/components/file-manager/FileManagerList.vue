@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Download, File, FilePenLine, Folder, Pencil, Trash2 } from '@lucide/vue'
+import { Download, File, FilePenLine, Folder, Pencil, Trash2 } from '@/icons'
 
 import type { DeviceFileEntry } from '@/api/client'
 import { currentLanguage, t } from '@/i18n/runtime'

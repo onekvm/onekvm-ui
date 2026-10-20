@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Cpu, Package } from '@lucide/vue'
+import { Cpu, Package } from '@/icons'
 import { extensionRouteURL, extensionTranslation, type ExtensionStatus, type ExtensionSummary } from '@/api/client'
 import { currentLanguage, t } from '@/i18n/runtime'
 import { pluginIcon } from '@/lib/plugin-icons'

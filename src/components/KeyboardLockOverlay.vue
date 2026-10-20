@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowBigUpDash, ArrowDownUp, Hash, LockKeyhole, LockKeyholeOpen } from '@lucide/vue'
+import { ArrowBigUpDash, ArrowDownUp, Hash, LockKeyhole, LockKeyholeOpen } from '@/icons'
 
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import type { KeyboardLock, KeyboardLockChange } from '@/lib/keyboard-lock-state'

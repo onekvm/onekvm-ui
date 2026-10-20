@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { RotateCcw, ZoomIn, ZoomOut } from '@lucide/vue'
+import { RotateCcw, ZoomIn, ZoomOut } from '@/icons'
 import { geoEquirectangular, geoPath } from 'd3-geo'
 import { feature } from 'topojson-client'
 import type { GeometryCollection, Topology } from 'topojson-specification'

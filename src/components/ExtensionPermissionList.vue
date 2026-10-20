@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue'
-import { CircuitBoard, Globe, Keyboard, Monitor, Network, Package, ScanLine, Settings2, ShieldCheck, Video } from '@lucide/vue'
+import { CircuitBoard, Globe, Keyboard, Monitor, Network, Package, ScanLine, Settings2, ShieldAlert, ShieldCheck, Video } from '@/icons'
 import { t } from '@/i18n/runtime'
 import IconDescriptionList from './IconDescriptionList.vue'
 import PluginDetailsSectionTitle from './PluginDetailsSectionTitle.vue'

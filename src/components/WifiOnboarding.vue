@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onUnmounted, shallowRef, watch } from 'vue'
-import { RefreshCw, Wifi } from '@lucide/vue'
+import { RefreshCw, Wifi } from '@/icons'
 
 import { api, type WifiNetwork, type WifiStatus } from '@/api/client'
 import { t } from '@/i18n/runtime'

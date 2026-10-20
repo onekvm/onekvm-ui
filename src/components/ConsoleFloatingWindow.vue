@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, useSlots } from 'vue'
 import { NButton, NCard, NTooltip } from 'naive-ui'
-import { X } from '@lucide/vue'
+import { X } from '@/icons'
 import { t } from '@/i18n/runtime'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 

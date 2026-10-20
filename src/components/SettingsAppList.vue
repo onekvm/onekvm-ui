@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
-import { ChevronRight, LoaderCircle } from '@lucide/vue'
+import { ChevronRight, LoaderCircle } from '@/icons'
 
 import type { SettingsListTone } from '@/lib/settings-nav'
 

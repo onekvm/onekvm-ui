@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { ChevronRight, Layers3, Network, Plus, RefreshCw, Shield, Wifi } from '@lucide/vue'
+import { computed, h, onMounted, ref, watch } from 'vue'
+import { ChevronRight, Layers3, Network, Plus, RefreshCw, Shield, TriangleAlert, Wifi } from '@/icons'
+import { useAsyncDialog } from '@/composables/useAsyncDialog'
 
 import {
   api,

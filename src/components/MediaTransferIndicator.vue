@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Download, Upload } from '@lucide/vue'
+import { Download, Upload } from '@/icons'
 
 import { t } from '@/i18n/runtime'
 import type { MediaTransferState } from '@/lib/media-transfer'

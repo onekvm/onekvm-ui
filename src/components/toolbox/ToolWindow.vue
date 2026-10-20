@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, shallowRef, useTemplateRef, watch } from 'vue'
-import { Copy, Ellipsis, Minus, Square } from '@lucide/vue'
+import { AppWindow, Copy, Minus, Square } from '@/icons'
 import { t } from '@/i18n/runtime'
 import { readSafeAreaInsets } from '@/lib/fullscreen-inset'
 import { clampOverlayPosition, resizeAnchoredBox, type OverlayResizeHandle } from '@/lib/overlay-drag'

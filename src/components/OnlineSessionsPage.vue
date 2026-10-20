@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { Globe2, MonitorPlay, PlugZap, RadioTower, UserRound } from '@lucide/vue'
+import { Globe2, MonitorPlay, PlugZap, RadioTower, UserRound } from '@/icons'
 
 import { api, type OnlineSession } from '@/api/client'
 import { t } from '@/i18n/runtime'

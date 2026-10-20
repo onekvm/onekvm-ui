@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CircleHelp, MemoryStick } from '@lucide/vue'
+import { CircleHelp, MemoryStick } from '@/icons'
 import { computed, shallowRef } from 'vue'
 import { t } from '@/i18n/runtime'
 import SystemSpecBadge from './SystemSpecBadge.vue'

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { Save } from '@lucide/vue'
+import { Save } from '@/icons'
 
 import type { KeyboardShortcut } from '@/api/client'
 import { useOverlayMount } from '@/composables/useOverlayMount'

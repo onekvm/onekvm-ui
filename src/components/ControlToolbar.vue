@@ -26,7 +26,7 @@ import {
   Server,
   UserRound,
   Volume2,
-} from '@lucide/vue'
+} from '@/icons'
 import { NIcon, useMessage, type DialogReactive, type DropdownOption } from 'naive-ui'
 
 import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type OneKVMStatus } from '@/api/client'

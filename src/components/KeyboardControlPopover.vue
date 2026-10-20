@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Keyboard, Pin, PinOff } from '@lucide/vue'
+import { Keyboard, Pin, PinOff } from '@/icons'
 import { useMessage, type DropdownOption, type InputInst } from 'naive-ui'
 
 import { api, type KeyboardLayout } from '@/api/client'

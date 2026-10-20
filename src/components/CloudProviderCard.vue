@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue'
-import { Cloud } from '@lucide/vue'
+import { Cloud } from '@/icons'
 
 import { extensionTranslation } from '@/api/client'
 import { currentLanguage, t } from '@/i18n/runtime'

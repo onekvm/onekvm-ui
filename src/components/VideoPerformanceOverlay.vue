@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Activity, Minus, Square, X } from '@lucide/vue'
+import type { WebRTCConnectionStats } from '@/lib/webrtc-connection-stats'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { Activity, Minus } from '@/icons'
 
 import { t } from '@/i18n/runtime'
 import { usePerformanceContentMotion } from '@/composables/usePerformanceContentMotion'

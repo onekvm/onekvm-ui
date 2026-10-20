@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue'
-import { CircleQuestionMark, Maximize, Minus, X } from '@lucide/vue'
+import { CircleQuestionMark, Maximize, Minus, X } from '@/icons'
 
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { useTrackpadHud } from '@/composables/useTrackpadHud'

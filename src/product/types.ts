@@ -2,6 +2,7 @@ import type { Component, DeepReadonly } from 'vue'
 
 import type { AuthStatus, AuthUser, AuthUserUpdate } from '@/api/client'
 import type { OneKVMThemeDefinition } from '@/theme/types'
+import type { OneKVMIconSetDefinition } from '@/icons/types'
 
 export type ProductAuthStatus = DeepReadonly<AuthStatus>
 

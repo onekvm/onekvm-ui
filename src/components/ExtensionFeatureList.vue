@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue'
-import { Cpu, Fingerprint, HardDrive, Keyboard, LayoutDashboard, PanelTop, PanelsTopLeft, Plug, Power, Puzzle, Server, Settings2, Toolbox, Video } from '@lucide/vue'
+import { Cpu, Fingerprint, HardDrive, Keyboard, LayoutDashboard, PanelTop, PanelsTopLeft, Plug, Power, Puzzle, Server, Settings2, Toolbox, Video } from '@/icons'
 import { extensionLocalizedText, extensionTranslation, type ExtensionStatus } from '@/api/client'
 import { currentLanguage, t } from '@/i18n/runtime'
 import IconDescriptionList from './IconDescriptionList.vue'

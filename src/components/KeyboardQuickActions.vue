@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Keyboard, TextCursorInput } from '@lucide/vue'
+import { Keyboard, TextCursorInput } from '@/icons'
 import { NButton } from 'naive-ui'
 import { t } from '@/i18n/runtime'
 import KeyboardChordIcon from './KeyboardChordIcon'

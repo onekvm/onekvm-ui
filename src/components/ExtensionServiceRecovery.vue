@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Play } from '@lucide/vue'
+import { Play } from '@/icons'
 import { useMessage } from 'naive-ui'
 
 import { api, type ExtensionService, type ExtensionStatus } from '@/api/client'

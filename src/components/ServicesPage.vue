@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, type Component } from 'vue'
-import { Box, Clock3, Database, Play, RotateCw, Server, ServerCog, Settings2, Shield, Square, SquareTerminal } from '@lucide/vue'
+import { Box, Clock3, Database, Play, RotateCw, Server, ServerCog, Settings2, Shield, Square, SquareTerminal } from '@/icons'
 import { useMessage } from 'naive-ui'
 
 import { api, type ExtensionSummary, type ManagedService } from '@/api/client'

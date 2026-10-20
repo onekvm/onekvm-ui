@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, watch } from 'vue'
-import { X } from '@lucide/vue'
+import { X } from '@/icons'
 
 import { t } from '@/i18n/runtime'
 import { useOverlayMount } from '@/composables/useOverlayMount'

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronDown, ChevronRight, Folder, FolderOpen, LoaderCircle } from '@lucide/vue'
+import { ChevronDown, ChevronRight, Folder, FolderOpen, LoaderCircle } from '@/icons'
 
 import type { StorageDirectoryTreeNode } from './storage-directory-tree'
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
-import { Activity, GripHorizontal, Keyboard, Monitor, MousePointer2, Settings } from '@lucide/vue'
+import { Activity, GripVertical, Keyboard, Monitor, MousePointer2, Settings } from '@/icons'
 
 import type { ConsoleSubtitlePart, ConsoleTitleSource, PersonalizationConfig } from '@/api/client'
 import { serviceURL } from '@/api/service-url'

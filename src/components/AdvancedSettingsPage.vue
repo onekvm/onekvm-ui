@@ -39,7 +39,7 @@ import {
 	Usb,
   Wifi,
   icons,
-} from '@lucide/vue'
+} from '@/icons'
 import { NIcon, useMessage, type DropdownOption } from 'naive-ui'
 
 import { useOneKVMTheme } from '@/theme/runtime'

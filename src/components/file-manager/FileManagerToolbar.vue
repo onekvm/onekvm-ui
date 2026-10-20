@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, useTemplateRef } from 'vue'
-import { ChevronRight, FolderPlus, RefreshCw, Upload } from '@lucide/vue'
+import { ChevronRight, FolderPlus, RefreshCw, Upload } from '@/icons'
 
 import { t } from '@/i18n/runtime'
 

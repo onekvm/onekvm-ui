@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Copy, RefreshCw, Search } from '@lucide/vue'
+import { Copy, RefreshCw, Search } from '@/icons'
 import { useMessage } from 'naive-ui'
 import type { FitAddon as FitAddonInstance } from '@xterm/addon-fit'
 import type { Terminal as TerminalInstance } from '@xterm/xterm'

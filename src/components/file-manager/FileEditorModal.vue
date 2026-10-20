@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { computed, ref, watch } from 'vue'
-import { FileCode2, Save } from '@lucide/vue'
+import { FileCode2, Save } from '@/icons'
 import { useMessage } from 'naive-ui'
 
 import type { DeviceFileEntry } from '@/api/client'

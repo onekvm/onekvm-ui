@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, toRef, watch } from 'vue'
-import { WifiOff } from '@lucide/vue'
+import { WifiOff } from '@/icons'
 
 import { useMouse, type MouseMode } from '@/composables/useMouse'
 import { consolePointerCursor } from '@/lib/console-pointer'

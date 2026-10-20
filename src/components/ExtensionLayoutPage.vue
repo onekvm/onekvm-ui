@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { RefreshCw, Save, X } from '@lucide/vue'
+import { RefreshCw, Save, X } from '@/icons'
 import { useMessage } from 'naive-ui'
 
 import {

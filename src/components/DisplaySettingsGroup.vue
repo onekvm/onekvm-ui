@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { shallowRef, useId, type Component } from 'vue'
-import { ChevronDown } from '@lucide/vue'
+import { ChevronDown } from '@/icons'
 import { useThemeVars } from 'naive-ui'
 
 const props = defineProps<{

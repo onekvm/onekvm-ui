@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, shallowRef } from 'vue'
-import { Plus, Settings2 } from '@lucide/vue'
+import { Plus, Settings2 } from '@/icons'
 import { api, type SavedWifiNetwork, type WifiProfileSettings, type WifiStatus } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { wifiProfileError } from '@/lib/wifi-profile'

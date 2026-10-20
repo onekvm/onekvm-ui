@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
-import { ArrowLeft, Check, CircleCheck, CirclePlus, ClipboardPaste, Copy, Database, Disc3, Download, File, Folder, FolderOpen, FolderPlus, HardDrive, House, Info, Laptop, LayoutGrid, LoaderCircle, Pencil, Plug, Scissors, Server, Smartphone, Trash2, Unplug, Upload, X } from '@lucide/vue'
-import { useMessage } from 'naive-ui'
+import { ArrowLeft, Check, CircleCheck, CirclePlus, ClipboardPaste, Copy, Database, Disc3, Download, File, Folder, FolderOpen, FolderPlus, FolderSync, HardDrive, House, Info, Laptop, LayoutGrid, Link, LoaderCircle, Pencil, Scissors, Server, Trash2, Unlink, Unplug, Upload, X } from '@/icons'
+import { useMessage, type TabsProps } from 'naive-ui'
 
 import { api, APIError, type MSDDownloadTask, type MSDFileEntry, type MSDMedia, type MSDSource, type MSDStatus } from '@/api/client'
 import { useMSDDownload } from '@/composables/useMSDDownload'

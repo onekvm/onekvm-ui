@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { Trash2 } from '@lucide/vue'
+import { ref } from 'vue'
+import { Trash2 } from '@/icons'
 
 import type { VpnClientConfig } from '@/api/client'
 import { t } from '@/i18n/runtime'

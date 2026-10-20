@@ -4,7 +4,7 @@ import {
   ArrowBigUp, ArrowBigUpDash, ArrowDown, ArrowLeft, ArrowRight,
   ArrowRightToLine, ArrowUp, ChevronUp, Command,
   CornerDownLeft, Delete, Grid2X2, Menu, Option, Space,
-} from '@lucide/vue'
+} from '@/icons'
 import type { VirtualKey, VirtualKeyboardMode } from '@/lib/virtual-keyboard'
 
 const props = defineProps<{ item: VirtualKey; mode: VirtualKeyboardMode; compact?: boolean }>()

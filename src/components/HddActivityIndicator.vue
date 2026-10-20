@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { HardDrive } from '@lucide/vue'
+import { HardDrive } from '@/icons'
 
 import { t } from '@/i18n/runtime'
 

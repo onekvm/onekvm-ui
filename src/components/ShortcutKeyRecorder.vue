@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ListChecks, X } from '@lucide/vue'
+import { ListChecks, X } from '@/icons'
 
 import { t } from '@/i18n/runtime'
 import { KeyboardCodes, ModifierCodes } from '@/input/keyboard'

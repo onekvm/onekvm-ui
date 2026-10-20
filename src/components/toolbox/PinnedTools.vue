@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { type DropdownOption } from 'naive-ui'
-import { Ellipsis, Pin } from '@lucide/vue'
+import { Ellipsis, Pin } from '@/icons'
 import { useToolboxContext } from '@/composables/useToolbox'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { DISMISS_CONTROL_OVERLAY_EVENT } from '@/lib/overlay-target'

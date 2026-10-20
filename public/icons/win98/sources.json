@@ -1,0 +1,1086 @@
+{
+  "repository": "https://github.com/nestoris/Win98SE",
+  "revision": "2bab6e96cfcd76a55ee29fd3060460338adb8beb",
+  "files": [
+    {
+      "file": "16/devices-video-display.png",
+      "upstream": "SE98/devices/16/video-display.png",
+      "resolved": "SE98/devices/16/video-display.png",
+      "sha256": "95653dfdc595b2f4a2533a7e04e8550f7cb031f32f9f49e96c7381dd66509721"
+    },
+    {
+      "file": "24/devices-video-display.png",
+      "upstream": "SE98/devices/24/video-display.png",
+      "resolved": "SE98/devices/24/video-display.png",
+      "sha256": "8d95780d73e239845d70067ebbb31936e7b098fa345f7e5dde25b43f4400120b"
+    },
+    {
+      "file": "32/devices-video-display.png",
+      "upstream": "SE98/devices/32/video-display.png",
+      "resolved": "SE98/devices/32/video-display.png",
+      "sha256": "5e4b67b7d84c1bee01da44f74a8780ba4861acc18bf366fa3f85c83c43706c66"
+    },
+    {
+      "file": "16/devices-computer.png",
+      "upstream": "SE98/devices/16/computer.png",
+      "resolved": "SE98/devices/16/computer.png",
+      "sha256": "f58bbbab467e93ce7150c7fecd18d89e503da4bea0095dac0231d565aec5ecff"
+    },
+    {
+      "file": "24/devices-computer.png",
+      "upstream": "SE98/devices/24/computer.png",
+      "resolved": "SE98/devices/24/computer.png",
+      "sha256": "0a5b9aa08a60f65e8a493a8d1efb3ea536b9cf63d128c7275deabf69c1dc34b9"
+    },
+    {
+      "file": "32/devices-computer.png",
+      "upstream": "SE98/devices/32/computer.png",
+      "resolved": "SE98/devices/32/computer.png",
+      "sha256": "a40474efa42ccc8dc483fb7170ca45e2a5ff9c4953ce010f77229e4b131f0f15"
+    },
+    {
+      "file": "16/devices-input-keyboard.png",
+      "upstream": "SE98/devices/16/input-keyboard.png",
+      "resolved": "SE98/devices/16/input-keyboard.png",
+      "sha256": "11870fd6ca321551e855ede2b3f6f52e954ae0bce8d755ca358215234afa583e"
+    },
+    {
+      "file": "24/devices-input-keyboard.png",
+      "upstream": "SE98/devices/24/input-keyboard.png",
+      "resolved": "SE98/devices/24/input-keyboard.png",
+      "sha256": "85d1a08e650a367d60bdbea0f7cf7c0e17b58f561eede4278b8d9b6e2c80a44f"
+    },
+    {
+      "file": "32/devices-input-keyboard.png",
+      "upstream": "SE98/devices/32/input-keyboard.png",
+      "resolved": "SE98/devices/32/input-keyboard.png",
+      "sha256": "5b80049220083bd6aabf6d2086c9169a6fe367dc11447298f903d2e96e5aef27"
+    },
+    {
+      "file": "16/devices-input-mouse.png",
+      "upstream": "SE98/devices/16/input-mouse.png",
+      "resolved": "SE98/devices/16/input-mouse.png",
+      "sha256": "d0683a368e5cd536829b8d6f7607fd2fb8b5ed8e255ad2e16bf2deea14b72e7f"
+    },
+    {
+      "file": "24/devices-input-mouse.png",
+      "upstream": "SE98/devices/24/input-mouse.png",
+      "resolved": "SE98/devices/24/input-mouse.png",
+      "sha256": "a3ae7d2765e6e626dbb95d27614dfeb52f37ee3d2acc810243d2a5c8687b98d5"
+    },
+    {
+      "file": "32/devices-input-mouse.png",
+      "upstream": "SE98/devices/32/input-mouse.png",
+      "resolved": "SE98/devices/32/input-mouse.png",
+      "sha256": "3b9cf5ba5f450da53cb421c16ab2f3c9357b096c2757b08a9fe5ea7050f9319a"
+    },
+    {
+      "file": "16/devices-drive-removable-media.png",
+      "upstream": "SE98/devices/16/drive-removable-media.png",
+      "resolved": "SE98/devices/16/drive-removable-media.png",
+      "sha256": "a779b071c05304f5da8ced2b8a44a2b8ac62f59d078a9a47462bb3b196d7d5e1"
+    },
+    {
+      "file": "24/devices-drive-removable-media.png",
+      "upstream": "SE98/devices/24/drive-removable-media.png",
+      "resolved": "SE98/devices/24/drive-removable-media.png",
+      "sha256": "d05cf4f33679d5d8b5127a1501b6819b1f323006f675983f16757697a8e50f8c"
+    },
+    {
+      "file": "32/devices-drive-removable-media.png",
+      "upstream": "SE98/devices/32/drive-removable-media.png",
+      "resolved": "SE98/devices/32/drive-removable-media.png",
+      "sha256": "84ba724adfbdf51af623cc2f5f0649b1d0234ba17586dd5e13bf9749224a7a99"
+    },
+    {
+      "file": "16/devices-drive-removable-media-usb.png",
+      "upstream": "SE98/devices/16/drive-removable-media-usb.png",
+      "resolved": "SE98/devices/16/drive-harddisk-usb.png",
+      "sha256": "d1e077da660b20638ce6ecb4870e6c2bc979d98465d5db11bbad4fd3d049c393"
+    },
+    {
+      "file": "24/devices-drive-removable-media-usb.png",
+      "upstream": "SE98/devices/24/drive-removable-media-usb.png",
+      "resolved": "SE98/devices/24/drive-harddisk-usb.png",
+      "sha256": "e4be21536deefa2ce266ea827873c0ff9d8ed177aa4a261b862d5b74e1c799e7"
+    },
+    {
+      "file": "32/devices-drive-removable-media-usb.png",
+      "upstream": "SE98/devices/32/drive-removable-media-usb.png",
+      "resolved": "SE98/devices/32/drive-harddisk-usb.png",
+      "sha256": "bf8de2ebd53abf746be45179d2871ae2f64187e42b258591be9d3f4403bb7172"
+    },
+    {
+      "file": "16/devices-audio-card.png",
+      "upstream": "SE98/devices/48/audio-card.png",
+      "resolved": "SE98/devices/48/audio-card.png",
+      "sha256": "f8af02eace3b57b84414352e35c2d86b3444270f03e746afdaa5dd78bf28268c"
+    },
+    {
+      "file": "24/devices-audio-card.png",
+      "upstream": "SE98/devices/48/audio-card.png",
+      "resolved": "SE98/devices/48/audio-card.png",
+      "sha256": "f8af02eace3b57b84414352e35c2d86b3444270f03e746afdaa5dd78bf28268c"
+    },
+    {
+      "file": "32/devices-audio-card.png",
+      "upstream": "SE98/devices/48/audio-card.png",
+      "resolved": "SE98/devices/48/audio-card.png",
+      "sha256": "f8af02eace3b57b84414352e35c2d86b3444270f03e746afdaa5dd78bf28268c"
+    },
+    {
+      "file": "16/devices-media-optical.png",
+      "upstream": "SE98/devices/16/media-optical.png",
+      "resolved": "SE98/devices/16/media-optical.png",
+      "sha256": "607c29e605daabe0e386e876dff56de96f45b859b0d39fee3fc436c49f7c813a"
+    },
+    {
+      "file": "24/devices-media-optical.png",
+      "upstream": "SE98/devices/24/media-optical.png",
+      "resolved": "SE98/devices/24/media-optical.png",
+      "sha256": "751932530b60277091584822c9c18be3a27c7062106e4ed1f00a8fdf4633a1cb"
+    },
+    {
+      "file": "32/devices-media-optical.png",
+      "upstream": "SE98/devices/32/media-optical.png",
+      "resolved": "SE98/devices/32/media-optical.png",
+      "sha256": "35aab3ab37f74b48aed41aceccca753aa7776b5e4dce0f5279beb711567f6bd7"
+    },
+    {
+      "file": "16/devices-drive-harddisk.png",
+      "upstream": "SE98/devices/16/drive-harddisk.png",
+      "resolved": "SE98/devices/16/drive-harddisk.png",
+      "sha256": "221b29e75c06cf61b7f00daa82b78fe4f326495417f37313f0ab1f60fc74c2a2"
+    },
+    {
+      "file": "24/devices-drive-harddisk.png",
+      "upstream": "SE98/devices/24/drive-harddisk.png",
+      "resolved": "SE98/devices/24/drive-harddisk.png",
+      "sha256": "e909d0160ed8086c8de5577b4dfb66b28d12c81ae4e971d223c6fceec1076c82"
+    },
+    {
+      "file": "32/devices-drive-harddisk.png",
+      "upstream": "SE98/devices/32/drive-harddisk.png",
+      "resolved": "SE98/devices/32/drive-harddisk.png",
+      "sha256": "87ff20b15514bf5ded3a4b9b92db91602f19802d9ac7219dc023583f3b102605"
+    },
+    {
+      "file": "16/devices-input-gaming.png",
+      "upstream": "SE98/devices/16/input-gaming.png",
+      "resolved": "SE98/devices/16/input-gaming.png",
+      "sha256": "f5a3eca9449fbf7d1620847147fe96538f6845c9960167cdbe016969988a914b"
+    },
+    {
+      "file": "24/devices-input-gaming.png",
+      "upstream": "SE98/devices/24/input-gaming.png",
+      "resolved": "SE98/devices/24/input-gaming.png",
+      "sha256": "bd5259a3911c82df5baae0eb4cbd42e2fa3dce3dc833c0f7c7f06d6d317b93cc"
+    },
+    {
+      "file": "32/devices-input-gaming.png",
+      "upstream": "SE98/devices/32/input-gaming.png",
+      "resolved": "SE98/devices/32/input-gaming.png",
+      "sha256": "f1a968b540362fcff4a04b10af95173609f01ee11a7422a36de63b863400c4f1"
+    },
+    {
+      "file": "16/status-audio-volume-high.png",
+      "upstream": "SE98/status/16/audio-volume-high.png",
+      "resolved": "SE98/status/16/audio-volume-high.png",
+      "sha256": "31cfe3943af4d5d45b7b109d3e96ba154cbfcdfc00abbfb080d03c6531702b4f"
+    },
+    {
+      "file": "24/status-audio-volume-high.png",
+      "upstream": "SE98/status/24/audio-volume-high.png",
+      "resolved": "SE98/status/24/audio-volume-high.png",
+      "sha256": "c94bdb8079be0ada0e32d58de318657495ce201661628b8125a3e090a4ea9982"
+    },
+    {
+      "file": "32/status-audio-volume-high.png",
+      "upstream": "SE98/status/32/audio-volume-high.png",
+      "resolved": "SE98/status/32/audio-volume-high.png",
+      "sha256": "3f3bfd50d0b2b2e77efa2a36fb95b615843c73267e3f321fa53df8ca31b49db7"
+    },
+    {
+      "file": "16/status-weather-clear.png",
+      "upstream": "SE98/status/16/weather-clear.png",
+      "resolved": "SE98/status/16/weather-clear.png",
+      "sha256": "9b62a0a84d5054dac322cbb7663230d2ae1a5a724459b36232d56b3c36bd51e3"
+    },
+    {
+      "file": "24/status-weather-clear.png",
+      "upstream": "SE98/status/24/weather-clear.png",
+      "resolved": "SE98/status/24/weather-clear.png",
+      "sha256": "41ee8b9b890a7b5c7855d563d9d00c3ff247514d068b566b69223c4c522dfb52"
+    },
+    {
+      "file": "32/status-weather-clear.png",
+      "upstream": "SE98/status/32/weather-clear.png",
+      "resolved": "SE98/status/32/weather-clear.png",
+      "sha256": "ec2243bcc349d4b92c6ec4e85b69ba249938527628ca3d6c3cde8ee089178b5f"
+    },
+    {
+      "file": "16/status-weather-clear-night.png",
+      "upstream": "SE98/status/16/weather-clear-night.png",
+      "resolved": "SE98/status/16/weather-clear-night.png",
+      "sha256": "cf7f2e700ed97fd489f78ad991b782176645cd539222309443c97e0a3f21e6b4"
+    },
+    {
+      "file": "24/status-weather-clear-night.png",
+      "upstream": "SE98/status/24/weather-clear-night.png",
+      "resolved": "SE98/status/24/weather-clear-night.png",
+      "sha256": "bf3e8d2f517c4f9bb44baf58df623ce4b2ae3837b5b73c79feabaa5ee28b3790"
+    },
+    {
+      "file": "32/status-weather-clear-night.png",
+      "upstream": "SE98/status/32/weather-clear-night.png",
+      "resolved": "SE98/status/32/weather-clear-night.png",
+      "sha256": "3f8e9f724a281d10b3854a42316f1a39b15bf3eee2b9ab00e934b0f3dcb996f3"
+    },
+    {
+      "file": "16/status-avatar-default.png",
+      "upstream": "SE98/status/16/avatar-default.png",
+      "resolved": "SE98/status/16/avatar-default.png",
+      "sha256": "dc9766e61eda732a61dff890a0edcfe3e0fcf2ca628015c4b5777df148e23a35"
+    },
+    {
+      "file": "24/status-avatar-default.png",
+      "upstream": "SE98/status/24/avatar-default.png",
+      "resolved": "SE98/status/24/avatar-default.png",
+      "sha256": "2db891ce5ba7dfdd15551fe18545e60fca4452834c1d58ebc381a64f4b352e45"
+    },
+    {
+      "file": "32/status-avatar-default.png",
+      "upstream": "SE98/status/32/avatar-default.png",
+      "resolved": "SE98/status/32/avatar-default.png",
+      "sha256": "8b3d1b6237bd9ba5a8735ae10b73072bda41ac9b20b8ab74aa84d200a3343115"
+    },
+    {
+      "file": "16/status-dialog-information.png",
+      "upstream": "SE98/status/16/dialog-information.png",
+      "resolved": "SE98/status/16/dialog-information.png",
+      "sha256": "27bb2648c48eba06a3358a1c3c38c739adba88082cb6a259f99c8d5a3eb4c89b"
+    },
+    {
+      "file": "24/status-dialog-information.png",
+      "upstream": "SE98/status/24/dialog-information.png",
+      "resolved": "SE98/status/24/dialog-information.png",
+      "sha256": "f1e3121e8035861c9e2b439ca1c12c93c48a2d9abd56e90862b7da16c80d2d11"
+    },
+    {
+      "file": "32/status-dialog-information.png",
+      "upstream": "SE98/status/32/dialog-information.png",
+      "resolved": "SE98/status/32/dialog-information.png",
+      "sha256": "11f52062fc860456f39a7cf571b697a6cda36c85fe11e8e3108953164ec135ce"
+    },
+    {
+      "file": "16/status-dialog-password.png",
+      "upstream": "SE98/status/16/dialog-password.png",
+      "resolved": "SE98/status/16/dialog-password.png",
+      "sha256": "6bc532c06a886a8a5785690f70d38d97121e4461cb34578b80e8a48370221ab0"
+    },
+    {
+      "file": "24/status-dialog-password.png",
+      "upstream": "SE98/status/24/dialog-password.png",
+      "resolved": "SE98/status/24/dialog-password.png",
+      "sha256": "be2c241e3e3b1e45799c896e01dfc018af3ac8f5122d788b21bc34b551b270a2"
+    },
+    {
+      "file": "32/status-dialog-password.png",
+      "upstream": "SE98/status/32/dialog-password.png",
+      "resolved": "SE98/status/32/dialog-password.png",
+      "sha256": "4fbc9ed17b142806780f78715e04bcbde5ce3cd73c91cc337209c6dbbfc4cf2e"
+    },
+    {
+      "file": "16/status-security-high.png",
+      "upstream": "SE98/status/16/security-high.png",
+      "resolved": "SE98/status/16/security-high.png",
+      "sha256": "c6f48da032f21b6f3fa7b290b9b0848949c9b74bef1a3234437c1a168982568b"
+    },
+    {
+      "file": "24/status-security-high.png",
+      "upstream": "SE98/status/24/security-high.png",
+      "resolved": "SE98/status/24/security-high.png",
+      "sha256": "68a627a9578028854a3fe11d6eeef8931572ff6ab81b76cf35a647c5c569d896"
+    },
+    {
+      "file": "32/status-security-high.png",
+      "upstream": "SE98/status/32/security-high.png",
+      "resolved": "SE98/status/32/security-high.png",
+      "sha256": "8c60095fb99df4302d33ad66ecaf358c8c7041db183ee22fa226ecb26e607d31"
+    },
+    {
+      "file": "16/status-dialog-warning.png",
+      "upstream": "SE98/status/16/dialog-warning.png",
+      "resolved": "SE98/status/16/dialog-warning.png",
+      "sha256": "1b9286a6250c87e04e92b202eecb80179884da2e85efbafd8a3341c373156bb5"
+    },
+    {
+      "file": "24/status-dialog-warning.png",
+      "upstream": "SE98/status/24/dialog-warning.png",
+      "resolved": "SE98/status/24/dialog-warning.png",
+      "sha256": "b34ae68429df152afd6f0ea845f7b0656bc26608b13decb6f6224a30af843a5e"
+    },
+    {
+      "file": "32/status-dialog-warning.png",
+      "upstream": "SE98/status/32/dialog-warning.png",
+      "resolved": "SE98/status/32/dialog-warning.png",
+      "sha256": "e0f10f0c473ced5a276b01279e600ab2161b0021feec7229d04229930b5e5d99"
+    },
+    {
+      "file": "16/apps-preferences-system.png",
+      "upstream": "SE98/apps/16/preferences-system.png",
+      "resolved": "SE98/apps/16/preferences-system.png",
+      "sha256": "2537cc6e209abc285af2eb582c0e7b9c9defad94a62a224631b1cd050964b739"
+    },
+    {
+      "file": "24/apps-preferences-system.png",
+      "upstream": "SE98/apps/24/preferences-system.png",
+      "resolved": "SE98/apps/24/preferences-system.png",
+      "sha256": "11684d6bb9154c24598f90ba0be917a891012b7593710effdec83eed9b155295"
+    },
+    {
+      "file": "32/apps-preferences-system.png",
+      "upstream": "SE98/apps/32/preferences-system.png",
+      "resolved": "SE98/apps/32/preferences-system.png",
+      "sha256": "ff55c34ef09f06f0e3528c3db8b6ab27d4b74c745ba97f084ed2e21e4dda5ca3"
+    },
+    {
+      "file": "16/emblems-emblem-system.png",
+      "upstream": "SE98/emblems/16/emblem-system.png",
+      "resolved": "SE98/emblems/16/emblem-system.png",
+      "sha256": "42af79de05b8abb0c518901a6590539173d481aa9fbdc95daf33afe291334f03"
+    },
+    {
+      "file": "24/emblems-emblem-system.png",
+      "upstream": "SE98/emblems/24/emblem-system.png",
+      "resolved": "SE98/emblems/24/emblem-system.png",
+      "sha256": "d0c765a42a5c71bd3945bf77e994bbbdb63522ed1fbb84adf49832481c7bc4d9"
+    },
+    {
+      "file": "32/emblems-emblem-system.png",
+      "upstream": "SE98/emblems/32/emblem-system.png",
+      "resolved": "SE98/emblems/32/emblem-system.png",
+      "sha256": "7cf4feddd12a84db73062dc5059d21865ef842cd83475905b83a6273b2b786d3"
+    },
+    {
+      "file": "16/apps-preferences-desktop-theme.png",
+      "upstream": "SE98/apps/16/preferences-desktop-theme.png",
+      "resolved": "SE98/apps/16/preferences-desktop-theme.png",
+      "sha256": "fd5b31595386142b760ef7d65dced71b61d7868149ffee7353225b4bfd6c84c7"
+    },
+    {
+      "file": "24/apps-preferences-desktop-theme.png",
+      "upstream": "SE98/apps/24/preferences-desktop-theme.png",
+      "resolved": "SE98/apps/24/preferences-desktop-theme.png",
+      "sha256": "e3a4a4b57a2ffb79c5018af12c7a397a4f03832aeef6b8323d2a846ae14966e1"
+    },
+    {
+      "file": "32/apps-preferences-desktop-theme.png",
+      "upstream": "SE98/apps/32/preferences-desktop-theme.png",
+      "resolved": "SE98/apps/32/preferences-desktop-theme.png",
+      "sha256": "aaa066babafacbe16097a226f8a8cdfc6ebf371910f34e75e3fee64824dbda0b"
+    },
+    {
+      "file": "16/apps-preferences-desktop-locale.png",
+      "upstream": "SE98/apps/16/preferences-desktop-locale.png",
+      "resolved": "SE98/apps/16/preferences-desktop-locale.png",
+      "sha256": "c8d0e14cf40c5539076ef96b5a91989b29ee7868d6aab83c6b60a157ad8a5fe5"
+    },
+    {
+      "file": "24/apps-preferences-desktop-locale.png",
+      "upstream": "SE98/apps/24/preferences-desktop-locale.png",
+      "resolved": "SE98/apps/24/preferences-desktop-locale.png",
+      "sha256": "8eabe15e26ad691aeacad83304f8c51db177a817ebe9a6554652be94b47c948e"
+    },
+    {
+      "file": "32/apps-preferences-desktop-locale.png",
+      "upstream": "SE98/apps/32/preferences-desktop-locale.png",
+      "resolved": "SE98/apps/32/preferences-desktop-locale.png",
+      "sha256": "3faa5795c2c2c876c439931dcfb6cb690cbb240d6a7ddce034cb495231253165"
+    },
+    {
+      "file": "16/apps-preferences-system-windows.png",
+      "upstream": "SE98/apps/16/preferences-system-windows.png",
+      "resolved": "SE98/apps/16/preferences-system-windows.png",
+      "sha256": "803112f56195ebf74eae6ef337a5f19ef8414371471ef569056a31569d32f878"
+    },
+    {
+      "file": "24/apps-preferences-system-windows.png",
+      "upstream": "SE98/apps/24/preferences-system-windows.png",
+      "resolved": "SE98/apps/24/preferences-system-windows.png",
+      "sha256": "5b5857667a922f5ff2f209451384551fb843b7831837cfb01081a9d345580c3f"
+    },
+    {
+      "file": "32/apps-preferences-system-windows.png",
+      "upstream": "SE98/apps/32/preferences-system-windows.png",
+      "resolved": "SE98/apps/32/preferences-system-windows.png",
+      "sha256": "5a8fdbfbfbbe003d2461dcc5bcf61cfb5cce212ba89813515308b2cae0bd3f3a"
+    },
+    {
+      "file": "16/apps-preferences-system-network.png",
+      "upstream": "SE98/apps/16/preferences-system-network.png",
+      "resolved": "SE98/apps/16/preferences-system-network.png",
+      "sha256": "30f3e74dc568e70b6a6804967abae6bb646df75f4aec27402ddced3ea3698724"
+    },
+    {
+      "file": "24/apps-preferences-system-network.png",
+      "upstream": "SE98/apps/24/preferences-system-network.png",
+      "resolved": "SE98/apps/24/preferences-system-network.png",
+      "sha256": "6da5f230b31d9a9891fed155bd67cec03b147984d7beb9ada88e2cfa5e54a7c7"
+    },
+    {
+      "file": "32/apps-preferences-system-network.png",
+      "upstream": "SE98/apps/32/preferences-system-network.png",
+      "resolved": "SE98/apps/32/preferences-system-network.png",
+      "sha256": "4fccbfa65826a77a5e534ea1462bf3331b77e5a9cbe6077d280e22f413ba4be4"
+    },
+    {
+      "file": "16/apps-preferences-system-firewall.png",
+      "upstream": "SE98/apps/16/preferences-system-firewall.png",
+      "resolved": "SE98/apps/16/preferences-system-firewall.png",
+      "sha256": "6cce9c38fc5cf2afc79883c6cc28d3fb6db6086e72fd472b11bc7ab92207b919"
+    },
+    {
+      "file": "24/apps-preferences-system-firewall.png",
+      "upstream": "SE98/apps/24/preferences-system-firewall.png",
+      "resolved": "SE98/apps/24/preferences-system-firewall.png",
+      "sha256": "01bf0e47b1b510417d3f6558378d240025d52c56215967a1bec9b2e4c5cc47d3"
+    },
+    {
+      "file": "32/apps-preferences-system-firewall.png",
+      "upstream": "SE98/apps/32/preferences-system-firewall.png",
+      "resolved": "SE98/apps/32/preferences-system-firewall.png",
+      "sha256": "26b2d65f2faf99d76bf9208bde65534b2c9dfceb9337c4bb309f8ed1caab96ea"
+    },
+    {
+      "file": "16/apps-preferences-system-time.png",
+      "upstream": "SE98/apps/16/preferences-system-time.png",
+      "resolved": "SE98/apps/16/preferences-system-time.png",
+      "sha256": "8a9775bd4274a1a6bfa1de70dcb6b2029a231cd9711c2a97c56bab3fa387a485"
+    },
+    {
+      "file": "24/apps-preferences-system-time.png",
+      "upstream": "SE98/apps/24/preferences-system-time.png",
+      "resolved": "SE98/apps/24/preferences-system-time.png",
+      "sha256": "20c76b0a25897c801bda1c6ec31d702716de09af442997ec6c41667810f6a7ec"
+    },
+    {
+      "file": "32/apps-preferences-system-time.png",
+      "upstream": "SE98/apps/32/preferences-system-time.png",
+      "resolved": "SE98/apps/32/preferences-system-time.png",
+      "sha256": "915a4e4064b2c42d6baa3974505e431e0e32db2550d06dd949e50dbdb2cf0c37"
+    },
+    {
+      "file": "16/apps-utilities-system-monitor.png",
+      "upstream": "SE98/apps/16/utilities-system-monitor.png",
+      "resolved": "SE98/apps/16/utilities-system-monitor.png",
+      "sha256": "43f1f7da49b845568b4de9687cb4518a4b2f876c861595cebf6aa541c608ee26"
+    },
+    {
+      "file": "24/apps-utilities-system-monitor.png",
+      "upstream": "SE98/apps/24/utilities-system-monitor.png",
+      "resolved": "SE98/apps/24/utilities-system-monitor.png",
+      "sha256": "ba2d83943a25b2b249ad31951dfc924e951ccf22531bfa6dcf7fd8bf3edae036"
+    },
+    {
+      "file": "32/apps-utilities-system-monitor.png",
+      "upstream": "SE98/apps/32/utilities-system-monitor.png",
+      "resolved": "SE98/apps/32/utilities-system-monitor.png",
+      "sha256": "7b7567d2064f1b6e2845203bc314c340156eee135290c79ef2877211a037116b"
+    },
+    {
+      "file": "16/actions-view-refresh.png",
+      "upstream": "SE98/actions/16/view-refresh.png",
+      "resolved": "SE98/actions/16/view-refresh.png",
+      "sha256": "1800462c35215bc744fc7d25f6ee9ba17184c01ba9fc1ec4c71ae228394204aa"
+    },
+    {
+      "file": "24/actions-view-refresh.png",
+      "upstream": "SE98/actions/24/view-refresh.png",
+      "resolved": "SE98/actions/24/view-refresh.png",
+      "sha256": "1b6c8e509bd252be2b928826c360d762d97d1e1ba4570d06b05563808a710368"
+    },
+    {
+      "file": "32/actions-view-refresh.png",
+      "upstream": "SE98/actions/32/view-refresh.png",
+      "resolved": "SE98/actions/32/view-refresh.png",
+      "sha256": "52bdbe2d4b8973d4408773f77d862ac31b21f97d019adb0bd19351e3bd4e738c"
+    },
+    {
+      "file": "16/apps-system-software-update.png",
+      "upstream": "SE98/apps/16/system-software-update.png",
+      "resolved": "SE98/apps/16/system-software-update.png",
+      "sha256": "04637c8388844c498cc7bca6d179bbcc7818ca080ebc7ddaf98be2674e0f07b2"
+    },
+    {
+      "file": "24/apps-system-software-update.png",
+      "upstream": "SE98/apps/24/system-software-update.png",
+      "resolved": "SE98/apps/24/system-software-update.png",
+      "sha256": "321f4f69d7a8f8cf1dcd784129751c2b39add6cb4d3dec3b4692a175e60e364d"
+    },
+    {
+      "file": "32/apps-system-software-update.png",
+      "upstream": "SE98/apps/32/system-software-update.png",
+      "resolved": "SE98/apps/32/system-software-update.png",
+      "sha256": "3eec20b50a1019d5ee71a4d82099842070364c6fc0a3c089679603761e88addb"
+    },
+    {
+      "file": "16/apps-system-users.png",
+      "upstream": "SE98/apps/16/system-users.png",
+      "resolved": "SE98/apps/16/system-users.png",
+      "sha256": "440f136a5429fdc70323477dcabb0bdb4d342b1fe2b9f8058910a07e64b311f7"
+    },
+    {
+      "file": "24/apps-system-users.png",
+      "upstream": "SE98/apps/24/system-users.png",
+      "resolved": "SE98/apps/24/system-users.png",
+      "sha256": "bf951685b4d922812ec1ad828c95c2f9aef244b086899ad0c4242e304682c48d"
+    },
+    {
+      "file": "32/apps-system-users.png",
+      "upstream": "SE98/apps/32/system-users.png",
+      "resolved": "SE98/apps/32/system-users.png",
+      "sha256": "0aecd2c96237a416b7a77bafd3428d08fe12234a8c6a94223cac8b13d168d540"
+    },
+    {
+      "file": "16/apps-utilities-log-viewer.png",
+      "upstream": "SE98/apps/16/utilities-log-viewer.png",
+      "resolved": "SE98/apps/16/logviewer.png",
+      "sha256": "2139d93ab8ed285e066d7d2ac1f0b26798b69b22ef9600f175779a59dd078dad"
+    },
+    {
+      "file": "24/apps-utilities-log-viewer.png",
+      "upstream": "SE98/apps/24/utilities-log-viewer.png",
+      "resolved": "SE98/apps/24/logviewer.png",
+      "sha256": "71f6dd97dab625585e636adef1c3c3fafecbb76d92fdcd7c24366d0578409150"
+    },
+    {
+      "file": "32/apps-utilities-log-viewer.png",
+      "upstream": "SE98/apps/32/utilities-log-viewer.png",
+      "resolved": "SE98/apps/32/logviewer.png",
+      "sha256": "4912ffec40e1dfb29525f392ffc15206edec737285da2f6e6889fc88823687b9"
+    },
+    {
+      "file": "16/apps-utilities-terminal.png",
+      "upstream": "SE98/apps/16/utilities-terminal.png",
+      "resolved": "SE98/apps/16/utilities-terminal.png",
+      "sha256": "ebb0357c0c78acba2d84972019c763869bbf740e0256c30b3df98915b5a51035"
+    },
+    {
+      "file": "24/apps-utilities-terminal.png",
+      "upstream": "SE98/apps/24/utilities-terminal.png",
+      "resolved": "SE98/apps/24/utilities-terminal.png",
+      "sha256": "91bb27879432dafb6b9963bc174032963b9b4702d7d349e746a2b1e9342d7d86"
+    },
+    {
+      "file": "32/apps-utilities-terminal.png",
+      "upstream": "SE98/apps/32/utilities-terminal.png",
+      "resolved": "SE98/apps/32/utilities-terminal.png",
+      "sha256": "fa6ad976af855d6ce9ef527cfb4fdd4283f8f03e2a0f3152cbbea8be17fa3360"
+    },
+    {
+      "file": "16/categories-applications-accessories.png",
+      "upstream": "SE98/categories/16/applications-accessories.png",
+      "resolved": "SE98/categories/16/applications-accessories.png",
+      "sha256": "94ff65c22038eb3a058b7359d0edba953623ac6e7c858daf141d642bd3a9a695"
+    },
+    {
+      "file": "24/categories-applications-accessories.png",
+      "upstream": "SE98/categories/24/applications-accessories.png",
+      "resolved": "SE98/categories/24/applications-accessories.png",
+      "sha256": "a9a8cda3aac8abed4da30b10438d8af8cf79a577be7e94ba7595e9919dea4d10"
+    },
+    {
+      "file": "32/categories-applications-accessories.png",
+      "upstream": "SE98/categories/32/applications-accessories.png",
+      "resolved": "SE98/categories/32/applications-accessories.png",
+      "sha256": "dfa0173b0caf8c68688f57445870a63506e6171c4b7faa602e666f8648e77586"
+    },
+    {
+      "file": "16/categories-applications-other.png",
+      "upstream": "SE98/categories/16/applications-other.png",
+      "resolved": "SE98/categories/16/applications-other.png",
+      "sha256": "08561d98feb91fef0b9b22118c31df6ad70c9b634bc8ae9cfc78b8e86da7308f"
+    },
+    {
+      "file": "24/categories-applications-other.png",
+      "upstream": "SE98/categories/24/applications-other.png",
+      "resolved": "SE98/categories/24/applications-other.png",
+      "sha256": "372bbbafb801f63826a8e450fa2196c51a681970d3d03e12dd2d43834edce10c"
+    },
+    {
+      "file": "32/categories-applications-other.png",
+      "upstream": "SE98/categories/32/applications-other.png",
+      "resolved": "SE98/categories/32/applications-other.png",
+      "sha256": "28b874ab90d8b9c8c367fc24414f1556c06af485e8e7b506121537bc22eda5d1"
+    },
+    {
+      "file": "16/emblems-emblem-synchronizing-symbolic.png",
+      "upstream": "SE98/emblems/16/emblem-synchronizing-symbolic.png",
+      "resolved": "SE98/emblems/16/emblem-synchronizing-symbolic.png",
+      "sha256": "62084de7f61e34fb562b5969aed896589332e2448a1733521c7371521ca246ba"
+    },
+    {
+      "file": "24/emblems-emblem-synchronizing-symbolic.png",
+      "upstream": "SE98/emblems/24/emblem-synchronizing-symbolic.png",
+      "resolved": "SE98/emblems/24/emblem-synchronizing-symbolic.png",
+      "sha256": "39088deb906757471b87043624ecb0b4a72a3be8258dd20362c6d129026178c3"
+    },
+    {
+      "file": "32/emblems-emblem-synchronizing-symbolic.png",
+      "upstream": "SE98/emblems/32/emblem-synchronizing-symbolic.png",
+      "resolved": "SE98/emblems/32/emblem-synchronizing-symbolic.png",
+      "sha256": "3483b1353ce32a042ba6c4c15a927a4bf14e5927f77f962c50f8adbae8a92014"
+    },
+    {
+      "file": "16/categories-applications-internet.png",
+      "upstream": "SE98/categories/16/applications-internet.png",
+      "resolved": "SE98/categories/16/applications-internet.png",
+      "sha256": "df3c4771a58c91cbb2261faed40615d27aa034f759dea50b462da0c45b0f6f1c"
+    },
+    {
+      "file": "24/categories-applications-internet.png",
+      "upstream": "SE98/categories/24/applications-internet.png",
+      "resolved": "SE98/categories/24/applications-internet.png",
+      "sha256": "a2a0ead98f37a4e12f0a9a49f1f6466663f36fbcd269013dce7ad204af0d6e20"
+    },
+    {
+      "file": "32/categories-applications-internet.png",
+      "upstream": "SE98/categories/32/applications-internet.png",
+      "resolved": "SE98/categories/32/applications-internet.png",
+      "sha256": "02a69cdaa61af849193f9f1ebca0417a129f90d283d6b4691f65bbb53d00f680"
+    },
+    {
+      "file": "16/mimes-package-x-generic.png",
+      "upstream": "SE98/mimes/16/package-x-generic.png",
+      "resolved": "SE98/mimes/16/package-x-generic.png",
+      "sha256": "e2d1efb23d323886820d0b1a534ea4ab66978a393fe9f0776a8eeca5d974329a"
+    },
+    {
+      "file": "24/mimes-package-x-generic.png",
+      "upstream": "SE98/mimes/24/package-x-generic.png",
+      "resolved": "SE98/mimes/24/package-x-generic.png",
+      "sha256": "d59e51344c5b1ffb0a95bf48579de719b662111e3a41d5e02c22a828b15e6459"
+    },
+    {
+      "file": "32/mimes-package-x-generic.png",
+      "upstream": "SE98/mimes/32/package-x-generic.png",
+      "resolved": "SE98/mimes/32/package-x-generic.png",
+      "sha256": "2f43ee0e259b74029a6aa969a6a1f55ee3ebd5bd040a53f671f6e045acd4c25d"
+    },
+    {
+      "file": "16/mimes-video-x-generic.png",
+      "upstream": "SE98/mimes/16/video-x-generic.png",
+      "resolved": "SE98/mimes/16/video-x-generic.png",
+      "sha256": "51382483a24d04d0a8cdae57be6ffdd727fb2faaca00fb25fd894246186dcb02"
+    },
+    {
+      "file": "24/mimes-video-x-generic.png",
+      "upstream": "SE98/mimes/24/video-x-generic.png",
+      "resolved": "SE98/mimes/24/video-x-generic.png",
+      "sha256": "f5ebb4967b742bcdf12c8471d4d936447ad0ad040cbff0b58872c3822229cf82"
+    },
+    {
+      "file": "32/mimes-video-x-generic.png",
+      "upstream": "SE98/mimes/32/video-x-generic.png",
+      "resolved": "SE98/mimes/32/video-x-generic.png",
+      "sha256": "fd67e849575c630e31d81508db8b5f3a92bf38d826a3c331797a933fdba8f8a5"
+    },
+    {
+      "file": "16/places-folder.png",
+      "upstream": "SE98/places/16/folder.png",
+      "resolved": "SE98/places/16/folder.png",
+      "sha256": "a8a6eea9124fb4f45f2045f44e81e8c6af4e6e23935500073b7d9cf736b4484f"
+    },
+    {
+      "file": "24/places-folder.png",
+      "upstream": "SE98/places/24/folder.png",
+      "resolved": "SE98/places/24/folder.png",
+      "sha256": "4168dc0f143a4ddd2b5146031948c5b3926e969f8d1b4e0e050a59ae2024780e"
+    },
+    {
+      "file": "32/places-folder.png",
+      "upstream": "SE98/places/32/folder.png",
+      "resolved": "SE98/places/32/folder.png",
+      "sha256": "7bd91de40e438f649434314d2474b49892ce9d850ce86018c2d122f43cc96307"
+    },
+    {
+      "file": "16/places-folder-open.png",
+      "upstream": "SE98/places/16/folder-open.png",
+      "resolved": "SE98/places/16/folder-open.png",
+      "sha256": "c3b2bd56044a8f8d6d37c471ffa1df035cff9cdb000cd30f449cbe94ac88e863"
+    },
+    {
+      "file": "24/places-folder-open.png",
+      "upstream": "SE98/places/24/folder-open.png",
+      "resolved": "SE98/places/24/folder-open.png",
+      "sha256": "784ddd6d3dd6328e0f7a3a27f7c1db84b963b743c3b5c7e01818dab9e1a98128"
+    },
+    {
+      "file": "32/places-folder-open.png",
+      "upstream": "SE98/places/32/folder-open.png",
+      "resolved": "SE98/places/32/folder-open.png",
+      "sha256": "5d82b32cae884c0d3183a36792b78a285e48077352f9e22f9e52b4dfbff0e964"
+    },
+    {
+      "file": "16/places-start-here.png",
+      "upstream": "SE98/places/16/start-here.png",
+      "resolved": "SE98/places/16/start-here.png",
+      "sha256": "df79d55f14418b0e67058beec7c8d60665b351d83ebae7fa1fa7289c91cf771d"
+    },
+    {
+      "file": "24/places-start-here.png",
+      "upstream": "SE98/places/24/start-here.png",
+      "resolved": "SE98/places/24/start-here.png",
+      "sha256": "3f513a8043cb3d1fbbd87a0e355974968d9cd629d5caead6a0b61a871c5006e0"
+    },
+    {
+      "file": "32/places-start-here.png",
+      "upstream": "SE98/places/32/start-here.png",
+      "resolved": "SE98/places/32/start-here.png",
+      "sha256": "7939f53525dcf84cfa642f192820606390ae9abcc1183c2cb0369e938a94452b"
+    },
+    {
+      "file": "16/places-network-server.png",
+      "upstream": "SE98/places/16/network-server.png",
+      "resolved": "SE98/places/16/network-server.png",
+      "sha256": "896b046df63b595bb63f211bf4b07017905917cd77ba8b7832105b5f8162ad5c"
+    },
+    {
+      "file": "24/places-network-server.png",
+      "upstream": "SE98/places/24/network-server.png",
+      "resolved": "SE98/places/24/network-server.png",
+      "sha256": "8d00dda4bcc09e3d70106eb2aeadb9a0a859d72c7f2b5c822d4f1ebfa0f973ec"
+    },
+    {
+      "file": "32/places-network-server.png",
+      "upstream": "SE98/places/32/network-server.png",
+      "resolved": "SE98/places/32/network-server.png",
+      "sha256": "368b7d272e9bd1b2e896fbdd33c2721659cca285953190a623ba32d69b813ebd"
+    },
+    {
+      "file": "16/actions-go-down.png",
+      "upstream": "SE98/actions/16/go-down.png",
+      "resolved": "SE98/actions/16/go-down.png",
+      "sha256": "5a9907517dbe16b1ef93118e07055726a1a03ef76a9d5e8cd20903460e3e9b70"
+    },
+    {
+      "file": "24/actions-go-down.png",
+      "upstream": "SE98/actions/24/go-down.png",
+      "resolved": "SE98/actions/24/go-down.png",
+      "sha256": "0fd91c92b916ba03e1494d8c8aa1ddd656bca291b7649278456621a814de608a"
+    },
+    {
+      "file": "32/actions-go-down.png",
+      "upstream": "SE98/actions/32/go-down.png",
+      "resolved": "SE98/actions/32/go-down.png",
+      "sha256": "686874c5c20bc0ad6aab3fe3d5d81977ccb2373e7a7bd0f1b058bd4f99e4ee71"
+    },
+    {
+      "file": "16/apps-preferences-system-power.png",
+      "upstream": "SE98/apps/16/preferences-system-power.png",
+      "resolved": "SE98/apps/16/preferences-system-power.png",
+      "sha256": "c54d809014436d5e07b4c98a6e5a35b25fe68c4ca38688f30c359ef67dd96388"
+    },
+    {
+      "file": "24/apps-preferences-system-power.png",
+      "upstream": "SE98/apps/24/preferences-system-power.png",
+      "resolved": "SE98/apps/24/preferences-system-power.png",
+      "sha256": "b1d79048fb47b94252bd4edfdf5a4ab2e0237ac5d762e7c6503b795c608fe36a"
+    },
+    {
+      "file": "32/apps-preferences-system-power.png",
+      "upstream": "SE98/apps/32/preferences-system-power.png",
+      "resolved": "SE98/apps/32/preferences-system-power.png",
+      "sha256": "d97ec3c69198eb7a6288865ab22896525d99eb948031f7f12b0caf2ec7bba4a1"
+    },
+    {
+      "file": "16/actions-process-stop.png",
+      "upstream": "SE98/actions/16/process-stop.png",
+      "resolved": "SE98/actions/16/process-stop.png",
+      "sha256": "a2f04513cb46e04f8c058f538fe68c0531966cc0b500821ffc6bb9d6924a204f"
+    },
+    {
+      "file": "24/actions-process-stop.png",
+      "upstream": "SE98/actions/24/process-stop.png",
+      "resolved": "SE98/actions/24/process-stop.png",
+      "sha256": "365027bf1646c7f9dae527efe00e9a7fd4d514d85c4f725155889dd9baf182d3"
+    },
+    {
+      "file": "32/actions-process-stop.png",
+      "upstream": "SE98/actions/32/process-stop.png",
+      "resolved": "SE98/actions/32/process-stop.png",
+      "sha256": "15a58ac558cc2c355f4a19748bd97f5a310417c36b14dcc8deb40ea75e794f32"
+    },
+    {
+      "file": "16/actions-media-playback-start.png",
+      "upstream": "SE98/actions/16/media-playback-start.png",
+      "resolved": "SE98/actions/16/media-playback-start.png",
+      "sha256": "72542d0db20a4f01b333e2b48c8a148f439138eed73a7e73387cc181e8f586ac"
+    },
+    {
+      "file": "24/actions-media-playback-start.png",
+      "upstream": "SE98/actions/24/media-playback-start.png",
+      "resolved": "SE98/actions/24/media-playback-start.png",
+      "sha256": "ba0d25a6e3c390a63bf569de881342d4f7d02dc1d486cc59134b21a7e14bf470"
+    },
+    {
+      "file": "32/actions-media-playback-start.png",
+      "upstream": "SE98/actions/32/media-playback-start.png",
+      "resolved": "SE98/actions/32/media-playback-start.png",
+      "sha256": "ca17f8f07f6584bd98c89d3e6c0a58c1692a101e2c6044e780be17e5e786229b"
+    },
+    {
+      "file": "16/actions-document-save.png",
+      "upstream": "SE98/actions/16/document-save.png",
+      "resolved": "SE98/actions/16/document-save.png",
+      "sha256": "4c311c9be5c8ea066f6ce2d5e7c4d18360d59335c4d438d57577daf9095dc9eb"
+    },
+    {
+      "file": "24/actions-document-save.png",
+      "upstream": "SE98/actions/24/document-save.png",
+      "resolved": "SE98/actions/24/document-save.png",
+      "sha256": "df9df61ad559fa98a40ae19944e1d0868d560dddb1fe4afd77953530699e492e"
+    },
+    {
+      "file": "32/actions-document-save.png",
+      "upstream": "SE98/actions/32/document-save.png",
+      "resolved": "SE98/actions/32/document-save.png",
+      "sha256": "76c4796e172ca05a07081329c38a8748d82412c4d1bb39602fb3d207c5d03051"
+    },
+    {
+      "file": "16/places-user-trash_win98.png",
+      "upstream": "SE98/places/16/user-trash_win98.png",
+      "resolved": "SE98/places/16/user-trash_win98.png",
+      "sha256": "81558c89357229f1122eebb4a83c7da747ccd008b5be64b3d08a798429071a79"
+    },
+    {
+      "file": "24/places-user-trash_win98.png",
+      "upstream": "SE98/places/24/user-trash_win98.png",
+      "resolved": "SE98/places/24/user-trash_win98.png",
+      "sha256": "aca17d7cfc1ae820528994e928e8202a892a1548d95babd183be8caf84a8b4ae"
+    },
+    {
+      "file": "32/places-user-trash_win98.png",
+      "upstream": "SE98/places/32/user-trash_win98.png",
+      "resolved": "SE98/places/32/user-trash_win98.png",
+      "sha256": "56df553a46642c5910ecbefc9eac4d012d371e25b5b4e473c658f4e3232667ea"
+    },
+    {
+      "file": "16/apps-preferences-plugin.png",
+      "upstream": "SE98/apps/16/preferences-plugin.png",
+      "resolved": "SE98/mimes/16/extension.png",
+      "sha256": "61baa8802257482f531f0a7b6c290ed8b3e5211985c4b4cf7ca2b7e1e4cf9c1c"
+    },
+    {
+      "file": "24/apps-preferences-plugin.png",
+      "upstream": "SE98/apps/24/preferences-plugin.png",
+      "resolved": "SE98/mimes/24/extension.png",
+      "sha256": "e9670447d90c20c7e80e4e57c1a16f6dfd0803739d4a04800a70e5bb925c0e84"
+    },
+    {
+      "file": "32/apps-preferences-plugin.png",
+      "upstream": "SE98/apps/32/preferences-plugin.png",
+      "resolved": "SE98/mimes/32/extension.png",
+      "sha256": "011e481728505c3eab53a1c947d18e8a001cd19d507d79ce535de6ca0bd7f84a"
+    },
+    {
+      "file": "16/actions-system-reboot.png",
+      "upstream": "SE98/actions/16/system-reboot.png",
+      "resolved": "SE98/actions/16/system-reboot.png",
+      "sha256": "bdc1a1ebe432d5d4b0deec139c521cb14b490f4f10c9df52dabf376ba716d965"
+    },
+    {
+      "file": "24/actions-system-reboot.png",
+      "upstream": "SE98/actions/24/system-reboot.png",
+      "resolved": "SE98/actions/24/system-reboot.png",
+      "sha256": "95827adbb004c259e96751305883addbc7894a9f2bd6e077102939ccd99abc90"
+    },
+    {
+      "file": "32/actions-system-reboot.png",
+      "upstream": "SE98/actions/32/system-reboot.png",
+      "resolved": "SE98/actions/32/system-reboot.png",
+      "sha256": "0ac201e5afe6a2a9a29e4566a6c170b60696f7712c87e9e723ff5bd798644f7f"
+    },
+    {
+      "file": "16/actions-system-log-out.png",
+      "upstream": "SE98/actions/16/system-log-out.png",
+      "resolved": "SE98/actions/16/system-log-out.png",
+      "sha256": "81b14c09ec5aa31791678aa28461890df0187a223cbcb285dad77a1da4aa1d2c"
+    },
+    {
+      "file": "24/actions-system-log-out.png",
+      "upstream": "SE98/actions/24/system-log-out.png",
+      "resolved": "SE98/actions/24/system-log-out.png",
+      "sha256": "80a49885faa4424ab9f289ee11378e51a4d8d85e6baa2abc0bcd0f4130f1048e"
+    },
+    {
+      "file": "32/actions-system-log-out.png",
+      "upstream": "SE98/actions/32/system-log-out.png",
+      "resolved": "SE98/actions/32/system-log-out.png",
+      "sha256": "b3bacc899d731e83cfd818fcd81f311e648b149d87058423ceb99694bc5710a4"
+    },
+    {
+      "file": "16/actions-help-faq.png",
+      "upstream": "SE98/actions/16/help-faq.png",
+      "resolved": "SE98/actions/16/help-faq.png",
+      "sha256": "b108d2876eec2f9deaa7ec73b754a4c5201a3a711d2fe35ce0c094efe4d68a47"
+    },
+    {
+      "file": "24/actions-help-faq.png",
+      "upstream": "SE98/actions/24/help-faq.png",
+      "resolved": "SE98/actions/24/help-faq.png",
+      "sha256": "5a898974bf040d0016ac1a8baf80ab214cee29aea99d7b4786cf54b9f1971c39"
+    },
+    {
+      "file": "32/actions-help-faq.png",
+      "upstream": "SE98/actions/32/help-faq.png",
+      "resolved": "SE98/actions/32/help-faq.png",
+      "sha256": "e2812339a89de87db6d38d2288b3c7b18a76bcc3eb76ac809841fd60502cfdee"
+    },
+    {
+      "file": "16/actions-window-close.png",
+      "upstream": "SE98/actions/16/window-close.png",
+      "resolved": "SE98/actions/16/window-close.png",
+      "sha256": "551ce986a4060f842818f6517fda5926ae2278679e78a405b4145401071dbce4"
+    },
+    {
+      "file": "24/actions-window-close.png",
+      "upstream": "SE98/actions/24/window-close.png",
+      "resolved": "SE98/actions/24/window-close.png",
+      "sha256": "7bc2d3307b2b959df6e94a2f6d597e7d40dd36d19671ac1941b52a1c745f57d0"
+    },
+    {
+      "file": "32/actions-window-close.png",
+      "upstream": "SE98/actions/32/window-close.png",
+      "resolved": "SE98/actions/32/window-close.png",
+      "sha256": "0aef835c7e49b5326160a90ba2e9cc36dd24242ec50b7c7a323024a3b0c50b43"
+    },
+    {
+      "file": "16/actions-window-minimize.png",
+      "upstream": "SE98/actions/16/window-minimize.png",
+      "resolved": "SE98/actions/16/window-minimize.png",
+      "sha256": "35f6cb09218ffb82534c72b6aa3259b89fe7752ea20c25763d95577963ab577c"
+    },
+    {
+      "file": "24/actions-window-minimize.png",
+      "upstream": "SE98/actions/24/window-minimize.png",
+      "resolved": "SE98/actions/24/window-minimize.png",
+      "sha256": "e66f47ff24ca4cc65a45dbb691432bf3d85a0a7940f2be22dd4f264c0846ae8b"
+    },
+    {
+      "file": "32/actions-window-minimize.png",
+      "upstream": "SE98/actions/32/window-minimize.png",
+      "resolved": "SE98/actions/32/window-minimize.png",
+      "sha256": "0eb03d038e4a2703e1f6d2263aebd71b20bb6e46a1324331046fd5f219876e17"
+    },
+    {
+      "file": "16/actions-window-maximize.png",
+      "upstream": "SE98/actions/16/window-maximize.png",
+      "resolved": "SE98/actions/16/window-maximize.png",
+      "sha256": "b1fdfe4ddf5c3a916b1ab0b45e244cc974b92c1d7041279b3cdfb9808001f8b7"
+    },
+    {
+      "file": "24/actions-window-maximize.png",
+      "upstream": "SE98/actions/24/window-maximize.png",
+      "resolved": "SE98/actions/24/window-maximize.png",
+      "sha256": "51e112588b9a48acc29a547a1cecbf0f0fda1ecf1a35d7899994ee303ed18c8d"
+    },
+    {
+      "file": "32/actions-window-maximize.png",
+      "upstream": "SE98/actions/32/window-maximize.png",
+      "resolved": "SE98/actions/32/window-maximize.png",
+      "sha256": "0e8e7abd4c2b63e42435382294d119edd8728d76a4e33a13793a8210a5764b92"
+    },
+    {
+      "file": "16/actions-window-restore.png",
+      "upstream": "SE98/actions/16/window-restore.png",
+      "resolved": "SE98/actions/16/window-restore.png",
+      "sha256": "579351daa38943deab340bc45d34a9dbb2b9aee38c45045c189709bfb8fae39f"
+    },
+    {
+      "file": "24/actions-window-restore.png",
+      "upstream": "SE98/actions/24/window-restore.png",
+      "resolved": "SE98/actions/24/window-restore.png",
+      "sha256": "72b28478235a91bc2f05f0e94c84cdb9bf61c49759c10cde1de9fef727633b2f"
+    },
+    {
+      "file": "32/actions-window-restore.png",
+      "upstream": "SE98/actions/32/window-restore.png",
+      "resolved": "SE98/actions/32/window-restore.png",
+      "sha256": "ff079414071a3398bfe6cf603056dffe312a684edceefc5ed98f764176931977"
+    },
+    {
+      "file": "16/actions-window-pin.png",
+      "upstream": "SE98/actions/16/window-pin.png",
+      "resolved": "SE98/actions/16/window-pin.png",
+      "sha256": "5818ab0ccbfcc183cd0de14f79679982cfa937ad76f57224fd1b446672e2525b"
+    },
+    {
+      "file": "24/actions-window-pin.png",
+      "upstream": "SE98/actions/16/window-pin.png",
+      "resolved": "SE98/actions/16/window-pin.png",
+      "sha256": "5818ab0ccbfcc183cd0de14f79679982cfa937ad76f57224fd1b446672e2525b"
+    },
+    {
+      "file": "32/actions-window-pin.png",
+      "upstream": "SE98/actions/16/window-pin.png",
+      "resolved": "SE98/actions/16/window-pin.png",
+      "sha256": "5818ab0ccbfcc183cd0de14f79679982cfa937ad76f57224fd1b446672e2525b"
+    },
+    {
+      "file": "16/actions-window-unpin.png",
+      "upstream": "SE98/actions/16/window-unpin.png",
+      "resolved": "SE98/actions/16/window-unpin.png",
+      "sha256": "2206bdff9acaddddfb053542ec15cc5e6a30c885f005f09402f3843ef3d38d83"
+    },
+    {
+      "file": "24/actions-window-unpin.png",
+      "upstream": "SE98/actions/16/window-unpin.png",
+      "resolved": "SE98/actions/16/window-unpin.png",
+      "sha256": "2206bdff9acaddddfb053542ec15cc5e6a30c885f005f09402f3843ef3d38d83"
+    },
+    {
+      "file": "32/actions-window-unpin.png",
+      "upstream": "SE98/actions/16/window-unpin.png",
+      "resolved": "SE98/actions/16/window-unpin.png",
+      "sha256": "2206bdff9acaddddfb053542ec15cc5e6a30c885f005f09402f3843ef3d38d83"
+    },
+    {
+      "file": "16/status-network-transmit-receive.png",
+      "upstream": "SE98/status/16/network-transmit-receive.png",
+      "resolved": "SE98/status/16/network-transmit-receive.png",
+      "sha256": "5dcb3f189e7c90f6a4eedabf346345e7787e318bf5f5c5f182802062f6a2a18d"
+    },
+    {
+      "file": "24/status-network-transmit-receive.png",
+      "upstream": "SE98/status/24/network-transmit-receive.png",
+      "resolved": "SE98/status/24/network-transmit-receive.png",
+      "sha256": "8c6f1c6f0a8f0ab0d32cd7a4f0e7cf51325c2894abd4f8b61fe8afd2d8d62d00"
+    },
+    {
+      "file": "32/status-network-transmit-receive.png",
+      "upstream": "SE98/status/32/network-transmit-receive.png",
+      "resolved": "SE98/status/32/network-transmit-receive.png",
+      "sha256": "c4959487703149ee4b96967b55f33156cc4f366511d1828330021d634994da0b"
+    },
+    {
+      "file": "16/status-network-unavailable.png",
+      "upstream": "SE98/status/16/network-unavailable.png",
+      "resolved": "SE98/status/16/network-unavailable.png",
+      "sha256": "35066072123946005fd4427dab043f92d3b9d4b5426f91546510341c34fd2d08"
+    },
+    {
+      "file": "24/status-network-unavailable.png",
+      "upstream": "SE98/status/24/network-unavailable.png",
+      "resolved": "SE98/status/24/network-unavailable.png",
+      "sha256": "3bd38e1b7d811d93b17238d7b9863be7f35ae924e4fb5d6527b854e6261c7c75"
+    },
+    {
+      "file": "32/status-network-unavailable.png",
+      "upstream": "SE98/status/32/network-unavailable.png",
+      "resolved": "SE98/status/32/network-unavailable.png",
+      "sha256": "a54974a2d9638b9e5b81869960202b6adff6c827930af9b06a8c85dadf4ef46e"
+    }
+  ]
+}

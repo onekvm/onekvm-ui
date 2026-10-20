@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { Download, Play } from '@lucide/vue'
+import { Download, Play } from '@/icons'
 import { useMessage } from 'naive-ui'
 import type { FitAddon as FitAddonInstance } from '@xterm/addon-fit'
 import type { Terminal as TerminalInstance } from '@xterm/xterm'

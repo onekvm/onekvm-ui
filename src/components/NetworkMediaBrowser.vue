@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { Disc3, Folder, HardDrive, House, LoaderCircle, RefreshCw, Server, Unplug } from '@lucide/vue'
+import { Disc3, Folder, HardDrive, House, LoaderCircle, RefreshCw, Server, Unplug } from '@/icons'
 import { api, type MSDMedia, type MSDSource, type MSDSourceListing } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { useOverlayMount } from '@/composables/useOverlayMount'

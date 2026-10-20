@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { icons, LoaderCircle, Wrench } from '@lucide/vue'
+import { LoaderCircle, Wrench } from '@/icons'
 import { extensionAssetURL } from '@/api/client'
 import type { ToolboxTool } from '@/composables/useToolbox'
 const props = defineProps<{ tool: ToolboxTool; loading?: boolean }>()

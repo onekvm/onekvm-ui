@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, shallowRef, useTemplateRef } from 'vue'
-import { GripVertical, PinOff } from '@lucide/vue'
+import { GripVertical, PinOff } from '@/icons'
 import { useToolboxContext } from '@/composables/useToolbox'
 import { t } from '@/i18n/runtime'
 import ToolIcon from './ToolIcon.vue'

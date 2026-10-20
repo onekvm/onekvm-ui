@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
-import { Cable, CircleHelp, Monitor, PictureInPicture2, RotateCcw, SlidersHorizontal, Waypoints } from '@lucide/vue'
+import { Cable, CircleHelp, Monitor, PictureInPicture2, RotateCcw, SlidersHorizontal, Waypoints } from '@/icons'
 import { useMessage, type SelectOption } from 'naive-ui'
 
 import { api, APIError, type ConfigSchema, type EDIDStatus, type OneKVMConfig } from '@/api/client'

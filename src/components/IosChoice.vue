@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Check, ChevronRight } from '@lucide/vue'
+import { Check, ChevronRight } from '@/icons'
 
 import { useOverlayMount } from '@/composables/useOverlayMount'
 

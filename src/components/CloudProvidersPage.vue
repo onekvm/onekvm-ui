@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { computed } from 'vue'
-import { CloudOff, RefreshCw, Store } from '@lucide/vue'
+import { CloudOff, RefreshCw, Store } from '@/icons'
 import { useMessage } from 'naive-ui'
 
 import type { ExtensionSummary } from '@/api/client'

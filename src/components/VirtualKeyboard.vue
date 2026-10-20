@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import type { GlobalThemeOverrides } from 'naive-ui'
-import { Command, Grid2X2, X } from '@lucide/vue'
+import { Command, Grid2X2, X } from '@/icons'
 import VirtualKeyboardKeyContent from './VirtualKeyboardKeyContent.vue'
 
 import { t } from '@/i18n/runtime'

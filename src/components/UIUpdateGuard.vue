@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { RefreshCw } from '@lucide/vue'
+import { RefreshCw } from '@/icons'
 
 import { t } from '@/i18n/runtime'
 

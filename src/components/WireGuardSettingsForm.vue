@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Plus, RefreshCw, Trash2 } from '@lucide/vue'
+import { onMounted, ref } from 'vue'
+import { Plus, RefreshCw, Trash2 } from '@/icons'
 import { useMessage } from 'naive-ui'
 
 import type { WireGuardConfig, WireGuardPeer } from '@/api/client'

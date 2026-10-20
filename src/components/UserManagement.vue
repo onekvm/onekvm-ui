@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { computed, onMounted, reactive, ref } from 'vue'
-import { Pencil, Plus, Trash2, UserRound } from '@lucide/vue'
+import { Pencil, Plus, Trash2, UserRound } from '@/icons'
 import { useMessage } from 'naive-ui'
 
 import { api, type AuthUser, type AuthUserUpdate } from '@/api/client'

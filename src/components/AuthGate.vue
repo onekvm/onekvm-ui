@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { serviceURL } from '@/api/service-url'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ChevronDown, ChevronLeft, ChevronRight, Circle, CircleCheck, Languages, LogIn, Settings2 } from '@lucide/vue'
+import { isCloudHosted, serviceURL } from '@/api/service-url'
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
+import { ChevronDown, ChevronLeft, ChevronRight, Circle, CircleCheck, Languages, LogIn, Settings2 } from '@/icons'
 
 import type { DeviceLanguage, NetworkConfig, SetupSystemSettings } from '@/api/client'
 import { useAuth } from '@/composables/useAuth'

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { CircleHelp } from '@lucide/vue'
+import { CircleHelp } from '@/icons'
 
 import { t } from '@/i18n/runtime'
 import { isDNSServer } from '@/lib/network'

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue'
-import { AlertTriangle, FileUp } from '@lucide/vue'
+import { AlertTriangle, FileUp } from '@/icons'
 import { useMessage } from 'naive-ui'
 
 import type { DeviceFileEntry } from '@/api/client'

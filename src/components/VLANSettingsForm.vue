@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Trash2 } from '@lucide/vue'
+import { Trash2 } from '@/icons'
 
 import type { ManagedNetworkInterface } from '@/api/client'
 import { t } from '@/i18n/runtime'

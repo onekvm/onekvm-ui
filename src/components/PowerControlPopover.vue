@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Power, RotateCcw, TimerReset } from '@lucide/vue'
+import { Power, RotateCcw, TimerReset } from '@/icons'
 
 import { t } from '@/i18n/runtime'
 import ControlOverlay from './ControlOverlay.vue'

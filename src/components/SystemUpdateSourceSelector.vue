@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, shallowRef, watch } from 'vue'
-import { api, type SystemUpdateLocalFile, type SystemUpdateSource } from '@/api/client'
+import { computed, shallowRef } from 'vue'
+import { FileUp, FolderOpen } from '@/icons'
+import { type SystemUpdateLocalFile, type SystemUpdateSource } from '@/api/client'
 import { t } from '@/i18n/runtime'
 
 export type UpdateMethod = 'github' | 'http' | 'tftp' | 'nfs' | 'local' | 'upload'

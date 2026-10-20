@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, shallowRef, watch } from 'vue'
-import { Plus, Trash2 } from '@lucide/vue'
+import { Plus, Trash2 } from '@/icons'
 
 import type { WebRtcIceConfig, WebRtcTurnServerConfig } from '@/api/client'
 import { t } from '@/i18n/runtime'

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, shallowRef, watch } from 'vue'
-import { RefreshCw, VideoOff, WifiOff } from '@lucide/vue'
+import { RefreshCw, VideoOff, WifiOff } from '@/icons'
 
 import { t } from '@/i18n/runtime'
 import type { VideoFallbackPrompt } from '@/lib/video-transport'

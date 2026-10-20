@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RefreshCw } from '@lucide/vue'
+import { RefreshCw } from '@/icons'
 
 import { api, type ActiveNetworkRoute } from '@/api/client'
 import { t } from '@/i18n/runtime'

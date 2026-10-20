@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue'
-import { Captions, Film, Fingerprint, Keyboard, Monitor, Plug, Power, Video, Volume2 } from '@lucide/vue'
+import { Captions, Film, Fingerprint, Keyboard, Monitor, Plug, Power, Video, Volume2 } from '@/icons'
 import { t } from '@/i18n/runtime'
 import IconDescriptionList from './IconDescriptionList.vue'
 import PluginDetailsSectionTitle from './PluginDetailsSectionTitle.vue'

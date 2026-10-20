@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ExternalLink } from '@lucide/vue'
+import { ExternalLink } from '@/icons'
 import { computed } from 'vue'
 
 import { t } from '@/i18n/runtime'

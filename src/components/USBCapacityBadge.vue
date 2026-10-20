@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Zap } from '@lucide/vue'
+import { Zap } from '@/icons'
 import { computed } from 'vue'
 
 import { t } from '@/i18n/runtime'

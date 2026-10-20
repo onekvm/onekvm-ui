@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, shallowRef, watch, type Component } from 'vue'
-import { Box, CheckCircle2, FileUp, Info, PackageCheck, Power, PowerOff, Save, Trash2, Upload, X } from '@lucide/vue'
+import { Box, CheckCircle2, FileUp, Info, PackageCheck, Play, PowerOff, Save, Trash2, Upload, X } from '@/icons'
 import { useMessage } from 'naive-ui'
 
 import {

@@ -5,13 +5,14 @@ import { RefreshCw, Wifi } from '@/icons'
 import { api, type WifiNetwork, type WifiStatus } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { defaultWifiApNetwork, wifiApNetworkError } from '@/lib/wifi-ap-network'
+import { wifiErrorText } from '@/lib/wifi-error'
 import { normalizeApChannel, validApChannel } from '@/lib/wifi-radio'
 import WifiApSettings from './WifiApSettings.vue'
 import WifiSavedNetworks from './WifiSavedNetworks.vue'
 
 const status = shallowRef<WifiStatus | null>(null)
 const props = withDefaults(defineProps<{ initialSetup?: boolean; interfaceName?: string; active?: boolean; disabled?: boolean }>(), { active: true })
-const emit = defineEmits<{ changed: [] }>()
+const emit = defineEmits<{ changed: []; status: [value: WifiStatus]; connected: [value: WifiStatus] }>()
 const networks = shallowRef<WifiNetwork[]>([])
 const selected = shallowRef<WifiNetwork | null>(null)
 const showConnectModal = shallowRef(false)
@@ -50,6 +51,8 @@ const canSaveAp = computed(() => apDirty.value && !loading.value
   && /^[\x20-\x7e]{8,63}$/.test(apPassword.value)
   && apPassword.value.trim() === apPassword.value
   && validApChannel(status.value, apBand.value, apChannel.value))
+
+const connectionPending = computed(() => loading.value || !!status.value?.connecting)
 
 const canConnect = computed(() =>
   !props.disabled && !!selected.value && !loading.value && !status.value?.connecting
@@ -149,11 +152,14 @@ async function retryLoad() {
 
 async function connect() {
   if (!selected.value || !canConnect.value) return
-  attemptedSsid.value = selected.value.ssid
+  const ssid = selected.value.ssid
+  attemptedSsid.value = ''
   loading.value = true
   connectError.value = ''
   try {
-    status.value = await api.connectWifi(selected.value.ssid, savedSelection.value && !password.value ? undefined : password.value, stationInterface.value)
+    const nextStatus = await api.connectWifi(ssid, savedSelection.value && !password.value ? undefined : password.value, stationInterface.value)
+    attemptedSsid.value = ssid
+    status.value = nextStatus
     password.value = ''
   } catch (reason) {
     connectError.value = reason instanceof Error ? reason.message : String(reason)
@@ -222,6 +228,17 @@ async function selectMode(mode: WifiStatus['mode']) {
     loading.value = false
   }
 }
+
+watch(status, (value) => {
+  if (!value) return
+  emit('status', value)
+  if (!attemptedSsid.value || connectError.value || value.error || !value.connected || value.connecting || value.station_ssid !== attemptedSsid.value) return
+  attemptedSsid.value = ''
+  password.value = ''
+  showConnectModal.value = false
+  emit('connected', value)
+  emit('changed')
+})
 
 watch(() => props.active, (active) => {
   if (timer) clearInterval(timer)
@@ -307,7 +324,7 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
             </span>
           </span>
         </div>
-        <p v-else-if="status.connecting" class="wifi-muted wifi-setup-empty">{{ t('network.wifi.connecting', '正在关联并获取 IP 地址…') }}</p>
+        <p v-else-if="status.connecting" class="wifi-muted wifi-setup-empty">{{ t('network.wifi.connecting', '正在连接 Wi-Fi…') }}</p>
         <p v-else class="wifi-muted wifi-setup-empty">{{ t('network.wifi.notConnected', '未连接') }}</p>
       </section>
 
@@ -368,28 +385,30 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
         </p>
       </section>
     </div>
-    <p v-if="error || (showStation && status.error)" class="wifi-error" role="alert">{{ error || status.error }}</p>
+    <p v-if="error || (showStation && status.error)" class="wifi-error" role="alert">{{ wifiErrorText(error || status.error || '', t) }}</p>
 
-    <n-modal v-model:show="showConnectModal" preset="card" class="wifi-connect-modal" :title="selected ? `连接 ${selected.ssid}` : t('network.wifi.connect', '连接')" :mask-closable="!loading">
+    <n-modal v-model:show="showConnectModal" preset="card" :style="{ width: '420px', maxWidth: 'calc(100vw - 32px)' }" :title="selected ? t('network.wifi.connectTo', 'Connect to {ssid}').replace('{ssid}', selected.ssid) : t('network.wifi.connect', '连接')" :mask-closable="!loading">
       <template v-if="selected">
-        <p class="wifi-muted">{{ selected.ssid }} · {{ securityBadge(selected) }}</p>
-        <n-input
-          v-if="selected.secure"
-          :value="password"
-          type="password"
-          show-password-on="click"
-          :placeholder="savedSelection ? t('network.wifi.keepPassword', 'Leave blank to use the saved password') : t('network.wifi.networkPassword', '接入点密码')"
-          @update:value="password = $event"
-          @keyup.enter="connect"
-        />
-        <p v-if="status.connecting" class="wifi-muted">{{ t('network.wifi.connecting', '正在关联并获取 IP 地址…') }}</p>
+        <n-form v-if="selected.secure && !connectionPending" label-placement="top" :show-feedback="false" @submit.prevent.stop="connect">
+          <n-form-item :label="t('network.wifi.password', '密码')">
+            <n-input
+              :value="password"
+              type="password"
+              show-password-on="click"
+              :input-props="{ 'aria-label': t('network.wifi.password', '密码') }"
+              :placeholder="savedSelection ? t('network.wifi.keepPassword', 'Leave blank to use the saved password') : t('network.wifi.password', '密码')"
+              @update:value="password = $event"
+            />
+          </n-form-item>
+        </n-form>
+        <p v-if="connectionPending" class="wifi-muted" role="status">{{ t('network.wifi.connecting', '正在连接 Wi-Fi…') }}</p>
         <p v-if="status.connected && status.station_ssid === selected.ssid" class="wifi-success">{{ t('network.wifi.connected', '已连接') }} · {{ status.station_address }}</p>
-        <p v-if="connectError || (attemptedSsid === selected.ssid && status.error)" class="wifi-error" role="alert">{{ connectError || status.error }}</p>
+        <p v-if="!connectionPending && (connectError || (attemptedSsid === selected.ssid && status.error))" class="wifi-error" role="alert">{{ wifiErrorText(connectError || status.error || '', t) }}</p>
       </template>
       <template #footer>
         <div class="wifi-modal-actions">
           <n-button :disabled="loading" @click="showConnectModal = false">{{ t('common.close', '关闭') }}</n-button>
-          <n-button v-if="selected && !(status.connected && status.station_ssid === selected.ssid)" type="primary" :loading="loading || status.connecting" :disabled="!canConnect" @click="connect">
+          <n-button v-if="selected && !(status.connected && status.station_ssid === selected.ssid)" type="primary" :loading="connectionPending" :disabled="!canConnect" @click="connect">
             {{ t('network.wifi.connect', '连接') }}
           </n-button>
         </div>
@@ -454,7 +473,7 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
 .wifi-control-row p { margin: 4px 0 0; }
 .wifi-ap code { font-size: 13px; user-select: all; }
 .wifi-networks { display: grid; gap: 5px; max-height: 260px; overflow-y: auto; }
-.wifi-network { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--onekvm-surface-inset); color: inherit; text-align: left; cursor: pointer; }
+.wifi-network { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--onekvm-surface-inset); color: inherit; text-align: left; cursor: pointer; transition: background-color 160ms ease, border-color 160ms ease; }
 .wifi-network:hover, .wifi-network--selected { border-color: var(--primary); background: var(--accent); }
 .wifi-network--current { cursor: default; }
 .wifi-network--current:hover { border-color: var(--border); background: var(--onekvm-surface-inset); }
@@ -470,9 +489,9 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
 .wifi-success { color: #36a870; }
 .wifi-error { color: #d95757; }
 .wifi-modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+@media (prefers-reduced-motion: reduce) { .wifi-network { transition: none; } }
 @media (max-width: 540px) { .wifi-ap, .wifi-control-row { align-items: stretch; flex-direction: column; } .wifi-load-error { align-items: flex-start; flex-direction: column; } }
 </style>
 
 <style>
-.wifi-connect-modal { width: min(100%, 420px); }
 </style>

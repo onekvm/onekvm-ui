@@ -18,6 +18,7 @@ export type RememberedLogin = {
 
 export function readRememberedLogin(): RememberedLogin | null {
   try {
+    if (typeof document !== 'undefined' && document.querySelector('meta[name="onekvm-service-base"]')) return null
     const raw = localStorage.getItem(rememberLoginKey())
     if (!raw) return null
     const parsed = JSON.parse(raw) as { username?: unknown; password?: unknown }
@@ -30,6 +31,7 @@ export function readRememberedLogin(): RememberedLogin | null {
 }
 
 export function writeRememberedLogin(login: RememberedLogin) {
+  if (typeof document !== 'undefined' && document.querySelector('meta[name="onekvm-service-base"]')) return
   localStorage.setItem(rememberLoginKey(), JSON.stringify({
     username: login.username,
     password: login.password,

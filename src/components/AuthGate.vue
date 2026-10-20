@@ -14,6 +14,7 @@ import {
   withManagementVLAN,
 } from '@/lib/network'
 import { timezones } from '@/lib/timezones'
+import { PHONE_UI_QUERY } from '@/lib/mobile-viewport'
 import { useOneKVMTheme } from '@/theme/runtime'
 import {
   clearRememberedLogin,
@@ -22,6 +23,8 @@ import {
 } from '@/lib/remember-login'
 
 import IosChoice from './IosChoice.vue'
+import CloudBackButton from './CloudBackButton.vue'
+import DesktopSetupForm from './DesktopSetupForm.vue'
 import NetworkSettingsForm from './NetworkSettingsForm.vue'
 import TimezoneMap from './TimezoneMap.vue'
 import WifiOnboarding from './WifiOnboarding.vue'
@@ -39,6 +42,7 @@ function detectedTimezone() {
 
 const { auth, login, setup, completeMfa, cancelMfa } = useAuth()
 const { theme } = useOneKVMTheme()
+const cloudHosted = isCloudHosted()
 const logoSource = computed(() => theme.value.appearance === 'light'
   ? serviceURL('/brand/onekvm-logo-primary.svg')
   : serviceURL('/brand/onekvm-logo-inverse.svg'))
@@ -51,6 +55,9 @@ const setupUsername = ref('admin')
 const setupPassword = ref('')
 const confirmPassword = ref('')
 const setupPage = ref<'menu' | 'account' | 'network' | 'region'>('menu')
+const setupMedia = window.matchMedia(PHONE_UI_QUERY)
+const phoneSetup = shallowRef(setupMedia.matches)
+const desktopSetupStep = shallowRef<1 | 2 | 3>(1)
 const setupMotion = ref<'ios-push' | 'ios-pop'>('ios-push')
 const setupNetwork = ref(defaultNetworkConfig())
 const networkAdvancedOpen = ref(false)
@@ -318,7 +325,14 @@ function saveSetupPage() {
 }
 
 function onSetupPop() {
+  if (!phoneSetup.value) return
   if (setupPage.value !== 'menu') showSetupMenu()
+}
+
+function onSetupViewportChange(event: MediaQueryListEvent) {
+  phoneSetup.value = event.matches
+  edgeSwipe.tracking = false
+  edgeSwipe.page = null
 }
 
 const edgeSwipe = { x: 0, y: 0, tracking: false, page: null as HTMLElement | null }
@@ -328,7 +342,7 @@ function drawerOpen() {
 }
 
 function onEdgeStart(event: TouchEvent) {
-  if (setupPage.value === 'menu' || drawerOpen()) return
+  if (!phoneSetup.value || setupPage.value === 'menu' || drawerOpen()) return
   const touch = event.changedTouches[0]
   if (!touch || touch.clientX > 28) return
   edgeSwipe.tracking = true
@@ -378,6 +392,7 @@ function onEdgeEnd(event: TouchEvent) {
 }
 
 onMounted(() => {
+  setupMedia.addEventListener('change', onSetupViewportChange)
   history.replaceState({ ...(history.state || {}), onekvmSetupRoot: true }, '')
   window.addEventListener('popstate', onSetupPop)
   window.addEventListener('touchstart', onEdgeStart, { passive: true })
@@ -386,6 +401,7 @@ onMounted(() => {
   window.addEventListener('touchcancel', onEdgeEnd)
 })
 onUnmounted(() => {
+  setupMedia.removeEventListener('change', onSetupViewportChange)
   window.removeEventListener('popstate', onSetupPop)
   window.removeEventListener('touchstart', onEdgeStart)
   window.removeEventListener('touchmove', onEdgeMove)
@@ -395,12 +411,41 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <CloudBackButton v-if="cloudHosted && !auth.authenticated" class="auth-cloud-back" show-label />
   <div v-if="auth.loading" class="auth-loading">
     <n-spin size="small" />
   </div>
 
   <main v-else-if="!auth.configured" class="auth-screen">
-    <form class="auth-panel auth-panel-setup" @submit.prevent="setupPage === 'menu' && initialize()">
+    <DesktopSetupForm
+      v-if="!phoneSetup"
+      v-model:step="desktopSetupStep"
+      v-model:hostname="hostname"
+      v-model:username="setupUsername"
+      v-model:password="setupPassword"
+      v-model:confirm-password="confirmPassword"
+      v-model:network="setupNetwork"
+      v-model:network-advanced-open="networkAdvancedOpen"
+      v-model:vlan-enabled="setupVLANEnabled"
+      v-model:vlan-id="setupVLANID"
+      v-model:language="setupLanguage"
+      v-model:timezone="setupTimezone"
+      v-model:ntp="setupNTP"
+      v-model:ntp-server="setupNTPServer"
+      :logo-source="logoSource"
+      :brand-badge="brandBadge"
+      :busy="busy"
+      :error="error"
+      :hostname-valid="hostnameValid"
+      :account-valid="setupAccountValid"
+      :network-valid="setupNetworkValid"
+      :valid="setupValid"
+      :timezone-options="timezoneOptions"
+      :clock="setupClock"
+      @initialize="initialize"
+      @select-language="selectUILanguage"
+    />
+    <form v-else class="auth-panel auth-panel-setup" @submit.prevent="setupPage === 'menu' && initialize()">
       <div class="ios-stage">
       <Transition :name="setupMotion">
       <div :key="setupPage" class="ios-page">
@@ -513,7 +558,7 @@ onUnmounted(() => {
           <button type="button" class="ios-disclosure" :disabled="busy" @click="networkAdvancedOpen = !networkAdvancedOpen">
             <Settings2 />
             <span>{{ t('auth.advancedSettings', 'Advanced settings') }}</span>
-            <ChevronDown :class="{ expanded: networkAdvancedOpen }" />
+            <ChevronDown class="setup-advanced-icon" :class="{ expanded: networkAdvancedOpen }" />
           </button>
           <n-collapse-transition :show="networkAdvancedOpen">
             <div class="setup-network-advanced">
@@ -676,7 +721,7 @@ onUnmounted(() => {
             />
           </n-form-item>
         </n-form>
-        <label class="auth-remember">
+        <label v-if="!cloudHosted" class="auth-remember">
           <n-checkbox v-model:checked="rememberPassword">
             {{ t('auth.rememberPassword', 'Remember password') }}
           </n-checkbox>
@@ -692,3 +737,7 @@ onUnmounted(() => {
 
   <slot v-else />
 </template>
+
+<style scoped>
+.auth-cloud-back { position: fixed; top: 12px; left: 12px; z-index: 1; }
+</style>

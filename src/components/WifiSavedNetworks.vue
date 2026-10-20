@@ -3,6 +3,7 @@ import { computed, reactive, shallowRef } from 'vue'
 import { Plus, Settings2 } from '@/icons'
 import { api, type SavedWifiNetwork, type WifiProfileSettings, type WifiStatus } from '@/api/client'
 import { t } from '@/i18n/runtime'
+import { wifiErrorText } from '@/lib/wifi-error'
 import { wifiProfileError } from '@/lib/wifi-profile'
 
 const props = defineProps<{ status: WifiStatus; interfaceName: string; disabled?: boolean }>()
@@ -37,7 +38,7 @@ async function run(action: () => Promise<WifiStatus>, inModal = false): Promise<
   if (inModal) modalError.value = ''; else error.value = ''
   try { emit('updated', await action()); return true }
   catch (reason) {
-    const message = reason instanceof Error ? reason.message : String(reason)
+    const message = wifiErrorText(reason instanceof Error ? reason.message : String(reason), t)
     if (inModal) modalError.value = message; else error.value = message
     return false
   } finally { busy.value = false }

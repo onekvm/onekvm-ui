@@ -4,10 +4,10 @@ import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, r
 import { useMessage } from 'naive-ui'
 
 import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type OneKVMStatus } from '@/api/client'
-import { isCloudHosted } from '@/api/service-url'
 import ToolboxWorkspace from './toolbox/ToolboxWorkspace.vue'
 import MacroRunBanner from './toolbox/MacroRunBanner.vue'
 import { useToolbox } from '@/composables/useToolbox'
+import { providePerformanceDock } from '@/composables/usePerformanceDock'
 import { useAuth } from '@/composables/useAuth'
 import { useDeviceInputSettings } from '@/composables/useDeviceInputSettings'
 import { useKeyboardLockOverlay } from '@/composables/useKeyboardLockOverlay'
@@ -35,6 +35,7 @@ import { consumeConsoleBack, lockConsoleHistory } from '@/lib/history-lock'
 import { fullscreenTopInsetPx, isIpadLikeUserAgent, readSafeAreaTop } from '@/lib/fullscreen-inset'
 import { useTransport } from '@/composables/useTransport'
 import { usePictureInPicture } from '@/composables/usePictureInPicture'
+import type { WebRTCConnectionStats } from '@/lib/webrtc-connection-stats'
 import { onekvm, type BrowserAudioStats, type BrowserVideoLatencyUs } from '@/lib/onekvm'
 import { effectiveVideoCodec } from '@/lib/video-transport'
 import { loadLocalShortcuts, saveLocalShortcuts } from '@/lib/keyboard-shortcuts'
@@ -83,6 +84,7 @@ const pictureInPicture = usePictureInPicture(() => state.value.videoMode)
 const { active: pipActive, busy: pipBusy, supported: pipSupported } = pictureInPicture
 const { auth, logout, refresh } = useAuth()
 const toolbox = useToolbox()
+providePerformanceDock()
 const dialog = useAsyncDialog()
 const message = useMessage()
 const keyboardLockOverlay = useKeyboardLockOverlay()
@@ -156,17 +158,21 @@ const canvasWidth = ref(0)
 const canvasHeight = ref(0)
 const videoFps = ref(0)
 const videoBitrate = ref(0)
+const webrtcConnection = shallowRef<WebRTCConnectionStats | null>(null)
 const iceRttUs = ref(0)
 const jitterBufferUs = ref(0)
 const decodeUs = ref(0)
 const presentUs = ref(0)
+const transportUs = shallowRef<number | null>(null)
+const transportErrorUs = shallowRef<number | null>(null)
 const audioBitrate = ref(0)
-const websocketAudioCodec = shallowRef<'opus' | 'pcm'>('pcm')
+const browserAudioCodec = shallowRef<'opus' | 'pcm' | undefined>()
 const audioPacketsPerSecond = ref(0)
 const audioJitterBufferUs = ref(0)
 const switchingTransport = shallowRef<'websocket' | 'webrtc' | 'h264' | ''>('')
 const fallbackActionError = shallowRef('')
 let unsubscribeKeyboardLED: (() => void) | undefined
+let unsubscribeWebRTCConnection: (() => void) | undefined
 let unsubscribeStatus: (() => void) | undefined
 
 const consoleTitle = computed(() => resolveConsoleTitle(
@@ -287,11 +293,13 @@ function setBrowserLatency(latency: BrowserVideoLatencyUs & { presentUs: number 
   jitterBufferUs.value = latency.jitterBufferUs
   decodeUs.value = latency.decodeUs
   presentUs.value = latency.presentUs
+  transportUs.value = latency.transportUs ?? null
+  transportErrorUs.value = latency.transportErrorUs ?? null
 }
 
 function setAudioStats(stats: BrowserAudioStats) {
   audioBitrate.value = stats.bitrateKbps
-  if (stats.codec) websocketAudioCodec.value = stats.codec
+  browserAudioCodec.value = stats.codec
   audioPacketsPerSecond.value = stats.packetsPerSecond
   audioJitterBufferUs.value = stats.jitterBufferUs
 }
@@ -483,6 +491,7 @@ watch(advancedSettingsOpen, (open) => {
 })
 
 onMounted(() => {
+  unsubscribeWebRTCConnection = onekvm.subscribeWebRTCConnectionStats(stats => { webrtcConnection.value = stats })
 	unsubscribeStatus = statusEvents.subscribe(
 		(next) => {
 			status.value = { ...next, hid: keyboardLockOverlay.applyStatus(next.hid) }
@@ -521,6 +530,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
 	document.title = 'OneKVM'
+  unsubscribeWebRTCConnection?.()
 	unsubscribeStatus?.()
 	unsubscribeKeyboardLED?.()
   window.removeEventListener('onekvm:extensions-changed', refreshExtensionContributions)
@@ -569,6 +579,7 @@ onBeforeUnmount(() => {
       :style="toolbarStageStyle"
       @pointerdown.capture="onekvm.unlockAudio()"
     >
+        <div class="console-connection-overlays" />
         <ControlToolbar
           ref="controlToolbar"
           :state="state"
@@ -580,7 +591,7 @@ onBeforeUnmount(() => {
           :can-power="canPower"
           :brand-badge="brandBadge"
           :console-title="consoleTitle"
-          :username="isCloudHosted() ? t('auth.cloudIdentity', 'Cloud account') : auth.username"
+          :username="auth.username"
           :mouse-mode="mouseMode"
           :scroll-interval="scrollInterval"
           :mouse-report-rate="mouseReportRate"
@@ -666,7 +677,10 @@ onBeforeUnmount(() => {
           :video-bitrate="videoBitrate"
           :target-fps="status?.video.fps || 60"
           :codec="status ? effectiveVideoCodec(status.video).toUpperCase() : ''"
+          :bit-depth="state.videoMode !== 'mjpeg' || status?.video.actual_codec === 'mjpeg' ? status?.video.bit_depth : null"
+          :color-range="state.videoMode !== 'mjpeg' || status?.video.actual_codec === 'mjpeg' ? status?.video.color_range : undefined"
           :transport="state.videoMode"
+          :webrtc-connection="webrtcConnection"
           :input-width="status?.video.input_width ?? 0"
           :input-height="status?.video.input_height ?? 0"
           :capture-latency-us="status?.video.capture_latency_us ?? 0"
@@ -675,15 +689,17 @@ onBeforeUnmount(() => {
           :jitter-buffer-us="jitterBufferUs"
           :decode-us="decodeUs"
           :present-us="presentUs"
+          :transport-us="transportUs"
+          :transport-error-us="transportErrorUs"
           :audio-enabled="status?.audio.enabled ?? false"
-          :audio-encoder="state.videoMode === 'websocket' ? websocketAudioCodec : status?.audio.encoder ?? ''"
+          :audio-encoder="browserAudioCodec ?? status?.audio.encoder ?? ''"
           :audio-quality="status?.audio.quality ?? ''"
           :audio-sample-rate="status?.audio.sample_rate ?? 0"
           :audio-channels="audioOverlayChannels"
           :audio-fps="audioPacketsPerSecond || status?.audio.actual_fps || 0"
           :audio-bitrate="audioBitrate || status?.audio.bitrate_kbps || 0"
           :audio-capture-latency-us="status?.audio.capture_latency_us ?? 0"
-          :audio-encode-latency-us="state.videoMode === 'websocket' && websocketAudioCodec === 'pcm' ? 0 : status?.audio.encode_latency_us ?? 0"
+          :audio-encode-latency-us="browserAudioCodec === 'pcm' ? 0 : status?.audio.encode_latency_us ?? 0"
           :audio-jitter-buffer-us="audioJitterBufferUs"
           @close="performanceOpen = false"
         />

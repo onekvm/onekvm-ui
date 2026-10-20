@@ -32,3 +32,9 @@ export function serviceWebSocketURL(path: string) {
 export function isCloudHosted() {
   return Boolean(document.querySelector('meta[name="onekvm-service-base"]'))
 }
+
+export function cloudDeviceName() {
+  return isCloudHosted()
+    ? document.querySelector<HTMLMetaElement>('meta[name="onekvm-cloud-device-name"]')?.content || ''
+    : ''
+}

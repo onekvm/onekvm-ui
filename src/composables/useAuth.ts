@@ -1,6 +1,6 @@
 import { reactive, readonly } from 'vue'
 
-import { api, invalidateExtensionCaches, type AuthStatus, type NetworkConfig, type SetupSystemSettings } from '@/api/client'
+import { api, invalidateExtensionCaches, isUnauthorizedError, type AuthStatus, type NetworkConfig, type SetupSystemSettings } from '@/api/client'
 import { isCloudHosted } from '@/api/service-url'
 
 const state = reactive<AuthStatus & { loading: boolean }>({
@@ -52,7 +52,13 @@ async function refresh() {
         window.clearTimeout(refreshRetryTimer)
         refreshRetryTimer = null
       }
-    } catch {
+    } catch (error) {
+      // Core's public auth status returns 200 for an expired device session.
+      // A 401 here comes from the cloud transport's independent session gate.
+      if (isCloudHosted() && isUnauthorizedError(error)) {
+        window.parent.postMessage({ type: 'onekvm-cloud-expired' }, window.location.origin)
+        return
+      }
       // Changing the management address briefly makes the API unreachable.
       // An unknown auth state must never be presented as an uninitialized
       // device; retain the last known state and retry until Core is reachable.
@@ -66,6 +72,8 @@ async function refresh() {
 }
 
 async function login(username: string, password: string) {
+  // HttpOnly session cookies must be expired by the server before a fresh login.
+  await api.authLogout()
   const status = await api.authLogin(username, password)
   assign(status)
   return status
@@ -105,10 +113,6 @@ async function updateAccount(username: string, currentPassword: string, newPassw
 }
 
 async function logout() {
-  if (isCloudHosted()) {
-    window.parent.postMessage({ type: 'onekvm-cloud-logout' }, window.location.origin)
-    return
-  }
   await api.authLogout()
   invalidateExtensionCaches()
   state.authenticated = false
@@ -125,10 +129,6 @@ export function useAuth() {
     window.addEventListener('onekvm:permissions-changed', () => { void refresh() })
     window.addEventListener('onekvm:unauthorized', () => {
       invalidateExtensionCaches()
-      if (isCloudHosted()) {
-        window.parent.postMessage({ type: 'onekvm-cloud-expired' }, window.location.origin)
-        return
-      }
       state.authenticated = false
       state.required = true
       state.mfa_required = false
@@ -136,6 +136,7 @@ export function useAuth() {
       state.factors = []
       state.mfa = { totp: false, backup_codes: 0, plugins: [] }
       state.loading = false
+      if (isCloudHosted()) void refresh()
     })
     void refresh()
   }

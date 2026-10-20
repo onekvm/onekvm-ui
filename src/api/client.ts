@@ -40,6 +40,53 @@ export interface NetworkConfig {
   webrtc?: WebRtcIceConfig
 }
 
+export interface FirewallRule {
+  id: number
+  action: 'allow' | 'deny' | 'reject' | 'limit' | string
+  direction: 'in' | 'out' | string
+  protocol: 'tcp' | 'udp' | 'any' | string
+  port: string
+  source: string
+  comment: string
+  enabled: boolean
+}
+
+export interface FirewallConfirmation {
+  pending: boolean
+  deadline?: string
+  seconds_remaining: number
+  confirm_token?: string
+  ready?: boolean
+  applying?: boolean
+}
+
+export interface FirewallStatus {
+  available: boolean
+  enabled: boolean
+  default_incoming: string
+  default_outgoing: string
+  logging: string
+  rules: FirewallRule[]
+  confirmation?: FirewallConfirmation
+}
+
+export interface FirewallRuleInput {
+  action: string
+  direction: string
+  protocol: string
+  port: string
+  source?: string
+  comment?: string
+}
+
+export interface FirewallUpdate {
+  enabled?: boolean
+  default_incoming?: string
+  default_outgoing?: string
+  protect_management?: boolean
+  rules?: FirewallRuleInput[]
+}
+
 export interface WifiNetwork {
   ssid: string
   signal_dbm: number
@@ -224,6 +271,7 @@ export interface ConfigSaveResponse {
 
 export interface OneKVMConfig {
   schema_version: number
+  recovery?: { network: RecoveryNetworkSettings }
   video: {
     codec: string
     quality_factor: number
@@ -242,7 +290,7 @@ export interface OneKVMConfig {
     microphone?: boolean
     device: string
     encoder: string
-    quality?: 'low' | 'medium' | 'high'
+    quality?: 'low' | 'medium' | 'high' | 'pcm'
     channels?: 'mono' | 'stereo'
     product_name?: string
   }
@@ -398,6 +446,8 @@ export interface OneKVMStatus {
 		resolution: number
 		input_width?: number
 		input_height?: number
+		bit_depth?: number | null
+		color_range?: 'unknown' | 'limited' | 'full' | 'unspecified'
 		hdmi_error?: string
 		capture_latency_us?: number
 		encode_latency_us?: number
@@ -575,10 +625,23 @@ export interface SystemOnlineUpdate {
 }
 
 export interface SystemOnlineUpdateProgress {
-  phase: 'idle' | 'downloading' | 'installing' | 'error'
+  phase: 'idle' | 'downloading' | 'checking' | 'awaiting_packages' | 'installing' | 'error'
   bytes: number
   total_bytes: number
   error: string
+}
+
+export interface SystemUpdatePreflight {
+  id?: string
+  phase: 'idle' | 'prepared' | 'armed' | 'installing' | 'complete' | 'failed'
+  error?: string
+  kernel_changed?: boolean
+  current_kernel?: string
+  target_kernel?: string
+  target_build?: string
+  ready?: boolean
+  missing?: { package: string; plugin: string; reason: string }[]
+  packages?: { name: string; version: string }[]
 }
 
 export type SystemUpdateSource =
@@ -687,10 +750,12 @@ export interface ExtensionSettingProperty {
 export interface ExtensionToolboxItem {
   id: string
   title: string
-  i18n?: Record<string, { title: string }>
+  subtitle?: string
+  i18n?: Record<string, { title: string; subtitle?: string }>
   icon?: { source: 'lucide'; name: string } | { source: 'custom'; path: string }
   order?: number
   presentation: 'drawer' | 'window'
+  layout?: 'padded' | 'edge-to-edge'
   size?: { width?: number; height?: number }
   view: { renderer: 'vue'; entrypoint: string }
 }
@@ -1025,7 +1090,7 @@ export function invalidateExtensionCaches() {
 function changesExtensions(path: string, method: string | undefined) {
   if (!path.startsWith('/api/extensions') || !method || method.toUpperCase() === 'GET') return false
   const invoke = path.match(/\/invoke\/([^/?]+)/)
-  return !invoke || !['status', 'list_packages', 'list_sources', 'install_progress',
+  return !invoke || !['status', 'assistance_info', 'list_packages', 'list_sources', 'install_progress',
     'set_source', 'set_source_enabled', 'remove_source'].includes(decodeURIComponent(invoke[1]!))
 }
 
@@ -1437,12 +1502,15 @@ export const api = {
     }),
   resetVideoEDID: () => request<{ status: string; apply_required: EDIDApplyRequired }>('/api/video/edid/reset', { method: 'POST' }),
   getMJPEGStreamURL: () => `${serviceBaseUrl()}/api/stream`,
-  getVideoWebSocketURL: () => serviceWebSocketURL('/api/stream/ws'),
+  getVideoWebSocketURL: (videoCodec?: string) => serviceWebSocketURL(
+    `/api/stream/ws${videoCodec ? `?video_codec=${encodeURIComponent(videoCodec)}` : ''}`,
+  ),
   getAudioWebSocketURL: () => serviceWebSocketURL('/api/audio/ws'),
   getHIDWebSocketURL: () => serviceWebSocketURL('/api/hid/ws'),
   resetUSB: () => request<{ status: string }>('/api/hid/reset', { method: 'POST' }),
   getMSDWebSocketURL: () => serviceWebSocketURL('/api/msd/ws'),
-  getStatusEventsURL: () => `${serviceBaseUrl()}/api/status/events`,
+  // The status endpoint negotiates a snapshot or SSE stream from Accept.
+  getStatusEventsURL: () => `${serviceBaseUrl()}/api/status`,
   getMSDStatus: () => request<MSDStatus>('/api/msd/status', { cache: 'no-store' }),
   connectMSD: () => request<MSDStatus>('/api/msd/connect', { method: 'POST' }),
   disconnectMSD: () => request<MSDStatus>('/api/msd/disconnect', { method: 'POST' }),
@@ -1544,7 +1612,7 @@ export const api = {
   resetConfig: () => request<{ status: string }>('/api/config/reset', { method: 'POST', keepalive: true }),
   factoryReset: () => request<{ status: string }>('/api/system/factory-reset', { method: 'POST', keepalive: true }),
   rebootSystem: () => request<{ status: string }>('/api/system/reboot', { method: 'POST', keepalive: true }),
-  enterRecovery: () => request<{ status: string }>('/api/system/recovery', { method: 'POST', keepalive: true }),
+  enterRecovery: (network: RecoveryNetworkSettings) => request<{ status: string }>('/api/system/recovery', { method: 'POST', body: JSON.stringify(network), keepalive: true }),
   runDiagnostics: async (
     onEvent: (event: DiagnosticsEvent) => void,
     signal?: AbortSignal,
@@ -1671,6 +1739,14 @@ export const api = {
 	getNetworkRoutes: () => request<StaticRoute[]>('/api/network/routes'),
 	setNetworkRoutes: (routes: StaticRoute[]) => request<{ status: string }>('/api/network/routes', { method: 'PUT', body: JSON.stringify(routes) }),
 	getNetworkActiveRoutes: () => request<ActiveNetworkRoute[]>('/api/network/routes/active'),
+  getFirewall: () => request<FirewallStatus>('/api/firewall', { cache: 'no-store' }),
+  updateFirewall: (settings: FirewallUpdate) =>
+    request<FirewallStatus>('/api/firewall', { method: 'PUT', body: JSON.stringify(settings) }),
+  addFirewallRule: (rule: FirewallRuleInput) =>
+    request<FirewallStatus>('/api/firewall/rules', { method: 'POST', body: JSON.stringify(rule) }),
+  deleteFirewallRule: (id: number) => request<FirewallStatus>(`/api/firewall/rules/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  confirmFirewall: (token?: string) => request<{ status: string }>(`/api/firewall/confirm${token ? `?token=${encodeURIComponent(token)}` : ''}`, { method: 'POST' }),
+  rollbackFirewall: () => request<{ status: string }>('/api/firewall/rollback', { method: 'POST' }),
   getSystemTime: () => request<SystemTimeStatus>('/api/system/time'),
   updateSystemTime: (timezone: string, ntp: boolean, ntpServers: string[], language: string) =>
     request<SystemTimeStatus>('/api/system/time', {
@@ -1683,6 +1759,16 @@ export const api = {
       body: JSON.stringify({ ntp: false, time_usec: Date.now() * 1000 }),
     }),
   getSystemUpdate: () => request<SystemUpdateStatus>('/api/system/update'),
+  getSystemUpdatePreflight: () => request<SystemUpdatePreflight>('/api/system/update/preflight'),
+  addSystemUpdatePackage: (id: string, file: File) => request<SystemUpdatePreflight>('/api/system/update/preflight/packages', {
+    method: 'POST', body: file, headers: { 'Content-Type': 'application/octet-stream', 'X-OneKVM-Update-ID': id },
+  }),
+  commitSystemUpdatePreflight: (id: string) => request<{ status: string }>('/api/system/update/preflight', {
+    method: 'POST', body: JSON.stringify({ id }),
+  }),
+  cancelSystemUpdatePreflight: (id: string) => request<SystemUpdatePreflight>('/api/system/update/preflight', {
+    method: 'DELETE', body: JSON.stringify({ id }),
+  }),
   getSystemOnlineUpdate: () => request<SystemOnlineUpdate>('/api/system/update/online'),
   startSystemOnlineUpdate: () => request<{ status: string }>('/api/system/update/online', { method: 'POST' }),
   getSystemOnlineUpdateProgress: () => request<SystemOnlineUpdateProgress>('/api/system/update/online/progress'),
@@ -1749,10 +1835,10 @@ export const api = {
       body: JSON.stringify({ delete_data: Boolean(options?.deleteData) }),
     }),
   getWebRTCIce: () => request<{ ice_servers: IceServer[] }>('/api/webrtc/ice', { cache: 'no-store' }),
-  createWebRTCSession: (sdp: string, microphone = false, media: 'audio_video' | 'video' | 'audio' = 'audio_video') =>
+  createWebRTCSession: (sdp: string, microphone = false, media: 'audio_video' | 'video' | 'audio' = 'audio_video', videoCodec?: string) =>
     request<WebRTCAnswer>('/api/webrtc/offer', {
       method: 'POST',
-      body: JSON.stringify({ type: 'offer', sdp, microphone, media }),
+      body: JSON.stringify({ type: 'offer', sdp, microphone, media, video_codec: videoCodec }),
     }),
   closeWebRTCSession: (sessionId: string, keepalive = false) =>
     request<{ status: string }>('/api/webrtc/close', {
@@ -1767,4 +1853,27 @@ export const api = {
     }),
   power: (action: 'on' | 'off' | 'reset') =>
     request<{ status: string }>(`/api/power/${action}`, { method: 'POST' }),
+}
+
+export interface RecoveryNetworkSettings {
+  source: 'system' | 'custom'
+  interface: string
+  mode: 'dhcp' | 'static'
+  address: string
+  gateway: string
+  fallback_enabled: boolean
+  fallback_address: string
+  mac_address: string
+  use_custom_dns: boolean
+  dns: string[]
+}
+export interface RecoveryNetworkPreview {
+  settings: RecoveryNetworkSettings
+  effective: RecoveryNetworkSettings | null
+  error: string | null
+  pending_system_network: boolean
+}
+export const recoveryNetworkApi = {
+  get: () => request<RecoveryNetworkPreview>('/api/system/recovery-network'),
+  preview: (settings: RecoveryNetworkSettings) => request<RecoveryNetworkPreview>('/api/system/recovery-network', { method: 'POST', body: JSON.stringify(settings) }),
 }

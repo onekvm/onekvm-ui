@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePrimaryNetworkInterface } from '@/composables/usePrimaryNetworkInterface'
 import type { NetworkConfig } from '@/api/client'
 import { ChevronDown, Settings2 } from '@/icons'
 import { t } from '@/i18n/runtime'
@@ -6,6 +7,7 @@ import NetworkSettingsForm from '../NetworkSettingsForm.vue'
 
 defineProps<{ disabled: boolean }>()
 const network = defineModel<NetworkConfig>({ required: true })
+const primary = usePrimaryNetworkInterface(network)
 const advancedOpen = defineModel<boolean>('advancedOpen', { required: true })
 const vlanEnabled = defineModel<boolean>('vlanEnabled', { required: true })
 const vlanID = defineModel<number>('vlanId', { required: true })
@@ -13,7 +15,7 @@ const vlanID = defineModel<number>('vlanId', { required: true })
 
 <template>
   <div class="setup-ethernet-form">
-    <NetworkSettingsForm v-model="network" hide-route-metric :disabled="disabled" :showMAC="false" :allowIPv4Disabled="false" />
+    <NetworkSettingsForm v-model="primary" hide-route-metric :disabled="disabled" :showMAC="false" :allowIPv4Disabled="false" />
     <n-button
       text
       class="setup-advanced-toggle"
@@ -28,7 +30,7 @@ const vlanID = defineModel<number>('vlanId', { required: true })
     <n-collapse-transition :show="advancedOpen">
       <section class="setup-network-advanced">
         <n-form-item :label="t('network.interfaces.routeMetric', 'Route metric')">
-          <n-input-number :value="network.route_metric" :disabled="disabled" :min="0" :precision="0" @update:value="network.route_metric = $event ?? 0" />
+          <n-input-number :value="primary.route_metric" :disabled="disabled" :min="0" :precision="0" @update:value="primary = { ...primary, route_metric: $event ?? 0 }" />
         </n-form-item>
         <n-form-item :label="t('auth.useVLAN', 'Use a management VLAN')">
           <n-switch v-model:value="vlanEnabled" :disabled="disabled" />

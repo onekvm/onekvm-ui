@@ -13,7 +13,7 @@ export function ipv4ModeUsesStaticAddress(mode: IPv4Mode | string) {
   return mode === 'static' || mode === 'dhcp-static'
 }
 
-export function usesCustomDNS(config: NetworkConfig) {
+export function usesCustomDNS(config: Pick<ManagedNetworkInterface, 'dns' | 'use_custom_dns'>) {
   return config.use_custom_dns ?? (config.dns || []).length > 0
 }
 
@@ -28,7 +28,6 @@ export function usesCustomDiscoveryURL(config: NetworkConfig) {
  */
 export function configuredIPv4Address(config: NetworkConfig) {
   const candidates = [
-    ...(ipv4ModeUsesStaticAddress(config.ipv4_mode) ? [config.ipv4_address] : []),
     ...(config.interfaces || [])
       .filter((networkInterface) => ipv4ModeUsesStaticAddress(networkInterface.ipv4_mode))
       .map((networkInterface) => networkInterface.ipv4_address),
@@ -46,8 +45,6 @@ export function configuredStaticAddresses(config: NetworkConfig) {
       if (address) addresses.add(address)
     }
   }
-  add(config.ipv4_mode, config.ipv4_address)
-  add(config.ipv6_mode, config.ipv6_address)
   for (const networkInterface of config.interfaces || []) {
     add(networkInterface.ipv4_mode, networkInterface.ipv4_address)
     add(networkInterface.ipv6_mode, networkInterface.ipv6_address)
@@ -57,20 +54,8 @@ export function configuredStaticAddresses(config: NetworkConfig) {
 
 export function defaultNetworkConfig(): NetworkConfig {
   return {
-    device: 'eth0',
-    mac_address: '',
-    ipv4_mode: 'dhcp-static',
-    ipv4_address: DEFAULT_FALLBACK_IPV4,
-    ipv4_gateway: '',
-    dns: [],
-    use_custom_dns: false,
-    ipv6_enabled: true,
-    ipv6_mode: 'slaac',
-    ipv6_address: '',
-    ipv6_gateway: '',
-    route_metric: 100,
-		static_routes: [],
-    wifi_ssid: '',
+    primary_interface: 'eth0',
+    static_routes: [],
     hostname: '',
     mdns: true,
     discovery_enabled: true,
@@ -84,7 +69,11 @@ export function defaultNetworkConfig(): NetworkConfig {
     tls_cert_path: '/etc/onekvm/tls/server.crt',
     tls_key_path: '/etc/onekvm/tls/server.key',
     wireguard: [],
-    interfaces: [],
+    interfaces: [{
+      ...defaultPhysicalInterface('eth0'),
+      ipv4_mode: 'dhcp-static', ipv4_address: DEFAULT_FALLBACK_IPV4, route_metric: 100,
+      dns: [], use_custom_dns: false,
+    }],
     vpn: [],
     proxy: { http: '', https: '', no_proxy: '' },
     webrtc: {},
@@ -105,7 +94,7 @@ export function availablePhysicalInterfaces(
       ...networkInterface,
       kind: wifiAvailable && networkInterface.name === 'ap0' ? 'wifi_ap' as const
         : wifiAvailable && /^wlan\d+$/.test(networkInterface.name) ? 'wifi_station' as const : 'physical' as const,
-      configured: networkInterface.name === config.device,
+      configured: false,
     }))
   if (wifiAvailable) {
     if (!reservedNames.has('ap0') && !available.some(({ name }) => name === 'ap0')) {
@@ -117,73 +106,64 @@ export function availablePhysicalInterfaces(
         kind: 'wifi_station', port_type: 'physical', link_speed_mbps: 0 })
     }
   }
-  if (config.device && !available.some(({ name }) => name === config.device)) {
-    available.unshift({
-      name: config.device,
-      up: false,
-      configured: true,
-      mac: '',
-      addresses: [],
-      kind: 'physical' as const,
-      port_type: 'physical' as const,
-      link_speed_mbps: 0,
-    })
-  }
   return available
 }
 
-/** Project one physical link into the existing address/MAC form. */
-export function physicalInterfaceConfig(config: NetworkConfig, name: string): NetworkConfig {
-  if (name === config.device) return config
-  const link = config.interfaces.find((item) => item.kind === 'physical' && item.name === name)
+function defaultPhysicalInterface(name: string): ManagedNetworkInterface {
   return {
-    ...config,
-    device: name,
-    mac_address: link?.mac_address || '',
-    ipv4_mode: link?.ipv4_mode || 'dhcp',
-    ipv4_address: link?.ipv4_address || '',
-    ipv4_gateway: link?.ipv4_gateway || '',
-    ipv6_mode: link?.ipv6_mode || 'slaac',
-    ipv6_enabled: link?.ipv6_mode !== 'disabled',
-    ipv6_address: link?.ipv6_address || '',
-    ipv6_gateway: link?.ipv6_gateway || '',
-    route_metric: link?.route_metric ?? 200,
-    dns: link?.dns?.length || link?.use_custom_dns !== undefined ? [...(link?.dns || [])] : [...config.dns],
-    use_custom_dns: link?.use_custom_dns ?? (link?.dns?.length ? true : config.use_custom_dns),
+    kind: 'physical', name, parent: '', vlan_id: 0, mac_address: '',
+    ipv4_mode: 'dhcp', ipv4_address: '', ipv4_gateway: '',
+    ipv6_mode: 'slaac', ipv6_address: '', ipv6_gateway: '', route_metric: 200,
   }
 }
 
-/** Editing another port must not replace the primary link or move its VLANs. */
-export function updatePhysicalInterface(config: NetworkConfig, name: string, value: NetworkConfig): NetworkConfig {
-  if (name === config.device) return { ...value, device: config.device }
-  const existing = config.interfaces.find((item) => item.name === name)
-  const link: ManagedNetworkInterface = {
-    ...existing,
-    kind: 'physical', name, parent: '', vlan_id: 0,
-    mac_address: value.mac_address,
-    ipv4_mode: value.ipv4_mode, ipv4_address: value.ipv4_address, ipv4_gateway: value.ipv4_gateway,
-    ipv6_mode: value.ipv6_mode, ipv6_address: value.ipv6_address, ipv6_gateway: value.ipv6_gateway,
-    route_metric: value.route_metric,
-    dns: [...value.dns],
-    use_custom_dns: value.use_custom_dns,
+/** Address forms edit one link; DNS defaults inherit from the primary link. */
+export function physicalInterfaceConfig(config: NetworkConfig, name: string): ManagedNetworkInterface {
+  const primary = config.interfaces.find(item => item.name === config.primary_interface)
+  const link = config.interfaces.find(item => item.kind === 'physical' && item.name === name)
+  return {
+    ...defaultPhysicalInterface(name), ...link,
+    dns: [...(link?.dns?.length || link?.use_custom_dns !== undefined ? link.dns || [] : primary?.dns || [])],
+    use_custom_dns: link?.use_custom_dns ?? (link?.dns?.length ? true : primary?.use_custom_dns),
   }
-  const interfaces = config.interfaces.some((item) => item.name === name)
-    ? config.interfaces.map((item) => item.name === name ? link : item)
+}
+
+export function updatePhysicalInterface(config: NetworkConfig, name: string, value: ManagedNetworkInterface): NetworkConfig {
+  const link = { ...value, kind: 'physical' as const, name, dns: [...(value.dns || [])] }
+  const interfaces = config.interfaces.some(item => item.name === name)
+    ? config.interfaces.map(item => item.name === name ? link : item)
     : [...config.interfaces, link]
   return { ...config, interfaces }
+}
+
+/** First-run setup may select a different primary port. */
+export function updatePrimaryInterface(config: NetworkConfig, value: ManagedNetworkInterface): NetworkConfig {
+  const previous = config.primary_interface
+  const updated = updatePhysicalInterface(config, previous, value)
+  return {
+    ...updated, primary_interface: value.name,
+    interfaces: updated.interfaces
+      .filter(item => item.name !== value.name || item.name === previous)
+      .map(item => ({
+        ...item,
+        name: item.name === previous ? value.name : item.name,
+        parent: item.parent === previous ? value.name : item.parent,
+      })),
+    vpn: updated.vpn?.map(client => ({ ...client, parent: client.parent === previous ? value.name : client.parent })),
+    static_routes: updated.static_routes.map(route => ({ ...route, interface: route.interface === previous ? value.name : route.interface })),
+  }
 }
 
 export function cloneNetworkConfig(config: NetworkConfig): NetworkConfig {
   return {
     ...config,
-    dns: [...(config.dns || [])],
 		static_routes: (config.static_routes || []).map((route) => ({ ...route })),
     wireguard: (config.wireguard || []).map((wireGuard) => ({
       ...wireGuard,
       addresses: [...(wireGuard.addresses || [])],
       peers: (wireGuard.peers || []).map((peer) => ({ ...peer, allowed_ips: [...(peer.allowed_ips || [])] })),
     })),
-		interfaces: (config.interfaces || []).map((networkInterface) => ({ ...networkInterface })),
+		interfaces: (config.interfaces || []).map((networkInterface) => ({ ...networkInterface, dns: networkInterface.dns ? [...networkInterface.dns] : undefined })),
     vpn: (config.vpn || []).map((client) => ({ ...client })),
     proxy: { ...(config.proxy || {}) },
     webrtc: {
@@ -231,28 +211,18 @@ export function isNetworkConfigDirty(config: NetworkConfig, savedSnapshot: strin
 // The physical parent only transports tagged frames and does not also acquire
 // an untagged management address.
 export function withManagementVLAN(config: NetworkConfig, vlanID: number): NetworkConfig {
+  const cloned = cloneNetworkConfig(config)
+  const primary = physicalInterfaceConfig(cloned, cloned.primary_interface)
+  const name = `vlan${vlanID}`
   return {
-    ...cloneNetworkConfig(config),
-    ipv4_mode: 'disabled',
-    ipv4_address: '',
-    ipv4_gateway: '',
-    ipv6_enabled: false,
-    ipv6_mode: 'disabled',
-    ipv6_address: '',
-    ipv6_gateway: '',
-    interfaces: [{
-      kind: 'vlan',
-      name: `vlan${vlanID}`,
-      parent: config.device,
-      vlan_id: vlanID,
-      ipv4_mode: config.ipv4_mode,
-      ipv4_address: config.ipv4_address,
-      ipv4_gateway: config.ipv4_gateway,
-      ipv6_mode: config.ipv6_mode,
-      ipv6_address: config.ipv6_address,
-      ipv6_gateway: config.ipv6_gateway,
-      route_metric: config.route_metric,
-    }],
+    ...cloned,
+    interfaces: [
+      ...cloned.interfaces.filter(item => item.name !== name).map(item => item.name === primary.name ? {
+        ...item, ipv4_mode: 'disabled' as const, ipv4_address: '', ipv4_gateway: '',
+        ipv6_mode: 'disabled' as const, ipv6_address: '', ipv6_gateway: '',
+      } : item),
+      { ...primary, kind: 'vlan', name, parent: primary.name, vlan_id: vlanID, mac_address: '' },
+    ],
   }
 }
 
@@ -335,21 +305,11 @@ export function validCIDR(value: string, family: 4 | 6) {
 }
 
 export function isNetworkConfigValid(config: NetworkConfig) {
-  if (!/^[A-Za-z0-9_.:@-]+$/.test(config.device) || config.route_metric < 0) return false
+  if (!config.interfaces.some(item => item.name === config.primary_interface && item.kind === 'physical')) return false
   if (config.discovery_enabled !== false && usesCustomDiscoveryURL(config) && !validDiscoveryURL(config.discovery_url ?? '')) return false
-  if (!validMACAddress(config.mac_address)) return false
-  if (ipv4ModeUsesStaticAddress(config.ipv4_mode)) {
-    if (!validCIDR(config.ipv4_address, 4)) return false
-    if (config.ipv4_gateway && !isIPv4(config.ipv4_gateway)) return false
-  }
-  if (config.ipv6_mode === 'static') {
-    if (!validCIDR(config.ipv6_address, 6)) return false
-    if (config.ipv6_gateway && !isIPv6(config.ipv6_gateway)) return false
-  }
-  if (usesCustomDNS(config) && (!(config.dns || []).length || !(config.dns || []).every((server) => isDNSServer(server)))) return false
   const names = new Set<string>()
   for (const wireGuard of config.wireguard || []) {
-    if (!/^[A-Za-z0-9_.:@-]+$/.test(wireGuard.name) || wireGuard.name === config.device || names.has(wireGuard.name)) return false
+    if (!/^[A-Za-z0-9_.:@-]+$/.test(wireGuard.name) || names.has(wireGuard.name)) return false
     names.add(wireGuard.name)
     if ((wireGuard.private_key && !validWireGuardKey(wireGuard.private_key)) || !validWireGuardKey(wireGuard.public_key) ||
         wireGuard.listen_port < 0 || wireGuard.listen_port > 65535) return false
@@ -363,14 +323,12 @@ export function isNetworkConfigValid(config: NetworkConfig) {
   }
   for (const networkInterface of config.interfaces || []) {
     if (!/^[A-Za-z0-9_.:@-]+$/.test(networkInterface.name) ||
-        names.has(networkInterface.name) || networkInterface.name === config.device) return false
+        names.has(networkInterface.name)) return false
     names.add(networkInterface.name)
-    if (networkInterface.use_custom_dns === true && !(networkInterface.dns || []).length) return false
-    if ((networkInterface.dns || []).some(server => !isDNSServer(server))) return false
     if (networkInterface.kind === 'physical') {
       if (!validMACAddress(networkInterface.mac_address || '')) return false
     } else if (networkInterface.kind === 'vlan') {
-      const managedParent = networkInterface.parent === config.device || config.interfaces.some((item) => item.kind === 'physical' && item.name === networkInterface.parent)
+      const managedParent = config.interfaces.some((item) => item.kind === 'physical' && item.name === networkInterface.parent)
       if (!managedParent || networkInterface.vlan_id < 1 || networkInterface.vlan_id > 4094) return false
     } else if (networkInterface.kind === 'gre' || networkInterface.kind === 'ipip' || networkInterface.kind === 'sit' || networkInterface.kind === 'gretap') {
       if (!isIPv4(networkInterface.local || '') && !isIPv6(networkInterface.local || '')) return false
@@ -407,7 +365,7 @@ export function isNetworkConfigValid(config: NetworkConfig) {
 		if (networkInterface.route_metric < 0) return false
 	}
   for (const client of config.vpn || []) {
-    if (!/^[A-Za-z0-9_.:@-]+$/.test(client.name) || names.has(client.name) || client.name === config.device) return false
+    if (!/^[A-Za-z0-9_.:@-]+$/.test(client.name) || names.has(client.name)) return false
     names.add(client.name)
     if (client.kind === 'openvpn') {
       if (!client.config?.trim()) {
@@ -427,7 +385,6 @@ export function isNetworkConfigValid(config: NetworkConfig) {
   }
 	const destinations = new Set<string>()
 	const routeInterfaces = new Set([
-		config.device,
 		...(config.wireguard || []).map(({ name }) => name),
 		...(config.interfaces || []).map(({ name }) => name),
     ...(config.vpn || []).map(({ name }) => name),
@@ -440,8 +397,7 @@ export function isNetworkConfigValid(config: NetworkConfig) {
 		destinations.add(route.destination)
 	}
   if (!validProxyURL(config.proxy?.http) || !validProxyURL(config.proxy?.https)) return false
-  if (!validIceURL(config.webrtc?.stun, 'stun') || !validIceURL(config.webrtc?.turn, 'turn')) return false
-  if (config.webrtc?.turn?.trim() && (!config.webrtc.turn_username?.trim() || !config.webrtc.turn_credential?.trim())) return false
+  if (!validIceURL(config.webrtc?.stun, 'stun')) return false
   for (const server of config.webrtc?.turn_servers || []) {
     if (!validIceURL(server.url, 'turn') || !server.url.trim() || !server.username.trim() || !server.credential.trim()) return false
   }

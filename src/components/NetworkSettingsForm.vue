@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
-import { api, type NetworkConfig, type NetworkInterfaceStatus } from '@/api/client'
+import { api, type ManagedNetworkInterface, type NetworkInterfaceStatus } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { validMACAddress } from '@/lib/network'
 
@@ -9,7 +9,7 @@ import IosChoice from './IosChoice.vue'
 import NetworkAddressSettingsForm from './NetworkAddressSettingsForm.vue'
 
 const props = withDefaults(defineProps<{
-  modelValue: NetworkConfig
+  modelValue: ManagedNetworkInterface
   disabled?: boolean
   showDevice?: boolean
   showMAC?: boolean
@@ -24,9 +24,9 @@ const props = withDefaults(defineProps<{
   hideRouteMetric: false,
   inset: false,
 })
-const emit = defineEmits<{ 'update:modelValue': [value: NetworkConfig] }>()
+const emit = defineEmits<{ 'update:modelValue': [value: ManagedNetworkInterface] }>()
 
-function update<K extends keyof NetworkConfig>(key: K, value: NetworkConfig[K]) {
+function update<K extends keyof ManagedNetworkInterface>(key: K, value: ManagedNetworkInterface[K]) {
   emit('update:modelValue', { ...props.modelValue, [key]: value })
 }
 
@@ -48,7 +48,7 @@ const interfaceOptions = computed(() => {
   const names = interfaces.value
     .filter((item) => item.port_type === 'physical' && !/^(wlan|wl|ap|lo)/.test(item.name))
     .map((item) => item.name)
-  const current = props.modelValue.device
+  const current = props.modelValue.name
   if (current && !names.includes(current)) names.unshift(current)
   if (!names.length) names.push(current || 'eth0')
   return names.map((name) => ({ label: name, value: name }))
@@ -61,18 +61,18 @@ const interfaceOptions = computed(() => {
     <IosChoice
       v-if="showDevice && inset"
       :label="t('network.interfaces.selectInterface', 'Interface')"
-      :value="modelValue.device || 'eth0'"
+      :value="modelValue.name || 'eth0'"
       :options="interfaceOptions"
       :disabled="disabled || loadingInterfaces"
-      @select="update('device', $event)"
+      @select="update('name', $event)"
     />
     <n-form-item v-else-if="showDevice" :label="t('network.interfaces.selectInterface', 'Interface')">
       <n-select
-        :value="modelValue.device"
+        :value="modelValue.name"
         :options="interfaceOptions"
         :loading="loadingInterfaces"
         :disabled="disabled || loadingInterfaces"
-        @update:value="update('device', $event)"
+        @update:value="update('name', $event)"
       />
     </n-form-item>
 
@@ -99,7 +99,6 @@ const interfaceOptions = computed(() => {
       @update:model-value="emit('update:modelValue', {
         ...modelValue,
         ...$event,
-        ipv6_enabled: $event.ipv6_mode !== 'disabled',
       })"
     />
 

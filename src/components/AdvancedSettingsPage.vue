@@ -76,7 +76,7 @@ import { loadMarketplaceInstallPackage } from '@/lib/marketplace-install-client'
 import { fillMarketplaceTemplate, WIREGUARD_MARKETPLACE_ID, type MarketplaceInstallPackage } from '@/lib/marketplace-install'
 import { IP_TUNNELS_MARKETPLACE_ID, networkEnvironmentAvailable, type NetworkEnvironmentId } from '@/lib/network-environment'
 import { brandPluginIconUrl, namedPluginIcon } from '@/lib/plugin-icons'
-import { DEFAULT_DISCOVERY_URL, configuredStaticAddresses, isNetworkConfigDirty, isNetworkConfigValid, networkConfigSnapshot, networkKindLabel, usesCustomDNS, usesCustomDiscoveryURL, validHostname } from '@/lib/network'
+import { DEFAULT_DISCOVERY_URL, configuredStaticAddresses, isNetworkConfigDirty, isNetworkConfigValid, networkConfigSnapshot, networkKindLabel, physicalInterfaceConfig, updatePhysicalInterface, usesCustomDNS, usesCustomDiscoveryURL, validHostname } from '@/lib/network'
 import {
   SETTINGS_APP_QUERY,
   SETTINGS_INDEX,
@@ -625,10 +625,25 @@ const deviceVariant = computed(() => machineDisplayName({
   machine: props.status?.machine || schema.value?.machine,
   variant: props.status?.variant || schema.value?.variant,
 }))
+const primaryNetworkDNS = computed({
+  get: () => config.value ? physicalInterfaceConfig(config.value.network, config.value.network.primary_interface).dns || [] : [],
+  set: (dns: string[]) => updatePrimaryNetworkDNS({ dns }),
+})
+const primaryNetworkCustomDNS = computed({
+  get: () => config.value ? usesCustomDNS(physicalInterfaceConfig(config.value.network, config.value.network.primary_interface)) : false,
+  set: (use_custom_dns: boolean) => updatePrimaryNetworkDNS({ use_custom_dns }),
+})
+function updatePrimaryNetworkDNS(value: { dns?: string[]; use_custom_dns?: boolean }) {
+  if (!config.value) return
+  const network = config.value.network
+  config.value.network = updatePhysicalInterface(network, network.primary_interface, {
+    ...physicalInterfaceConfig(network, network.primary_interface), ...value,
+  })
+}
+
 const routeInterfaceNames = computed(() => {
 	if (!config.value) return []
 	return [
-		config.value.network.device,
 		...(config.value.network.interfaces || []).map(({ name }) => name),
 		...(config.value.network.wireguard || []).map(({ name }) => name),
 	].filter((name, index, values) => name && values.indexOf(name) === index)
@@ -1040,10 +1055,8 @@ async function load() {
       api.getConfigSchema(),
       api.getNetworkDNS().catch(() => null),
     ])
-		loadedConfig.network.dns ||= []
 		automaticDNSServers.value = dnsStatus?.automatic_servers || []
 		loadedConfig.network.static_routes ||= []
-		loadedConfig.network.mac_address ||= ''
 		loadedConfig.network.wireguard ||= []
 		loadedConfig.network.interfaces ||= []
 		loadedConfig.network.vpn ||= []
@@ -1969,12 +1982,13 @@ watch(paneSection, (value) => {
 				  @update:model-value="config.network.webrtc = $event"
 				/>
 				<DNSSettingsForm
-				  v-model="config.network.dns"
-				  :custom-dns-enabled="usesCustomDNS(config.network)"
+				  :model-value="primaryNetworkDNS"
+				  @update:model-value="primaryNetworkDNS = $event"
+				  :custom-dns-enabled="primaryNetworkCustomDNS"
 				  :automatic-servers="automaticDNSServers"
 				  :dnssec="config.network.dnssec"
 				  :disabled="saving"
-				  @update:custom-dns-enabled="config.network.use_custom_dns = $event"
+				  @update:custom-dns-enabled="primaryNetworkCustomDNS = $event"
 				  @update:dnssec="config.network.dnssec = $event"
 				/>
 				<ActiveRoutesPanel />

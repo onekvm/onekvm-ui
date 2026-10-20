@@ -211,7 +211,7 @@ function selectInterface(name: string) {
   expanded.value = name
 }
 
-function updateConfig(name: string, value: NetworkConfig) {
+function updateConfig(name: string, value: ManagedNetworkInterface) {
   emit('update:modelValue', updatePhysicalInterface(props.modelValue, name, value))
 }
 
@@ -231,7 +231,7 @@ function addVLAN() {
   const networkInterface: ManagedNetworkInterface = {
     kind: 'vlan',
     name: `vlan${vlanID}`,
-    parent: props.modelValue.device,
+    parent: props.modelValue.primary_interface,
     vlan_id: vlanID,
     ipv4_mode: 'dhcp',
     ipv4_address: '',
@@ -273,7 +273,7 @@ function addVpn(kind: VpnKind) {
     remote: '',
     port: kind === 'openvpn' ? 1194 : 0,
     protocol: kind === 'openvpn' ? 'udp' : '',
-    parent: kind === 'pppoe' ? props.modelValue.device : '',
+    parent: kind === 'pppoe' ? props.modelValue.primary_interface : '',
     username: '',
     password: '',
     service: '',
@@ -581,7 +581,7 @@ watch(() => props.disabled, (disabled, previous) => {
                 <VpnSettingsForm
                   :model-value="networkInterface.configuration"
                   :disabled="disabled"
-                  :parent-device="modelValue.device"
+                  :parent-device="modelValue.primary_interface"
                   @update:model-value="updateVpn(networkInterface.vpnIndex, $event)"
                   @validity="setWireGuardValidity(networkInterface.configuration.name, $event)"
                   @remove="removeVpn(networkInterface.vpnIndex)"

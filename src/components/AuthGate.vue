@@ -4,6 +4,7 @@ import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { ChevronDown, ChevronLeft, ChevronRight, Circle, CircleCheck, Languages, LogIn, Settings2 } from '@/icons'
 
 import type { DeviceLanguage, NetworkConfig, SetupSystemSettings } from '@/api/client'
+import { usePrimaryNetworkInterface } from '@/composables/usePrimaryNetworkInterface'
 import { useAuth } from '@/composables/useAuth'
 import { uiProduct } from '@/product'
 import { currentLanguage, languageOptions, setLanguage, t } from '@/i18n/runtime'
@@ -60,6 +61,7 @@ const phoneSetup = shallowRef(setupMedia.matches)
 const desktopSetupStep = shallowRef<1 | 2 | 3>(1)
 const setupMotion = ref<'ios-push' | 'ios-pop'>('ios-push')
 const setupNetwork = ref(defaultNetworkConfig())
+const setupPrimary = usePrimaryNetworkInterface(setupNetwork)
 const networkAdvancedOpen = ref(false)
 const setupVLANEnabled = ref(false)
 const setupVLANID = ref(1)
@@ -484,7 +486,7 @@ onUnmounted(() => {
           <CircleCheck v-if="setupNetworkValid" class="ios-state done" />
           <Circle v-else class="ios-state" />
           <span>{{ t('auth.networkStep', 'Network') }}</span>
-          <em>{{ setupNetwork.device || 'eth0' }}</em>
+          <em>{{ setupNetwork.primary_interface || 'eth0' }}</em>
           <ChevronRight />
         </button>
         <button type="button" class="ios-menu" @click="openSetupPage('region')">
@@ -549,7 +551,7 @@ onUnmounted(() => {
         <h2 class="ios-header">{{ t('settings.advancedSettings.systemPage.ethernet', 'Ethernet') }}</h2>
         <section class="ios-plain">
           <NetworkSettingsForm
-            v-model="setupNetwork"
+            v-model="setupPrimary"
             inset
             :disabled="busy"
             :showMAC="false"
@@ -566,11 +568,11 @@ onUnmounted(() => {
                 <span>{{ t('network.interfaces.routeMetric', 'Route metric') }}</span>
                 <section class="ios-group">
                   <n-input-number
-                    :value="setupNetwork.route_metric"
+                    :value="setupPrimary.route_metric"
                     :disabled="busy"
                     :min="0"
                     :precision="0"
-                    @update:value="setupNetwork.route_metric = $event ?? 0"
+                    @update:value="setupPrimary = { ...setupPrimary, route_metric: $event ?? 0 }"
                   />
                 </section>
               </label>

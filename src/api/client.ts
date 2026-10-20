@@ -6,21 +6,8 @@ export type IPv6Mode = 'disabled' | 'slaac' | 'dhcp' | 'static'
 export type DeviceLanguage = 'en' | 'zh' | 'zh_tw'
 
 export interface NetworkConfig {
-  device: string
-  mac_address: string
-  ipv4_mode: IPv4Mode
-  ipv4_address: string
-  ipv4_gateway: string
-  dns: string[]
-  use_custom_dns?: boolean
-  ipv6_enabled: boolean
-  ipv6_mode: IPv6Mode
-  ipv6_address: string
-  ipv6_gateway: string
-  route_metric: number
-	static_routes: StaticRoute[]
-  wifi_ssid: string
-  wifi_psk?: string
+  primary_interface: string
+  static_routes: StaticRoute[]
   hostname: string
   mdns?: boolean
   discovery_enabled?: boolean
@@ -149,10 +136,6 @@ export interface ProxyConfig {
 export interface WebRtcIceConfig {
   stun?: string
   turn_servers?: WebRtcTurnServerConfig[]
-  /** Legacy shared-credential TURN fields kept for config compatibility. */
-  turn?: string
-  turn_username?: string
-  turn_credential?: string
 }
 
 export interface WebRtcTurnServerConfig {
@@ -185,6 +168,7 @@ export interface VpnClientConfig {
 export interface ManagedNetworkInterface {
   kind: 'physical' | 'vlan' | 'gre' | 'ipip' | 'sit' | 'vxlan' | 'geneve' | 'fou' | 'bareudp' | 'gretap'
   name: string
+  disabled?: boolean
   mac_address?: string
   dns?: string[]
   use_custom_dns?: boolean
@@ -289,16 +273,13 @@ export interface OneKVMConfig {
     enabled: boolean
     microphone?: boolean
     device: string
-    encoder: string
     quality?: 'low' | 'medium' | 'high' | 'pcm'
     channels?: 'mono' | 'stereo'
     product_name?: string
   }
-  stream: { sink: string }
   network: NetworkConfig
   ssh: SSHConfig
   auth: Record<string, unknown>
-  ota: Record<string, unknown>
   logging: Record<string, unknown>
   system: { language: 'en' | 'zh' | 'zh_tw'; zram_size_mb?: number }
   personalization: PersonalizationConfig

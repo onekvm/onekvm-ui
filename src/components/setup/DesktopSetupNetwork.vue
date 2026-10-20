@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, shallowRef, useId } from 'vue'
 import { api, type NetworkConfig, type NetworkInterfaceStatus, type WifiStatus } from '@/api/client'
 import { Cable, ChevronRight, Wifi } from '@/icons'
+import { physicalInterfaceConfig } from '@/lib/network'
 import { t } from '@/i18n/runtime'
 import WifiOnboarding from '../WifiOnboarding.vue'
 import SetupEthernetForm from './SetupEthernetForm.vue'
@@ -32,12 +33,13 @@ const wifiSummary = computed(() => {
 })
 const ethernetSummary = computed(() => {
   if (!props.valid) return t('auth.networkNeedsConfiguration', 'Configuration required')
-  const mode = network.value.ipv4_mode === 'static'
-    ? network.value.ipv4_address
-    : network.value.ipv4_mode === 'dhcp-static'
+  const primary = physicalInterfaceConfig(network.value, network.value.primary_interface)
+  const mode = primary.ipv4_mode === 'static'
+    ? primary.ipv4_address
+    : primary.ipv4_mode === 'dhcp-static'
       ? t('network.interfaces.dhcpStatic', 'Automatic + fallback address')
       : t('network.interfaces.automatic', 'Automatic')
-  return [network.value.device, mode].filter(Boolean).join(' · ')
+  return [network.value.primary_interface, mode].filter(Boolean).join(' · ')
 })
 
 async function loadNetworks() {

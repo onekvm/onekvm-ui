@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 
-import { defaultNetworkConfig, isDNSServer, isNetworkConfigValid, usesCustomDNS } from '../src/lib/network.ts'
+import { defaultNetworkConfig, isDNSServer, isNetworkConfigValid, usesCustomDNS, physicalInterfaceConfig, updatePhysicalInterface } from '../src/lib/network.ts'
 
 const accepted = [
   '1.1.1.1',
@@ -42,10 +42,12 @@ for (const server of rejected) {
 }
 
 assert.equal(defaultNetworkConfig().dnssec, 'no', 'DNSSEC defaults to off')
-assert.equal(usesCustomDNS(defaultNetworkConfig()), false)
-const legacy = { ...defaultNetworkConfig(), dns: ['1.1.1.1'], use_custom_dns: undefined }
+const base = defaultNetworkConfig()
+const primary = physicalInterfaceConfig(base, base.primary_interface)
+assert.equal(usesCustomDNS(primary), false)
+const legacy = { ...primary, dns: ['1.1.1.1'], use_custom_dns: undefined }
 assert.equal(usesCustomDNS(legacy), true, 'legacy configured DNS stays custom')
-assert.equal(isNetworkConfigValid({ ...legacy, use_custom_dns: true, dns: [] }), false)
-assert.equal(isNetworkConfigValid({ ...legacy, use_custom_dns: false, dns: ['invalid'] }), true)
+assert.equal(isNetworkConfigValid(updatePhysicalInterface(base, 'eth0', { ...legacy, use_custom_dns: true, dns: [] })), false)
+assert.equal(isNetworkConfigValid(updatePhysicalInterface(base, 'eth0', { ...legacy, use_custom_dns: false, dns: ['invalid'] })), true)
 
 console.log('network-dns tests passed')

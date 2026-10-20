@@ -11,18 +11,8 @@ const emit = defineEmits<{ 'update:modelValue': [value: WebRtcIceConfig] }>()
 
 const emptyIce = (): WebRtcIceConfig => ({})
 
-function legacyTurnServers(value?: WebRtcIceConfig): WebRtcTurnServerConfig[] {
-  const username = value?.turn_username || ''
-  const credential = value?.turn_credential || ''
-  return (value?.turn || '')
-    .split(/\r?\n/)
-    .map((url) => url.trim())
-    .filter(Boolean)
-    .map((url) => ({ url, username, credential }))
-}
-
 function turnServers(value?: WebRtcIceConfig): WebRtcTurnServerConfig[] {
-  const servers = value?.turn_servers?.length ? value.turn_servers : legacyTurnServers(value)
+  const servers = value?.turn_servers || []
   return servers.map((server) => ({
     url: server.url || '',
     username: server.username || '',
@@ -33,7 +23,7 @@ function turnServers(value?: WebRtcIceConfig): WebRtcTurnServerConfig[] {
 function cloneIce(value?: WebRtcIceConfig): WebRtcIceConfig {
   if (!value) return emptyIce()
   return {
-    ...value,
+    stun: value.stun,
     turn_servers: value.turn_servers?.map((server) => ({ ...server })),
   }
 }

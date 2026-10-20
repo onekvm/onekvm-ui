@@ -12,7 +12,10 @@ import {
   type WireGuardConfig,
 } from '@/api/client'
 import { t } from '@/i18n/runtime'
-import { defaultManagedTunnel, networkKindLabel, physicalInterfaceConfig, updatePhysicalInterface } from '@/lib/network'
+import { fillMarketplaceTemplate } from '@/lib/marketplace-install'
+import { IP_TUNNELS_MARKETPLACE_ID, type NetworkEnvironmentId } from '@/lib/network-environment'
+import { availablePhysicalInterfaces, defaultManagedTunnel, networkKindLabel, physicalInterfaceConfig, updatePhysicalInterface } from '@/lib/network'
+import { createWireGuardInterface } from '@/lib/wireguard-config'
 
 import ExpandablePanel from './ExpandablePanel.vue'
 import NetworkSettingsForm from './NetworkSettingsForm.vue'
@@ -44,7 +47,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [value: NetworkConfig]
   validity: [valid: boolean]
+  'install-environment': [kind: NetworkEnvironmentId, done: (close: boolean) => void]
 }>()
+const dialog = useAsyncDialog()
 
 const interfaces = ref<NetworkInterfaceStatus[]>([])
 const expanded = ref('')
@@ -71,9 +76,8 @@ const addOptions = computed(() => [
     key: 'group-overlay',
     label: t('network.interfaces.addGroupOverlay', 'Overlay'),
     children: OVERLAY_KINDS.map((kind) => ({
-      label: networkKindLabel(kind),
+      label: environmentOptionLabel(kind, tunnelsSupported.value),
       key: kind,
-      disabled: !tunnelsSupported.value,
     })),
   },
   {
@@ -81,9 +85,8 @@ const addOptions = computed(() => [
     key: 'group-tunnels',
     label: t('network.interfaces.addGroupTunnels', 'Tunnels'),
     children: POINT_TUNNEL_KINDS.map((kind) => ({
-      label: networkKindLabel(kind),
+      label: environmentOptionLabel(kind, tunnelsSupported.value),
       key: kind,
-      disabled: !tunnelsSupported.value,
     })),
   },
   {
@@ -92,53 +95,31 @@ const addOptions = computed(() => [
     label: t('network.interfaces.addGroupVpn', 'VPN'),
     children: [
       {
-        label: networkKindLabel('wireguard'),
+        label: !wireguardSupported.value
+          ? () => h('span', { class: 'network-add-warning-option' }, [
+            h(TriangleAlert, { size: 14 }),
+            h('span', null, networkKindLabel('wireguard')),
+          ])
+          : networkKindLabel('wireguard'),
         key: 'wireguard',
-        disabled: !wireguardSupported.value,
+        disabled: false,
       },
       ...VPN_KINDS.map((kind) => ({
-        label: networkKindLabel(kind),
+        label: vpnAvailability.value[kind]
+          ? networkKindLabel(kind)
+          : () => h('span', { class: 'network-add-warning-option' }, [
+            h(TriangleAlert, { size: 14 }),
+            h('span', null, networkKindLabel(kind)),
+          ]),
         key: kind,
-        disabled: !vpnAvailability.value[kind],
+        disabled: false,
       })),
     ],
   },
 ])
 
 const visibleInterfaces = computed(() => {
-  const wireGuardNames = new Set((props.modelValue.wireguard || []).map(({ name }) => name))
-  const managedNames = new Set((props.modelValue.interfaces || []).map(({ name }) => name))
-  const vpnNames = new Set((props.modelValue.vpn || []).map(({ name }) => name))
-  const available = interfaces.value
-    .filter(({ name }) => !wireGuardNames.has(name) && !managedNames.has(name) && !vpnNames.has(name))
-    .map((networkInterface) => ({
-      ...networkInterface,
-      kind: props.wifiAvailable && networkInterface.name === 'ap0' ? 'wifi_ap' as const
-        : props.wifiAvailable && /^wlan\d+$/.test(networkInterface.name) ? 'wifi_station' as const : 'physical' as const,
-      configured: networkInterface.name === props.modelValue.device,
-    }))
-  if (props.wifiAvailable) {
-    if (!available.some(({ name }) => name === 'ap0')) {
-      available.push({ name: 'ap0', up: false, configured: false, mac: '', addresses: [],
-        kind: 'wifi_ap', port_type: 'virtual', link_speed_mbps: 0 })
-    }
-    if (!available.some(({ name }) => name === 'wlan0')) {
-      available.push({ name: 'wlan0', up: false, configured: false, mac: '', addresses: [],
-        kind: 'wifi_station', port_type: 'physical', link_speed_mbps: 0 })
-    }
-  }
-  if (props.modelValue.device && !available.some(({ name }) => name === props.modelValue.device)) {
-    available.unshift({
-      name: props.modelValue.device,
-      up: false,
-      configured: true,
-      mac: '',
-      addresses: [],
-      kind: 'physical' as const,
-      port_type: 'physical' as const,
-      link_speed_mbps: 0,
-    })
-  }
+  const available = availablePhysicalInterfaces(interfaces.value, props.modelValue, props.wifiAvailable)
   const wireGuard = (props.modelValue.wireguard || []).map((configuration, wireGuardIndex) => {
     const status = interfaces.value.find(({ name }) => name === configuration.name)
     return {
@@ -238,14 +219,7 @@ function addWireGuard() {
   const names = usedNames()
   let index = 0
   while (names.has(`wg${index}`)) index++
-  const wireGuard: WireGuardConfig = {
-    name: `wg${index}`,
-    private_key: '',
-    public_key: '',
-    addresses: [],
-    listen_port: 51820,
-    peers: [],
-  }
+  const wireGuard = createWireGuardInterface(`wg${index}`)
   emit('update:modelValue', { ...props.modelValue, wireguard: [...(props.modelValue.wireguard || []), wireGuard] })
   expanded.value = wireGuard.name
 }
@@ -317,9 +291,54 @@ function addMenuProps() {
   }
 }
 
+function environmentOptionLabel(kind: string, available: boolean) {
+  return available
+    ? networkKindLabel(kind)
+    : () => h('span', { class: 'network-add-warning-option' }, [
+      h(TriangleAlert, { size: 14 }),
+      h('span', null, networkKindLabel(kind)),
+    ])
+}
+
+function environmentInstallCopy(kind: NetworkEnvironmentId) {
+  if (kind === IP_TUNNELS_MARKETPLACE_ID) {
+    return {
+      title: t('network.tunnels.notInstalledTitle', 'IP tunnel environment is not installed'),
+      content: t('network.tunnels.notInstalled', 'Install the IP tunnel environment from Plugin Marketplace before adding tunnel interfaces.'),
+      positiveText: t('network.tunnels.installEnvironment', 'Install IP tunnel environment'),
+    }
+  }
+  if (kind === 'wireguard') {
+    return {
+      title: t('network.wireguard.notInstalledTitle', 'WireGuard is not installed'),
+      content: t('network.wireguard.notInstalled', 'Install the WireGuard environment from Plugin Marketplace before adding a WireGuard interface.'),
+      positiveText: t('network.wireguard.installEnvironment', 'Install the WireGuard environment from Plugin Marketplace'),
+    }
+  }
+  const name = networkKindLabel(kind)
+  return {
+    title: fillMarketplaceTemplate(t('network.vpnEnvironment.notInstalledTitle', '{name} environment is not installed'), { name }),
+    content: fillMarketplaceTemplate(t('network.vpnEnvironment.notInstalled', 'Install the {name} environment from Plugin Marketplace before adding a {name} interface.'), { name }),
+    positiveText: fillMarketplaceTemplate(t('network.vpnEnvironment.installEnvironment', 'Install the {name} environment from Plugin Marketplace'), { name }),
+  }
+}
+
+function promptEnvironmentInstall(kind: NetworkEnvironmentId) {
+  dialog.warning({
+    ...environmentInstallCopy(kind),
+    negativeText: t('common.cancel', 'Cancel'),
+    onPositiveClick: () => new Promise<boolean>((resolve) => {
+      emit('install-environment', kind, resolve)
+    }),
+  })
+}
+
 function addInterface(kind: string) {
   if (kind === 'wireguard') {
-    if (!wireguardSupported.value) return
+    if (!wireguardSupported.value) {
+      promptEnvironmentInstall('wireguard')
+      return
+    }
     addWireGuard()
     return
   }
@@ -328,12 +347,18 @@ function addInterface(kind: string) {
     return
   }
   if (isTunnelKind(kind)) {
-    if (!tunnelsSupported.value) return
+    if (!tunnelsSupported.value) {
+      promptEnvironmentInstall(IP_TUNNELS_MARKETPLACE_ID)
+      return
+    }
     addTunnel(kind)
     return
   }
   if (isVpnKind(kind)) {
-    if (!vpnAvailability.value[kind]) return
+    if (!vpnAvailability.value[kind]) {
+      promptEnvironmentInstall(kind)
+      return
+    }
     addVpn(kind)
   }
 }
@@ -389,6 +414,10 @@ function updateVpn(index: number, value: VpnClientConfig) {
   const vpn = [...(props.modelValue.vpn || [])]
   const oldName = vpn[index]?.name
   vpn[index] = value
+  if (oldName && oldName !== value.name && oldName in wireGuardValidity.value) {
+    wireGuardValidity.value = { ...wireGuardValidity.value, [value.name]: wireGuardValidity.value[oldName] }
+    delete wireGuardValidity.value[oldName]
+  }
   emit('update:modelValue', { ...props.modelValue, vpn })
   if (expanded.value === oldName) expanded.value = value.name
 }
@@ -400,6 +429,7 @@ function removeVpn(index: number) {
     vpn: (props.modelValue.vpn || []).filter((_, vpnIndex) => vpnIndex !== index),
   })
   if (expanded.value === removed?.name) expanded.value = ''
+  if (removed?.name) setWireGuardValidity(removed.name, true, true)
 }
 
 onMounted(load)
@@ -438,31 +468,6 @@ watch(() => props.disabled, (disabled, previous) => {
     </header>
 
     <n-alert v-if="loadError" type="error" :show-icon="false">{{ loadError }}</n-alert>
-    <n-alert
-      v-else-if="!wireguardSupported || !tunnelsSupported"
-      type="warning"
-      :show-icon="false"
-      class="modules-unavailable"
-    >
-      <template v-if="!wireguardSupported && !tunnelsSupported">
-        {{ t(
-          'network.modules.unavailableBoth',
-          'WireGuard and IP tunnel kernel modules are not installed. Install onekvm-kernel-module-wireguard (depends on onekvm-kernel-module-ip-tunnels).',
-        ) }}
-      </template>
-      <template v-else-if="!wireguardSupported">
-        {{ t(
-          'network.wireguard.modulesUnavailable',
-          'WireGuard kernel modules are not installed. Install onekvm-kernel-module-wireguard (it depends on onekvm-kernel-module-ip-tunnels).',
-        ) }}
-      </template>
-      <template v-else>
-        {{ t(
-          'network.tunnels.modulesUnavailable',
-          'IP tunnel kernel modules are not installed. Install onekvm-kernel-module-ip-tunnels.',
-        ) }}
-      </template>
-    </n-alert>
     <n-spin :show="loading">
       <n-empty v-if="!loading && visibleInterfaces.length === 0" :description="t('network.interfaces.empty', 'No network interfaces')" />
       <ul v-else class="settings-list">
@@ -578,6 +583,7 @@ watch(() => props.disabled, (disabled, previous) => {
                   :disabled="disabled"
                   :parent-device="modelValue.device"
                   @update:model-value="updateVpn(networkInterface.vpnIndex, $event)"
+                  @validity="setWireGuardValidity(networkInterface.configuration.name, $event)"
                   @remove="removeVpn(networkInterface.vpnIndex)"
                 />
               </n-form>
@@ -650,7 +656,6 @@ watch(() => props.disabled, (disabled, previous) => {
   gap: 6px;
 }
 .settings-list-detail { display: grid; gap: 18px; padding: 14px 16px 18px 37px; background: var(--onekvm-surface-inset); }
-.modules-unavailable { margin-bottom: 12px; }
 .interface-kind-icon { color: var(--muted-foreground); }
 .interface-facts {
   display: grid;
@@ -689,4 +694,5 @@ watch(() => props.disabled, (disabled, previous) => {
 .network-add-interface-menu {
   max-height: min(24rem, calc(100vh - 12rem));
 }
+.network-add-warning-option { display: inline-flex; align-items: center; gap: 7px; color: var(--warning); }
 </style>

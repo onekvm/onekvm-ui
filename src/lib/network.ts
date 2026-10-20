@@ -1,8 +1,8 @@
-import type { IPv4Mode, ManagedNetworkInterface, NetworkConfig } from '@/api/client'
+import type { IPv4Mode, ManagedNetworkInterface, NetworkConfig, NetworkInterfaceStatus } from '@/api/client'
 
 export type ManagedTunnelKind = Exclude<ManagedNetworkInterface['kind'], 'vlan' | 'physical'>
 
-export const DEFAULT_FALLBACK_IPV4 = '192.168.233.1/24'
+export const DEFAULT_FALLBACK_IPV4 = '192.168.233.10/24'
 export const DEFAULT_DISCOVERY_URL = 'https://find.onekvm.org'
 
 export function ipv4ModeUsesDHCP(mode: IPv4Mode | string) {
@@ -89,6 +89,47 @@ export function defaultNetworkConfig(): NetworkConfig {
     proxy: { http: '', https: '', no_proxy: '' },
     webrtc: {},
   }
+}
+
+/** Live physical links plus missing Wi-Fi placeholders, excluding separately rendered config entries. */
+export function availablePhysicalInterfaces(
+  interfaces: NetworkInterfaceStatus[], config: NetworkConfig, wifiAvailable = false,
+) {
+  const wireGuardNames = new Set((config.wireguard || []).map(({ name }) => name))
+  const managedNames = new Set((config.interfaces || []).map(({ name }) => name))
+  const vpnNames = new Set((config.vpn || []).map(({ name }) => name))
+  const reservedNames = new Set([...wireGuardNames, ...managedNames, ...vpnNames])
+  const available = interfaces
+    .filter(({ name }) => !wireGuardNames.has(name) && !managedNames.has(name) && !vpnNames.has(name))
+    .map((networkInterface) => ({
+      ...networkInterface,
+      kind: wifiAvailable && networkInterface.name === 'ap0' ? 'wifi_ap' as const
+        : wifiAvailable && /^wlan\d+$/.test(networkInterface.name) ? 'wifi_station' as const : 'physical' as const,
+      configured: networkInterface.name === config.device,
+    }))
+  if (wifiAvailable) {
+    if (!reservedNames.has('ap0') && !available.some(({ name }) => name === 'ap0')) {
+      available.push({ name: 'ap0', up: false, configured: false, mac: '', addresses: [],
+        kind: 'wifi_ap', port_type: 'virtual', link_speed_mbps: 0 })
+    }
+    if (!reservedNames.has('wlan0') && !available.some(({ name }) => name === 'wlan0')) {
+      available.push({ name: 'wlan0', up: false, configured: false, mac: '', addresses: [],
+        kind: 'wifi_station', port_type: 'physical', link_speed_mbps: 0 })
+    }
+  }
+  if (config.device && !available.some(({ name }) => name === config.device)) {
+    available.unshift({
+      name: config.device,
+      up: false,
+      configured: true,
+      mac: '',
+      addresses: [],
+      kind: 'physical' as const,
+      port_type: 'physical' as const,
+      link_speed_mbps: 0,
+    })
+  }
+  return available
 }
 
 /** Project one physical link into the existing address/MAC form. */

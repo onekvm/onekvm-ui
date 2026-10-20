@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 
 import {
+  availablePhysicalInterfaces,
   defaultManagedTunnel,
   defaultNetworkConfig,
   configuredIPv4Address,
@@ -15,7 +16,7 @@ import {
 
 const base = defaultNetworkConfig()
 assert.equal(base.ipv4_mode, 'dhcp-static', 'default IPv4 mode is DHCP plus fallback')
-assert.equal(base.ipv4_address, '192.168.233.1/24', 'default fallback IPv4 address is assigned')
+assert.equal(base.ipv4_address, '192.168.233.10/24', 'default fallback IPv4 address is assigned')
 assert.equal(base.discovery_url, 'https://find.onekvm.org', 'default discovery page is configured')
 assert.equal(base.discovery_enabled, true, 'discovery is enabled by default')
 assert.equal(base.use_custom_discovery_url, false, 'custom URL is folded by default')
@@ -26,8 +27,8 @@ assert.equal(isNetworkConfigValid({ ...base, use_custom_discovery_url: true, dis
 assert.equal(isNetworkConfigValid({ ...base, use_custom_discovery_url: true, discovery_url: 'https://user:secret@finder.example' }), false, 'discovery URL credentials are rejected')
 assert.equal(isNetworkConfigValid({ ...base, use_custom_discovery_url: false, discovery_url: 'javascript:alert(1)' }), true, 'folded custom URL does not block saving')
 assert.equal(isNetworkConfigValid({ ...base, discovery_enabled: false, use_custom_discovery_url: true, discovery_url: '' }), true, 'disabled discovery does not block saving')
-assert.equal(configuredIPv4Address(base), '192.168.233.1', 'top-level fallback IPv4 is used for redirect')
-assert.deepEqual(configuredStaticAddresses(base), ['192.168.233.1'])
+assert.equal(configuredIPv4Address(base), '192.168.233.10', 'top-level fallback IPv4 is used for redirect')
+assert.deepEqual(configuredStaticAddresses(base), ['192.168.233.10'])
 assert.equal(
   configuredIPv4Address({
     ...base,
@@ -178,3 +179,20 @@ assert.equal(isNetworkConfigValid({ ...secondary, interfaces: [...secondary.inte
 }] }), true, 'VLANs may attach to a secondary physical port')
 
 console.log('network-config tests passed')
+
+// Configuring wlan0 moves it from live links to managed links; do not add a placeholder.
+const liveWifi = { name: 'wlan0', up: true, configured: false, mac: '02:00:00:00:00:01',
+  addresses: ['192.0.2.20/24'], port_type: 'physical' as const, link_speed_mbps: 0 }
+const configuredWifi = updatePhysicalInterface(base, 'wlan0', physicalInterfaceConfig(base, 'wlan0'))
+for (const live of [[], [liveWifi]]) {
+  const before = availablePhysicalInterfaces(live, base, true)
+  assert.equal(before.filter(link => link.name === 'wlan0').length, 1, 'unconfigured Wi-Fi is shown once, even before discovery')
+  const after = availablePhysicalInterfaces(live, configuredWifi, true)
+  assert.equal(after.filter(link => link.name === 'wlan0').length, 0, 'configured Wi-Fi is rendered only by the managed list')
+  assert.equal(after.filter(link => link.name === 'ap0').length, 1, 'AP placeholder remains available')
+  assert.equal(configuredWifi.interfaces.filter(link => link.name === 'wlan0').length, 1)
+}
+assert.equal(availablePhysicalInterfaces([liveWifi], { ...base, device: 'wlan0' }, true)
+  .filter(link => link.name === 'wlan0').length, 1, 'primary Wi-Fi stays a single live interface')
+assert.equal(availablePhysicalInterfaces([], base, false).some(link => link.name === 'wlan0'), false,
+  'machines without Wi-Fi do not receive placeholders')

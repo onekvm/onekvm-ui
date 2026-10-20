@@ -3,9 +3,10 @@ import { computed } from 'vue'
 
 import type { IPv4Mode, IPv6Mode } from '@/api/client'
 import { t } from '@/i18n/runtime'
-import { DEFAULT_FALLBACK_IPV4, ipv4ModeUsesStaticAddress, isIPv4, isIPv6, validCIDR } from '@/lib/network'
+import { DEFAULT_FALLBACK_IPV4, ipv4ModeUsesStaticAddress, isIPv6, validCIDR } from '@/lib/network'
 
 import IosChoice from './IosChoice.vue'
+import NetworkGatewayField from './NetworkGatewayField.vue'
 
 interface NetworkAddressConfig {
   ipv4_mode: IPv4Mode
@@ -36,8 +37,8 @@ const ipv4Options = computed(() => [
   ...(props.hideDisabledIpv4
     ? []
     : [{ label: t('network.interfaces.ipv4Disabled', 'Disabled'), value: 'disabled' }]),
-  { label: t('network.interfaces.automatic', 'Automatic (DHCP)'), value: 'dhcp' },
-  { label: t('network.interfaces.dhcpStatic', 'DHCP + fallback IP'), value: 'dhcp-static' },
+  { label: t('network.interfaces.automatic', 'Automatic'), value: 'dhcp' },
+  { label: t('network.interfaces.dhcpStatic', 'Automatic + fallback address'), value: 'dhcp-static' },
   { label: t('network.interfaces.staticIP', 'Static IP'), value: 'static' },
 ])
 
@@ -93,18 +94,12 @@ function update<K extends keyof NetworkAddressConfig>(key: K, value: NetworkAddr
               {{ t('network.interfaces.fallbackIPHint', 'Always assigned so the device stays reachable if DHCP is unavailable.') }}
             </template>
           </n-form-item>
-          <n-form-item :label="t('network.interfaces.gateway', 'Gateway')">
-            <n-input
-              :value="modelValue.ipv4_gateway"
-              :disabled="disabled"
-              placeholder="192.168.1.1"
-              :status="modelValue.ipv4_gateway && !isIPv4(modelValue.ipv4_gateway) ? 'error' : undefined"
-              @update:value="update('ipv4_gateway', $event)"
-            />
-            <template v-if="modelValue.ipv4_mode === 'dhcp-static'" #feedback>
-              {{ t('network.interfaces.gatewayOptionalHint', 'Leave empty to use the DHCP gateway.') }}
-            </template>
-          </n-form-item>
+          <NetworkGatewayField
+            :model-value="modelValue.ipv4_gateway"
+            :allow-automatic="modelValue.ipv4_mode === 'dhcp-static'"
+            :disabled="disabled"
+            @update:model-value="update('ipv4_gateway', $event)"
+          />
         </template>
       </div>
     </section>

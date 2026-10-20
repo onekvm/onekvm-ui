@@ -7,7 +7,14 @@ import type { WireGuardConfig, WireGuardPeer } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { validCIDR, validEndpoint, validWireGuardKey } from '@/lib/network'
 import { generateWireGuardKeyPair } from '@/lib/wireguard'
-import { parseWireGuardConfig, serializeWireGuardConfig } from '@/lib/wireguard-config'
+import {
+  createWireGuardInterface,
+  DEFAULT_WIREGUARD_ADDRESS,
+  DEFAULT_WIREGUARD_PORT,
+  parseWireGuardConfig,
+  serializeWireGuardConfig,
+  WireGuardConfigError,
+} from '@/lib/wireguard-config'
 
 const props = defineProps<{ modelValue: WireGuardConfig; disabled?: boolean }>()
 const emit = defineEmits<{
@@ -19,6 +26,52 @@ const message = useMessage()
 const editorMode = ref<'form' | 'file'>('form')
 const configurationFile = ref('')
 const configurationError = ref('')
+const pendingDefault = ref<WireGuardConfig | null>(null)
+const configurationPlaceholder = `[Interface]
+PrivateKey = ...
+Address = ${DEFAULT_WIREGUARD_ADDRESS}
+ListenPort = ${DEFAULT_WIREGUARD_PORT}`
+
+function blankInterface(config: WireGuardConfig) {
+  return !config.private_key && !config.public_key && config.addresses.length === 0 && config.peers.length === 0
+}
+
+function fill(template: string, params: Record<string, string | number>) {
+  return template.replace(/\{(\w+)\}/g, (token, key: string) => (
+    Object.prototype.hasOwnProperty.call(params, key) ? String(params[key]) : token
+  ))
+}
+
+function configurationErrorText(reason: unknown) {
+  if (!(reason instanceof WireGuardConfigError)) {
+    return reason instanceof Error ? reason.message : String(reason)
+  }
+  const messageText = fill(t(`network.wireguard.errors.${reason.code}`, reason.message), reason.params)
+  if (reason.params.line == null) return messageText
+  return fill(t('network.wireguard.errors.line', 'Line {line}: {message}'), {
+    line: reason.params.line,
+    message: messageText,
+  })
+}
+
+function ensureDefaultInterface() {
+  const current = props.modelValue
+  if (!blankInterface(current)) {
+    pendingDefault.value = null
+    return current
+  }
+  if (pendingDefault.value?.name === current.name) return pendingDefault.value
+  try {
+    const created = createWireGuardInterface(current.name)
+    const next = { ...created, listen_port: current.listen_port || created.listen_port }
+    pendingDefault.value = next
+    emit('update:modelValue', next)
+    return next
+  } catch (reason) {
+    message.error(reason instanceof Error ? reason.message : String(reason))
+    return current
+  }
+}
 
 function update<K extends keyof WireGuardConfig>(key: K, value: WireGuardConfig[K]) {
   emit('update:modelValue', { ...props.modelValue, [key]: value })
@@ -69,7 +122,7 @@ function parseConfigurationFile(value: string) {
     emit('validity', true)
     return true
   } catch (reason) {
-    configurationError.value = reason instanceof Error ? reason.message : String(reason)
+    configurationError.value = configurationErrorText(reason)
     emit('validity', false)
     return false
   }
@@ -82,13 +135,17 @@ function updateConfigurationFile(value: string) {
 
 function selectEditorMode(value: 'form' | 'file') {
   if (value === 'file') {
-    configurationFile.value = serializeWireGuardConfig(props.modelValue)
+    configurationFile.value = serializeWireGuardConfig(ensureDefaultInterface())
     configurationError.value = ''
     editorMode.value = 'file'
     return
   }
   if (parseConfigurationFile(configurationFile.value)) editorMode.value = 'form'
 }
+
+onMounted(() => {
+  ensureDefaultInterface()
+})
 </script>
 
 <template>
@@ -112,7 +169,7 @@ function selectEditorMode(value: 'form' | 'file') {
     </div>
 
     <div v-if="editorMode === 'form'" class="wireguard-fields">
-	  <n-form-item :label="t('network.wireguard.listenPort', 'Listen port')">
+      <n-form-item :label="t('network.wireguard.listenPort', 'Listen port')">
         <n-input-number
           :value="modelValue.listen_port"
           :disabled="disabled"
@@ -123,38 +180,42 @@ function selectEditorMode(value: 'form' | 'file') {
           @update:value="update('listen_port', $event || 0)"
         />
       </n-form-item>
-	  <n-form-item :label="t('network.wireguard.privateKey', 'Private key')">
+      <n-form-item :label="t('network.wireguard.addresses', 'Addresses')">
+        <n-input
+          :value="modelValue.addresses.join(', ')"
+          :disabled="disabled"
+          :placeholder="DEFAULT_WIREGUARD_ADDRESS"
+          :status="modelValue.addresses.some((value) => !validCIDR(value, value.includes(':') ? 6 : 4)) ? 'error' : undefined"
+          @update:value="update('addresses', lines($event))"
+        />
+      </n-form-item>
+      <n-form-item class="span-all" :label="t('network.wireguard.privateKey', 'Private key')">
         <div class="key-field">
           <n-input
             :value="modelValue.private_key"
             type="password"
             show-password-on="click"
             :disabled="disabled"
+            placeholder=""
             :status="modelValue.private_key && !validWireGuardKey(modelValue.private_key) ? 'error' : undefined"
             @update:value="update('private_key', $event)"
           />
           <n-tooltip>
             <template #trigger>
-			  <n-button circle secondary :disabled="disabled" :aria-label="t('network.wireguard.generateKeyPair', 'Generate key pair')" @click="generateKeyPair">
+              <n-button circle secondary :disabled="disabled" :aria-label="t('network.wireguard.generateKeyPair', 'Generate key pair')" @click="generateKeyPair">
                 <template #icon><RefreshCw /></template>
               </n-button>
             </template>
-			{{ t('network.wireguard.generateKeyPair', 'Generate key pair') }}
+            {{ t('network.wireguard.generateKeyPair', 'Generate key pair') }}
           </n-tooltip>
         </div>
       </n-form-item>
-	  <n-form-item :label="t('network.wireguard.publicKey', 'Public key')">
-        <n-input :value="modelValue.public_key" readonly :status="modelValue.public_key && !validWireGuardKey(modelValue.public_key) ? 'error' : undefined" />
-      </n-form-item>
-	  <n-form-item :label="t('network.wireguard.addresses', 'Addresses')">
+      <n-form-item class="span-all" :label="t('network.wireguard.publicKey', 'Public key')">
         <n-input
-          :value="modelValue.addresses.join('\n')"
-          type="textarea"
-          :autosize="{ minRows: 2, maxRows: 4 }"
-          :disabled="disabled"
-          placeholder="10.10.0.2/24"
-          :status="modelValue.addresses.some((value) => !validCIDR(value, value.includes(':') ? 6 : 4)) ? 'error' : undefined"
-          @update:value="update('addresses', lines($event))"
+          :value="modelValue.public_key"
+          readonly
+          placeholder=""
+          :status="modelValue.public_key && !validWireGuardKey(modelValue.public_key) ? 'error' : undefined"
         />
       </n-form-item>
     </div>
@@ -180,20 +241,22 @@ function selectEditorMode(value: 'form' | 'file') {
 			{{ t('network.wireguard.removePeer', 'Remove peer') }}
           </n-tooltip>
         </header>
-		<n-form-item :label="t('network.wireguard.publicKey', 'Public key')">
+        <n-form-item class="span-all" :label="t('network.wireguard.publicKey', 'Public key')">
           <n-input
             :value="peer.public_key"
             :disabled="disabled"
+            placeholder=""
             :status="peer.public_key && !validWireGuardKey(peer.public_key) ? 'error' : undefined"
             @update:value="updatePeer(index, { ...peer, public_key: $event })"
           />
         </n-form-item>
-		<n-form-item :label="t('network.wireguard.presharedKey', 'Preshared key')">
+        <n-form-item class="span-all" :label="t('network.wireguard.presharedKey', 'Preshared key')">
           <n-input
             :value="peer.preshared_key"
             type="password"
             show-password-on="click"
             :disabled="disabled"
+            placeholder=""
             :status="peer.preshared_key && !validWireGuardKey(peer.preshared_key) ? 'error' : undefined"
             @update:value="updatePeer(index, { ...peer, preshared_key: $event })"
           />
@@ -217,7 +280,7 @@ function selectEditorMode(value: 'form' | 'file') {
             @update:value="updatePeer(index, { ...peer, persistent_keepalive: $event || 0 })"
           />
         </n-form-item>
-		<n-form-item :label="t('network.wireguard.allowedIPs', 'Allowed IPs')" class="allowed-ips-field">
+        <n-form-item class="span-all" :label="t('network.wireguard.allowedIPs', 'Allowed IPs')">
           <n-input
             :value="peer.allowed_ips.join('\n')"
             type="textarea"
@@ -235,10 +298,12 @@ function selectEditorMode(value: 'form' | 'file') {
       <n-input
         :value="configurationFile"
         type="textarea"
-        :autosize="{ minRows: 14, maxRows: 30 }"
+        class="wireguard-config-input"
+        :autosize="{ minRows: 8, maxRows: 24 }"
         :disabled="disabled"
         :status="configurationError ? 'error' : undefined"
-        placeholder="[Interface]\nPrivateKey = ...\nAddress = 10.0.0.2/24\n\n[Peer]\nPublicKey = ...\nAllowedIPs = 0.0.0.0/0"
+        :placeholder="configurationPlaceholder"
+        :input-props="{ spellcheck: false, autocomplete: 'off', autocapitalize: 'off' }"
         @update:value="updateConfigurationFile"
       />
       <n-alert v-if="configurationError" type="error" :show-icon="false">
@@ -262,27 +327,46 @@ function selectEditorMode(value: 'form' | 'file') {
 </template>
 
 <style scoped>
-.wireguard-form { display: grid; gap: 18px; }
-.wireguard-editor-header,
-.wireguard-fields,
-.peer-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
-.key-field { display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) 34px; gap: 6px; }
+.wireguard-form { display: grid; gap: 16px; }
+.wireguard-form :deep(.n-form-item) { margin-bottom: 0 !important; }
+.wireguard-editor-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+.wireguard-fields {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 16px 12px;
+}
+.peer-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  gap: 16px 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.span-all,
+.peer-fields > header { grid-column: 1 / -1; }
+.key-field { display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) 34px; gap: 6px; align-items: center; }
 .peer-section { display: grid; gap: 12px; padding-top: 14px; border-top: 1px solid var(--border); }
 .peer-section > header,
-.peer-fields > header { display: flex; grid-column: 1 / -1; align-items: center; justify-content: space-between; }
+.peer-fields > header { display: flex; align-items: center; justify-content: space-between; }
 .peer-section h3 { margin: 0; font-size: 13px; }
-.peer-fields { padding-top: 12px; border-top: 1px solid var(--border); }
 .peer-fields > header strong { font-size: 12px; }
-.allowed-ips-field { grid-column: 1 / -1; }
 .configuration-file-editor { display: grid; gap: 8px; }
 .configuration-file-editor p { margin: 0; color: var(--muted-foreground); font-size: 11px; }
+.wireguard-config-input :deep(.n-input__textarea-el) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
 .wireguard-form > footer { display: flex; justify-content: flex-end; }
 @media (max-width: 760px) {
   .wireguard-editor-header,
   .wireguard-fields,
-  .peer-fields { grid-template-columns: 1fr; }
-  .peer-fields > *,
-  .peer-fields > header { grid-column: 1; }
+  .peer-fields { grid-template-columns: 1fr; gap: 16px 0; }
   .key-field { grid-template-columns: minmax(0, 1fr) 44px; }
   .wireguard-form > footer { justify-content: stretch; }
   .wireguard-form > footer .n-button { width: 100%; }

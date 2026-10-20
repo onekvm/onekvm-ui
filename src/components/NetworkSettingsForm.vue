@@ -14,12 +14,14 @@ const props = withDefaults(defineProps<{
   showDevice?: boolean
   showMAC?: boolean
   allowIPv4Disabled?: boolean
+  hideRouteMetric?: boolean
   inset?: boolean
 }>(), {
   disabled: false,
   showDevice: true,
   showMAC: true,
   allowIPv4Disabled: true,
+  hideRouteMetric: false,
   inset: false,
 })
 const emit = defineEmits<{ 'update:modelValue': [value: NetworkConfig] }>()
@@ -29,12 +31,16 @@ function update<K extends keyof NetworkConfig>(key: K, value: NetworkConfig[K]) 
 }
 
 const interfaces = ref<NetworkInterfaceStatus[]>([])
+const loadingInterfaces = ref(false)
 onMounted(async () => {
-  if (!props.inset) return
+  if (!props.showDevice) return
+  loadingInterfaces.value = true
   try {
     interfaces.value = await api.getNetworkInterfaces()
   } catch {
     interfaces.value = []
+  } finally {
+    loadingInterfaces.value = false
   }
 })
 
@@ -57,15 +63,15 @@ const interfaceOptions = computed(() => {
       :label="t('network.interfaces.selectInterface', 'Interface')"
       :value="modelValue.device || 'eth0'"
       :options="interfaceOptions"
-      :disabled="disabled"
+      :disabled="disabled || loadingInterfaces"
       @select="update('device', $event)"
     />
     <n-form-item v-else-if="showDevice" :label="t('network.interfaces.selectInterface', 'Interface')">
-      <n-input
+      <n-select
         :value="modelValue.device"
-        :disabled="disabled"
-        placeholder="eth0"
-        :status="modelValue.device && !/^[A-Za-z0-9_.:@-]+$/.test(modelValue.device) ? 'error' : undefined"
+        :options="interfaceOptions"
+        :loading="loadingInterfaces"
+        :disabled="disabled || loadingInterfaces"
         @update:value="update('device', $event)"
       />
     </n-form-item>
@@ -88,7 +94,7 @@ const interfaceOptions = computed(() => {
       :model-value="modelValue"
       :disabled="disabled"
       :hide-disabled-ipv4="!allowIPv4Disabled"
-      :hide-route-metric="props.inset"
+      :hide-route-metric="props.hideRouteMetric || props.inset"
       :inset="props.inset"
       @update:model-value="emit('update:modelValue', {
         ...modelValue,

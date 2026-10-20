@@ -73,6 +73,7 @@ onBeforeUnmount(() => {
     trigger="click"
     :placement="placement || 'bottom-end'"
     :show-arrow="false"
+    class="host-control-popover"
     :class="popoverClass"
     :theme-overrides="compactPopoverTheme"
     :to="to ?? overlayTo"

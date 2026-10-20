@@ -5,7 +5,7 @@ import { useMessage } from 'naive-ui'
 
 import { api, type ExtensionSummary, type ManagedService } from '@/api/client'
 import { currentLanguage, t } from '@/i18n/runtime'
-import { brandPluginIconUrl, lucidePluginIcon } from '@/lib/plugin-icons'
+import { brandPluginIconUrl, namedPluginIcon } from '@/lib/plugin-icons'
 
 import OneKVMServiceSettingsDrawer from './OneKVMServiceSettingsDrawer.vue'
 import SSHServiceSettingsDrawer from './SSHServiceSettingsDrawer.vue'
@@ -46,7 +46,7 @@ function serviceIconComponent(service: ManagedService): Component {
   if (!service.provider_id) return Box
   const icon = extensionsByID.value.get(service.provider_id)?.icon
   if (icon?.source !== 'lucide') return Box
-  return lucidePluginIcon(icon.name)
+  return namedPluginIcon(icon.name)
 }
 
 function translation(service: ManagedService) {

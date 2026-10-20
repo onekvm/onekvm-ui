@@ -11,6 +11,7 @@ let generation = 0
 
 // Retain the form after its first visit. Observe the content rather than the
 // animated wrapper so loading and scan results can resize without snapping.
+// Layout height stays accurate while an ancestor's opening animation scales it.
 watch(() => props.show, async (show) => {
   const current = ++generation
   cancelAnimationFrame(frame)
@@ -20,12 +21,12 @@ watch(() => props.show, async (show) => {
   if (current !== generation || !content.value) return
   if (!observer) {
     observer = new ResizeObserver(() => {
-      if (props.show && content.value) height.value = content.value.getBoundingClientRect().height
+      if (props.show && content.value) height.value = content.value.offsetHeight
     })
     observer.observe(content.value)
   }
   frame = requestAnimationFrame(() => {
-    if (current === generation && content.value) height.value = content.value.getBoundingClientRect().height
+    if (current === generation && content.value) height.value = content.value.offsetHeight
   })
 }, { immediate: true })
 

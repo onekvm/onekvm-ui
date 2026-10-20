@@ -583,7 +583,7 @@ onBeforeUnmount(() => {
 <template>
   <section
     ref="overlay"
-    class="trackpad-overlay"
+    class="trackpad-overlay host-window-frame"
     :class="{ 'is-minimized': minimized, 'is-placed': placed, 'is-dragging': dragging, 'is-touch': touchUi }"
     :style="overlayStyle"
     role="group"
@@ -591,19 +591,19 @@ onBeforeUnmount(() => {
   >
     <template v-if="!minimized">
       <header
-        class="trackpad-overlay-header"
+        class="trackpad-overlay-header host-window-titlebar"
         :aria-label="t('mouse.moveTrackpad', 'Move trackpad')"
         @pointerdown="onHudDown"
       >
         <strong>{{ t('mouse.trackpad', 'Trackpad') }}</strong>
-        <div class="trackpad-overlay-actions" @pointerdown.stop>
+        <div class="trackpad-overlay-actions host-window-actions" @pointerdown.stop>
           <n-popover
             trigger="click"
             placement="top-end"
             :to="overlayTo"
             :show-arrow="true"
             :z-index="5000"
-            class="trackpad-help-popover"
+            class="trackpad-help-popover host-info-popover"
           >
             <template #trigger>
               <button

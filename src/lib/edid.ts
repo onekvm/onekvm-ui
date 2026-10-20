@@ -7,6 +7,20 @@ export type EdidSelectOption =
 
 const SEPARATOR = '\0'
 
+const MANUFACTURERS: Readonly<Record<string, string>> = {
+  OKV: 'OneKVM', SAM: 'Samsung', LGD: 'LG Display', GSM: 'LG', DEL: 'Dell',
+  HPN: 'HP', HWP: 'HP', ACR: 'Acer', ACI: 'ASUS', AUS: 'ASUS', MSI: 'MSI',
+  LEN: 'Lenovo', APP: 'Apple', SNY: 'Sony', VSC: 'ViewSonic', BNQ: 'BenQ',
+  AOC: 'AOC', PHL: 'Philips', SHP: 'Sharp', TSB: 'Toshiba', NEC: 'NEC',
+  IVM: 'Iiyama', AUO: 'AU Optronics', BOE: 'BOE', CMN: 'Chi Mei', QDS: 'Quanta Display',
+}
+
+export function edidManufacturerLabel(manufacturer: string | undefined) {
+  const id = manufacturer?.trim().toUpperCase() || ''
+  if (!/^[A-Z]{3}$/.test(id)) return ''
+  return MANUFACTURERS[id] ? `${MANUFACTURERS[id]} (${id})` : id
+}
+
 export function encodeEdidSelection(ref: EdidLibraryRef) {
   return `${ref.extension}${SEPARATOR}${ref.directory}${SEPARATOR}${ref.id}`
 }

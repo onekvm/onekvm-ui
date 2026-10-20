@@ -207,7 +207,7 @@ onBeforeUnmount(() => {
           :title="t('keyboard.title', 'Keyboard')"
           :subtitle="`${t('keyboard.layout', 'Keyboard layout')} · ${layoutLabel(layout)}`"
         />
-        <div v-if="!sheet" class="control-popover-header-actions">
+        <div v-if="!sheet" class="control-popover-header-actions host-window-actions">
           <n-tooltip :to="overlayTo" :z-index="4000">
             <template #trigger>
               <n-button quaternary circle size="tiny" :aria-label="t('keyboard.pinStatus', 'Pin keyboard status')" @click="pinPanel($event)">
@@ -286,16 +286,16 @@ onBeforeUnmount(() => {
     <section
       v-if="pinned"
       ref="panel"
-      class="keyboard-status-window"
+      class="keyboard-status-window host-window-frame"
       :style="panelStyle"
       role="dialog"
       :aria-label="t('keyboard.title', 'Keyboard')"
     >
-      <header class="display-status-titlebar" @pointerdown="startDrag">
+      <header class="display-status-titlebar host-window-titlebar" @pointerdown="startDrag">
         <Keyboard :size="15" />
         <strong>{{ t('keyboard.title', 'Keyboard') }}</strong>
         <span class="display-status-pinned-label">{{ t('keyboard.pinned', 'Pinned') }}</span>
-        <div class="control-popover-header-actions" @pointerdown.stop>
+        <div class="control-popover-header-actions host-window-actions" @pointerdown.stop>
           <n-tooltip :to="overlayTo" :z-index="4000">
             <template #trigger>
               <n-button quaternary circle size="tiny" :aria-label="t('keyboard.unpinStatus', 'Unpin keyboard status')" @click="unpinPanel">

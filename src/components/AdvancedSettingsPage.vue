@@ -15,6 +15,7 @@ import {
   Download,
   ExternalLink,
   FileUp,
+  BrickWallShield,
   FolderOpen,
   Keyboard,
   LaptopMinimalCheck,
@@ -38,13 +39,11 @@ import {
   Upload,
 	Usb,
   Wifi,
-  icons,
 } from '@/icons'
 import { NIcon, useMessage, type DropdownOption } from 'naive-ui'
 
-import { useOneKVMTheme } from '@/theme/runtime'
-import { isCloudHosted } from '@/api/service-url'
-import { oneKVMThemeCSSVariables, type OneKVMAppearancePreference } from '@/theme/model'
+import { useThemeMenu } from '@/composables/useThemeMenu'
+import { oneKVMThemeCSSVariables } from '@/theme/model'
 
 import {
   api,
@@ -57,6 +56,7 @@ import {
   type ConfigSchema,
   type OneKVMConfig,
   type OneKVMStatus,
+  type RecoveryNetworkSettings,
 	type NetworkApplyStatus,
   type StoragePartitionStatus,
   type SystemTimeStatus,
@@ -71,8 +71,12 @@ import { useAuth } from '@/composables/useAuth'
 import { currentLanguage, languageOptions, setLanguage, t } from '@/i18n/runtime'
 import { normalizeConsoleSubtitleParts } from '@/lib/console-title'
 import { machineDisplayName } from '@/lib/machine'
-import { brandPluginIconUrl } from '@/lib/plugin-icons'
-import { DEFAULT_DISCOVERY_URL, configuredStaticAddresses, isNetworkConfigDirty, isNetworkConfigValid, networkConfigSnapshot, usesCustomDNS, usesCustomDiscoveryURL, validHostname } from '@/lib/network'
+import { PLUGIN_MARKETPLACE_ID } from '@/lib/cloud-services'
+import { loadMarketplaceInstallPackage } from '@/lib/marketplace-install-client'
+import { fillMarketplaceTemplate, WIREGUARD_MARKETPLACE_ID, type MarketplaceInstallPackage } from '@/lib/marketplace-install'
+import { IP_TUNNELS_MARKETPLACE_ID, networkEnvironmentAvailable, type NetworkEnvironmentId } from '@/lib/network-environment'
+import { brandPluginIconUrl, namedPluginIcon } from '@/lib/plugin-icons'
+import { DEFAULT_DISCOVERY_URL, configuredStaticAddresses, isNetworkConfigDirty, isNetworkConfigValid, networkConfigSnapshot, networkKindLabel, usesCustomDNS, usesCustomDiscoveryURL, validHostname } from '@/lib/network'
 import {
   SETTINGS_APP_QUERY,
   SETTINGS_INDEX,
@@ -90,6 +94,7 @@ import { statusEvents } from '@/lib/status-events'
 
 import ExtensionLayoutPage from './ExtensionLayoutPage.vue'
 import ExtensionServiceRecovery from './ExtensionServiceRecovery.vue'
+import RecoveryEntryModal from './RecoveryEntryModal.vue'
 import ExtensionVuePage from './ExtensionVuePage.vue'
 import CloudProvidersPage from './CloudProvidersPage.vue'
 import AccountDrawer from './AccountDrawer.vue'
@@ -99,7 +104,9 @@ import DisplaySettingsForm from './DisplaySettingsForm.vue'
 import PersonalizationSettingsForm from './PersonalizationSettingsForm.vue'
 import HostnameSettingsForm from './HostnameSettingsForm.vue'
 import DiscoverySettingsForm from './DiscoverySettingsForm.vue'
+import MarketplaceInstallDialog from './MarketplaceInstallDialog.vue'
 import NetworkInterfaceManager from './NetworkInterfaceManager.vue'
+import FirewallSettingsPage from './FirewallSettingsPage.vue'
 import ProxySettingsForm from './ProxySettingsForm.vue'
 import WebRtcIceSettingsForm from './WebRtcIceSettingsForm.vue'
 import ExtensionManager from './ExtensionManager.vue'
@@ -110,6 +117,7 @@ import ServicesPage from './ServicesPage.vue'
 import StaticRoutesForm from './StaticRoutesForm.vue'
 import TimezoneMap from './TimezoneMap.vue'
 import SystemUpdateSourceSelector, { type UpdateMethod } from './SystemUpdateSourceSelector.vue'
+import SystemUpdatePreflight from './SystemUpdatePreflight.vue'
 import { timezones } from '@/lib/timezones'
 import KeyboardShortcutEditor from './KeyboardShortcutEditor.vue'
 import UserManagement from './UserManagement.vue'
@@ -124,6 +132,8 @@ import SystemMemorySpec from './SystemMemorySpec.vue'
 import SystemSpecBadge from './SystemSpecBadge.vue'
 
 type Section = string
+const recoveryEntryOpen = shallowRef(false)
+
 type SystemAction = 'factory-reset' | 'reboot' | 'recovery'
 type SystemActionStage = 'submitting' | 'waiting' | 'offline' | 'complete' | 'timeout'
 type SidebarSection = {
@@ -154,7 +164,7 @@ function sectionFromRoute(route: string): Section {
   }
   if (uiProduct.settingsSections?.some((item) => item.key === normalized)) return normalized
   if (normalized === 'audio') return 'usb'
-  return ['display', 'personalization', 'network', 'keyboard', 'usb', 'cloud', 'plugins', 'services', 'logs', 'resources', 'sessions', 'system', 'files', 'users', 'time', 'update'].includes(normalized) ? normalized : 'system'
+  return ['display', 'personalization', 'network', 'firewall', 'keyboard', 'usb', 'cloud', 'plugins', 'services', 'logs', 'resources', 'sessions', 'system', 'files', 'users', 'time', 'update'].includes(normalized) ? normalized : 'system'
 }
 
 function routeFromSection(value: Section) {
@@ -422,21 +432,19 @@ const systemActionDescription = computed(() => {
 let updatePollIdleCount = 0
 
 const dropdownIcon = (component: typeof CircleUserRound) => () => h(NIcon, null, { default: () => h(component) })
-const { appearance, setAppearance } = useOneKVMTheme()
-const themeChoices: { key: OneKVMAppearancePreference; label: () => string }[] = [
-  { key: 'system', label: () => t('settings.appearance.followSystem', 'System') },
-  { key: 'light', label: () => t('settings.appearance.light', 'Light') },
-  { key: 'dark', label: () => t('settings.appearance.dark', 'Dark') },
-]
+const { themeChoices, selectedThemeChoice, selectThemeChoice, themeMenuProps } = useThemeMenu()
 const accountOptions = computed<DropdownOption[]>(() => [
   {
     key: 'theme',
     label: t('settings.appearance.theme', 'Theme'),
     icon: dropdownIcon(Palette),
-    children: themeChoices.map((choice) => ({
+    children: themeChoices.value.map((choice) => ({
       key: `theme-${choice.key}`,
-      label: choice.label(),
-      icon: appearance.value === choice.key ? dropdownIcon(Check) : undefined,
+      label: () => h('span', { class: 'theme-menu-choice' }, [
+        h('span', choice.label),
+        selectedThemeChoice.value === choice.key ? h(Check, { size: 16, 'aria-hidden': true }) : null,
+      ]),
+      icon: dropdownIcon(choice.icon),
     })),
   },
   { type: 'divider', key: 'account-theme-divider' },
@@ -447,17 +455,11 @@ const accountOptions = computed<DropdownOption[]>(() => [
 function selectAccount(key: string | number) {
   const value = String(key)
   if (value.startsWith('theme-')) {
-    setAppearance(value.slice('theme-'.length))
+    selectThemeChoice(value.slice('theme-'.length))
     return
   }
   if (key === 'settings') accountOpen.value = true
   if (key === 'logout') void logout()
-}
-
-function lucideIcon(name: string | undefined): Component {
-  if (!name) return Box
-  const componentName = name.split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join('')
-  return (icons as Record<string, Component>)[componentName] || Box
 }
 
 const activeCloudProviderPage = computed(() => extensions.value.find(
@@ -480,7 +482,7 @@ const sections = computed<SidebarSection[]>(() => {
       return {
         key: `extension:${extension.id}`,
         label: extensionTranslation(extension, currentLanguage.value).name,
-        icon: icon?.source === 'lucide' ? lucideIcon(icon.name) : Box,
+        icon: icon?.source === 'lucide' ? namedPluginIcon(icon.name) : Box,
         iconURL:
           icon?.source === 'custom' && extension.icon_data_url?.startsWith('data:image/')
             ? extension.icon_data_url
@@ -498,6 +500,7 @@ const sections = computed<SidebarSection[]>(() => {
 		{ key: 'keyboard', label: t('settings.advancedSettings.keyboard', 'Keyboard'), icon: Keyboard },
 		{ key: 'usb', label: t('settings.advancedSettings.usb', 'USB'), icon: Usb },
     { key: 'network', label: t('settings.advancedSettings.network', 'Network'), icon: Network },
+    { key: 'firewall', label: t('settings.firewall.title', 'Firewall'), icon: BrickWallShield },
     { key: 'cloud', label: t('settings.advancedSettings.cloudProviders', 'Cloud services'), icon: Cloud },
     { key: 'plugins', label: t('settings.advancedSettings.plugins', 'Plugins'), icon: Box },
     ...pluginPages,
@@ -733,6 +736,8 @@ function connectionLabel(connected: boolean, available = true) {
 
 function updateOperationLabel(operation: string) {
   if (operation === 'idle') {
+    if (onlineUpdateProgress.value?.phase === 'checking') return t('settings.advancedSettings.systemPage.updateChecking', 'Checking kernel versions and plugin dependencies…')
+    if (onlineUpdateProgress.value?.phase === 'awaiting_packages') return t('settings.advancedSettings.systemPage.updateAwaitingPackages', 'Upload the missing packages to continue')
     if (onlineUpdateProgress.value?.phase === 'downloading') return t('settings.advancedSettings.systemPage.updateDownloading', '正在下载升级包')
     if (onlineUpdateProgress.value?.phase === 'installing' || updateInstalling.value) return t('settings.advancedSettings.systemPage.updateInstalling', 'Installing')
     return updateFile.value
@@ -890,6 +895,10 @@ async function pollOnlineUpdate() {
   try {
     const progress = await api.getSystemOnlineUpdateProgress()
     onlineUpdateProgress.value = progress
+    if (progress.phase === 'awaiting_packages') {
+      updateInstalling.value = false
+      return
+    }
     if (progress.phase === 'error') {
       updateInstalling.value = false
       onlineUpdateError.value = progress.error
@@ -982,6 +991,20 @@ async function pollSystemUpdate() {
   updatePollTimer = window.setTimeout(pollSystemUpdate, 1000)
 }
 
+async function installPreparedUpdate() {
+  updateInstalling.value = true
+  updateStarted.value = true
+  updatePollSawOperation = false
+  updatePollIdleCount = 0
+  await pollSystemUpdate()
+}
+
+function cancelPreparedUpdate() {
+  updateStarted.value = false
+  onlineUpdateProgress.value = null
+  onlineUpdateError.value = ''
+}
+
 function confirmSystemUpdate() {
   if (!updateFile.value) return
   dialog.warning({
@@ -997,7 +1020,7 @@ function confirmSystemUpdate() {
       try {
         await api.installSystemUpdate(updateFile.value)
         updateStarted.value = true
-        await pollSystemUpdate()
+        await pollOnlineUpdate()
       } catch (reason) {
         updateInstalling.value = false
         message.error(reason instanceof Error ? reason.message : String(reason))
@@ -1240,6 +1263,77 @@ function openCloudProvider(id: string) {
 
 function manageCloudProvider() {
   selectSettingsItem('plugins')
+}
+
+const environmentInstallerOpen = ref(false)
+const environmentInstallerPackage = ref<MarketplaceInstallPackage | null>(null)
+const environmentInstallerId = ref<NetworkEnvironmentId | null>(null)
+const environmentInstallerFailed = ref('')
+const environmentInstallerTimedOut = ref('')
+const environmentInstallerUnavailable = ref('')
+
+function environmentInstallText(id: NetworkEnvironmentId) {
+  if (id === IP_TUNNELS_MARKETPLACE_ID) {
+    return {
+      marketplaceMissing: t('network.tunnels.marketplaceMissing', 'Enable Plugin Marketplace to install the IP tunnel environment.'),
+      packageUnavailable: t('network.tunnels.packageUnavailable', 'The IP tunnel environment is not available from Plugin Marketplace.'),
+      failed: t('network.tunnels.installFailed', 'IP tunnel environment installation failed. Try again.'),
+      timedOut: t('network.tunnels.installTimedOut', 'IP tunnel environment installation timed out. Try again.'),
+      unavailable: t('network.tunnels.installEnvironmentUnavailable', 'IP tunnels are still unavailable after installation. Check that the modules match the device kernel, then try again.'),
+    }
+  }
+  if (id === WIREGUARD_MARKETPLACE_ID) {
+    return {
+      marketplaceMissing: t('network.wireguard.marketplaceMissing', 'Plugin Marketplace is not enabled, so the WireGuard environment cannot be installed.'),
+      packageUnavailable: t('network.wireguard.packageUnavailable', 'The WireGuard environment is not available from the Plugin Marketplace.'),
+      failed: t('network.wireguard.installFailed', 'WireGuard environment installation failed. Try again.'),
+      timedOut: t('network.wireguard.installTimedOut', 'WireGuard environment installation timed out. Try again.'),
+      unavailable: t('network.wireguard.installEnvironmentUnavailable', 'WireGuard is still unavailable after installation. Check that the wg command and kernel module are installed, then try again.'),
+    }
+  }
+  const name = networkKindLabel(id)
+  const text = (key: string, fallback: string) => fillMarketplaceTemplate(t(key, fallback), { name })
+  return {
+    marketplaceMissing: text('network.vpnEnvironment.marketplaceMissing', 'Plugin Marketplace is not enabled, so the {name} environment cannot be installed.'),
+    packageUnavailable: text('network.vpnEnvironment.packageUnavailable', 'The {name} environment is not available from the Plugin Marketplace.'),
+    failed: text('network.vpnEnvironment.installFailed', '{name} environment installation failed. Try again.'),
+    timedOut: text('network.vpnEnvironment.installTimedOut', '{name} environment installation timed out. Try again.'),
+    unavailable: text('network.vpnEnvironment.installEnvironmentUnavailable', '{name} is still unavailable after installation. Check that the client and kernel module are installed, then try again.'),
+  }
+}
+
+async function reloadEnvironmentAvailability() {
+  const id = environmentInstallerId.value
+  await Promise.all([loadExtensions(), load()])
+  return id != null && networkEnvironmentAvailable(schema.value?.capabilities, id)
+}
+
+async function installNetworkEnvironment(id: NetworkEnvironmentId, done: (close: boolean) => void) {
+  const copy = environmentInstallText(id)
+  let close = false
+  try {
+    const marketplace = extensions.value.find((item) => item.id === PLUGIN_MARKETPLACE_ID && item.installed)
+    if (!marketplace?.enabled || !marketplace.shell?.entrypoint) {
+      message.error(copy.marketplaceMissing)
+      return
+    }
+    const pkg = await loadMarketplaceInstallPackage(marketplace, id)
+    if (!pkg) {
+      message.error(copy.packageUnavailable)
+      return
+    }
+    environmentInstallerId.value = id
+    environmentInstallerFailed.value = copy.failed
+    environmentInstallerTimedOut.value = copy.timedOut
+    environmentInstallerUnavailable.value = copy.unavailable
+    environmentInstallerPackage.value = pkg
+    environmentInstallerOpen.value = true
+    close = true
+  } catch (reason) {
+    message.error(reason instanceof Error ? reason.message : String(reason))
+  } finally {
+    done(close)
+  }
 }
 
 function onSettingsBack() {
@@ -1503,11 +1597,11 @@ async function waitForRecoveryDisconnect(token: number) {
   if (token === systemActionRun) systemActionStage.value = 'timeout'
 }
 
-async function performEnterRecovery() {
+async function performEnterRecovery(network: RecoveryNetworkSettings) {
   if (systemAction.value) return
   enteringRecovery.value = true
   const token = beginSystemAction('recovery')
-  const result = await dispatchSystemAction(api.enterRecovery())
+  const result = await dispatchSystemAction(api.enterRecovery(network))
   if (token !== systemActionRun) return
   if (result.kind === 'rejected') {
     failSystemAction(token, result.error)
@@ -1552,16 +1646,7 @@ function confirmSystemReboot() {
 }
 
 function confirmEnterRecovery() {
-  dialog.warning({
-    title: t('settings.recoveryMode.title', 'Recovery'),
-    content: t('settings.recoveryMode.confirm', 'The device will restart and the current session will end. Continue?'),
-    positiveText: t('settings.recoveryMode.confirmAction', 'Restart to recovery'),
-    negativeText: t('common.cancel', 'Cancel'),
-    positiveButtonProps: { type: 'warning' },
-    onPositiveClick: () => {
-      void performEnterRecovery()
-    },
-  })
+  recoveryEntryOpen.value = true
 }
 
 function syncSettingsAppLayout(event?: MediaQueryListEvent) {
@@ -1676,7 +1761,7 @@ watch(paneSection, (value) => {
           always-visible
           @restore="emit('restore-media-transfer')"
         />
-        <n-dropdown trigger="click" placement="bottom-end" :options="accountOptions" @select="selectAccount">
+        <n-dropdown trigger="click" placement="bottom-end" :options="accountOptions" :menu-props="themeMenuProps" @select="selectAccount">
           <n-tooltip>
             <template #trigger>
               <n-button
@@ -1686,7 +1771,7 @@ watch(paneSection, (value) => {
                 :aria-label="t('settings.account.title', 'Account')"
               >
                 <template #icon><CircleUserRound /></template>
-                <span class="button-label account-name">{{ isCloudHosted() ? t('auth.cloudIdentity', 'Cloud account') : auth.username }}</span>
+                <span class="button-label account-name">{{ auth.username }}</span>
               </n-button>
             </template>
             {{ t('settings.account.title', 'Account') }}
@@ -1697,7 +1782,8 @@ watch(paneSection, (value) => {
 
     <div class="advanced-settings-layout">
       <aside class="advanced-settings-sidebar">
-        <nav ref="sidebarNav">
+        <div class="advanced-settings-nav-heading" aria-hidden="true">{{ t('settings.advancedSettings.title', 'Advanced settings') }}</div>
+        <nav ref="sidebarNav" :aria-label="t('settings.advancedSettings.title', 'Advanced settings')">
           <button
             v-for="item in visibleSections"
             :key="item.key"
@@ -1707,6 +1793,7 @@ watch(paneSection, (value) => {
               'group-active': settingsSidebarGroupActive(item.key, section, activeExtensionParent),
               'plugin-child': Boolean(item.parent),
             }"
+            :aria-current="settingsSidebarActive(item.key, section, activeExtensionParent) ? 'page' : undefined"
             :aria-busy="sidebarItemLoading(item)"
             :aria-expanded="item.key === 'plugins' ? pluginsExpanded : undefined"
             @click="selectSidebar(item)"
@@ -1854,6 +1941,7 @@ watch(paneSection, (value) => {
                   :l2tp-available="schema?.capabilities?.l2tp !== false"
                   :wifi-available="status?.network?.wifi_available === true"
                   @validity="networkEditorsValid = $event"
+                  @install-environment="installNetworkEnvironment"
                 />
 				<HostnameSettingsForm
 				  v-model="config.network.hostname"
@@ -1906,6 +1994,10 @@ watch(paneSection, (value) => {
                     {{ t('settings.network.save', 'Apply') }}
                   </n-button>
                 </footer>
+              </section>
+
+              <section v-else-if="paneSection === 'firewall'" class="advanced-settings-section">
+                <FirewallSettingsPage :catalog="extensions" :catalog-loading="extensionsLoading" @catalog="updateExtensions" @open-plugins="selectSettingsItem('plugins')" />
               </section>
 
               <section v-else-if="paneSection === 'cloud'" class="advanced-settings-section">
@@ -2430,6 +2522,8 @@ watch(paneSection, (value) => {
                     </div>
                   </section>
 
+                  <SystemUpdatePreflight :progress="onlineUpdateProgress" :disabled="updateInstalling || systemUpdate.operation !== 'idle'" @install="installPreparedUpdate" @cancel="cancelPreparedUpdate" />
+
                   <section v-if="updateStarted || systemUpdate.operation !== 'idle'" class="system-settings-group">
                     <h2>{{ t('settings.advancedSettings.systemPage.updateStatus', '升级状态') }}</h2>
                     <div class="system-update-panel">
@@ -2472,6 +2566,15 @@ watch(paneSection, (value) => {
     </div>
     <AccountDrawer v-model:show="accountOpen" />
     <DiagnosticsCollectModal v-model:show="diagnosticsOpen" />
+    <RecoveryEntryModal v-if="recoveryEntryOpen" v-model:show="recoveryEntryOpen" @enter="performEnterRecovery" />
+    <MarketplaceInstallDialog
+      v-model:show="environmentInstallerOpen"
+      :entry="environmentInstallerPackage"
+      :on-installed="reloadEnvironmentAvailability"
+      :failed-text="environmentInstallerFailed"
+      :timed-out-text="environmentInstallerTimedOut"
+      :unavailable-text="environmentInstallerUnavailable"
+    />
   </section>
   <Transition name="onekvm-page-loading">
     <AdvancedSettingsLoading v-if="loading && !config" />

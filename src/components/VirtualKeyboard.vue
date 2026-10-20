@@ -348,7 +348,7 @@ onBeforeUnmount(() => {
     <section
       v-if="show"
       ref="panel"
-      class="keyboard-panel"
+      class="keyboard-panel host-window-frame"
       :class="{
         'keyboard-panel-mobile': !desktop,
         'is-landscape': landscape,
@@ -358,7 +358,7 @@ onBeforeUnmount(() => {
       role="dialog"
       :aria-label="t('keyboard.virtualKeyboard')"
     >
-      <header class="keyboard-titlebar" @pointerdown="startDrag">
+      <header class="keyboard-titlebar host-window-titlebar" @pointerdown="startDrag">
         <strong v-if="desktop">{{ t('keyboard.virtualKeyboard') }} · {{ t(`keyboard.layouts.${layout}`, layout.toUpperCase()) }}</strong>
         <strong v-else>{{ t('keyboard.title', 'Keyboard') }}</strong>
         <n-radio-group
@@ -379,7 +379,7 @@ onBeforeUnmount(() => {
             <span class="keyboard-mode-label">macOS</span>
           </n-radio-button>
         </n-radio-group>
-        <div class="keyboard-title-actions" @pointerdown.stop.prevent>
+        <div class="keyboard-title-actions host-window-actions" @pointerdown.stop.prevent>
           <n-button size="tiny" :theme-overrides="titleButtonTheme" @click="sendChord([76], 1 | 4)">{{ desktop ? t('keyboard.ctrlaltdel', 'Ctrl+Alt+Del') : t('keyboard.cadShort', 'CAD') }}</n-button>
           <n-button size="tiny" :theme-overrides="titleButtonTheme" @click="resetKeyboard">{{ desktop ? t('keyboard.releaseAll', 'Release all') : t('keyboard.releaseShort', 'Release') }}</n-button>
           <n-button quaternary circle size="tiny" :theme-overrides="titleButtonTheme" :aria-label="t('common.close', 'Close')" @click="close">

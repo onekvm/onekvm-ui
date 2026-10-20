@@ -17,7 +17,6 @@ const emit = defineEmits<{
 
 const overlayTo = useOverlayMount()
 const message = useMessage()
-const cloudHosted = isCloudHosted()
 const { auth, updateAccount, refresh } = useAuth()
 const saving = ref(false)
 const totpBusy = ref(false)
@@ -263,7 +262,6 @@ function pluginDisabledMessage(id: string) {
 watch(
   () => props.show,
   (show) => {
-    if (cloudHosted) return
     if (show) {
       account.username = auth.username || 'admin'
       passwordNeeded.value = false
@@ -311,10 +309,6 @@ watch(totpUrl, async (url) => {
     @update:show="emit('update:show', $event)"
   >
     <n-drawer-content :title="t('settings.account.title', 'Account')" closable>
-      <n-alert v-if="cloudHosted" type="info" :bordered="false">
-        {{ t('auth.cloudAccount', 'Access is authorized by your cloud account. Manage your account in OneKVM Cloud.') }}
-      </n-alert>
-      <template v-else>
       <div class="account-sections">
         <section class="account-section">
           <header class="account-section-header">
@@ -452,7 +446,6 @@ watch(totpUrl, async (url) => {
           </div>
         </section>
       </div>
-      </template>
     </n-drawer-content>
   </n-drawer>
 

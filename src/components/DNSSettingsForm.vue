@@ -70,6 +70,7 @@ function update(value: string) {
         placement="bottom-start"
         :show-arrow="false"
         content-class="dns-examples-popover"
+        class="host-info-popover"
       >
         <template #trigger>
           <n-button

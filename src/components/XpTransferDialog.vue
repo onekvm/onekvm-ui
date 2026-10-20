@@ -119,14 +119,14 @@ defineExpose({ windowElement })
       <div v-if="show" class="xp-upload-modal-layer" :class="layerClass">
         <section
           ref="windowElement"
-          class="xp-upload-window"
+          class="xp-upload-window host-window-frame"
           :style="resolvedWindowStyle"
           role="dialog"
           aria-modal="false"
           :aria-label="dialogLabel"
         >
           <header
-            class="xp-upload-titlebar"
+            class="xp-upload-titlebar host-window-titlebar"
             @pointerdown="startDrag"
             @pointermove="moveDrag"
             @pointerup="stopDrag"

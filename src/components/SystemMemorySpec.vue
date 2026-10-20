@@ -43,7 +43,7 @@ const reserved = computed(() => Math.max(0, physical.value - (props.managedBytes
       <span>{{ physical ? formatCapacity(physical) : '-' }}</span>
       <span v-if="managedBytes" class="system-spec-detail">
         {{ t('settings.advancedSettings.systemPage.memoryAvailableTotal', 'Total available memory') }} {{ formatMib(managedBytes) }}
-        <n-popover trigger="manual" :show="helpOpen" placement="bottom" :show-arrow="true">
+        <n-popover class="host-info-popover" trigger="manual" :show="helpOpen" placement="bottom" :show-arrow="true">
           <template #trigger>
             <button type="button" class="system-memory-help" :aria-label="t('settings.advancedSettings.systemPage.memoryDetails', 'Memory details')" :aria-expanded="helpOpen" @mouseenter="helpOpen = true" @mouseleave="helpOpen = false" @focus="helpOpen = true" @blur="helpOpen = false"><CircleHelp :size="16" aria-hidden="true" /></button>
           </template>

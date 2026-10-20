@@ -33,6 +33,7 @@ import {
 import ControlOverlay from './ControlOverlay.vue'
 import ControlPopoverHeading from './ControlPopoverHeading.vue'
 import DisplaySettingsGroup from './DisplaySettingsGroup.vue'
+import EdidIdentitySummary from './EdidIdentitySummary.vue'
 
 const props = defineProps<{
   state: TransportState
@@ -605,6 +606,7 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
         :icon="Cable"
         collapsible
       >
+        <EdidIdentitySummary :status="edid" compact />
         <div>
           <span class="display-edid-label">
             {{ t('screen.edid', 'EDID') }}

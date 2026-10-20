@@ -22,7 +22,7 @@ const activeUrl = computed(() => props.useCustomUrl ? url.value : DEFAULT_DISCOV
     <header>
       <div>
         <h2>{{ t('network.discovery.title', 'Device discovery') }}</h2>
-        <p>{{ t('network.discovery.description', 'Find and open OneKVM devices on your local network.') }}</p>
+        <p>{{ t('network.discovery.description', 'Allow the discovery page to find and open this device on your local network.') }}</p>
       </div>
       <n-button
         tag="a"

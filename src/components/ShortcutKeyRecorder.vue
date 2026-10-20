@@ -116,7 +116,7 @@ function clear() {
       <small>{{ modelValue.length }}/{{ MAX_SHORTCUT_KEYS }}</small>
     </div>
 
-    <n-popover trigger="click" placement="bottom-end" :width="380">
+    <n-popover class="host-info-popover" trigger="click" placement="bottom-end" :width="380">
       <template #trigger>
         <n-button
           quaternary

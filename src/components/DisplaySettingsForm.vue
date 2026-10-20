@@ -320,7 +320,7 @@ function fieldReadOnly(path: string) {
               <template #suffix>{{ video.gop === 0 ? t('screen.auto', 'Automatic') : t('settings.advancedSettings.displayPage.frames', 'frames') }}</template>
             </n-input-number>
             <span class="display-setting-field-hint">
-              {{ t('settings.advancedSettings.displayPage.gopHint', 'Use 0 to select the keyframe interval automatically from the target frame rate.') }}
+              {{ t('settings.advancedSettings.displayPage.gopHint', 'Use 0 for a 5 second interval at the target frame rate.') }}
             </span>
           </div>
         </n-form-item>

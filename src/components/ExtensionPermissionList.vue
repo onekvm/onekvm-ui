@@ -17,6 +17,8 @@ const permissionIcons: Readonly<Record<string, Component>> = {
   'device-fb': Monitor,
   gpio: ScanLine,
   'opkg-admin': Package,
+  'host-root': ShieldCheck,
+  'host-unrestricted': ShieldAlert,
 }
 
 const items = computed(() => (props.permissions || []).map(id => {

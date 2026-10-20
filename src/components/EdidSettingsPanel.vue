@@ -7,6 +7,7 @@ import { api, APIError, type EDIDApplyRequired, type EDIDStatus } from '@/api/cl
 import { t } from '@/i18n/runtime'
 import { edidSelectOptions, parseEdidSelection } from '@/lib/edid'
 import SettingsPanel from './SettingsPanel.vue'
+import EdidIdentitySummary from './EdidIdentitySummary.vue'
 
 defineProps<{ disabled?: boolean }>()
 
@@ -101,11 +102,8 @@ onMounted(() => {
     :title="t('settings.advancedSettings.displayPage.edid', 'HDMI EDID')"
     :description="t('settings.advancedSettings.displayPage.edidHint', 'Apply a saved EDID file to the HDMI capture chip. Edit files in the EDID Editor plugin.')"
   >
-    <p class="display-setting-field-hint">
-      {{ status.summary?.preferred
-        ? `${status.summary.preferred.width}×${status.summary.preferred.height}@${status.summary.preferred.fps}`
-        : t('settings.advancedSettings.displayPage.edidUnknown', 'Current advertised mode is unavailable') }}
-    </p>
+    <EdidIdentitySummary :status="status" />
+    <p v-if="!status.summary" class="display-setting-field-hint">{{ t('settings.advancedSettings.displayPage.edidReadUnavailable', 'Current EDID could not be read. Presets and custom files are still available.') }}</p>
     <n-alert :type="applyPolicyType" :show-icon="false">
       {{ applyPolicyText }}
     </n-alert>

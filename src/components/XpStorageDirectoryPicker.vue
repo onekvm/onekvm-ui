@@ -374,9 +374,9 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.xp-picker-close { display: grid !important; border: 1px solid #fff !important; border-radius: 3px !important; background: linear-gradient(135deg, #e8846b 0%, #d9422f 46%, #b7190b 100%) !important; box-shadow: inset 1px 1px rgba(255, 255, 255, .55), inset -1px -1px rgba(91, 0, 0, .45) !important; color: #fff; place-items: center; }
-.xp-picker-close:hover { background: linear-gradient(135deg, #ffad95 0%, #ef5a43 46%, #c52110 100%) !important; }
-.xp-picker-close:active { background: linear-gradient(135deg, #a8170b 0%, #d83c28 100%) !important; box-shadow: inset 1px 1px rgba(77, 0, 0, .55) !important; }
+.xp-picker-close { display: grid; border: 1px solid #fff; border-radius: 3px; background: linear-gradient(135deg, #e8846b 0%, #d9422f 46%, #b7190b 100%); box-shadow: inset 1px 1px rgba(255, 255, 255, .55), inset -1px -1px rgba(91, 0, 0, .45); color: #fff; place-items: center; }
+.xp-picker-close:hover { background: linear-gradient(135deg, #ffad95 0%, #ef5a43 46%, #c52110 100%); }
+.xp-picker-close:active { background: linear-gradient(135deg, #a8170b 0%, #d83c28 100%); box-shadow: inset 1px 1px rgba(77, 0, 0, .55); }
 .xp-picker-toolbar { display: flex; gap: 4px; padding: 2px; border: 1px solid #aca899; background: #f1efe2; }
 .xp-picker-toolbar button { display: inline-flex; min-height: 27px; align-items: center; gap: 5px; padding: 2px 7px; border: 1px solid transparent; background: transparent; color: #111; font: 11px Tahoma, "Noto Sans SC", sans-serif; }
 .xp-picker-toolbar button:not(:disabled):hover { border-color: #316ac5; background: #dbeaff; }

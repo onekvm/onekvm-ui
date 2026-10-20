@@ -33,7 +33,7 @@ const valid = computed(() => validHostname(props.modelValue))
     <label class="network-inline-option">
       <span>
         <strong>{{ t('network.mdns.title', 'mDNS') }}</strong>
-        <small>{{ t('network.mdns.hint', 'Advertise hostname.local on the LAN. Turn this off if you do not use discovery.') }}</small>
+        <small>{{ t('network.mdns.hint', 'Discover the device on your LAN and access it using hostname.local.') }}</small>
       </span>
       <n-switch
         :value="Boolean(props.mdns)"

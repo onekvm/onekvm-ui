@@ -283,7 +283,7 @@ const keyboardLeds = computed({
         <li v-if="showMTP">
           <div>
             <strong>{{ t('virtualMedia.mtpTab', 'File transfer') }}</strong>
-            <small>{{ t('settings.advancedSettings.usbPage.mtpHint', 'Share the virtual-media folder with the controlled device, like plugging in a phone. Turn it off and that device will not see this feature.') }}</small>
+            <small>{{ t('settings.advancedSettings.usbPage.mtpHint', 'Share files on OneKVM over USB so the controlled device can access them in its file manager. Turn it off to stop sharing.') }}</small>
           </div>
           <div class="usb-function-controls">
             <USBCapacityBadge :endpoints="endpointCosts.mtp" />

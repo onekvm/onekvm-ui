@@ -81,7 +81,7 @@ function ledLabel(value: boolean | undefined | null) {
         </div>
       </div>
 
-      <div class="power-status-values power-display-options">
+      <div v-if="available && hasLed(hddLed)" class="power-status-values power-display-options">
         <div>
           <span>{{ t('power.showHddIndicator', 'Show HDD LED separately') }}</span>
           <n-switch

@@ -241,7 +241,7 @@ function updateSubtitleParts(values: Array<string | number>) {
           />
         </div>
         <span class="toolbar-spacer personalization-preview-spacer" aria-hidden="true">
-          <span class="toolbar-handle"><GripHorizontal :size="14" /></span>
+          <span class="toolbar-handle"><GripVertical :size="14" /></span>
         </span>
         <div class="device-controls personalization-preview-devices" aria-hidden="true">
           <n-button quaternary size="small" class="device-indicator" data-state="ready" tabindex="-1">

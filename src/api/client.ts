@@ -255,7 +255,6 @@ export interface ConfigSaveResponse {
 
 export interface OneKVMConfig {
   schema_version: number
-  recovery?: { network: RecoveryNetworkSettings }
   video: {
     codec: string
     quality_factor: number

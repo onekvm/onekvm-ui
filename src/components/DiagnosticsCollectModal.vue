@@ -10,6 +10,7 @@ import { api, APIError, type DiagnosticsEvent } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { xtermTheme } from '@/lib/terminal-theme'
 import { activeTheme } from '@/theme/runtime'
+import { pendingDiagnostics, savePendingDiagnostics } from '@/lib/diagnostics-pending'
 
 const show = defineModel<boolean>('show', { required: true })
 
@@ -82,7 +83,7 @@ function updateVisibility(value: boolean) {
   show.value = false
 }
 
-async function startCollect() {
+async function startCollect(resumeId = '') {
   if (stage.value === 'running') return
   stage.value = 'running'
   errorMessage.value = ''
@@ -93,9 +94,14 @@ async function startCollect() {
   terminal?.reset()
   appendLine(t('settings.diagnostics.starting', 'Starting diagnostics collection…'))
 
-  abort = new AbortController()
+  const controller = new AbortController()
+  abort = controller
   try {
     await api.runDiagnostics((event: DiagnosticsEvent) => {
+      if (event.type === 'job') {
+        savePendingDiagnostics(event.id)
+        return
+      }
       if (event.type === 'line') {
         appendLine(event.text)
         return
@@ -104,33 +110,38 @@ async function startCollect() {
         archiveId.value = event.id
         archiveName.value = event.name
         stage.value = 'done'
+        savePendingDiagnostics('')
         return
       }
       if (event.type === 'error') {
         errorMessage.value = event.message
         stage.value = 'error'
+        savePendingDiagnostics('')
         appendLine(event.message)
       }
-    }, abort.signal)
+    }, controller.signal, resumeId)
     if (stage.value === 'running') {
       errorMessage.value = t('settings.diagnostics.incomplete', 'Collection ended without a result')
       stage.value = 'error'
     }
   } catch (reason) {
-    if (abort.signal.aborted) {
+    if (controller.signal.aborted) {
       stage.value = 'idle'
       return
     }
+    if (reason instanceof APIError && reason.status === 404) savePendingDiagnostics('')
     const text = reason instanceof APIError
       ? reason.message
       : reason instanceof Error
         ? reason.message
         : String(reason)
-    errorMessage.value = text
+    errorMessage.value = reason instanceof APIError && reason.status === 401
+      ? t('settings.diagnostics.signInAgain', 'Capture is restoring. Sign in again to resume this diagnostics job.')
+      : text
     stage.value = 'error'
     appendLine(text)
   } finally {
-    abort = null
+    if (abort === controller) abort = null
   }
 }
 
@@ -155,11 +166,13 @@ watch(show, (visible) => {
   if (visible) {
     mounted = true
     resetState()
+    const pending = pendingDiagnostics()
+    if (pending) void startCollect(pending)
   } else {
     abort?.abort()
     abort = null
   }
-})
+}, { immediate: true })
 
 onBeforeUnmount(() => {
   mounted = false
@@ -185,10 +198,10 @@ onBeforeUnmount(() => {
   >
     <template v-if="stage === 'idle'">
       <p class="diagnostics-purpose">
-        {{ t('settings.diagnostics.purpose', 'Collect system logs, network state, and NanoKVM hardware identity into a zip for support. Passwords and private keys are not included.') }}
+        {{ t('settings.diagnostics.purpose', 'Collect system logs, network state, hardware information, and supported bridge firmware in a ZIP file. Reading firmware briefly stops capture services. Sign in again afterward to download the result.') }}
       </p>
       <div class="diagnostics-actions">
-        <n-button type="primary" @click="startCollect">
+        <n-button type="primary" @click="startCollect()">
           <template #icon><Play /></template>
           {{ t('settings.diagnostics.start', 'Start') }}
         </n-button>
@@ -229,7 +242,7 @@ onBeforeUnmount(() => {
         </n-button>
         <n-button
           v-else-if="stage === 'error'"
-          @click="startCollect"
+          @click="startCollect(pendingDiagnostics())"
         >
           {{ t('settings.diagnostics.retry', 'Try again') }}
         </n-button>

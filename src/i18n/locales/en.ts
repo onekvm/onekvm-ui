@@ -1509,7 +1509,8 @@ const en = {
       diagnostics: {
         title: 'Download diagnostic data',
         action: 'Download',
-        purpose: 'Collect system logs, network status, and device hardware information in a ZIP file to help technical support troubleshoot issues. Passwords and private keys are not included.',
+        purpose: 'Collect system logs, network state, hardware information, and supported bridge firmware in a ZIP file. Reading firmware briefly stops capture services. Sign in again afterward to download the result.',
+        signInAgain: 'Capture is restoring. Sign in again to resume this diagnostics job.',
         start: 'Start',
         starting: 'Starting diagnostics collection…',
         running: 'Collecting…',

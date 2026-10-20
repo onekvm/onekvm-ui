@@ -126,6 +126,7 @@ import AdvancedSettingsLoading from './AdvancedSettingsLoading.vue'
 import MediaTransferIndicator from './MediaTransferIndicator.vue'
 import { emptyMediaTransfer, type MediaTransferState } from '@/lib/media-transfer'
 import DiagnosticsCollectModal from './DiagnosticsCollectModal.vue'
+import { pendingDiagnostics } from '@/lib/diagnostics-pending'
 import FileManagerPage from './file-manager/FileManagerPage.vue'
 import SettingsAppList from './SettingsAppList.vue'
 import SystemMemorySpec from './SystemMemorySpec.vue'
@@ -249,7 +250,7 @@ const networkConfirming = ref(false)
 const resetting = ref(false)
 const rebooting = ref(false)
 const enteringRecovery = ref(false)
-const diagnosticsOpen = ref(false)
+const diagnosticsOpen = ref(Boolean(pendingDiagnostics()))
 const systemAction = ref<SystemAction | null>(null)
 const systemActionStage = ref<SystemActionStage>('submitting')
 const systemActionInitialUptime = ref(0)

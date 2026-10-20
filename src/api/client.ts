@@ -1381,6 +1381,7 @@ async function transferMSDDriveFile(
 export type EDIDApplyRequired = 'none' | 'hotplug' | 'reboot' | 'power_cycle'
 
 export type DiagnosticsEvent =
+  | { type: 'job'; id: string }
   | { type: 'line'; text: string }
   | { type: 'done'; id: string; name: string }
   | { type: 'error'; message: string }
@@ -1616,37 +1617,42 @@ export const api = {
   runDiagnostics: async (
     onEvent: (event: DiagnosticsEvent) => void,
     signal?: AbortSignal,
+    resumeId?: string,
   ) => {
-    const response = await fetch(`${serviceBaseUrl()}/api/system/diagnostics/run`, {
-      method: 'POST',
-      credentials: import.meta.env.VITE_WITH_CREDENTIALS === 'false' ? 'omit' : 'include',
-      headers: { Accept: 'application/x-ndjson' },
-      signal,
-    })
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null
-      if (response.status === 401) window.dispatchEvent(new Event('onekvm:unauthorized'))
-      throw new APIError(body?.error || `HTTP ${response.status}`, response.status)
+    const { id } = resumeId ? { id: resumeId } : await request<{ id: string }>(
+      '/api/system/diagnostics/run', { method: 'POST', signal },
+    )
+    onEvent({ type: 'job', id })
+    let seen = 0
+    const deadline = Date.now() + 360_000
+    while (!signal?.aborted && Date.now() < deadline) {
+      let job: { state: string; lines: string[]; name?: string; message?: string }
+      try {
+        job = await request(`/api/system/diagnostics/${encodeURIComponent(id)}`, {
+          cache: 'no-store', signal: signal
+            ? AbortSignal.any([signal, AbortSignal.timeout(5000)])
+            : AbortSignal.timeout(5000),
+        })
+      } catch (error) {
+        if (signal?.aborted || (error instanceof APIError && error.status < 500)) throw error
+        // Bridge reads stop Core briefly. The independent job keeps running.
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 1500))
+        continue
+      }
+      for (const text of job.lines.slice(seen)) onEvent({ type: 'line', text })
+      seen = job.lines.length
+      if (job.state === 'done' && job.name) {
+        onEvent({ type: 'done', id, name: job.name })
+        return
+      }
+      if (job.state === 'error') {
+        onEvent({ type: 'error', message: job.message || job.lines.at(-1) || 'Diagnostics collection failed' })
+        return
+      }
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 1500))
     }
-    if (!response.body) throw new APIError('Empty diagnostics response', 0)
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let pending = ''
-    const consume = (line: string) => {
-      if (!line.trim()) return
-      const event = JSON.parse(line) as DiagnosticsEvent
-      onEvent(event)
-      if (event.type === 'error') throw new APIError(event.message, 0)
-    }
-    while (true) {
-      const { value, done } = await reader.read()
-      pending += decoder.decode(value, { stream: !done })
-      const lines = pending.split('\n')
-      pending = lines.pop() || ''
-      for (const line of lines) consume(line)
-      if (done) break
-    }
-    if (pending.trim()) consume(pending)
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+    throw new APIError('Diagnostics collection timed out', 0)
   },
   downloadDiagnostics: async (id: string) => {
     const response = await fetch(

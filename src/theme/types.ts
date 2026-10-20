@@ -35,6 +35,8 @@ export const oneKVMThemeTokenNames = [
   'surfaceInset',
   'surfaceRaised',
   'surfaceOverlay',
+  'titlebarActive',
+  'titlebarInactive',
   'textSecondary',
   'textTertiary',
   'shadowPopover',
@@ -50,12 +52,15 @@ export const oneKVMThemeTokenNames = [
 export type OneKVMThemeTokenName = (typeof oneKVMThemeTokenNames)[number]
 export type OneKVMThemeTokens = Record<OneKVMThemeTokenName, string>
 export type OneKVMThemeAppearance = 'dark' | 'light'
+export type OneKVMThemeSkin = 'default' | 'classic'
 
 export interface OneKVMThemeDefinition {
   id: string
   name: string
   appearance: OneKVMThemeAppearance
   extends?: string
+  iconSet?: string
+  skin?: OneKVMThemeSkin
   tokens: Partial<OneKVMThemeTokens>
 }
 
@@ -63,6 +68,8 @@ export interface ResolvedOneKVMTheme {
   id: string
   name: string
   appearance: OneKVMThemeAppearance
+  iconSet: string
+  skin: OneKVMThemeSkin
   tokens: OneKVMThemeTokens
 }
 
@@ -70,6 +77,8 @@ export interface OneKVMThemeSummary {
   id: string
   name: string
   appearance: OneKVMThemeAppearance
+  iconSet: string
+  skin: OneKVMThemeSkin
 }
 
 export interface OneKVMThemeRuntimeV1 {

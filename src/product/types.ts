@@ -33,5 +33,6 @@ export interface UIProduct {
   userAssignments?: ProductUserAssignments
   settingsSections?: readonly ProductSettingsSection[]
   themes?: readonly OneKVMThemeDefinition[]
+  iconSets?: readonly OneKVMIconSetDefinition[]
   defaultTheme?: string
 }

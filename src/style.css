@@ -60,6 +60,8 @@
   --onekvm-surface-inset: #0d131a;
   --onekvm-surface-raised: #171e26;
   --onekvm-surface-overlay: rgb(17 23 30 / 94%);
+  --onekvm-titlebar-active: #171e26;
+  --onekvm-titlebar-inactive: #29323d;
   --onekvm-text-secondary: #c7d0d9;
   --onekvm-text-tertiary: #a7b1bc;
   --onekvm-shadow-popover: 0 16px 40px rgb(0 0 0 / 48%), 0 0 0 1px rgb(255 255 255 / 4%);
@@ -188,6 +190,25 @@ select { font: inherit; }
 .console-workspace .toolbar { grid-area: top; }
 .console-workspace .console-stage,
 .console-workspace .video-performance-overlay { grid-area: stage; }
+
+/* Keep connection masks within the video area, including in fullscreen. Layout
+   containment makes this the containing block for Naive UI's fixed overlays. */
+.console-connection-overlays {
+  grid-area: stage;
+  min-width: 0;
+  min-height: 0;
+  contain: layout;
+  z-index: 1500;
+  pointer-events: none;
+}
+
+.console-connection-overlays .n-modal-container { pointer-events: auto; }
+
+/* Floating and launcher toolbars share the video area. Keep them available
+   during connection errors, below their menus and control sheets (1700+). */
+.console-workspace:has(.console-connection-overlays .n-modal-mask) .toolbar:not(.is-launcher-open) {
+  z-index: 1600;
+}
 
 .console-workspace.toolbar-dock-top {
   --toolbar-top-track: var(--onekvm-toolbar-bar);
@@ -451,18 +472,19 @@ select { font: inherit; }
   transform: translate3d(var(--toolbar-hide-x, 0px), var(--toolbar-hide-y, 0px), 0);
 }
 
-.toolbar.is-launcher.is-launcher-open { z-index: 50; }
+/* Launcher navigation sits above console windows (1000+) and below sheets (1800). */
+.toolbar.is-launcher.is-launcher-open { z-index: 1700; }
 
 .toolbar-launcher-mask {
   position: fixed;
   inset: 0;
-  z-index: 45;
+  z-index: 1690;
   background: var(--onekvm-scrim);
 }
 
 .toolbar-tray.is-centered {
   position: fixed;
-  z-index: 50;
+  z-index: 1700;
   inset: 12px;
   display: grid;
   width: min(320px, calc(100vw - 24px));
@@ -1420,6 +1442,12 @@ select { font: inherit; }
   font-weight: 600;
 }
 
+/* Keep connection feedback above the HID surface and startup trace. */
+.console-loading-state {
+  z-index: 5;
+  pointer-events: none;
+}
+
 .console-oor {
   inset: 0;
   z-index: 3;
@@ -1956,13 +1984,13 @@ select { font: inherit; }
   color: var(--muted-foreground);
 }
 
-.setup-advanced-toggle .lucide-chevron-down {
+.setup-advanced-toggle .setup-advanced-icon {
   width: 14px;
   margin-left: 4px;
   transition: transform 160ms ease;
 }
 
-.setup-advanced-toggle .lucide-chevron-down.expanded { transform: rotate(180deg); }
+.setup-advanced-toggle .setup-advanced-icon.expanded { transform: rotate(180deg); }
 
 .setup-network > .ios-header {
   margin-left: 4px;
@@ -2316,6 +2344,12 @@ select { font: inherit; }
   font-size: 16px;
   text-align: left;
 }
+.theme-choice-row { gap: 10px; }
+.theme-choice-row > span { flex: 1; }
+.theme-choice-row > svg { flex: 0 0 auto; }
+.theme-menu-choice { display: flex; align-items: center; gap: 16px; }
+.theme-menu-choice > span { flex: 1; }
+.theme-menu-choice > svg { flex: 0 0 auto; }
 .control-sheet-row[aria-current],
 .control-sheet-row:hover,
 .control-sheet-row:focus-visible {
@@ -2364,9 +2398,17 @@ select { font: inherit; }
   line-height: 1.45;
 }
 
+.display-status-popover .display-status-values > .usb-audio-volume,
+.display-status-popover .display-status-values > .usb-audio-format {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
 .usb-audio-slider {
-  width: 128px;
-  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  flex: 0 0 auto;
 }
 
 .display-status-values .display-status-select {
@@ -2513,10 +2555,11 @@ select { font: inherit; }
   display: inline-flex;
   height: 100%;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   gap: 3px;
   font-feature-settings: "tnum" 1, "zero" 1;
+  text-align: center;
   /* The larger, heavier value pulls the two-line block's visual center down. */
   transform: translateY(-2px);
   white-space: nowrap;
@@ -2567,6 +2610,112 @@ select { font: inherit; }
 .performance-compact-bar .performance-window-actions {
   margin-left: auto;
   flex: 0 0 auto;
+}
+
+.toolbar-performance-slot {
+  display: flex;
+  flex: none;
+  align-items: center;
+  margin-right: 7px;
+  padding-right: 7px;
+  border-right: 1px solid var(--border);
+}
+
+.toolbar-performance-slot .performance-compact-bar {
+  height: 30px;
+  gap: 7px;
+  padding: 0;
+  cursor: grab;
+}
+
+.toolbar-performance-slot .performance-compact-chart { width: 52px; }
+.toolbar-performance-slot .performance-compact-metric { gap: 2px; transform: none; align-items: center; text-align: center; }
+.toolbar-performance-slot .performance-compact-metric span { font-size: 9px; }
+.toolbar-performance-slot .performance-compact-metric strong { font-size: 11px; }
+
+.toolbar-performance-drop-label {
+  padding: 4px 8px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 4px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: color 150ms ease-out, background-color 150ms ease-out;
+}
+.toolbar-performance-slot.is-drop-preview .toolbar-performance-drop-label {
+  color: var(--foreground);
+  background: var(--accent);
+  border-color: var(--ring);
+}
+
+.toolbar.is-vertical .toolbar-performance-slot {
+  grid-column: 1 / -1;
+  justify-self: stretch;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  justify-content: center;
+  margin: 0 0 7px;
+  padding: 0 0 7px;
+  border-right: 0;
+  border-bottom: 1px solid var(--border);
+}
+.toolbar.is-vertical .toolbar-performance-slot .performance-compact-bar {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  flex-direction: column;
+  align-items: center;
+  height: auto;
+  gap: 5px;
+  padding: 2px 0;
+}
+.toolbar.is-vertical .toolbar-performance-slot .performance-compact-chart {
+  display: block;
+  width: 44px;
+  height: 16px;
+}
+.toolbar.is-vertical .toolbar-performance-slot .performance-compact-metric {
+  display: flex;
+  width: 100%;
+  height: auto;
+  align-items: center;
+  transform: none;
+  gap: 2px;
+  text-align: center;
+}
+.toolbar.is-vertical .toolbar-performance-slot .performance-compact-metric span {
+  align-self: center;
+  font-size: 8px;
+}
+.toolbar.is-vertical .toolbar-performance-slot .performance-compact-metric strong {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+}
+.toolbar.is-vertical .toolbar-performance-slot .performance-compact-sep {
+  display: block;
+  width: 32px;
+  height: 1px;
+  flex: none;
+}
+.toolbar.is-vertical .toolbar-performance-drop-label {
+  writing-mode: vertical-rl;
+  text-align: center;
+}
+
+@media (max-width: 1100px) {
+  .toolbar:not(.is-launcher):has(.toolbar-pinned-tools) .brand { min-width: 0; }
+  .toolbar:not(.is-launcher):has(.toolbar-pinned-tools) .brand-copy { display: none; }
+  .toolbar-performance-slot .performance-compact-chart,
+  .toolbar-performance-slot .performance-compact-resolution,
+  .toolbar-performance-slot .performance-compact-sep:has(+ .performance-compact-resolution) { display: none; }
+}
+@media (max-width: 900px) {
+  .toolbar-performance-slot .performance-compact-codec,
+  .toolbar-performance-slot .performance-compact-sep:has(+ .performance-compact-codec) { display: none; }
 }
 
 .keyboard-status-window {
@@ -2633,8 +2782,16 @@ select { font: inherit; }
 .video-performance-overlay.is-mobile-sheet {
   width: min(380px, calc(100% - 16px));
   max-height: min(72dvh, 620px);
-  overflow: auto;
+  overflow: hidden;
   border-radius: 16px;
+}
+
+.video-performance-overlay.is-mobile-sheet .console-floating-card,
+.video-performance-overlay.is-mobile-sheet .n-card__content { max-height: inherit; }
+.video-performance-overlay.is-mobile-sheet .display-status-content {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .video-performance-overlay.is-mobile-sheet .display-status-titlebar {
@@ -2981,6 +3138,16 @@ select { font: inherit; }
   text-transform: uppercase;
 }
 
+.display-status-column > h2 > .display-status-total {
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+}
+
 .display-status-column > .display-status-meta,
 .display-status-column > .display-status-chart {
   min-height: 29px;
@@ -3029,6 +3196,7 @@ select { font: inherit; }
 
 .latency-band-capture { fill: rgb(96 165 250 / 55%); }
 .latency-band-encode { fill: rgb(192 132 252 / 55%); }
+.latency-band-transport { fill: rgb(34 211 238 / 50%); }
 .latency-band-jitter { fill: rgb(244 114 182 / 45%); }
 .latency-band-decode { fill: rgb(251 146 60 / 45%); }
 .latency-band-present { fill: rgb(163 230 53 / 45%); }
@@ -3047,19 +3215,21 @@ select { font: inherit; }
   stroke-width: 2;
 }
 .latency-line-ice {
-  stroke: #e2e8f0;
+  stroke: var(--muted-foreground);
   stroke-dasharray: 4 3;
   stroke-width: 1.4;
 }
 .latency-swatch-capture::after { background: #60a5fa; }
 .latency-swatch-encode::after { background: #c084fc; }
+.latency-swatch-transport::after { background: #22d3ee; }
 .latency-swatch-jitter::after { background: #f472b6; }
 .latency-swatch-decode::after { background: #fb923c; }
 .latency-swatch-present::after { background: #a3e635; }
 .latency-swatch-total::after { background: #22d3ee; }
 .latency-swatch-ice::after {
-  background: #e2e8f0;
-  box-shadow: inset 0 0 0 1px #94a3b8;
+  height: 2px;
+  border-radius: 0;
+  background: repeating-linear-gradient(to right, var(--muted-foreground) 0 3px, transparent 3px 5px);
 }
 .latency-axis { fill: #cbd5e1; }
 
@@ -3070,27 +3240,14 @@ select { font: inherit; }
   width: 100%;
 }
 
-.stream-chart-legend {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 12px;
-  padding: 0 22px;
-}
-
-.latency-chart .stream-chart-legend {
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  padding: 0;
-}
-
-.stream-chart-key {
+.performance-metric-label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--muted-foreground);
-  font-size: 10px;
+  min-width: 0;
 }
+
+.performance-metric-label .stream-chart-swatch { flex: 0 0 8px; width: 8px; height: 8px; }
 
 .stream-chart-swatch {
   display: inline-flex;
@@ -3369,6 +3526,7 @@ select { font: inherit; }
 }
 
 .advanced-settings-sidebar nav { display: grid; gap: 3px; }
+.advanced-settings-nav-heading { display: none; }
 .advanced-settings-sidebar button {
   display: flex;
   width: 100%;
@@ -3679,6 +3837,13 @@ select { font: inherit; }
 .advanced-settings-view:has(.plugin-page-section) .advanced-settings-section-header {
   margin-bottom: 12px;
   padding-bottom: 10px;
+}
+.plugin-page-section,
+.extension-vue-page-host,
+.extension-vue-page-host > .n-spin-container,
+.extension-vue-page-host > .n-spin-container > .n-spin-content {
+  min-width: 0;
+  max-width: 100%;
 }
 .plugin-page-section { min-height: 0; }
 .plugin-page-frame {
@@ -4900,6 +5065,18 @@ select { font: inherit; }
 .permission-options { display: grid; gap: 10px; }
 
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1100px) {
+  .video-performance-overlay.is-compact .performance-compact-bar {
+    height: auto;
+    min-height: 36px;
+    flex-wrap: wrap;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  .video-performance-overlay.is-compact .performance-compact-metric {
+    min-height: 28px;
+    transform: none;
+  }
+  .video-performance-overlay.is-compact .performance-compact-sep { display: none; }
   .toolbar-handle { width: 26px; height: 16px; }
   .video-performance-overlay .display-status-values,
   .video-performance-overlay.is-advanced .display-status-values { grid-template-columns: 1fr; }

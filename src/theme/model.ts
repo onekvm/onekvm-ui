@@ -1,3 +1,4 @@
+import { DEFAULT_ICON_SET_ID, WIN98_ICON_SET_ID } from '../icons/types.ts'
 import {
   oneKVMThemeTokenNames,
   type OneKVMThemeAppearance,
@@ -12,6 +13,7 @@ export const ONEKVM_THEME_STORAGE_KEY = 'onekvm-ui-theme'
 export const ONEKVM_APPEARANCE_STORAGE_KEY = 'onekvm-ui-appearance'
 export const DEFAULT_ONEKVM_THEME_ID = 'graphite'
 export const LIGHT_ONEKVM_THEME_ID = 'paper'
+export const WIN98_ONEKVM_THEME_ID = 'win98'
 export const APPEARANCE_PREFERENCES = ['system', 'light', 'dark'] as const
 export type OneKVMAppearancePreference = (typeof APPEARANCE_PREFERENCES)[number]
 export const DEFAULT_APPEARANCE_PREFERENCE: OneKVMAppearancePreference = 'dark'
@@ -53,6 +55,8 @@ export const oneKVMThemeCSSVariables: Readonly<Record<OneKVMThemeTokenName, stri
   surfaceInset: '--onekvm-surface-inset',
   surfaceRaised: '--onekvm-surface-raised',
   surfaceOverlay: '--onekvm-surface-overlay',
+  titlebarActive: '--onekvm-titlebar-active',
+  titlebarInactive: '--onekvm-titlebar-inactive',
   textSecondary: '--onekvm-text-secondary',
   textTertiary: '--onekvm-text-tertiary',
   shadowPopover: '--onekvm-shadow-popover',
@@ -69,6 +73,8 @@ export const graphiteTheme: ResolvedOneKVMTheme = Object.freeze({
   id: DEFAULT_ONEKVM_THEME_ID,
   name: 'Graphite',
   appearance: 'dark',
+  skin: 'default',
+  iconSet: DEFAULT_ICON_SET_ID,
   tokens: Object.freeze({
     background: '#090d12',
     foreground: '#f4f7fa',
@@ -106,6 +112,8 @@ export const graphiteTheme: ResolvedOneKVMTheme = Object.freeze({
     surfaceInset: '#0d131a',
     surfaceRaised: '#171e26',
     surfaceOverlay: 'rgb(17 23 30 / 94%)',
+    titlebarActive: '#171e26',
+    titlebarInactive: '#29323d',
     textSecondary: '#c7d0d9',
     textTertiary: '#a7b1bc',
     shadowPopover: '0 16px 40px rgb(0 0 0 / 48%), 0 0 0 1px rgb(255 255 255 / 4%)',
@@ -123,6 +131,8 @@ export const paperTheme: ResolvedOneKVMTheme = Object.freeze({
   id: LIGHT_ONEKVM_THEME_ID,
   name: 'Paper',
   appearance: 'light',
+  skin: 'default',
+  iconSet: DEFAULT_ICON_SET_ID,
   tokens: Object.freeze({
     background: '#f3f5f8',
     foreground: '#12181f',
@@ -160,6 +170,8 @@ export const paperTheme: ResolvedOneKVMTheme = Object.freeze({
     surfaceInset: '#eef2f6',
     surfaceRaised: '#ffffff',
     surfaceOverlay: 'rgb(255 255 255 / 97%)',
+    titlebarActive: '#2563eb',
+    titlebarInactive: '#5b6773',
     textSecondary: '#3a4653',
     textTertiary: '#5b6773',
     shadowPopover: '0 16px 40px rgb(15 23 42 / 14%), 0 0 0 1px rgb(15 23 42 / 6%)',
@@ -170,6 +182,64 @@ export const paperTheme: ResolvedOneKVMTheme = Object.freeze({
     radiusSmall: '4px',
     radius: '6px',
     radiusLarge: '8px',
+  }),
+})
+
+export const win98Theme: ResolvedOneKVMTheme = Object.freeze({
+  id: WIN98_ONEKVM_THEME_ID,
+  name: 'Win98',
+  appearance: 'light',
+  skin: 'classic',
+  iconSet: WIN98_ICON_SET_ID,
+  tokens: Object.freeze({
+    ...paperTheme.tokens,
+    background: '#c0c0c0',
+    foreground: '#000000',
+    card: '#c0c0c0',
+    cardForeground: '#000000',
+    popover: '#c0c0c0',
+    popoverForeground: '#000000',
+    primary: '#000080',
+    primaryHover: '#0000a0',
+    primaryPressed: '#000060',
+    primaryForeground: '#ffffff',
+    secondary: '#d4d4d4',
+    secondaryHover: '#dfdfdf',
+    secondaryForeground: '#000000',
+    muted: '#b8b8b8',
+    mutedForeground: '#404040',
+    placeholderForeground: '#595959',
+    accent: '#dfdfdf',
+    accentForeground: '#000000',
+    destructive: '#a00000',
+    destructiveHover: '#800000',
+    destructivePressed: '#600000',
+    destructiveForeground: '#ffffff',
+    success: '#006000',
+    successForeground: '#ffffff',
+    warning: '#805000',
+    warningForeground: '#ffffff',
+    border: '#808080',
+    borderStrong: '#404040',
+    input: '#ffffff',
+    ring: '#000080',
+    toolbar: '#c0c0c0',
+    canvas: '#008080',
+    surfaceInset: '#dfdfdf',
+    surfaceRaised: '#dfdfdf',
+    surfaceOverlay: '#c0c0c0',
+    titlebarActive: 'linear-gradient(90deg, #000080, #1084d0)',
+    titlebarInactive: 'linear-gradient(90deg, #808080, #b5b5b5)',
+    textSecondary: '#303030',
+    textTertiary: '#404040',
+    shadowPopover: 'inset 1px 1px 0 #ffffff, inset -1px -1px 0 #808080, 1px 1px 0 #000000',
+    shadowPanel: 'inset 1px 1px 0 #ffffff, inset -1px -1px 0 #808080, 1px 1px 0 #000000',
+    chartFps: '#005050',
+    chartBitrate: '#000080',
+    chartGrid: '#a0a0a0',
+    radiusSmall: '0px',
+    radius: '2px',
+    radiusLarge: '2px',
   }),
 })
 
@@ -205,7 +275,7 @@ export function themeIdForAppearance(
 }
 
 export function themeSummary(theme: ResolvedOneKVMTheme): OneKVMThemeSummary {
-  return { id: theme.id, name: theme.name, appearance: theme.appearance }
+  return { id: theme.id, name: theme.name, appearance: theme.appearance, iconSet: theme.iconSet, skin: theme.skin }
 }
 
 export function resolveThemeDefinition(
@@ -222,6 +292,10 @@ export function resolveThemeDefinition(
   if (baseId === definition.id) throw new Error(`OneKVM theme ${definition.id} cannot extend itself`)
   const base = themes.get(baseId)
   if (!base) throw new Error(`Unknown OneKVM base theme: ${baseId}`)
+  const iconSet = definition.iconSet ?? base.iconSet
+  if (!themeIdPattern.test(iconSet)) throw new Error(`Invalid OneKVM icon set ID: ${iconSet}`)
+  const skin = definition.skin ?? base.skin
+  if (skin !== 'default' && skin !== 'classic') throw new Error(`Invalid OneKVM theme skin: ${skin}`)
 
   const tokens = { ...base.tokens }
   for (const tokenName of oneKVMThemeTokenNames) {
@@ -237,6 +311,8 @@ export function resolveThemeDefinition(
     id: definition.id,
     name: definition.name.trim(),
     appearance: definition.appearance,
+    iconSet,
+    skin,
     tokens: Object.freeze(tokens as OneKVMThemeTokens),
   })
 }

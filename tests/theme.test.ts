@@ -9,6 +9,7 @@ import {
   resolveAppearance,
   resolveThemeDefinition,
   themeIdForAppearance,
+  win98Theme,
 } from '../src/theme/model.ts'
 import { naiveOverridesFor } from '../src/theme/naive.ts'
 import { oneKVMThemeTokenNames } from '../src/theme/types.ts'
@@ -28,12 +29,35 @@ const custom = resolveThemeDefinition({
 assert.equal(custom.tokens.primary, '#2563eb')
 assert.equal(custom.tokens.radius, '4px')
 assert.equal(custom.tokens.background, graphiteTheme.tokens.background)
+assert.equal(custom.iconSet, 'outline')
+assert.equal(custom.skin, 'default')
+assert.equal(win98Theme.skin, 'classic')
+assert.equal(win98Theme.iconSet, 'win98')
+assert.match(win98Theme.tokens.titlebarActive, /^linear-gradient\(/)
+assert.match(win98Theme.tokens.titlebarInactive, /^linear-gradient\(/)
+const themedIcons = resolveThemeDefinition({
+  id: 'win98-retro', name: 'Retro', appearance: 'light', extends: 'win98',
+  iconSet: 'retro', tokens: {},
+}, new Map([[win98Theme.id, win98Theme]]))
+assert.equal(themedIcons.iconSet, 'retro')
+assert.equal(themedIcons.skin, 'classic')
+assert.equal(themedIcons.tokens.background, win98Theme.tokens.background)
+assert.equal(resolveThemeDefinition({
+  id: 'retro-child', name: 'Child', appearance: 'light', extends: 'win98-retro', tokens: {},
+}, new Map([[themedIcons.id, themedIcons]])).iconSet, 'retro')
+assert.equal(resolveThemeDefinition({
+  id: 'plain-retro', name: 'Plain', appearance: 'light', extends: 'win98', skin: 'default', tokens: {},
+}, new Map([[win98Theme.id, win98Theme]])).skin, 'default')
 assert.equal(Object.keys(oneKVMThemeCSSVariables).length, oneKVMThemeTokenNames.length)
 assert.equal(paperTheme.appearance, 'light')
 assert.equal(paperTheme.tokens.videoStage, graphiteTheme.tokens.videoStage)
 assert.ok(paperTheme.tokens.surfaceOverlay.includes('255 255 255'))
 assert.notEqual(paperTheme.tokens.mutedForeground, paperTheme.tokens.background)
 const paperUi = naiveOverridesFor(paperTheme)
+const classicUi = naiveOverridesFor(win98Theme)
+assert.equal(classicUi.InternalSelectMenu?.color, win98Theme.tokens.input)
+assert.equal(classicUi.InternalSelectMenu?.optionColorActive, win98Theme.tokens.primary)
+assert.equal(classicUi.InternalSelectMenu?.optionTextColorActive, win98Theme.tokens.primaryForeground)
 assert.equal(paperUi.Tooltip?.textColor, paperTheme.tokens.popoverForeground)
 assert.equal(paperUi.Tooltip?.color, paperTheme.tokens.popover)
 assert.equal(paperUi.Popover?.textColor, paperTheme.tokens.popoverForeground)

@@ -1,0 +1,119 @@
+/* Shared host confirmations retain Naive's focus, loading, and dismissal logic. */
+html[data-onekvm-skin="classic"] .host-confirm-dialog.n-dialog {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  width: 446px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100dvh - 24px);
+  padding: 3px;
+  overflow-y: auto;
+  font-family: var(--classic-font);
+  transition: none;
+}
+html[data-onekvm-skin="classic"] .host-confirm-dialog :is(.n-dialog__title, .n-dialog-icon-container) {
+  display: contents;
+}
+html[data-onekvm-skin="classic"] .host-confirm-dialog .host-confirm-title {
+  display: flex;
+  grid-column: 1 / -1;
+  grid-row: 1;
+  min-height: 20px;
+  align-items: center;
+  padding: 3px 26px 3px 3px;
+  color: var(--primary-foreground);
+  background: var(--onekvm-titlebar-active);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+html[data-onekvm-skin="classic"] .host-confirm-dialog .n-dialog__icon {
+  grid-column: 1;
+  grid-row: 2;
+  width: 32px;
+  height: 32px;
+  margin: 16px 10px;
+  align-self: start;
+  font-size: 32px;
+  transition: none;
+}
+html[data-onekvm-skin="classic"] .host-confirm-dialog .n-dialog__content {
+  grid-column: 2;
+  grid-row: 2;
+  margin: 16px 12px 16px 0;
+  align-self: center;
+  font-size: 13px;
+  line-height: 1.5;
+}
+html[data-onekvm-skin="classic"] .host-confirm-dialog:not(:has(.n-dialog__icon)) .n-dialog__content {
+  grid-column: 1 / -1;
+  margin-left: 12px;
+}
+html[data-onekvm-skin="classic"] .host-confirm-dialog .n-dialog__action {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+html[data-onekvm-skin="classic"] .host-confirm-dialog .n-dialog__action > .n-button {
+  min-width: 75px;
+  min-height: 26px;
+  margin: 0;
+  font-family: var(--classic-font);
+  font-size: 12px;
+}
+html[data-onekvm-skin="classic"] .host-confirm-dialog .n-dialog__close.n-base-close {
+  top: 6px;
+  right: 5px;
+  width: 16px;
+  height: 14px;
+  margin: 0;
+  border-radius: 0;
+  background: var(--card);
+  box-shadow: var(--classic-raised);
+  transition: none;
+}
+html[data-onekvm-skin="classic"] .host-confirm-dialog .n-dialog__close:active {
+  box-shadow: var(--classic-sunken);
+}
+html[data-onekvm-skin="classic"] .host-confirm-dialog .n-dialog__close > .n-base-icon {
+  visibility: hidden;
+}
+html[data-onekvm-skin="classic"] .host-confirm-dialog .n-dialog__close::after {
+  position: absolute;
+  inset: 0;
+  background: url('/icons/win98/16/actions-window-close.png') center / 16px 16px no-repeat;
+  content: '';
+  pointer-events: none;
+}
+html[data-onekvm-skin="classic"] .host-confirm-default,
+html[data-onekvm-skin="classic"] .host-confirm-info {
+  --classic-confirm-icon: url('/icons/win98/32/status-dialog-information.png');
+}
+html[data-onekvm-skin="classic"] .host-confirm-warning {
+  --classic-confirm-icon: url('/icons/win98/32/status-dialog-warning.png');
+}
+html[data-onekvm-skin="classic"] .host-confirm-error {
+  --classic-confirm-icon: url('/icons/win98/32/actions-process-stop.png');
+}
+html[data-onekvm-skin="classic"] .host-confirm-dialog:not(.host-confirm-custom-icon):not(.host-confirm-success) .n-dialog__icon {
+  background: var(--classic-confirm-icon) center / 32px 32px no-repeat;
+  image-rendering: pixelated;
+}
+html[data-onekvm-skin="classic"] .host-confirm-dialog:not(.host-confirm-custom-icon):not(.host-confirm-success) .n-dialog__icon > svg {
+  visibility: hidden;
+}
+@media (pointer: coarse), (max-width: 760px), (max-height: 500px) and (max-width: 1100px) {
+  html[data-onekvm-skin="classic"] .host-confirm-dialog .host-confirm-title {
+    min-height: 50px;
+    padding-right: 52px;
+  }
+  html[data-onekvm-skin="classic"] .host-confirm-dialog .n-dialog__close.n-base-close {
+    width: 44px;
+    height: 44px;
+  }
+  html[data-onekvm-skin="classic"] .host-confirm-dialog .n-dialog__action > .n-button {
+    min-height: 44px;
+  }
+}

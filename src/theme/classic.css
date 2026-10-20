@@ -1,0 +1,603 @@
+/* Classic chrome belongs to the host shell. Keep plugin page and tool-window contents
+   outside these selectors; they continue to consume the ordinary theme tokens. */
+html[data-onekvm-skin="classic"] {
+  --classic-font: Tahoma, "MS Sans Serif", "Microsoft Sans Serif", sans-serif;
+  --classic-led-active: color-mix(in srgb, var(--success) 55%, var(--success-foreground));
+  --classic-raised: inset 1px 1px 0 var(--primary-foreground),
+    inset -1px -1px 0 var(--foreground),
+    inset 2px 2px 0 var(--onekvm-surface-raised),
+    inset -2px -2px 0 var(--border);
+  --classic-sunken: inset 1px 1px 0 var(--border),
+    inset -1px -1px 0 var(--primary-foreground),
+    inset 2px 2px 0 var(--foreground),
+    inset -2px -2px 0 var(--onekvm-surface-raised);
+  --classic-frame: inset -1px -1px 0 var(--foreground),
+    inset 1px 1px 0 var(--onekvm-surface-raised),
+    inset -2px -2px 0 var(--border),
+    inset 2px 2px 0 var(--primary-foreground);
+}
+
+html[data-onekvm-skin="classic"] :is(
+  .toolbar, .toolbar-tray, .advanced-settings-header, .advanced-settings-sidebar,
+  .settings-app-list, .host-theme-menu, .host-menu, .host-control-popover, .host-info-popover,
+  .control-sheet-card, .host-window-titlebar, .host-dialog > .n-card-header
+) {
+  font-family: var(--classic-font);
+}
+
+/* Taskbar: square controls, a recessed device label, and real pressed states. */
+html[data-onekvm-skin="classic"] .toolbar:not(.is-launcher) {
+  gap: 4px;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 0;
+  background: var(--onekvm-toolbar);
+  box-shadow: var(--classic-raised);
+}
+html[data-onekvm-skin="classic"] .toolbar.is-vertical {
+  padding: 6px 4px;
+}
+html[data-onekvm-skin="classic"] .toolbar .brand {
+  min-width: 0;
+  padding: 3px 7px;
+  box-shadow: var(--classic-sunken);
+}
+html[data-onekvm-skin="classic"] .toolbar :is(.brand-logo, .brand-mark) {
+  border-radius: 0;
+}
+html[data-onekvm-skin="classic"] .toolbar :is(.brand-name, .brand-device) {
+  letter-spacing: 0;
+}
+html[data-onekvm-skin="classic"] .toolbar-handle {
+  width: 14px;
+  border-radius: 0;
+  box-shadow: inset 1px 0 0 var(--primary-foreground), inset -1px 0 0 var(--border);
+}
+html[data-onekvm-skin="classic"] :is(
+  .toolbar, .toolbar-tray.is-centered, .advanced-settings-header
+) .n-button,
+html[data-onekvm-skin="classic"] :is(.host-window-actions, .host-window-titlebar) > button,
+html[data-onekvm-skin="classic"] .host-dialog > .n-card-header button,
+html[data-onekvm-skin="classic"] .control-sheet-close {
+  border: 0;
+  border-radius: 0;
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: var(--classic-raised);
+  transition: none;
+}
+html[data-onekvm-skin="classic"] :is(.host-window-actions, .host-window-titlebar) > button:hover:not(:disabled),
+html[data-onekvm-skin="classic"] .host-dialog > .n-card-header button:hover:not(:disabled) {
+  background: var(--onekvm-surface-raised);
+}
+html[data-onekvm-skin="classic"] :is(
+  .toolbar, .toolbar-tray.is-centered, .advanced-settings-header
+) .n-button:is(:active, [aria-pressed="true"], [aria-expanded="true"]),
+html[data-onekvm-skin="classic"] :is(.host-window-actions, .host-window-titlebar) > button:active:not(:disabled),
+html[data-onekvm-skin="classic"] .host-dialog > .n-card-header button:active:not(:disabled),
+html[data-onekvm-skin="classic"] .control-sheet-close:active {
+  background: var(--onekvm-surface-inset);
+  box-shadow: var(--classic-sunken);
+}
+html[data-onekvm-skin="classic"] :is(.host-window-actions, .host-window-titlebar) > button:disabled {
+  color: var(--muted-foreground);
+  text-shadow: 1px 1px var(--primary-foreground);
+}
+html[data-onekvm-skin="classic"] :is(
+  .toolbar, .toolbar-tray, .advanced-settings-header, .advanced-settings-sidebar,
+  .host-theme-menu, .host-menu, .control-sheet-card, .host-window-titlebar, .host-dialog > .n-card-header
+) :focus-visible {
+  outline: 1px dotted currentColor;
+  outline-offset: -4px;
+}
+/* Avoid animated transforms and filters on the pixel-art toolbar. */
+html[data-onekvm-skin="classic"] :is(.toolbar, .toolbar-tray) .device-indicator[data-state] .device-led,
+html[data-onekvm-skin="classic"] .toolbar-launcher-pip {
+  border-radius: 0;
+  box-shadow: none;
+  filter: none;
+  animation: none;
+}
+html[data-onekvm-skin="classic"] :is(.toolbar, .toolbar-tray) .device-indicator[data-state="ready"] .device-led-active {
+  background: var(--classic-led-active);
+}
+html[data-onekvm-skin="classic"] :is(.toolbar, .toolbar-tray) .upload-task-indicator[data-state="uploading"] .device-led {
+  animation: classic-led-blink 1s steps(1, end) infinite;
+}
+@keyframes classic-led-blink {
+  0%, 100% { background: var(--success); }
+  50% { background: var(--classic-led-active); }
+}
+
+/* Loading text and progress need their own silver surface over the dark video. */
+html[data-onekvm-skin="classic"] .console-loading-state {
+  padding: 12px 16px;
+  color: var(--foreground);
+  background: var(--card);
+  box-shadow: var(--classic-frame);
+  font-family: var(--classic-font);
+  font-size: 12px;
+}
+html[data-onekvm-skin="classic"] .console-connect-progress {
+  height: 16px;
+  border-radius: 0;
+  background: var(--input);
+  box-shadow: var(--classic-sunken);
+}
+html[data-onekvm-skin="classic"] .console-connect-progress > span {
+  inset-block: 2px;
+  background: repeating-linear-gradient(90deg, var(--primary) 0 8px, transparent 8px 10px);
+  box-shadow: none;
+}
+html[data-onekvm-skin="classic"] .toolbar-launcher {
+  border: 0;
+  border-radius: 0;
+  background: var(--card);
+  box-shadow: var(--classic-raised);
+}
+html[data-onekvm-skin="classic"] .toolbar-launcher:active {
+  transform: none;
+  box-shadow: var(--classic-sunken);
+}
+html[data-onekvm-skin="classic"] .toolbar-launcher .brand-mark {
+  width: 30px;
+  height: 30px;
+}
+
+/* Control Panel: a silver frame around a white, recessed navigation tree. */
+html[data-onekvm-skin="classic"] .advanced-settings-header {
+  gap: 8px;
+  padding: 4px 6px;
+  border: 0;
+  color: var(--primary-foreground);
+  background: var(--onekvm-titlebar-active);
+  box-shadow: inset 1px 1px 0 var(--primary-foreground), inset -1px -1px 0 var(--foreground);
+}
+html[data-onekvm-skin="classic"] .advanced-settings-device {
+  color: var(--primary-foreground);
+}
+html[data-onekvm-skin="classic"] .advanced-settings-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px;
+  border: 0;
+  overflow: hidden;
+  background: var(--card);
+  box-shadow: inset -1px 0 0 var(--border), inset -2px 0 0 var(--primary-foreground);
+}
+html[data-onekvm-skin="classic"] .advanced-settings-nav-heading {
+  display: block;
+  flex: 0 0 auto;
+  padding: 5px 4px;
+  font-size: 12px;
+  font-weight: 700;
+}
+html[data-onekvm-skin="classic"] .advanced-settings-sidebar nav {
+  flex: 1;
+  min-height: 0;
+  gap: 0;
+  padding: 5px;
+  overflow-y: auto;
+  align-content: start;
+  background: var(--input);
+  box-shadow: var(--classic-sunken);
+}
+html[data-onekvm-skin="classic"] .advanced-settings-sidebar button {
+  height: 32px;
+  gap: 8px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 0;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 400;
+  transition: none;
+}
+html[data-onekvm-skin="classic"] .advanced-settings-sidebar button:hover {
+  background: var(--accent);
+}
+html[data-onekvm-skin="classic"] .advanced-settings-sidebar button.active {
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+html[data-onekvm-skin="classic"] .advanced-settings-sidebar button.plugin-child {
+  position: relative;
+  padding-left: 27px;
+  font-size: 12px;
+}
+html[data-onekvm-skin="classic"] .advanced-settings-sidebar button.plugin-child::before {
+  position: absolute;
+  top: 0;
+  bottom: 50%;
+  left: 12px;
+  width: 8px;
+  border-left: 1px dotted var(--border);
+  border-bottom: 1px dotted var(--border);
+  content: '';
+}
+html[data-onekvm-skin="classic"] .advanced-settings-view:not(:has(.plugin-page-section)) > .advanced-settings-section-header {
+  min-height: 30px;
+  margin-bottom: 18px;
+  padding: 5px 8px;
+  border: 0;
+  background: var(--onekvm-titlebar-active);
+}
+html[data-onekvm-skin="classic"] .advanced-settings-view:not(:has(.plugin-page-section)) > .advanced-settings-section-header h1 {
+  color: var(--primary-foreground);
+  font-family: var(--classic-font);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+/* Host menus and video-control windows use the same titlebar and frame. */
+html[data-onekvm-skin="classic"] :is(
+  .toolbar-tray.is-centered, .host-theme-menu, .host-menu, .host-control-popover,
+  .host-info-popover, .display-fit-select-menu, .toolbar-snap-popover,
+  .control-sheet-card, .host-window-frame:not(.is-minimized)
+) {
+  border: 0;
+  border-radius: 0;
+  background: var(--popover);
+  box-shadow: var(--classic-frame);
+}
+html[data-onekvm-skin="classic"] :is(.host-theme-menu, .host-menu),
+html[data-onekvm-skin="classic"] .host-control-popover.n-popover:not(.n-popover--raw) {
+  padding: 3px;
+}
+html[data-onekvm-skin="classic"] :is(.host-theme-menu, .host-menu) .n-dropdown-option-body,
+html[data-onekvm-skin="classic"] :is(.host-theme-menu, .host-menu) .n-dropdown-option-body::before {
+  border-radius: 0;
+  transition: none;
+}
+/* Match Naive's pending/disabled selector depth so its pseudo-element and
+   explicit label/suffix colors cannot cover the classic highlight. */
+html[data-onekvm-skin="classic"] .n-dropdown-menu:is(.host-theme-menu, .host-menu) .n-dropdown-option-body.n-dropdown-option-body--pending:not(.n-dropdown-option-body--disabled) {
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+html[data-onekvm-skin="classic"] .n-dropdown-menu:is(.host-theme-menu, .host-menu) .n-dropdown-option-body.n-dropdown-option-body--pending:not(.n-dropdown-option-body--disabled)::before {
+  background: var(--primary);
+}
+html[data-onekvm-skin="classic"] .host-window-titlebar {
+  height: auto;
+  min-height: 20px;
+  line-height: 1;
+  text-shadow: none;
+}
+html[data-onekvm-skin="classic"] .host-window-titlebar :is(strong, .console-floating-title) {
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+html[data-onekvm-skin="classic"] .tool-window:not(.active) .host-window-titlebar {
+  color: var(--primary-foreground);
+  background: var(--onekvm-titlebar-inactive);
+}
+html[data-onekvm-skin="classic"] .n-dropdown-menu:is(.host-theme-menu, .host-menu) .n-dropdown-option-body.n-dropdown-option-body--pending:not(.n-dropdown-option-body--disabled) :is(.n-icon, .n-dropdown-option-body__label, .n-dropdown-option-body__suffix) {
+  color: inherit;
+}
+html[data-onekvm-skin="classic"] :is(
+  .toolbar-tray-header, .control-sheet-header,
+  .host-control-popover .control-popover-header,
+  .host-window-titlebar, .host-dialog > .n-card-header
+) {
+  margin: 3px;
+  padding: 3px 2px 3px 3px;
+  border: 0;
+  border-radius: 0;
+  color: var(--primary-foreground);
+  background: var(--onekvm-titlebar-active);
+}
+html[data-onekvm-skin="classic"] :is(
+  .toolbar-tray-header, .control-sheet-header,
+  .host-control-popover .control-popover-header,
+  .host-window-titlebar, .host-dialog > .n-card-header
+) :is(strong, .performance-advanced-toggle, .toolbar-tray-header span) {
+  color: var(--primary-foreground);
+}
+html[data-onekvm-skin="classic"] .toolbar-tray.is-centered .n-button {
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+html[data-onekvm-skin="classic"] .toolbar-tray.is-centered .n-button:is(:hover, :focus-visible),
+html[data-onekvm-skin="classic"] .control-sheet-row:is([aria-current], :hover, :focus-visible) {
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+html[data-onekvm-skin="classic"] .toolbar-tray.is-centered .n-button :is(.toolbar-action-label, .n-button__icon, .n-icon) {
+  color: inherit;
+}
+html[data-onekvm-skin="classic"] .control-sheet-row {
+  border-radius: 0;
+}
+html[data-onekvm-skin="classic"] .control-sheet-title {
+  font-size: 14px;
+}
+html[data-onekvm-skin="classic"] .host-window-actions > button {
+  flex: 0 0 auto;
+  height: 20px;
+}
+html[data-onekvm-skin="classic"] .host-window-actions > button[aria-label],
+html[data-onekvm-skin="classic"] .host-dialog > .n-card-header button,
+html[data-onekvm-skin="classic"] .host-window-titlebar > button {
+  display: grid;
+  flex: 0 0 auto;
+  width: 16px;
+  min-width: 16px;
+  height: 14px;
+  min-height: 14px;
+  padding: 0;
+  place-items: center;
+}
+html[data-onekvm-skin="classic"] .host-window-actions {
+  gap: 0;
+}
+html[data-onekvm-skin="classic"] .keyboard-title-actions {
+  gap: 4px;
+}
+html[data-onekvm-skin="classic"] .host-window-actions > button:last-child {
+  margin-left: 2px;
+}
+html[data-onekvm-skin="classic"] .host-window-actions > button .n-button__icon {
+  width: 16px;
+  height: 14px;
+  font-size: 16px;
+}
+html[data-onekvm-skin="classic"] .host-window-actions > button[aria-label] svg,
+html[data-onekvm-skin="classic"] .host-window-titlebar > button svg,
+html[data-onekvm-skin="classic"] .host-dialog > .n-card-header button svg {
+  width: 16px;
+  height: 16px;
+}
+html[data-onekvm-skin="classic"] .host-dialog > .n-card-header {
+  min-height: 20px;
+  font-size: 12px;
+  line-height: 1;
+}
+html[data-onekvm-skin="classic"] .host-dialog > .n-card-header .n-card-header__main {
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+html[data-onekvm-skin="classic"] .host-dialog > .n-card-header .n-base-close > .n-base-icon {
+  visibility: hidden;
+}
+html[data-onekvm-skin="classic"] .host-dialog > .n-card-header .n-base-close::after {
+  position: absolute;
+  top: calc(50% - 8px);
+  left: calc(50% - 8px);
+  width: 16px;
+  height: 16px;
+  background: url('/icons/win98/16/actions-window-close.png') center / 16px 16px no-repeat;
+  content: '';
+  pointer-events: none;
+}
+html[data-onekvm-skin="classic"] .host-window-actions > button:active:not(:disabled) :is(.n-button__content, .n-button__icon),
+html[data-onekvm-skin="classic"] .trackpad-overlay-actions > button:active:not(:disabled) > svg {
+  transform: translate(1px, 1px);
+}
+html[data-onekvm-skin="classic"] .host-window-titlebar > .xp-title-minimize {
+  background-image: none;
+  transform: none;
+}
+html[data-onekvm-skin="classic"] .host-window-titlebar > .xp-title-minimize::before {
+  inset: auto auto 3px calc(50% - 3px);
+  width: 6px;
+  height: 2px;
+  border-radius: 0;
+  background: currentColor;
+  opacity: 1;
+  transition: none;
+}
+html[data-onekvm-skin="classic"] .host-window-titlebar > .xp-title-minimize::after {
+  content: none;
+}
+html[data-onekvm-skin="classic"] .xp-upload-body {
+  border-color: var(--card);
+  background: var(--card);
+}
+html[data-onekvm-skin="classic"] .host-window-titlebar .keyboard-mode-switch .n-radio-button {
+  border-radius: 0;
+  color: var(--foreground);
+  background: var(--card);
+  box-shadow: var(--classic-raised);
+}
+html[data-onekvm-skin="classic"] .host-window-titlebar .keyboard-mode-switch .n-radio-button--checked {
+  box-shadow: var(--classic-sunken);
+}
+html[data-onekvm-skin="classic"] .host-window-titlebar .n-switch :is(.n-switch__rail, .n-switch__button) {
+  border-radius: 0;
+}
+html[data-onekvm-skin="classic"] .host-window-titlebar .n-switch__rail {
+  box-shadow: var(--classic-sunken);
+}
+html[data-onekvm-skin="classic"] .video-performance-overlay.is-mobile-sheet .host-window-titlebar .performance-advanced-toggle {
+  border-radius: 0;
+  color: var(--primary-foreground);
+  background: transparent;
+}
+
+/* Control popovers own their chrome, including menus teleported outside the panel. */
+html[data-onekvm-skin="classic"] .host-control-popover .control-popover-header {
+  min-height: 22px;
+  line-height: 1;
+}
+html[data-onekvm-skin="classic"] .host-control-popover .control-popover-heading {
+  gap: 6px;
+}
+html[data-onekvm-skin="classic"] .host-control-popover .control-popover-heading-icon {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 0;
+  color: inherit;
+  background: transparent;
+}
+html[data-onekvm-skin="classic"] .host-control-popover .control-popover-heading-text {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+}
+html[data-onekvm-skin="classic"] .host-control-popover .control-popover-heading-text small {
+  color: inherit;
+  font-size: 11px;
+}
+html[data-onekvm-skin="classic"] .host-control-popover :is(.display-status-popover, .keyboard-control-panel, .power-control-panel) > :not(.control-popover-header) {
+  margin-right: 8px;
+  margin-left: 8px;
+}
+html[data-onekvm-skin="classic"] .host-control-popover .display-settings-group {
+  margin-top: 8px;
+  padding: 7px;
+  border: 1px solid var(--border);
+  box-shadow: inset 1px 1px 0 var(--primary-foreground);
+}
+html[data-onekvm-skin="classic"] .host-control-popover :is(.n-button, .n-base-selection, .n-input),
+html[data-onekvm-skin="classic"] .control-sheet-card .n-button {
+  border-radius: 0;
+}
+html[data-onekvm-skin="classic"] .host-control-popover .n-button,
+html[data-onekvm-skin="classic"] .control-sheet-card .n-button {
+  box-shadow: var(--classic-raised);
+}
+html[data-onekvm-skin="classic"] .host-control-popover .n-button:active:not(:disabled),
+html[data-onekvm-skin="classic"] .control-sheet-card .n-button:active:not(:disabled) {
+  box-shadow: var(--classic-sunken);
+}
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card) .n-switch :is(.n-switch__rail, .n-switch__button) {
+  border-radius: 0;
+}
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card) .keyboard-lock-indicator {
+  border: 0;
+  border-radius: 0;
+  background: var(--card);
+  box-shadow: var(--classic-sunken);
+}
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card) .keyboard-lock-indicator i {
+  border-radius: 0;
+  box-shadow: none;
+}
+html[data-onekvm-skin="classic"] .host-control-popover .n-menu-item-content {
+  border-radius: 0;
+}
+html[data-onekvm-skin="classic"] .host-control-popover .n-menu-item-content:not(.n-menu-item-content--disabled):hover {
+  background: var(--primary);
+}
+html[data-onekvm-skin="classic"] .host-control-popover .n-menu-item-content:not(.n-menu-item-content--disabled):hover::before {
+  background: var(--primary);
+}
+html[data-onekvm-skin="classic"] .host-control-popover .n-menu-item-content:not(.n-menu-item-content--disabled):hover :is(.n-menu-item-content-header, .n-menu-item-content__icon) {
+  color: var(--primary-foreground);
+}
+html[data-onekvm-skin="classic"] .display-fit-select-menu .n-base-select-option {
+  border-radius: 0;
+  transition: none;
+}
+html[data-onekvm-skin="classic"] .display-fit-select-menu :is(.n-base-select-option--pending, .n-base-select-option--selected) {
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+html[data-onekvm-skin="classic"] .display-fit-select-menu :is(.n-base-select-option--pending, .n-base-select-option--selected)::before {
+  border-radius: 0;
+  background: var(--primary);
+}
+html[data-onekvm-skin="classic"] .display-fit-select-menu :is(.n-base-select-option--pending, .n-base-select-option--selected) .n-base-select-option__check {
+  color: inherit;
+}
+
+/* The narrow-screen settings index is host navigation, too. Keep touch sizes. */
+html[data-onekvm-skin="classic"] .settings-app-group-card {
+  padding: 3px;
+  border: 0;
+  border-radius: 0;
+  background: var(--input);
+  box-shadow: var(--classic-sunken);
+}
+html[data-onekvm-skin="classic"] .settings-app-large-title {
+  font-size: 24px;
+  letter-spacing: 0;
+}
+html[data-onekvm-skin="classic"] .settings-app-list .settings-app-icon {
+  border-radius: 0;
+  color: var(--foreground);
+  background: var(--card);
+  box-shadow: var(--classic-raised);
+}
+html[data-onekvm-skin="classic"] .settings-app-row {
+  gap: 10px;
+  border-bottom: 0;
+}
+html[data-onekvm-skin="classic"] .settings-app-row:is(:hover, :focus-visible) {
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+html[data-onekvm-skin="classic"] .settings-app-row:is(:hover, :focus-visible) .settings-app-chevron {
+  color: inherit;
+}
+html[data-onekvm-skin="classic"] :is(.advanced-settings-sidebar nav, .advanced-settings-main, .toolbar-tray.is-centered, .control-sheet-body) {
+  scrollbar-width: auto;
+}
+html[data-onekvm-skin="classic"] :is(.advanced-settings-sidebar nav, .advanced-settings-main, .toolbar-tray.is-centered, .control-sheet-body)::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+}
+html[data-onekvm-skin="classic"] :is(.advanced-settings-sidebar nav, .advanced-settings-main, .toolbar-tray.is-centered, .control-sheet-body)::-webkit-scrollbar-track {
+  background: var(--onekvm-surface-inset);
+}
+html[data-onekvm-skin="classic"] :is(.advanced-settings-sidebar nav, .advanced-settings-main, .toolbar-tray.is-centered, .control-sheet-body)::-webkit-scrollbar-thumb {
+  background: var(--card);
+  box-shadow: var(--classic-raised);
+}
+@media (pointer: coarse), (max-width: 760px), (max-height: 500px) and (max-width: 1100px) {
+  html[data-onekvm-skin="classic"] .host-window-actions > button[aria-label],
+  html[data-onekvm-skin="classic"] .host-window-titlebar > button,
+  html[data-onekvm-skin="classic"] .host-dialog > .n-card-header button,
+  html[data-onekvm-skin="classic"] .control-sheet-close {
+    flex: 0 0 auto;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+  html[data-onekvm-skin="classic"] .keyboard-title-actions > button {
+    height: 44px;
+  }
+  html[data-onekvm-skin="classic"] .host-window-titlebar .keyboard-mode-switch .n-radio-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  html[data-onekvm-skin="classic"] .keyboard-panel-mobile .host-window-titlebar {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+}
+
+/* Virtual-media choices are host controls. */
+html[data-onekvm-skin="classic"] .virtual-media-dialog .media-mode-panel {
+  border: 0;
+  border-radius: 0;
+  background: var(--card);
+}
+html[data-onekvm-skin="classic"] .virtual-media-dialog .virtual-media-home-card {
+  border: 0;
+  border-radius: 0;
+  color: var(--foreground);
+  background: var(--card);
+  box-shadow: var(--classic-raised);
+  font-family: var(--classic-font);
+}
+html[data-onekvm-skin="classic"] .virtual-media-dialog .virtual-media-home-card:hover {
+  background: var(--onekvm-surface-raised);
+}
+html[data-onekvm-skin="classic"] .virtual-media-dialog .virtual-media-home-card:focus-visible {
+  outline: 1px dotted var(--foreground);
+  outline-offset: -6px;
+}
+html[data-onekvm-skin="classic"] .virtual-media-dialog .virtual-media-home-card:active {
+  box-shadow: var(--classic-sunken);
+}

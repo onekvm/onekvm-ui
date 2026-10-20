@@ -1,0 +1,67 @@
+/* Opt-in host tabs leave embedded plugin interfaces untouched. */
+html[data-onekvm-skin="classic"] .host-tabs > .n-tabs-nav {
+  padding-top: 3px;
+  font-family: var(--classic-font);
+}
+html[data-onekvm-skin="classic"] .host-tabs > .n-tabs-nav :is(.n-tabs-bar, .n-tabs-tab-pad) {
+  display: none;
+}
+html[data-onekvm-skin="classic"] .host-tabs > .n-tabs-nav .n-tabs-nav-scroll-content {
+  border: 0;
+  box-shadow: inset 0 -1px 0 var(--primary-foreground);
+}
+html[data-onekvm-skin="classic"] .host-tabs > .n-tabs-nav .n-tabs-wrapper {
+  align-items: flex-end;
+  gap: 2px;
+  padding: 0 3px;
+}
+html[data-onekvm-skin="classic"] .host-tabs > .n-tabs-nav .n-tabs-tab {
+  min-height: 28px;
+  padding: 4px 10px;
+  margin-bottom: 1px;
+  border: 1px solid;
+  border-color: var(--primary-foreground) var(--foreground) var(--border) var(--primary-foreground);
+  border-radius: 3px 3px 0 0;
+  color: var(--foreground);
+  background: var(--card);
+  box-shadow: inset -1px 0 0 var(--border);
+  font-size: 12px;
+  font-weight: 400;
+  transition: none;
+}
+html[data-onekvm-skin="classic"] .host-tabs > .n-tabs-nav .n-tabs-tab--active {
+  min-height: 31px;
+  margin-bottom: 0;
+  border-bottom-color: var(--card);
+}
+html[data-onekvm-skin="classic"] .host-tabs > .n-tabs-nav .n-tabs-tab:hover:not(.n-tabs-tab--disabled) {
+  color: var(--foreground);
+  background: var(--onekvm-surface-raised);
+}
+html[data-onekvm-skin="classic"] .host-tabs > .n-tabs-nav .n-tabs-tab--active:hover {
+  background: var(--card);
+}
+html[data-onekvm-skin="classic"] .host-tabs > .n-tabs-nav .n-tabs-tab:focus-visible {
+  outline: 1px dotted var(--foreground);
+  outline-offset: -5px;
+}
+html[data-onekvm-skin="classic"] .host-tabs > .n-tabs-nav .n-tabs-tab--disabled {
+  color: var(--muted-foreground);
+  text-shadow: 1px 1px var(--primary-foreground);
+}
+html[data-onekvm-skin="classic"] .host-tabs > .n-tabs-pane-wrapper {
+  background: var(--card);
+  box-shadow: inset 1px 0 0 var(--primary-foreground),
+    inset -1px -1px 0 var(--foreground), inset -2px -2px 0 var(--border);
+}
+html[data-onekvm-skin="classic"] .host-tabs > .n-tabs-pane-wrapper > .n-tab-pane {
+  padding: 12px;
+}
+@media (pointer: coarse), (max-width: 760px) {
+  html[data-onekvm-skin="classic"] .host-tabs > .n-tabs-nav .n-tabs-tab {
+    min-height: 44px;
+  }
+  html[data-onekvm-skin="classic"] .host-tabs > .n-tabs-nav .n-tabs-tab--active {
+    min-height: 47px;
+  }
+}

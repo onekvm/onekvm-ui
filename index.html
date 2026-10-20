@@ -9,6 +9,27 @@
     <meta name="apple-mobile-web-app-title" content="OneKVM" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#061A3A" />
+    <script>
+      (() => {
+        let appearance = 'dark'
+        try {
+          const theme = localStorage.getItem('onekvm-ui-theme') || 'graphite'
+          const preference = localStorage.getItem('onekvm-ui-appearance')
+          if (theme !== 'graphite' && theme !== 'paper') {
+            appearance = 'light'
+          } else if (preference === 'system') {
+            appearance = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+          } else if (preference === 'light' || preference === 'dark') {
+            appearance = preference
+          } else if (theme === 'paper') {
+            appearance = 'light'
+          }
+        } catch {}
+        document.documentElement.dataset.onekvmLoadingAppearance = appearance
+        document.documentElement.style.colorScheme = appearance
+        document.querySelector('meta[name="theme-color"]').content = appearance === 'dark' ? '#090d12' : '#f3f5f8'
+      })()
+    </script>
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
@@ -24,8 +45,8 @@
         z-index: 2147483647;
         display: grid;
         place-items: center;
-        background: #000;
-        color: #edf2f5;
+        background: #f3f5f8;
+        color: #12181f;
         font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         opacity: 1;
         transition: opacity 320ms ease;
@@ -35,28 +56,39 @@
         pointer-events: none;
         opacity: 0;
       }
-      .onekvm-html-loading-content {
+      #onekvm-html-loading .onekvm-html-loading-content {
         display: grid;
         place-items: center;
         gap: 18px;
       }
-      .onekvm-html-loading-brand {
+      #onekvm-html-loading .onekvm-html-loading-brand {
         display: block;
         width: min(210px, 52vw);
         height: auto;
       }
-      .onekvm-html-loading-spinner {
+      #onekvm-html-loading .onekvm-html-loading-brand-inverse { display: none; }
+      html[data-onekvm-loading-appearance="dark"] #onekvm-html-loading {
+        background: #090d12;
+        color: #f4f7fa;
+      }
+      html[data-onekvm-loading-appearance="dark"] #onekvm-html-loading .onekvm-html-loading-brand-primary { display: none; }
+      html[data-onekvm-loading-appearance="dark"] #onekvm-html-loading .onekvm-html-loading-brand-inverse { display: block; }
+      #onekvm-html-loading .onekvm-html-loading-spinner {
         width: 28px;
         height: 28px;
         box-sizing: border-box;
-        border: 3px solid rgb(22 119 255 / 22%);
-        border-top-color: #1677ff;
+        border: 3px solid rgb(37 99 235 / 22%);
+        border-top-color: #2563eb;
         border-radius: 50%;
         animation: onekvm-html-loading-spin .75s linear infinite;
       }
+      html[data-onekvm-loading-appearance="dark"] #onekvm-html-loading .onekvm-html-loading-spinner {
+        border-color: rgb(59 130 246 / 22%);
+        border-top-color: #3b82f6;
+      }
       @keyframes onekvm-html-loading-spin { to { transform: rotate(360deg); } }
       @media (prefers-reduced-motion: reduce) {
-        .onekvm-html-loading-spinner { animation-duration: 1.8s; }
+        #onekvm-html-loading .onekvm-html-loading-spinner { animation-duration: 1.8s; }
         #onekvm-html-loading { transition: none; }
       }
     </style>
@@ -65,7 +97,8 @@
     <div id="app"></div>
     <div id="onekvm-html-loading" role="status" aria-label="Loading OneKVM">
       <div class="onekvm-html-loading-content">
-        <img class="onekvm-html-loading-brand" src="/brand/onekvm-logo-inverse.svg" alt="OneKVM" />
+        <img class="onekvm-html-loading-brand onekvm-html-loading-brand-primary" src="/brand/onekvm-logo-primary.svg" alt="OneKVM" />
+        <img class="onekvm-html-loading-brand onekvm-html-loading-brand-inverse" src="/brand/onekvm-logo-inverse.svg" alt="OneKVM" />
         <div class="onekvm-html-loading-spinner" aria-hidden="true"></div>
       </div>
     </div>

@@ -1,4 +1,6 @@
 import { computed, readonly, shallowRef } from 'vue'
+import { activateIconSet, initializeIconRuntime } from '../icons/runtime.ts'
+import type { OneKVMIconSetDefinition } from '../icons/types.ts'
 
 import { naiveOverridesFor, naiveThemeFor } from './naive'
 import {
@@ -9,6 +11,7 @@ import {
   ONEKVM_THEME_STORAGE_KEY,
   oneKVMThemeCSSVariables,
   paperTheme,
+  win98Theme,
   parseAppearancePreference,
   resolveAppearance,
   resolveThemeDefinition,
@@ -24,6 +27,7 @@ import type {
 } from './types'
 
 interface InitializeThemeOptions {
+  iconSets?: readonly OneKVMIconSetDefinition[]
   themes?: readonly OneKVMThemeDefinition[]
   defaultTheme?: string
 }
@@ -37,6 +41,7 @@ declare global {
 const themes = new Map<string, ResolvedOneKVMTheme>([
   [graphiteTheme.id, graphiteTheme],
   [paperTheme.id, paperTheme],
+  [win98Theme.id, win98Theme],
 ])
 const activeThemeState = shallowRef<ResolvedOneKVMTheme>(graphiteTheme)
 const appearancePreferenceState = shallowRef<OneKVMAppearancePreference>(DEFAULT_APPEARANCE_PREFERENCE)
@@ -91,8 +96,10 @@ function applyTheme(theme: ResolvedOneKVMTheme) {
     root.style.setProperty(variableName, theme.tokens[tokenName as keyof typeof theme.tokens])
   }
   root.dataset.onekvmTheme = theme.id
+  root.dataset.onekvmSkin = theme.skin
   root.dataset.theme = theme.appearance
   root.style.colorScheme = theme.appearance
+  activateIconSet(theme.iconSet)
 
   const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
   themeColor?.setAttribute('content', theme.tokens.background)
@@ -162,6 +169,7 @@ export function useOneKVMTheme() {
 
 export function initializeThemeRuntime(options: InitializeThemeOptions = {}) {
   if (initialized) return
+  initializeIconRuntime(options.iconSets)
   for (const theme of options.themes || []) registerOneKVMTheme(theme)
 
   const fallbackThemeId = options.defaultTheme && themes.has(options.defaultTheme)

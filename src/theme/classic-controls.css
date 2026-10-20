@@ -1,0 +1,192 @@
+/* Host controls follow the native list-box and checkbox treatment shown by
+   https://jdan.github.io/98.css/. Plugin page contents keep their own layout. */
+
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card, .host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-base-selection {
+  border-radius: 0;
+  font-family: var(--classic-font);
+}
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card, .host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) :is(.n-base-selection-label, .n-base-selection-tags) {
+  border-radius: 0;
+  background: var(--input);
+  box-shadow: var(--classic-sunken);
+  transition: none;
+}
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card, .host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) :is(.n-base-selection__border, .n-base-selection__state-border) {
+  border: 0;
+  box-shadow: none;
+  transition: none;
+}
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card, .host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-base-selection .n-base-suffix {
+  top: 2px;
+  right: 2px;
+  bottom: 2px;
+  width: 18px;
+  height: auto;
+  transform: none;
+  background: var(--card);
+  box-shadow: var(--classic-raised);
+}
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card, .host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-base-suffix__arrow {
+  position: relative;
+  color: var(--foreground);
+}
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card, .host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-base-suffix__arrow > svg {
+  visibility: hidden;
+}
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card, .host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-base-suffix__arrow::after {
+  position: absolute;
+  top: calc(50% - 2px);
+  left: calc(50% - 3px);
+  width: 7px;
+  height: 4px;
+  background: currentColor;
+  clip-path: polygon(0 0, 7px 0, 7px 1px, 6px 1px, 6px 2px, 5px 2px, 5px 3px, 4px 3px, 4px 4px, 3px 4px, 3px 3px, 2px 3px, 2px 2px, 1px 2px, 1px 1px, 0 1px);
+  content: '';
+  pointer-events: none;
+}
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card, .host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-base-selection--active:not(.n-base-selection--disabled) .n-base-suffix {
+  box-shadow: var(--classic-sunken);
+}
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card, .host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-base-selection--focus:not(.n-base-selection--disabled) .n-base-selection-label {
+  outline: 1px dotted var(--primary-foreground);
+  outline-offset: -4px;
+  background: var(--primary);
+}
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card, .host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-base-selection--focus:not(.n-base-selection--disabled) :is(.n-base-selection-input, .n-base-selection-label__render-label, .n-base-selection-overlay, .n-base-selection-placeholder) {
+  color: var(--primary-foreground);
+  caret-color: var(--primary-foreground);
+}
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card, .host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-base-selection--disabled :is(.n-base-selection-label, .n-base-selection-tags) {
+  background: var(--card);
+}
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card, .host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-base-selection--disabled .n-base-suffix__arrow {
+  color: var(--border);
+}
+/* Naive teleports select menus; use the palette for both selected and pending rows. */
+html[data-onekvm-skin="classic"] .n-base-select-menu .n-base-select-option--pending:not(.n-base-select-option--disabled) {
+  color: var(--primary-foreground);
+}
+html[data-onekvm-skin="classic"] .display-fit-select-menu {
+  background: var(--input);
+}
+
+/* 98.css's box indicator: an unfilled inset track and an 11×21 raised thumb. */
+html[data-onekvm-skin="classic"] .usb-audio-slider {
+  padding: 11px 0;
+}
+html[data-onekvm-skin="classic"] .usb-audio-slider.n-slider .n-slider-rail {
+  height: 2px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--foreground);
+  box-shadow: -1px -1px 0 var(--border), 1px 1px 0 var(--primary-foreground);
+  transition: none;
+}
+html[data-onekvm-skin="classic"] .usb-audio-slider.n-slider .n-slider-rail .n-slider-rail__fill {
+  background: transparent;
+  transition: none;
+}
+html[data-onekvm-skin="classic"] .usb-audio-slider .n-slider-handles {
+  right: 6px;
+  left: 6px;
+}
+html[data-onekvm-skin="classic"] .usb-audio-slider.n-slider .n-slider-handle-wrapper {
+  display: grid;
+  min-width: 24px;
+  min-height: 24px;
+  place-items: center;
+}
+html[data-onekvm-skin="classic"] .usb-audio-slider.n-slider .n-slider-handles .n-slider-handle-wrapper .n-slider-handle {
+  width: 11px;
+  height: 21px;
+  border-radius: 0;
+  background: var(--card);
+  box-shadow: var(--classic-raised);
+  transition: none;
+}
+html[data-onekvm-skin="classic"] .usb-audio-slider:has(.n-slider-handle-wrapper:focus-visible) {
+  outline: 1px dotted var(--foreground);
+  outline-offset: 2px;
+}
+html[data-onekvm-skin="classic"] .usb-audio-slider.n-slider:not(.n-slider--disabled):active .n-slider-handles .n-slider-handle-wrapper .n-slider-handle {
+  background: var(--onekvm-surface-raised);
+}
+
+/* Keep NSwitch semantics, keyboard handling, and loading feedback; replace only
+   the sliding rail/thumb with a fixed, inset checkbox and a pixel checkmark. */
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card, .host-window-titlebar, .host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-switch {
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-radius: 0;
+}
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card, .host-window-titlebar, .host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-switch .n-switch__rail {
+  width: 13px;
+  min-width: 13px;
+  height: 13px;
+  border-radius: 0;
+  color: var(--foreground);
+  background: var(--input);
+  box-shadow: var(--classic-sunken);
+  opacity: 1;
+  transition: none;
+}
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card, .host-window-titlebar, .host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-switch .n-switch__button {
+  top: 3px;
+  left: 3px;
+  width: 7px;
+  max-width: 7px;
+  height: 7px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transition: none;
+}
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card, .host-window-titlebar, .host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-switch :is(.n-switch__checked, .n-switch__unchecked, .n-switch__children-placeholder, .n-switch__button-icon) {
+  display: none;
+}
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card, .host-window-titlebar, .host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-switch[aria-checked="true"]:not(.n-switch--loading) .n-switch__rail::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 7px;
+  height: 7px;
+  background: currentColor;
+  clip-path: polygon(0 2px, 1px 2px, 1px 3px, 2px 3px, 2px 4px, 3px 4px, 3px 3px, 4px 3px, 4px 2px, 5px 2px, 5px 1px, 6px 1px, 6px 0, 7px 0, 7px 3px, 6px 3px, 6px 4px, 5px 4px, 5px 5px, 4px 5px, 4px 6px, 3px 6px, 3px 7px, 2px 7px, 2px 6px, 1px 6px, 1px 5px, 0 5px);
+  content: '';
+  pointer-events: none;
+}
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card, .host-window-titlebar, .host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-switch:not(.n-switch--disabled):active .n-switch__rail {
+  background: var(--card);
+}
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card, .host-window-titlebar, .host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-switch--disabled .n-switch__rail {
+  color: var(--border);
+  background: var(--card);
+}
+html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card, .host-window-titlebar, .host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-switch:focus-visible {
+  outline: 1px dotted currentColor;
+  outline-offset: 1px;
+}
+@media (min-width: 761px) and (min-height: 501px) {
+  html[data-onekvm-skin="classic"] .host-window-titlebar .n-switch[role="switch"] {
+    width: 18px;
+    min-width: 18px;
+    height: 18px;
+  }
+}
+@media (pointer: coarse), (max-width: 760px), (max-height: 500px) and (max-width: 1100px) {
+  html[data-onekvm-skin="classic"] .usb-audio-slider {
+    padding: 21px 0;
+  }
+  html[data-onekvm-skin="classic"] .usb-audio-slider.n-slider .n-slider-handle-wrapper {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  html[data-onekvm-skin="classic"] :is(.host-control-popover, .control-sheet-card, .host-window-titlebar, .host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-switch {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
+}

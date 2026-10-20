@@ -55,10 +55,16 @@ import { lockMobileViewport } from './lib/mobile-viewport'
 import { uiProduct } from './product'
 import { initializeThemeRuntime } from './theme/runtime'
 import './style.css'
+import './theme/classic.css'
+import './theme/classic-controls.css'
+import './theme/classic-tabs.css'
+import './theme/classic-settings.css'
+import './theme/classic-dialog.css'
 
 lockMobileViewport()
 
 initializeThemeRuntime({
+  iconSets: uiProduct.iconSets,
   themes: uiProduct.themes,
   defaultTheme: uiProduct.defaultTheme,
 })

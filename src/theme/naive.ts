@@ -190,6 +190,17 @@ export function naiveOverridesFor(theme: ResolvedOneKVMTheme): GlobalThemeOverri
     Select: {
       menuBoxShadow: token.shadowPopover,
     },
+    ...(theme.skin === 'classic' ? {
+      InternalSelectMenu: {
+        color: token.input,
+        optionTextColor: token.foreground,
+        optionTextColorActive: token.primaryForeground,
+        optionCheckColor: token.primaryForeground,
+        optionColorActive: token.primary,
+        optionColorPending: token.primary,
+        optionColorActivePending: token.primary,
+      },
+    } : {}),
     InternalSelection: {
       borderRadius: token.radius,
       color: token.input,

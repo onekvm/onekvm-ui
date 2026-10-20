@@ -1,0 +1,148 @@
+/* Settings and plugin management belong to the host. Embedded plugin pages
+   keep their own structure and do not match this scope. */
+html[data-onekvm-skin="classic"] :is(.host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) {
+  font-family: var(--classic-font);
+}
+html[data-onekvm-skin="classic"] :is(.host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-button {
+  border: 0;
+  border-radius: 0;
+  color: var(--foreground);
+  background: var(--card);
+  box-shadow: var(--classic-raised);
+  transition: none;
+}
+html[data-onekvm-skin="classic"] :is(.host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-button :is(.n-button__border, .n-button__state-border) {
+  border: 0;
+  box-shadow: none;
+}
+html[data-onekvm-skin="classic"] :is(.host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-button:not(.n-button--disabled):active {
+  box-shadow: var(--classic-sunken);
+}
+html[data-onekvm-skin="classic"] :is(.host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-button:not(.n-button--disabled):active :is(.n-button__content, .n-button__icon) {
+  transform: translate(1px, 1px);
+}
+html[data-onekvm-skin="classic"] :is(.host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-button:focus-visible {
+  outline: 1px dotted var(--foreground);
+  outline-offset: -4px;
+}
+html[data-onekvm-skin="classic"] :is(.host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-tag {
+  border: 0;
+  border-radius: 0;
+  background: var(--card);
+  box-shadow: inset 1px 1px 0 var(--border), inset -1px -1px 0 var(--primary-foreground);
+}
+html[data-onekvm-skin="classic"] :is(.host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-tag__border {
+  border: 0;
+}
+html[data-onekvm-skin="classic"] :is(.host-dialog, .advanced-settings-view:not(:has(.plugin-page-section))) .n-progress.n-progress--line :is(.n-progress-graph-line-rail, .n-progress-graph-line-fill) {
+  /* Naive derives this radius from the stroke width and writes it inline. */
+  border-radius: 0 !important;
+}
+html[data-onekvm-skin="classic"] :is(.host-dialog, .advanced-settings-view:not(:has(.plugin-page-section))) .n-progress.n-progress--line .n-progress-graph-line-rail {
+  background: var(--input);
+  box-shadow: var(--classic-sunken);
+}
+html[data-onekvm-skin="classic"] :is(.host-dialog, .advanced-settings-view:not(:has(.plugin-page-section))) .n-progress.n-progress--line .n-progress-graph-line-fill {
+  background: var(--primary);
+}
+html[data-onekvm-skin="classic"] :is(.service-icon, .extension-icon) {
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+html[data-onekvm-skin="classic"] .service-state i {
+  border-radius: 0;
+  box-shadow: none;
+}
+html[data-onekvm-skin="classic"] :is(.extension-manager .extension-list, .services-group) {
+  border-radius: 0;
+  box-shadow: inset 1px 1px 0 var(--primary-foreground);
+}
+
+/* Plugin details are a classic dialog, including host-rendered metadata and
+   capabilities. The plugin's own page is not contained by this dialog. */
+html[data-onekvm-skin="classic"] .plugin-details-card > .n-card-content {
+  padding: 12px;
+}
+html[data-onekvm-skin="classic"] .plugin-details-card > .n-card__footer {
+  padding: 0 12px 12px;
+}
+html[data-onekvm-skin="classic"] .plugin-details-body {
+  gap: 16px;
+}
+html[data-onekvm-skin="classic"] .plugin-details-icon {
+  border-radius: 0;
+  color: var(--foreground);
+  background: transparent;
+}
+html[data-onekvm-skin="classic"] .plugin-details-card :is(.plugin-details-metadata, .icon-description-list, .plugin-declaration-values li) {
+  border-radius: 0;
+  background: var(--card);
+  box-shadow: inset 1px 1px 0 var(--primary-foreground);
+}
+html[data-onekvm-skin="classic"] .plugin-details-metadata a {
+  color: var(--primary);
+  text-decoration: underline;
+}
+html[data-onekvm-skin="classic"] .plugin-details-section-title {
+  font-weight: 700;
+}
+html[data-onekvm-skin="classic"] .plugin-installer-card :is(.installer-hero-icon, .installer-package-icon, .plugin-drop-zone, .package-metadata, .bundle-contents, .installer-indeterminate) {
+  border-radius: 0;
+}
+
+/* Service configuration is a host drawer with the same caption controls. */
+html[data-onekvm-skin="classic"] .service-settings-drawer.n-drawer {
+  background: var(--card);
+  box-shadow: var(--classic-frame);
+}
+html[data-onekvm-skin="classic"] .service-settings-drawer .n-drawer-header {
+  margin: 3px;
+  padding: 3px 2px 3px 3px;
+  border: 0;
+  color: var(--primary-foreground);
+  font-family: var(--classic-font);
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--onekvm-titlebar-active);
+}
+html[data-onekvm-skin="classic"] .service-settings-drawer .n-drawer-header .n-base-close {
+  width: 16px;
+  height: 14px;
+  border-radius: 0;
+  background: var(--card);
+  box-shadow: var(--classic-raised);
+}
+html[data-onekvm-skin="classic"] .service-settings-drawer .n-drawer-header .n-base-close:active {
+  box-shadow: var(--classic-sunken);
+}
+html[data-onekvm-skin="classic"] .service-settings-drawer .n-drawer-header .n-base-close > .n-base-icon {
+  visibility: hidden;
+}
+html[data-onekvm-skin="classic"] .service-settings-drawer .n-drawer-header .n-base-close::after {
+  position: absolute;
+  inset: 0;
+  background: url('/icons/win98/16/actions-window-close.png') center / 16px 16px no-repeat;
+  content: '';
+  pointer-events: none;
+}
+@media (pointer: coarse), (max-width: 760px), (max-height: 500px) and (max-width: 1100px) {
+  html[data-onekvm-skin="classic"] :is(.host-dialog, .service-settings-drawer, .advanced-settings-view:not(:has(.plugin-page-section))) .n-button {
+    min-height: 44px;
+  }
+  html[data-onekvm-skin="classic"] .services-page .service-actions .n-button {
+    min-width: 44px;
+  }
+  html[data-onekvm-skin="classic"] .services-page .service-actions {
+    min-width: 136px;
+  }
+  html[data-onekvm-skin="classic"] .services-page .service-action-trigger {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+  }
+  html[data-onekvm-skin="classic"] .service-settings-drawer .n-drawer-header .n-base-close {
+    width: 44px;
+    height: 44px;
+  }
+}

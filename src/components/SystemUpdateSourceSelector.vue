@@ -3,6 +3,7 @@ import { computed, shallowRef } from 'vue'
 import { FileUp, FolderOpen } from '@/icons'
 import { type SystemUpdateLocalFile, type SystemUpdateSource } from '@/api/client'
 import { t } from '@/i18n/runtime'
+import SystemUpdateFilePicker from './SystemUpdateFilePicker.vue'
 
 export type UpdateMethod = 'github' | 'http' | 'tftp' | 'nfs' | 'local' | 'upload'
 
@@ -18,10 +19,8 @@ const tftpPort = shallowRef<number | null>(69)
 const nfsServer = shallowRef('')
 const nfsExport = shallowRef('')
 const nfsPath = shallowRef('')
-const localPath = shallowRef<string | null>(null)
-const localFiles = shallowRef<SystemUpdateLocalFile[]>([])
-const localLoading = shallowRef(false)
-const localError = shallowRef('')
+const localFile = shallowRef<SystemUpdateLocalFile | null>(null)
+const localPickerOpen = shallowRef(false)
 
 const methods = computed(() => [
   { value: 'github', label: t('settings.advancedSettings.systemPage.sourceGithub', 'GitHub 在线升级') },
@@ -31,11 +30,6 @@ const methods = computed(() => [
   { value: 'local', label: t('settings.advancedSettings.systemPage.sourceLocal', '本地文件') },
   { value: 'upload', label: t('settings.advancedSettings.systemPage.sourceUpload', '上传文件') },
 ] as const)
-
-const localOptions = computed(() => localFiles.value.map(file => ({
-  label: `${file.name} · ${(file.size / 1048576).toFixed(1)} MiB`,
-  value: file.path,
-})))
 
 const request = computed<SystemUpdateSource | null>(() => {
   if (method.value === 'http') {
@@ -56,25 +50,9 @@ const request = computed<SystemUpdateSource | null>(() => {
     if (!server || !exportPath.startsWith('/') || !path.endsWith('.fwup')) return null
     return { source: 'nfs', server, export: exportPath, path }
   }
-  if (method.value === 'local' && localPath.value) return { source: 'local', path: localPath.value }
+  if (method.value === 'local' && localFile.value) return { source: 'local', path: localFile.value.path }
   return null
 })
-
-async function loadLocalFiles() {
-  localLoading.value = true
-  localError.value = ''
-  try {
-    localFiles.value = (await api.getSystemUpdateFiles()).files
-    if (!localFiles.value.some(file => file.path === localPath.value)) localPath.value = null
-  } catch (error) {
-    localFiles.value = []
-    localError.value = error instanceof Error ? error.message : String(error)
-  } finally {
-    localLoading.value = false
-  }
-}
-
-watch(method, value => { if (value === 'local') void loadLocalFiles() }, { immediate: true })
 
 function install() {
   if (request.value) emit('install', request.value)
@@ -91,6 +69,8 @@ function install() {
     </div>
     <div class="update-source-detail">
       <slot name="error" />
+      <Transition name="update-source" mode="out-in">
+      <div :key="method" class="update-source-pane">
       <slot v-if="method === 'github'" name="github" />
       <slot v-else-if="method === 'upload'" name="upload" />
 
@@ -114,19 +94,30 @@ function install() {
       <label for="system-update-nfs-path">{{ t('settings.advancedSettings.systemPage.remoteFile', '远程文件') }}</label>
       <n-input id="system-update-nfs-path" v-model:value="nfsPath" placeholder="update.fwup" :disabled="disabled" />
     </div>
-    <div v-else-if="method === 'local'" class="update-source-form">
-      <label>{{ t('settings.advancedSettings.systemPage.localBundle', '/mnt/storage 中的升级包') }}</label>
-      <div class="update-local-picker">
-        <n-select v-model:value="localPath" :options="localOptions" :loading="localLoading" :disabled="disabled" :placeholder="t('settings.advancedSettings.systemPage.selectLocalBundle', '选择 .fwup 文件')" filterable />
-        <n-button secondary :loading="localLoading" :disabled="disabled" @click="loadLocalFiles">{{ t('common.refresh', '刷新') }}</n-button>
+    <div v-else-if="method === 'local'" class="system-update-upload update-local-picker" :class="{ selected: localFile }">
+      <div class="system-update-file-icon">
+        <FileUp :size="20" aria-hidden="true" />
       </div>
-      <n-alert v-if="localError" type="error" :bordered="false">{{ localError }}</n-alert>
-      <span v-else-if="!localLoading && localFiles.length === 0" class="update-source-hint">{{ t('settings.advancedSettings.systemPage.noLocalBundles', '/mnt/storage 中没有 .fwup 升级包') }}</span>
+      <div class="system-update-file" :title="localFile?.path">
+        <strong>{{ localFile?.name || t('settings.advancedSettings.systemPage.noBundleSelected', '未选择升级包') }}</strong>
+        <span v-if="localFile">{{ localFile.path }}</span>
+        <span v-else>/mnt/storage · .fwup</span>
+      </div>
+      <div class="system-update-actions">
+        <n-button secondary :disabled="disabled" @click="localPickerOpen = true">
+          <template #icon><FolderOpen /></template>
+          {{ localFile ? t('settings.advancedSettings.systemPage.replaceBundle', '更换') : t('settings.advancedSettings.systemPage.selectBundle', '选择升级包') }}
+        </n-button>
+        <n-button type="primary" :disabled="disabled || !request" @click="install">{{ t('settings.advancedSettings.systemPage.install', '安装') }}</n-button>
+      </div>
     </div>
-    <div v-if="method !== 'github' && method !== 'upload'" class="update-source-actions">
+    <div v-if="method !== 'github' && method !== 'upload' && method !== 'local'" class="update-source-actions">
       <n-button type="primary" :disabled="disabled || !request" @click="install">{{ t('settings.advancedSettings.systemPage.install', '安装') }}</n-button>
     </div>
+      </div>
+      </Transition>
     </div>
+    <SystemUpdateFilePicker v-model:show="localPickerOpen" :selected="localFile" :disabled="disabled" @select="localFile = $event" />
   </div>
 </template>
 
@@ -139,11 +130,14 @@ function install() {
 .update-source-radios :deep(.n-radio:hover), .update-source-radios :deep(.n-radio--checked) { background: color-mix(in srgb, var(--primary) 8%, var(--card)); }
 .update-source-radios :deep(.n-radio:not(.n-radio--disabled) .n-radio__dot) { background: #fff; }
 .update-source-detail { display: grid; align-content: start; gap: 16px; min-width: 0; padding: 20px 22px; }
+.update-source-pane { display: grid; align-content: start; gap: 16px; min-width: 0; }
+.update-source-enter-active { transition: opacity 160ms var(--win11-ease-out), transform 160ms var(--win11-ease-out); }
+.update-source-leave-active { transition: opacity 90ms ease-out, transform 90ms ease-out; pointer-events: none; }
+.update-source-enter-from { opacity: 0; transform: translateY(6px); }
+.update-source-leave-to { opacity: 0; transform: translateY(-4px); }
 .update-source-form { display: grid; grid-template-columns: minmax(100px, 150px) minmax(0, 1fr); gap: 12px; align-items: center; }
 .update-source-form label { color: var(--muted-foreground); font-size: 12px; }
-.update-local-picker { display: flex; gap: 8px; min-width: 0; }
-.update-local-picker :deep(.n-select) { min-width: 0; flex: 1; }
-.update-source-hint { color: var(--muted-foreground); font-size: 12px; }
+.update-local-picker { min-width: 0; }
 .update-source-actions { display: flex; justify-content: flex-start; }
 @media (max-width: 680px) {
   .update-sources { grid-template-columns: minmax(0, 1fr); }
@@ -151,5 +145,9 @@ function install() {
   .update-source-radios { grid-template-columns: minmax(0, 1fr); }
   .update-source-detail { padding: 16px; }
   .update-source-form { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .update-source-enter-active, .update-source-leave-active { transition: opacity 100ms ease-out; }
+  .update-source-enter-from, .update-source-leave-to { transform: none; }
 }
 </style>

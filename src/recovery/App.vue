@@ -504,9 +504,8 @@ h1 {
 }
 
 .addrs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .2rem .7rem;
+  display: grid;
+  gap: .25rem;
   margin: .28rem 0 0;
   padding: 0;
   list-style: none;
@@ -517,6 +516,7 @@ h1 {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: .82rem;
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .card {
@@ -585,8 +585,8 @@ h2 {
   list-style: none;
 }
 
-.info-list li,
-.action-list li {
+.info-list > li,
+.action-list > li {
   display: grid;
   gap: .85rem 1rem;
   align-items: center;
@@ -594,17 +594,17 @@ h2 {
   border-top: 1px solid var(--rec-border);
 }
 
-.info-list li { grid-template-columns: auto minmax(0, 1fr); }
-.action-list li { grid-template-columns: auto minmax(0, 1fr) auto; }
+.info-list > li { grid-template-columns: auto minmax(0, 1fr); }
+.action-list > li { grid-template-columns: auto minmax(0, 1fr) auto; }
 
-.info-list li:first-child,
-.action-list li:first-child {
+.info-list > li:first-child,
+.action-list > li:first-child {
   padding-top: 0;
   border-top: 0;
 }
 
-.info-list li:last-child,
-.action-list li:last-child { padding-bottom: 0; }
+.info-list > li:last-child,
+.action-list > li:last-child { padding-bottom: 0; }
 
 .row-icon {
   flex: 0 0 auto;
@@ -713,7 +713,7 @@ button:disabled {
   .recovery-head { flex-direction: column; align-items: stretch; }
   .controls { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
   .field select { min-width: 0; width: 100%; }
-  .action-list li { grid-template-columns: auto minmax(0, 1fr); }
+  .action-list > li { grid-template-columns: auto minmax(0, 1fr); }
   .action-list button { grid-column: 2; justify-self: start; }
 }
 </style>

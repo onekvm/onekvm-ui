@@ -85,7 +85,7 @@ export function recoveryStorageLabel(type: string, bytes: number) {
 }
 
 export async function loadRecoveryStatus(): Promise<RecoveryStatus> {
-  const response = await fetch('/status')
+  const response = await fetch('/status', { signal: AbortSignal.timeout(3000) })
   const text = await response.text()
   if (!response.ok) throw new Error(recoveryErrorMessage(response.status, text))
   return parseRecoveryStatus(text)

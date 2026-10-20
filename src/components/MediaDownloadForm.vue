@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { computed, shallowRef, watch } from 'vue'
+import { useMessage } from 'naive-ui'
 
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { t } from '@/i18n/runtime'
+import { httpsDownloadURL } from '@/lib/download-url'
 
 const show = defineModel<boolean>('show', { required: true })
 const props = defineProps<{ disabled: boolean }>()
 const emit = defineEmits<{ submit: [request: { url: string; name: string }] }>()
 const overlayTo = useOverlayMount()
+const message = useMessage()
 const url = shallowRef('')
 const name = shallowRef('')
 const suggestedName = computed(() => {
@@ -45,7 +48,13 @@ watch(show, (open) => {
 
 function submit() {
   if (props.disabled || !validURL.value || !validName.value) return
-  emit('submit', { url: url.value.trim(), name: name.value.trim() })
+  const originalURL = url.value.trim()
+  const secureURL = httpsDownloadURL(originalURL)
+  if (secureURL !== originalURL) {
+    url.value = secureURL
+    message.warning(t('virtualMedia.downloadURLUpgraded', 'The HTTP download link was changed to HTTPS before starting the download.'), { duration: 7000 })
+  }
+  emit('submit', { url: secureURL, name: name.value.trim() })
   show.value = false
 }
 </script>

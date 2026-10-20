@@ -14,7 +14,7 @@ const state = reactive<AuthStatus & { loading: boolean }>({
   mfa_required: false,
   pending_token: '',
   factors: [],
-  mfa: { totp: false, passkeys: [], backup_codes: 0, plugins: [] },
+  mfa: { totp: false, backup_codes: 0, plugins: [] },
   loading: true,
 })
 
@@ -29,7 +29,7 @@ function assign(status: AuthStatus) {
   state.mfa_required = false
   state.pending_token = ''
   state.factors = []
-  const mfa = status.mfa ?? { totp: false, passkeys: [], backup_codes: 0, plugins: [] }
+  const mfa = status.mfa ?? { totp: false, backup_codes: 0, plugins: [] }
   Object.assign(state, status, { loading: false, mfa })
 }
 
@@ -87,7 +87,7 @@ async function cancelMfa(pendingToken?: string) {
   state.mfa_required = false
   state.pending_token = ''
   state.factors = []
-  state.mfa = { totp: false, passkeys: [], backup_codes: 0, plugins: [] }
+  state.mfa = { totp: false, backup_codes: 0, plugins: [] }
 }
 
 async function setup(
@@ -116,7 +116,7 @@ async function logout() {
   state.mfa_required = false
   state.pending_token = ''
   state.factors = []
-  state.mfa = { totp: false, passkeys: [], backup_codes: 0, plugins: [] }
+  state.mfa = { totp: false, backup_codes: 0, plugins: [] }
 }
 
 export function useAuth() {
@@ -134,7 +134,7 @@ export function useAuth() {
       state.mfa_required = false
       state.pending_token = ''
       state.factors = []
-      state.mfa = { totp: false, passkeys: [], backup_codes: 0, plugins: [] }
+      state.mfa = { totp: false, backup_codes: 0, plugins: [] }
       state.loading = false
     })
     void refresh()

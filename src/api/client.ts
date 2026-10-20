@@ -635,7 +635,7 @@ export interface AuthStatus {
 }
 
 export interface AuthFactor {
-  type: 'totp' | 'passkey' | 'backup' | 'plugin'
+  type: 'totp' | 'backup' | 'plugin'
   id?: string
   name?: string
   version?: string
@@ -646,7 +646,6 @@ export interface AuthFactor {
 
 export interface AuthMfaStatus {
   totp: boolean
-  passkeys: Array<{ id: string; label: string }>
   backup_codes: number
   plugins: AuthFactor[]
 }
@@ -1411,22 +1410,6 @@ export const api = {
     request<void>(`/api/auth/mfa/plugin/${encodeURIComponent(id)}`, {
       method: 'DELETE',
       body: JSON.stringify({ current_password: currentPassword }),
-    }),
-  authPasskeyBegin: () => request<unknown>('/api/auth/mfa/passkey/begin', { method: 'POST' }),
-  authPasskeyFinish: (credential: unknown, label?: string) =>
-    request<{ id: string; label: string }>('/api/auth/mfa/passkey/finish', {
-      method: 'POST',
-      body: JSON.stringify({ credential, label: label || '' }),
-    }),
-  authPasskeyDisable: (id: string, currentPassword: string) =>
-    request<void>(`/api/auth/mfa/passkey/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-      body: JSON.stringify({ current_password: currentPassword }),
-    }),
-  authPasskeyLoginBegin: (pendingToken?: string) =>
-    request<unknown>('/api/auth/mfa/passkey/login/begin', {
-      method: 'POST',
-      body: JSON.stringify({ pending_token: pendingToken || '' }),
     }),
   authLogout: () => request<void>('/api/auth/logout', { method: 'POST' }),
   authUpdateAccount: (username: string, currentPassword: string, newPassword: string) =>

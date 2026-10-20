@@ -6,8 +6,6 @@ import { api, type ExtensionSummary } from '@/api/client'
 import { useAuth } from '@/composables/useAuth'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { t } from '@/i18n/runtime'
-import { createPasskey } from '@/lib/webauthn'
-import { isCloudHosted } from '@/api/service-url'
 
 const props = defineProps<{
   show: boolean
@@ -28,7 +26,6 @@ const totpUrl = ref('')
 const totpCode = ref('')
 const recoveryCodes = ref<string[]>([])
 const pluginBusy = ref('')
-const passkeyBusy = ref(false)
 const totpQr = ref<HTMLElement | null>(null)
 const currentPasswordInput = ref<{ focus?: () => void } | null>(null)
 const authPlugins = ref<ExtensionSummary[]>([])
@@ -55,7 +52,6 @@ const passwordMismatch = computed(
   () => account.confirmPassword.length > 0 && account.confirmPassword !== account.newPassword,
 )
 const totpEnabled = computed(() => auth.mfa?.totp === true)
-const passkeys = computed(() => auth.mfa?.passkeys || [])
 const recoveryLeft = computed(() => auth.mfa?.backup_codes || 0)
 
 function requireCurrentPassword() {
@@ -264,35 +260,6 @@ function pluginDisabledMessage(id: string) {
   return t('settings.account.pluginDisabled', 'Hardware confirmation disabled')
 }
 
-async function addPasskey() {
-  passkeyBusy.value = true
-  try {
-    const challenge = await api.authPasskeyBegin()
-    const credential = await createPasskey(challenge)
-    await api.authPasskeyFinish(credential)
-    await refresh()
-    message.success(t('settings.account.passkeyAdded', 'Passkey added'))
-  } catch (reason) {
-    message.error(reason instanceof Error ? reason.message : String(reason))
-  } finally {
-    passkeyBusy.value = false
-  }
-}
-
-async function disablePasskey(id: string) {
-  if (!requireCurrentPassword()) return
-  passkeyBusy.value = true
-  try {
-    await api.authPasskeyDisable(id, account.currentPassword)
-    await refresh()
-    message.success(t('settings.account.passkeyRemoved', 'Passkey removed'))
-  } catch (reason) {
-    message.error(reason instanceof Error ? reason.message : String(reason))
-  } finally {
-    passkeyBusy.value = false
-  }
-}
-
 watch(
   () => props.show,
   (show) => {
@@ -353,7 +320,7 @@ watch(totpUrl, async (url) => {
           <header class="account-section-header">
             <strong>{{ t('settings.account.webAccount', 'Web account') }}</strong>
           </header>
-          <p class="account-section-help">{{ t('settings.account.currentPasswordHint', 'Needed to save the account, and to turn off the authenticator or remove a passkey.') }}</p>
+          <p class="account-section-help">{{ t('settings.account.currentPasswordHint', 'Needed to save the account or turn off the authenticator.') }}</p>
           <n-form label-placement="top" :show-feedback="false" class="account-form">
             <n-form-item :label="t('settings.account.currentPassword', 'Current password')">
               <div id="account-current-password" class="account-password-field">
@@ -449,25 +416,6 @@ watch(totpUrl, async (url) => {
             </ul>
             <n-button size="small" @click="copyRecoveryCodes">{{ t('settings.account.copyRecovery', 'Copy codes') }}</n-button>
           </n-alert>
-        </section>
-
-        <section class="account-section">
-          <header class="account-section-header">
-            <strong>{{ t('settings.account.passkeys', 'Passkeys') }}</strong>
-            <n-button size="small" :loading="passkeyBusy" @click="addPasskey">
-              {{ t('settings.account.addPasskey', 'Add passkey') }}
-            </n-button>
-          </header>
-          <p class="account-section-help">{{ t('auth.passkeyHelp', 'Use a passkey. Open the device over HTTPS using its hostname, not an IP address.') }}</p>
-          <p v-if="!passkeys.length" class="account-empty">{{ t('settings.account.noPasskeys', 'No passkeys yet') }}</p>
-          <div v-else class="account-row-list">
-            <div v-for="key in passkeys" :key="key.id" class="account-row">
-              <span :title="key.label || key.id">{{ key.label || key.id }}</span>
-              <n-button size="small" :loading="passkeyBusy" @click="disablePasskey(key.id)">
-                {{ t('settings.account.removePasskey', 'Remove') }}
-              </n-button>
-            </div>
-          </div>
         </section>
 
         <section v-if="authPlugins.length" class="account-section">

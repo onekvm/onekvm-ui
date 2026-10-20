@@ -11,6 +11,7 @@ export function useVideoFps(
   update: (fps: number) => void,
   updatePresent?: (presentUs: number) => void,
   presentEnabled?: Ref<boolean>,
+  observeFrame?: (metadata: VideoFrameCallbackMetadata) => void,
 ) {
   let callbackId = 0
   let sampleTimer = 0
@@ -29,6 +30,7 @@ export function useVideoFps(
     // presentations since this media source started, not just callbacks.
     presentedFrames = metadata.presentedFrames
     lastFrame = now
+    observeFrame?.(metadata)
     const receive = metadata.receiveTime
     const display = metadata.expectedDisplayTime
     if (presentEnabled && !presentEnabled.value) {

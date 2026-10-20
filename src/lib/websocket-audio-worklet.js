@@ -8,10 +8,19 @@ class PCMPlayback extends AudioWorkletProcessor {
     this.read = 0
     this.queued = 0
     this.started = false
+    this.targetFrames = Math.ceil(sampleRate * 0.02)
+    this.maxQueuedFrames = Math.ceil(sampleRate * 0.08)
     this.reportFrames = 0
     this.dropped = 0
     this.underruns = 0
     this.port.onmessage = ({ data }) => {
+      if (data.type === 'buffering') {
+        // Three 20ms LZ4 packets arrive together. Keep a batch plus jitter
+        // headroom instead of draining to zero before the next network wake.
+        this.targetFrames = Math.ceil(sampleRate * (data.batched ? 0.08 : 0.02))
+        this.maxQueuedFrames = Math.ceil(sampleRate * (data.batched ? 0.14 : 0.08))
+        return
+      }
       if (data.type === 'flush' || data.reset) {
         this.read = 0
         this.queued = 0
@@ -37,8 +46,8 @@ class PCMPlayback extends AudioWorkletProcessor {
         if (this.queued < this.capacity) this.queued++
         else { this.read = (this.read + 1) % this.capacity; this.dropped++ }
       }
-      if (this.queued > sampleRate * 0.08) {
-        const drop = this.queued - Math.ceil(sampleRate * 0.02)
+      if (this.queued > this.maxQueuedFrames) {
+        const drop = this.queued - this.targetFrames
         this.read = (this.read + drop) % this.capacity
         this.queued -= drop
         this.dropped += drop
@@ -48,7 +57,7 @@ class PCMPlayback extends AudioWorkletProcessor {
   process(_inputs, outputs) {
     const output = outputs[0]
     if (!output?.length) return true
-    if (!this.started && this.queued >= sampleRate * 0.02) this.started = true
+    if (!this.started && this.queued >= this.targetFrames) this.started = true
     for (let frame = 0; frame < output[0].length; frame++) {
       if (this.started && this.queued > 0) {
         output[0][frame] = this.left[this.read]

@@ -34,6 +34,9 @@ const staleH265Telemetry = { codec: 'h264', actual_codec: 'h265' }
 assert.equal(connectionVideoCodec(staleH264Telemetry), 'h265')
 assert.equal(connectionVideoCodec(staleH265Telemetry), 'h264')
 assert.equal(connectionVideoCodec({ ...staleH265Telemetry, codec: 'auto' }), 'h264')
+assert.equal(connectionVideoCodec({ codec: 'auto', ...{ actual_codec: 'h264' } }, true), 'h265')
+assert.equal(connectionVideoCodec({ codec: 'auto', ...{ actual_codec: 'h265' } }, false), 'h264')
+assert.equal(connectionVideoCodec({ codec: 'h264' }, true), 'h264', 'An explicit H.264 choice must not be upgraded')
 assert.equal(videoCodecLabel({ codec: 'auto', actual_codec: 'h264' }), 'Auto (H264)')
 assert.equal(videoCodecLabel({ codec: 'h265' }), 'H265')
 

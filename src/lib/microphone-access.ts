@@ -1,6 +1,5 @@
 export interface MicrophoneActivationSteps<T> {
   requestPermission: () => Promise<T>
-  enableDevice?: () => Promise<void>
   claimSession: () => Promise<boolean>
   attach: (resource: T) => Promise<void>
   releaseSession: () => Promise<void>
@@ -22,7 +21,6 @@ export async function activateBrowserMicrophone<T>(
   }
 
   try {
-    await steps.enableDevice?.()
     claimed = await steps.claimSession()
     if (!claimed) {
       stop()

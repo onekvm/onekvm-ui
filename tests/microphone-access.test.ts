@@ -5,7 +5,7 @@ import {
   microphoneAccessErrorKind,
 } from '../src/lib/microphone-access.ts'
 
-async function testPermissionComesBeforeDeviceAndSessionChanges() {
+async function testPermissionComesBeforeSessionChanges() {
   const calls: string[] = []
   const stream = { id: 'stream' }
   const result = await activateBrowserMicrophone({
@@ -13,7 +13,6 @@ async function testPermissionComesBeforeDeviceAndSessionChanges() {
       calls.push('permission')
       return stream
     },
-    enableDevice: async () => { calls.push('device') },
     claimSession: async () => {
       calls.push('claim')
       return true
@@ -27,7 +26,7 @@ async function testPermissionComesBeforeDeviceAndSessionChanges() {
   })
 
   assert.equal(result, stream)
-  assert.deepEqual(calls, ['permission', 'device', 'claim', 'attach'])
+  assert.deepEqual(calls, ['permission', 'claim', 'attach'])
 }
 
 async function testDeniedPermissionHasNoDeviceSideEffects() {
@@ -38,7 +37,6 @@ async function testDeniedPermissionHasNoDeviceSideEffects() {
       calls.push('permission')
       throw denied
     },
-    enableDevice: async () => { calls.push('device') },
     claimSession: async () => {
       calls.push('claim')
       return true
@@ -98,7 +96,7 @@ async function testAttachFailureReleasesClaim() {
 assert.equal(microphoneAccessErrorKind({ name: 'NotFoundError' }), 'unavailable')
 assert.equal(microphoneAccessErrorKind(new Error('other')), 'other')
 
-await testPermissionComesBeforeDeviceAndSessionChanges()
+await testPermissionComesBeforeSessionChanges()
 await testDeniedPermissionHasNoDeviceSideEffects()
 await testBusySessionStopsCapture()
 await testAttachFailureReleasesClaim()

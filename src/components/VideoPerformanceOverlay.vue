@@ -4,6 +4,9 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch 
 import { Activity, Minus } from '@/icons'
 
 import { t } from '@/i18n/runtime'
+import { usePerformanceDock } from '@/composables/usePerformanceDock'
+import { usePerformanceDockMotion } from '@/composables/usePerformanceDockMotion'
+import PerformanceCompactBar from './PerformanceCompactBar.vue'
 import { usePerformanceContentMotion } from '@/composables/usePerformanceContentMotion'
 import { useLatencyHistory } from '@/composables/useLatencyHistory'
 import { useVideoStreamHistory } from '@/composables/useVideoStreamHistory'
@@ -17,12 +20,10 @@ import {
 import {
   COMPACT_CHART_HEIGHT,
   COMPACT_CHART_WIDTH,
-  formatCompactBitrate,
-  formatCompactResolution,
   performanceAudioVisible,
 } from '@/lib/performance-compact'
 import { TOOLBAR_LAUNCHER_QUERY, toolbarLauncherActive } from '@/lib/toolbar-dock'
-import { compactChartPaths } from '@/lib/video-stream-chart'
+import { compactChartPaths, sumLatencyUs } from '@/lib/video-stream-chart'
 
 import DisplayStatusValues from './DisplayStatusValues.vue'
 import ConsoleFloatingWindow from './ConsoleFloatingWindow.vue'
@@ -34,7 +35,10 @@ const props = defineProps<{
   videoBitrate: number
   targetFps: number
   codec: string
+  bitDepth?: number | null
+  colorRange?: 'unknown' | 'limited' | 'full' | 'unspecified'
   transport: 'webrtc' | 'websocket' | 'mjpeg'
+  webrtcConnection?: WebRTCConnectionStats | null
   inputWidth: number
   inputHeight: number
   captureLatencyUs: number
@@ -43,6 +47,8 @@ const props = defineProps<{
   jitterBufferUs: number
   decodeUs: number
   presentUs: number
+  transportUs?: number | null
+  transportErrorUs?: number | null
   visible: boolean
   originX?: number
   originY?: number
@@ -68,13 +74,24 @@ const COMPACT_KEY = 'onekvm-performance-compact'
 const advanced = ref(localStorage.getItem(ADVANCED_KEY) === 'true')
 const showAudio = ref(localStorage.getItem(AUDIO_KEY) !== 'false')
 const compact = ref(localStorage.getItem(COMPACT_KEY) === 'true')
+const dock = usePerformanceDock()
+const dragMoved = shallowRef(false)
+let dragStart = { x: 0, y: 0 }
+let dragFromDock = false
+const embedded = computed(() => dock.docked.value && compact.value && !!dock.target.value && !mobile.value)
 const mobile = ref(toolbarLauncherActive(window.innerWidth, window.innerHeight))
+const floatingBar = shallowRef<InstanceType<typeof PerformanceCompactBar> | null>(null)
+const dockedBar = shallowRef<InstanceType<typeof PerformanceCompactBar> | null>(null)
+const dockMotion = usePerformanceDockMotion(() => embedded.value, docked =>
+  (docked ? dockedBar.value : floatingBar.value)?.element || null,
+)
 let launcherMedia: MediaQueryList | undefined
 
 const { samples } = useVideoStreamHistory(() => props.videoFps, () => props.videoBitrate)
 const { samples: latencySamples } = useLatencyHistory(() => ({
   capture: props.captureLatencyUs,
   encode: props.encodeLatencyUs,
+  transport: props.transportUs ?? null,
   ice: props.iceRttUs,
   jitter: props.jitterBufferUs,
   decode: props.decodeUs,
@@ -94,7 +111,6 @@ const panel = computed(() => frame.value?.element || null)
 const position = ref({ x: 24, y: 8 })
 let dragOffset: OverlayPoint = { x: 0, y: 0 }
 let dragging = false
-let dragHandle: HTMLElement | null = null
 let dragPointerId: number | null = null
 const panelStyle = computed(() => ({
   left: `${position.value.x}px`,
@@ -102,7 +118,7 @@ const panelStyle = computed(() => ({
 }))
 
 function hostRect() {
-  const parent = panel.value?.offsetParent
+  const parent = panel.value?.offsetParent || dock.target.value?.closest('.console-workspace')
   const stage = parent instanceof HTMLElement
     ? parent.querySelector(':scope > .console-stage')
     : null
@@ -153,55 +169,79 @@ function onWindowResize() {
   clampPosition()
 }
 watch(mobile, onWindowResize)
-const compactResolution = computed(() => formatCompactResolution(props.inputWidth, props.inputHeight))
 const compactChart = computed(() => compactChartPaths(
   samples.value,
   props.targetFps,
   COMPACT_CHART_WIDTH,
   COMPACT_CHART_HEIGHT,
 ))
+const videoLatencyUs = computed(() => sumLatencyUs(
+  props.captureLatencyUs, props.encodeLatencyUs, props.transportUs, props.presentUs,
+))
+const audioLatencyUs = computed(() => sumLatencyUs(
+  props.audioCaptureLatencyUs, props.audioEncodeLatencyUs, props.audioJitterBufferUs,
+))
 
 function startDrag(event: PointerEvent) {
-  contentMotion.cancel()
-  if (event.button !== 0 || !panel.value) return
+  if (event.button !== 0 || dragging) return
   const handle = event.currentTarget
   if (!(handle instanceof HTMLElement)) return
+  const element = embedded.value ? handle : panel.value
+  if (!element) return
+  contentMotion.cancel()
   event.preventDefault()
   event.stopPropagation()
-  const rect = panel.value.getBoundingClientRect()
-  dragOffset = overlayGrabOffset(event.clientX, event.clientY, rect)
+  dragOffset = overlayGrabOffset(event.clientX, event.clientY, element.getBoundingClientRect())
+  dragStart = { x: event.clientX, y: event.clientY }
+  dragFromDock = embedded.value
+  dragMoved.value = false
   dragging = true
-  dragHandle = handle
   dragPointerId = event.pointerId
-  try {
-    handle.setPointerCapture(event.pointerId)
-  } catch {
-    // Window listeners still keep mouse/touch dragging functional when a
-    // browser refuses capture for a synthetic or already-retargeted pointer.
-  }
+  // Window listeners survive moving the bar between the toolbar and window.
+  // Pointer capture would be lost when its original element is unmounted.
   window.addEventListener('pointermove', drag)
   window.addEventListener('pointerup', stopDrag)
   window.addEventListener('pointercancel', stopDrag)
 }
 
 function drag(event: PointerEvent) {
-  if (!dragging) return
+  if (!dragging || event.pointerId !== dragPointerId) return
+  if (!dragMoved.value && Math.hypot(event.clientX - dragStart.x, event.clientY - dragStart.y) < 5) return
   event.preventDefault()
+  dragMoved.value = true
+  if (dragFromDock) {
+    dock.setDocked(false)
+    dragFromDock = false
+  }
   position.value = overlayPointerPosition(event.clientX, event.clientY, hostRect(), dragOffset)
   clampPosition()
+  if (compact.value) dock.updateDrag({ x: event.clientX, y: event.clientY })
 }
 
-function stopDrag() {
-  if (!dragging) return
-  dragging = false
-  if (dragHandle && dragPointerId != null && dragHandle.hasPointerCapture(dragPointerId)) {
-    dragHandle.releasePointerCapture(dragPointerId)
+function stopDrag(event?: PointerEvent) {
+  if (!dragging || (event && event.pointerId !== dragPointerId)) return
+  if (event?.type === 'pointerup' && compact.value && dragMoved.value) {
+    dock.updateDrag({ x: event.clientX, y: event.clientY })
+    if (dock.preview.value) dock.setDocked(true)
   }
-  dragHandle = null
+  dragging = false
+  dragMoved.value = false
   dragPointerId = null
+  dock.updateDrag(null)
   window.removeEventListener('pointermove', drag)
   window.removeEventListener('pointerup', stopDrag)
   window.removeEventListener('pointercancel', stopDrag)
+}
+
+function expand() {
+  dock.setDocked(false)
+  compact.value = false
+  void placePanel()
+}
+
+function undock() {
+  dock.setDocked(false)
+  void placePanel()
 }
 
 function syncMobile() {
@@ -220,13 +260,15 @@ onBeforeUnmount(() => {
   launcherMedia?.removeEventListener('change', syncMobile)
   window.removeEventListener('resize', onWindowResize)
   stopDrag()
+  dock.setVisible(false)
 })
 
 watch(() => props.visible, (visible) => {
+  dock.setVisible(visible)
   contentMotion.cancel()
   if (visible) void placePanel()
   else stopDrag()
-})
+}, { immediate: true })
 watch(() => [props.canvasWidth, props.canvasHeight], () => {
   if (props.visible) clampPosition()
 })
@@ -253,7 +295,8 @@ watch(compact, (value) => {
   <ConsoleFloatingWindow
     ref="frame"
     :title="t('screen.performance', 'Performance')"
-    :show="visible"
+    :show="visible && !embedded"
+    :animate="!dockMotion.active.value"
     :chrome-visible="renderedContent.compact"
     :close-label="t('screen.hidePerformance', 'Hide performance overlay')"
     class="video-performance-overlay"
@@ -268,61 +311,22 @@ watch(compact, (value) => {
     @header-pointerdown="startDrag"
   >
     <template #chrome>
-    <div
-      class="performance-compact-bar"
-      @pointerdown="startDrag"
-    >
-      <svg
-        class="performance-compact-chart"
-        :viewBox="`0 0 ${COMPACT_CHART_WIDTH} ${COMPACT_CHART_HEIGHT}`"
-        :width="COMPACT_CHART_WIDTH"
-        :height="COMPACT_CHART_HEIGHT"
-        aria-hidden="true"
-      >
-        <path v-if="compactChart.fpsArea" class="performance-compact-chart-fps-fill" :d="compactChart.fpsArea" />
-        <path v-if="compactChart.bitrate" class="performance-compact-chart-bitrate" :d="compactChart.bitrate" />
-        <path v-if="compactChart.fps" class="performance-compact-chart-fps" :d="compactChart.fps" />
-      </svg>
-      <span class="performance-compact-metric">
-        <span>FPS</span>
-        <strong>{{ videoFps }}</strong>
-      </span>
-      <span class="performance-compact-sep" />
-      <span class="performance-compact-metric">
-        <span>{{ t('screen.resolution', 'Resolution') }}</span>
-        <strong>{{ compactResolution }}</strong>
-      </span>
-      <span class="performance-compact-sep" />
-      <span class="performance-compact-metric">
-        <span>{{ t('screen.bitrate', 'Bitrate') }}</span>
-        <strong>{{ formatCompactBitrate(videoBitrate) }}</strong>
-      </span>
-      <span class="performance-compact-sep" />
-      <span class="performance-compact-metric">
-        <span>{{ t('screen.codec', 'Codec') }}</span>
-        <strong>{{ codec || '—' }}</strong>
-      </span>
-      <div class="performance-window-actions" @pointerdown.stop>
-        <n-button
-          quaternary
-          circle
-          size="tiny"
-          :aria-label="t('screen.performanceExpand', 'Expand performance overlay')"
-          @click="compact = false"
-        >
-          <template #icon><Square :size="11" /></template>
-        </n-button>
-        <n-button
-          quaternary
-          circle
-          size="tiny"
-          :aria-label="t('screen.hidePerformance', 'Hide performance overlay')"
-          @click="emit('close')"
-        >
-          <template #icon><X :size="13" /></template>
-        </n-button>
-      </div>
-    </div>
+    <PerformanceCompactBar
+      ref="floatingBar"
+      :video-fps="videoFps"
+      :video-bitrate="videoBitrate"
+      :input-width="inputWidth"
+      :input-height="inputHeight"
+      :codec="codec"
+      :chart="compactChart"
+      :video-latency-us="videoLatencyUs"
+      :audio-latency-us="audioLatencyUs"
+      :audio-enabled="showAudioColumn"
+      @drag="startDrag"
+      @expand="expand"
+      @close="emit('close')"
+      @undock="undock"
+    />
     </template>
     <template #title-icon><Activity :size="15" /></template>
     <template #actions>
@@ -356,14 +360,18 @@ watch(compact, (value) => {
         :target-fps="targetFps"
         :codec="codec"
         :transport="transport"
+        :webrtc-connection="webrtcConnection"
+        :bit-depth="bitDepth"
+        :color-range="colorRange"
         :input-width="inputWidth"
         :input-height="inputHeight"
         :capture-latency-us="captureLatencyUs"
         :encode-latency-us="encodeLatencyUs"
-        :ice-rtt-us="iceRttUs"
         :jitter-buffer-us="jitterBufferUs"
         :decode-us="decodeUs"
         :present-us="presentUs"
+        :transport-us="transportUs"
+        :transport-error-us="transportErrorUs"
         :show-latency="renderedContent.advanced"
         :animate-panels="false"
         :audio-enabled="renderedContent.audio"
@@ -381,4 +389,22 @@ watch(compact, (value) => {
       />
     </div>
   </ConsoleFloatingWindow>
+  <Teleport v-if="embedded && visible && dock.target.value" :to="dock.target.value">
+    <PerformanceCompactBar docked
+      ref="dockedBar"
+      :video-fps="videoFps"
+      :video-bitrate="videoBitrate"
+      :input-width="inputWidth"
+      :input-height="inputHeight"
+      :codec="codec"
+      :chart="compactChart"
+      :video-latency-us="videoLatencyUs"
+      :audio-latency-us="audioLatencyUs"
+      :audio-enabled="showAudioColumn"
+      @drag="startDrag"
+      @expand="expand"
+      @close="emit('close')"
+      @undock="undock"
+    />
+  </Teleport>
 </template>

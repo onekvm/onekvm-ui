@@ -3,13 +3,14 @@ import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
 
 const peers: FakePeer[] = []
+const sockets: FakeSocket[] = []
 let clock = 0
 let timerID = 0
 const timeouts = new Map<number, { callback: () => void; delay: number }>()
 const intervals = new Map<number, () => Promise<void>>()
 const nextTurn = () => new Promise<void>(resolve => setImmediate(resolve))
 async function until(predicate: () => boolean) {
-  for (let i = 0; i < 100; i++) { if (predicate()) return; await nextTurn() }
+  for (let i = 0; i < 100; i++) { if (predicate()) return; await new Promise(resolve => setTimeout(resolve, 2)) }
   assert.fail('Audio negotiation did not finish')
 }
 function runTimeouts(delay: number) {
@@ -71,19 +72,65 @@ class FakePeer {
 }
 class FakeSocket {
   static OPEN = 1
+  static CLOSING = 2
   readyState = 0
   onopen: (() => void) | null = null
   onclose: (() => void) | null = null
-  constructor() { queueMicrotask(() => { if (this.readyState === 0) { this.readyState = 1; this.onopen?.() } }) }
+  onmessage: ((event: { data: string }) => void) | null = null
+  sent: string[] = []
+  readonly id: string
+  readonly url: string
+  readonly protocol: string | string[]
+  constructor(url: string, protocol: string | string[]) {
+    this.url = url
+    this.protocol = protocol
+    sockets.push(this)
+    this.id = `socket-${sockets.length}`
+    queueMicrotask(() => {
+      if (this.readyState !== 0) return
+      this.readyState = 1
+      this.onopen?.()
+      if (this.protocol === 'onekvm.audio.v1' || this.protocol.includes('onekvm.audio.v1')) this.receive({ type: 'ready', session_id: this.id, codec: 'pcm' })
+    })
+  }
+  receive(data: object) { this.onmessage?.({ data: JSON.stringify(data) }) }
+  send(value: string) {
+    this.sent.push(value)
+    if (typeof value !== 'string') return
+    const request = JSON.parse(value)
+    if (request.type === 'microphone') queueMicrotask(() => this.receive({ ...request, microphone: request.enabled }))
+  }
   close() { this.readyState = 3; this.onclose?.() }
+}
+class FakeNode {
+  gain = { value: 1 }
+  fftSize = 256
+  connect() {}
+  disconnect() {}
+}
+class FakeContext {
+  state = 'suspended'
+  currentTime = 1
+  destination = new FakeNode()
+  audioWorklet = { addModule: async () => {} }
+  createGain() { return new FakeNode() }
+  createAnalyser() { return new FakeNode() }
+  createMediaStreamSource() { return new FakeNode() }
+  createMediaStreamDestination() { return Object.assign(new FakeNode(), { stream: new FakeStream([new FakeTrack('audio')]) }) }
+  async resume() { this.state = 'running' }
+  async close() { this.state = 'closed' }
+}
+class FakeWorklet extends FakeNode {
+  port = { onmessage: null, postMessage() {} }
 }
 const globals = {
   localStorage: { getItem: () => null, setItem() {} },
-  window: { location: new URL('https://onekvm.test'), addEventListener() {}, setTimeout(callback: () => void, delay: number) { const id = ++timerID; timeouts.set(id, { callback, delay }); return id }, clearTimeout(id: number) { timeouts.delete(id) }, setInterval(callback: () => Promise<void>) { const id = ++timerID; intervals.set(id, callback); return id }, clearInterval(id: number) { intervals.delete(id) } },
+  window: { AudioContext: FakeContext, location: new URL('https://onekvm.test'), addEventListener() {}, setTimeout(callback: () => void, delay: number) { const id = ++timerID; timeouts.set(id, { callback, delay }); return id }, clearTimeout(id: number) { timeouts.delete(id) }, setInterval(callback: () => Promise<void>) { const id = ++timerID; intervals.set(id, callback); return id }, clearInterval(id: number) { intervals.delete(id) } },
   document: { querySelector: () => null },
   performance: { now: () => clock },
   navigator: { mediaDevices: { getUserMedia: async () => new FakeStream([new FakeTrack('audio')]) } },
   MediaStream: FakeStream, RTCPeerConnection: FakePeer, WebSocket: FakeSocket,
+  AudioWorkletNode: FakeWorklet,
   RTCRtpReceiver: { getCapabilities: () => ({ codecs: [{ mimeType: 'video/H264' }] }) },
 }
 const originals = Object.keys(globals).map(name => [name, Object.getOwnPropertyDescriptor(globalThis, name)] as const)
@@ -190,6 +237,97 @@ try {
   assert.ok(peers.every(peer => peer.connectionState === 'closed'))
   assert.equal(intervals.size, 0)
   assert.equal(timeouts.size, 0)
+
+  pendingAudio = null
+  await onekvm.setMicrophone(false)
+  api.getStatus = async () => ({ video: { codec: 'h264' }, audio: { enabled: true, channels: 'stereo', quality: 'pcm' } })
+  const offerCount = offers.length
+  await onekvm.connect()
+  await until(() => Boolean(onekvm.audioSessionID()))
+  assert.deepEqual(offers.slice(offerCount).map(offer => offer.media), ['video'], 'PCM with WebRTC video does not create an Opus audio peer')
+  const pcmVideo = peers.at(-1)!
+  const pcmStream = video.srcObject
+  const pcmSocket = sockets.at(-1)!
+  assert.deepEqual(pcmSocket.protocol, ['onekvm.audio.pcm-lz4.v1', 'onekvm.audio.v1'])
+  const claims = microphoneClaims.length
+  await onekvm.setMicrophone(true)
+  assert.equal(onekvm.microphoneGranted(), true)
+  assert.equal(microphoneClaims.length, claims, 'PCM microphone ownership uses the audio WebSocket with WebRTC video')
+  assert.equal(JSON.parse(pcmSocket.sent.at(-1)!).enabled, true)
+
+  pcmSocket.close()
+  await until(() => [...timeouts.values()].some(timer => timer.delay === 1000))
+  runTimeouts(1000)
+  await until(() => Boolean(onekvm.audioSessionID()) && onekvm.audioSessionID() !== pcmSocket.id && onekvm.microphoneGranted())
+  assert.equal(pcmVideo.connectionState, 'connected', 'PCM reconnect leaves the WebRTC video peer running')
+  assert.equal(video.srcObject, pcmStream)
+  onekvm.sendKeyboard([4])
+  assert.equal(pcmVideo.control!.sent.length, 1)
+  const replacement = sockets.at(-1)!
+
+  const switchOffers = offers.length
+  onekvm.setSpeakerGain(0.4)
+  onekvm.setSpeakerEnabled(false)
+  await onekvm.setAudioQuality('medium')
+  await until(() => Boolean(onekvm.audioSessionID()) && onekvm.microphoneGranted())
+  const switchedOpus = onekvm.audioSessionID()
+  assert.equal(replacement.readyState, 3, 'Switching to Opus closes the PCM connection')
+  assert.equal(JSON.parse(replacement.sent.at(-1)!).enabled, false, 'Release PCM microphone ownership before the new session claims it')
+  assert.equal(microphoneClaims.at(-1)?.id, switchedOpus)
+  assert.deepEqual(offers.slice(switchOffers).map(offer => offer.media), ['audio'])
+  assert.equal(video.srcObject, pcmStream)
+  assert.equal(pcmVideo.connectionState, 'connected')
+  assert.equal(onekvm.speakerGain(), 0.4)
+  assert.equal(onekvm.speakerEnabled(), false)
+  assert.equal(audio.muted, true, 'Switching format preserves the local speaker preference')
+
+  await onekvm.setAudioQuality('pcm')
+  await until(() => onekvm.microphoneGranted())
+  assert.ok(closed.includes(switchedOpus), 'Switching to PCM releases the Opus audio session')
+  assert.equal(microphoneClaims.at(-1)?.id, switchedOpus, 'PCM restores microphone ownership through its own WebSocket')
+  assert.equal(video.srcObject, pcmStream)
+  onekvm.sendKeyboard([5])
+  assert.equal(pcmVideo.control!.sent.length, 2, 'Both audio formats leave the existing HID channel usable')
+
+  let resolveSchema!: (schema: object) => void
+  let waitingForSchema = false
+  let holdSchema = true
+  api.getConfigSchema = () => {
+    if (!holdSchema) return Promise.resolve({ capabilities: { audio: true } })
+    holdSchema = false
+    waitingForSchema = true
+    return new Promise(resolve => { resolveSchema = resolve })
+  }
+  const beforeRapidSwitch = offers.length
+  const staleOpen = onekvm.setAudioQuality('medium')
+  await until(() => waitingForSchema)
+  await onekvm.setAudioQuality('pcm')
+  const rapidPCM = onekvm.audioSessionID()
+  resolveSchema({ capabilities: { audio: true } })
+  await staleOpen
+  assert.equal(offers.length, beforeRapidSwitch, 'A stale schema response cannot create an Opus peer after a later PCM choice')
+  assert.equal(onekvm.audioSessionID(), rapidPCM)
+
+  let resolveSwitch!: (answer: { session_id: string; sdp: string }) => void
+  pendingAudio = { promise: new Promise(yes => { resolveSwitch = yes }), resolve: answer => resolveSwitch(answer) }
+  const beforeStaleAnswer = offers.length
+  const staleAnswer = onekvm.setAudioQuality('medium')
+  await until(() => offers.length > beforeStaleAnswer)
+  const staleSession = offers.at(-1)!.id
+  await onekvm.setAudioQuality('pcm')
+  const finalPCM = onekvm.audioSessionID()
+  pendingAudio.resolve({ session_id: staleSession, sdp: 'opus/48000/2' })
+  await staleAnswer
+  assert.ok(closed.includes(staleSession), 'Late Opus answers are closed after a newer format choice')
+  assert.equal(onekvm.audioSessionID(), finalPCM)
+  assert.equal(video.srcObject, pcmStream)
+  assert.equal(pcmVideo.connectionState, 'connected')
+  assert.equal(offers.filter(offer => offer.media === 'video').length, 2, 'Format changes never create another video session')
+  const finalSocket = sockets.at(-1)!
+  await onekvm.close()
+  assert.equal(finalSocket.readyState, 3, 'Closing WebRTC video also releases its PCM audio connection')
+  assert.equal(timeouts.size, 0)
+  assert.equal(intervals.size, 0)
   console.log('webrtc-audio-recovery tests passed')
 } finally {
   await cleanup?.()

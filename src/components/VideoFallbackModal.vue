@@ -127,7 +127,7 @@ onBeforeUnmount(stopCountdown)
 <template>
   <n-modal
     :show="show"
-    to=".console-workspace"
+    to=".console-connection-overlays"
     preset="card"
     class="connection-problem-modal"
     :title="title"
@@ -135,6 +135,7 @@ onBeforeUnmount(stopCountdown)
     :mask-closable="false"
     :close-on-esc="false"
     :auto-focus="false"
+    :trap-focus="false"
   >
     <div class="connection-problem-content" aria-live="assertive">
       <component :is="promptIcon" :size="42" aria-hidden="true" />

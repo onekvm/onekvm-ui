@@ -42,12 +42,13 @@ export function effectiveVideoCodec(video: { codec: string; actual_codec?: strin
   return configured === 'auto' ? 'h264' : configured
 }
 
-export function connectionVideoCodec(video: { codec: string }): string {
+export function connectionVideoCodec(video: { codec: string }, h265Supported = false): string {
   // A successful config PATCH has already reset the encoder. actual_codec is
   // sampled telemetry and can still describe the old encoder for a second.
-  // Both current Auto backends select H.264 when opening/resetting the encoder.
+  // Auto is a connection preference; the server keeps the persisted setting
+  // and resolves it against the device encoder and any existing video owner.
   const configured = video.codec.toLowerCase()
-  return configured === 'auto' || configured === '' ? 'h264' : configured
+  return configured === 'auto' || configured === '' ? (h265Supported ? 'h265' : 'h264') : configured
 }
 
 export function videoCodecLabel(video: { codec: string; actual_codec?: string }): string {

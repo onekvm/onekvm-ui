@@ -8,6 +8,7 @@ export type LatencySample = {
   t: number
   capture: number
   encode: number
+  transport?: number | null
   ice: number
   jitter: number
   decode: number
@@ -17,6 +18,7 @@ export type LatencySample = {
 export const LATENCY_STACK_KEYS = [
   'capture',
   'encode',
+  'transport',
   'jitter',
   'decode',
   'present',
@@ -60,6 +62,10 @@ export function formatLatencyUs(value: number): string {
   return `${value} µs`
 }
 
+export function sumLatencyUs(...stages: (number | null | undefined)[]): number {
+  return stages.reduce<number>((total, stage) => total + Math.max(0, stage ?? 0), 0)
+}
+
 export function latencyStackParts(sample: LatencySample): LatencyStackParts {
   const capture = Math.max(0, sample.capture)
   const encode = Math.max(0, sample.encode)
@@ -82,7 +88,7 @@ export function latencyStackParts(sample: LatencySample): LatencyStackParts {
     display = Math.max(0, present - jitter - decode)
   }
 
-  return { capture, encode, jitter, decode, present: display }
+  return { capture, encode, transport: Math.max(0, sample.transport ?? 0), jitter, decode, present: display }
 }
 
 export function latencyStackTotal(sample: LatencySample): number {

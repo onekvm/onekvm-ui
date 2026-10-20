@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
+import { readFile } from 'node:fs/promises'
 import { microphonePCMFrame } from '../src/lib/websocket-audio-protocol.ts'
 
 const contexts: Context[] = []
@@ -62,7 +63,7 @@ try {
   const connected = player.connect()
   await until(() => sockets.length === 1)
   const socket = sockets[0]!
-  assert.equal(socket.protocol, 'onekvm.audio.v1')
+  assert.deepEqual(socket.protocol, ['onekvm.audio.pcm-lz4.v1', 'onekvm.audio.v1'])
   socket.receive({ type: 'ready', session_id: 'audio-1' })
   await connected
   assert.equal(player.sessionID(), 'audio-1')
@@ -141,7 +142,7 @@ try {
     const connected = player.connect()
     await until(() => sockets.length === 3)
     const socket = sockets.at(-1)!
-    assert.deepEqual(socket.protocol, ['onekvm.audio.opus.v1', 'onekvm.audio.v1'], 'Opus is preferred with a compatible PCM fallback')
+    assert.deepEqual(socket.protocol, ['onekvm.audio.opus.v1', 'onekvm.audio.pcm-lz4.v1', 'onekvm.audio.v1'], 'Opus is preferred with a compatible PCM fallback')
     socket.receive({ type: 'ready', session_id: 'audio-opus', codec: 'opus' })
     await connected
     const opus = (sequence: bigint) => {
@@ -173,6 +174,68 @@ try {
     player.destroy()
     assert.equal(decoders.at(-1)!.closed, true)
     assert.equal(disconnects, 0)
+
+    const decoderCount = decoders.length
+    Decoder.isConfigSupported = async () => { throw new Error('PCM must not probe Opus support') }
+    player = new WebSocketAudio('wss://example.test/api/audio/ws', { stats: (value: any) => stats.push(value), disconnected: () => disconnects++ }, 'pcm')
+    const pcmConnected = player.connect()
+    await until(() => sockets.length === 4)
+    const pcmSocket = sockets.at(-1)!
+    assert.deepEqual(pcmSocket.protocol, ['onekvm.audio.pcm-lz4.v1', 'onekvm.audio.v1'], 'PCM offers lossless compression and a compatible raw fallback without requesting Opus')
+    pcmSocket.receive({ type: 'ready', session_id: 'audio-pcm', codec: 'pcm' })
+    await pcmConnected
+    player.resume()
+    const stereo = microphonePCMFrame(new ArrayBuffer(3840), 0n, 0)
+    new Uint8Array(stereo)[6] = 2
+    pcmSocket.receive(stereo)
+    assert.equal(nodes.at(-1)!.port.sent.at(-1).type, 'audio')
+    assert.equal(decoders.length, decoderCount, 'PCM playback never starts an Opus decoder')
+    player.reportStats()
+    assert.equal(stats.at(-1).codec, 'pcm')
+    player.destroy()
+
+    const fixtures = JSON.parse(await readFile(new URL('./fixtures/pcm-lz4-v1.json', import.meta.url), 'utf8'))
+    const fixture = fixtures.frames.find((frame: any) => frame.name === 'stereo-ramp')
+    const packet = () => Uint8Array.from(Buffer.from(fixture.lz4, 'base64')).buffer
+    player = new WebSocketAudio('wss://example.test/api/audio/ws', { stats: (value: any) => stats.push(value), disconnected: () => disconnects++ }, 'pcm')
+    const lz4Connected = player.connect()
+    await until(() => sockets.length === 5)
+    const lz4Socket = sockets.at(-1)!
+    lz4Socket.receive({ type: 'ready', session_id: 'audio-lz4', codec: 'pcm', compression: 'lz4-pcm-v1' })
+    await lz4Connected
+    assert.ok(nodes.at(-1)!.port.sent.some(message => message.type === 'buffering' && message.batched === true), 'Negotiated LZ4 enables buffering for its 60ms batches')
+    player.resume()
+    const playbackLz4 = nodes.at(-1)!
+    lz4Socket.receive(packet())
+    assert.deepEqual(new Uint8Array(playbackLz4.port.sent.at(-1).buffer), Uint8Array.from(Buffer.from(fixture.pcm, 'base64')), 'Low CPU PCM compression preserves every stereo sample and the complete packet header')
+    assert.equal(playbackLz4.port.sent.at(-1).channels, 2)
+    player.reportStats()
+    assert.equal(stats.at(-1).codec, 'pcm')
+    assert.equal(decoders.length, decoderCount, 'Compressed PCM never starts the Opus decoder')
+    const beforeClose = playbackLz4.port.sent.length
+    player.destroy()
+    lz4Socket.receive(packet())
+    assert.equal(playbackLz4.port.sent.length, beforeClose, 'An old audio connection cannot deliver sound after it closes')
+
+    player = new WebSocketAudio('wss://example.test/api/audio/ws', { stats: () => {}, disconnected: () => disconnects++ }, 'pcm')
+    const invalidConnected = player.connect()
+    await until(() => sockets.length === 6)
+    const invalidSocket = sockets.at(-1)!
+    invalidSocket.receive({ type: 'ready', session_id: 'audio-invalid', codec: 'pcm', compression: 'lz4-pcm-v1' })
+    await invalidConnected
+    player.resume()
+    const invalid = packet()
+    new DataView(invalid).setUint32(0, 65536, true)
+    invalidSocket.receive(invalid)
+    assert.equal(invalidSocket.readyState, 3, 'Invalid compressed audio closes the independent audio connection')
+    player.destroy()
+    player = new WebSocketAudio('wss://example.test/api/audio/ws', { stats: () => {}, disconnected: () => disconnects++ }, 'pcm')
+    const fallbackConnected = player.connect()
+    await until(() => sockets.length === 7)
+    assert.equal(sockets.at(-1)!.protocol, 'onekvm.audio.v1', 'A compressed PCM failure retries with compatible raw PCM')
+    sockets.at(-1)!.receive({ type: 'ready', session_id: 'audio-raw-fallback', codec: 'pcm' })
+    await fallbackConnected
+    player.destroy()
   } finally {
     player?.destroy()
     for (const [name, descriptor] of codecOriginals) {

@@ -194,15 +194,5 @@ function clearHover() {
       </div>
     </div>
 
-    <div class="stream-chart-legend">
-      <span class="stream-chart-key">
-        <span class="stream-chart-swatch stream-chart-swatch-fps" aria-hidden="true" />
-        {{ rateLabel }}
-      </span>
-      <span class="stream-chart-key">
-        <span class="stream-chart-swatch stream-chart-swatch-bitrate" aria-hidden="true" />
-        {{ t('screen.bitrate', 'Bitrate') }}
-      </span>
-    </div>
   </div>
 </template>

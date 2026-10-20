@@ -1,5 +1,6 @@
 import { parseOpusAudioFrame, parsePCMAudioFrame, microphonePCMFrame } from './websocket-audio-protocol'
 import { WebSocketOpusDecoder } from './websocket-opus-decoder'
+import { WebSocketLz4Decoder } from './websocket-lz4-decoder'
 import type { BrowserAudioStats } from './webrtc-playback-stats'
 
 interface AudioCallbacks {
@@ -11,6 +12,7 @@ type PendingRequest = { resolve: (enabled: boolean) => void; reject: (error: Err
 export class WebSocketAudio {
   private socket: WebSocket | null = null
   private decoder: WebSocketOpusDecoder | null = null
+  private pcmDecoder: WebSocketLz4Decoder | null = null
   private codec: 'opus' | 'pcm' = 'pcm'
   private context: AudioContext | null = null
   private playback: AudioWorkletNode | null = null
@@ -35,7 +37,11 @@ export class WebSocketAudio {
   private connectTimer: ReturnType<typeof setTimeout> | undefined
   private connectReject: ((error: Error) => void) | null = null
 
-  constructor(private readonly url: string, private readonly callbacks: AudioCallbacks) {}
+  constructor(
+    private readonly url: string,
+    private readonly callbacks: AudioCallbacks,
+    private readonly format: 'auto' | 'pcm' = 'auto',
+  ) {}
 
   sessionID() { return this.id }
   microphoneAnalyser() { return this.analyser }
@@ -56,7 +62,7 @@ export class WebSocketAudio {
     }
     this.sampledAt = performance.now()
     this.statsTimer = setInterval(() => this.reportStats(), 1000)
-    const opusSupported = await WebSocketOpusDecoder.supported()
+    const opusSupported = this.format !== 'pcm' && await WebSocketOpusDecoder.supported()
     if (this.closed) throw new Error('Audio connection closed')
     if (opusSupported) {
       this.decoder = new WebSocketOpusDecoder((planes, sampleRate, reset) => {
@@ -67,7 +73,11 @@ export class WebSocketAudio {
       })
     }
     return new Promise<void>((resolve, reject) => {
-      const socket = new WebSocket(this.url, opusSupported ? ['onekvm.audio.opus.v1', 'onekvm.audio.v1'] : 'onekvm.audio.v1')
+      const protocols = WebSocketLz4Decoder.supported()
+        ? ['onekvm.audio.pcm-lz4.v1', 'onekvm.audio.v1']
+        : ['onekvm.audio.v1']
+      if (opusSupported) protocols.unshift('onekvm.audio.opus.v1')
+      const socket = new WebSocket(this.url, protocols.length === 1 ? protocols[0]! : protocols)
       socket.binaryType = 'arraybuffer'
       this.socket = socket
       let ready = false
@@ -76,15 +86,29 @@ export class WebSocketAudio {
       this.connectReject = reject
       socket.onmessage = ({ data }) => {
         if (this.closed || this.socket !== socket) return
-        if (data instanceof ArrayBuffer) { this.receive(data); return }
+        if (data instanceof ArrayBuffer) {
+          if (this.pcmDecoder) {
+            this.sampleBytes += data.byteLength
+            this.samplePackets++
+            if (this.context?.state === 'running') this.pcmDecoder.decode(data)
+          } else this.receive(data)
+          return
+        }
         if (typeof data !== 'string') return
-        let message: { type?: string; session_id?: string; codec?: string; request_id?: number; microphone?: boolean; error?: string }
+        let message: { type?: string; session_id?: string; codec?: string; compression?: string; request_id?: number; microphone?: boolean; error?: string }
         try { message = JSON.parse(data) } catch { return }
         if (message.type === 'ready' && message.session_id) {
           clearTimeout(timer)
           this.connectReject = null
           this.id = message.session_id
           this.codec = message.codec === 'opus' ? 'opus' : 'pcm'
+          if (this.codec === 'pcm' && message.compression === 'lz4-pcm-v1') {
+            this.playback?.port.postMessage({ type: 'buffering', batched: true })
+            this.pcmDecoder = new WebSocketLz4Decoder(
+              (buffer) => { if (!this.closed) this.receive(buffer, false) },
+              () => { if (!this.closed) socket.close() },
+            )
+          }
           ready = true
           resolve()
         } else if (message.type === 'microphone' && typeof message.request_id === 'number') {
@@ -203,6 +227,8 @@ export class WebSocketAudio {
     this.playback?.disconnect()
     this.decoder?.destroy()
     this.decoder = null
+    this.pcmDecoder?.destroy()
+    this.pcmDecoder = null
     this.speaker?.disconnect()
     void this.context?.close().catch(() => undefined)
     this.context = null
@@ -217,7 +243,7 @@ export class WebSocketAudio {
     this.pending.clear()
   }
 
-  private receive(buffer: ArrayBuffer) {
+  private receive(buffer: ArrayBuffer, countPacket = true) {
     const opus = parseOpusAudioFrame(buffer)
     const frame = opus ?? parsePCMAudioFrame(buffer)
     if (!frame || (this.lastSequence !== null && frame.sequence <= this.lastSequence)) return
@@ -225,8 +251,10 @@ export class WebSocketAudio {
     const reset = this.lastSequence !== null && (frame.sequence !== this.lastSequence + 1n || now - this.lastReceived > 160)
     this.lastSequence = frame.sequence
     this.lastReceived = now
-    this.sampleBytes += frame.payloadBytes
-    this.samplePackets++
+    if (countPacket) {
+      this.sampleBytes += frame.payloadBytes
+      this.samplePackets++
+    }
     this.codec = opus ? 'opus' : 'pcm'
     // Never build a port-message backlog while autoplay is suspended.
     if (this.context?.state !== 'running') return

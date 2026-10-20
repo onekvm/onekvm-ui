@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
+import type { WebRTCConnectionStats } from '../src/lib/webrtc-connection-stats.ts'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -141,14 +142,16 @@ try {
   api.getConfigSchema = async () => ({ capabilities: { audio: false } })
   const closedSessions: string[] = []
   api.closeWebRTCSession = async (id: string) => { closedSessions.push(id) }
-  const offers: { id: string; codec: string; sdp: string }[] = []
+  const offers: { id: string; codec: string; sdp: string; preference?: string }[] = []
+  let autoBackendCodec: string | undefined
   type Answer = { session_id: string; sdp: string }
   let pendingAnswer: ReturnType<typeof deferred<Answer>> | undefined
-  api.createWebRTCSession = async (sdp: string) => {
+  api.createWebRTCSession = async (sdp: string, _microphone: boolean, _media: string, preference?: string) => {
     const id = `session-${offers.length + 1}`
-    offers.push({ id, codec, sdp })
+    const selected = codec === 'auto' ? (autoBackendCodec ?? preference ?? 'h264') : codec
+    offers.push({ id, codec: selected, sdp, preference })
     if (pendingAnswer) return pendingAnswer.promise
-    return { session_id: id, sdp: `${codec === 'h265' ? 'H265' : 'H264'}/90000` }
+    return { session_id: id, sdp: `${selected === 'h265' ? 'H265' : 'H264'}/90000` }
   }
   let state: { connection: string; controlReady: boolean; webRTCSessionId: string } | undefined
   const unsubscribe = onekvm.subscribe((next: typeof state) => { state = next })
@@ -157,6 +160,10 @@ try {
 
   await onekvm.connect()
   assert.equal(state?.connection, 'connected')
+  const connectionStats: (WebRTCConnectionStats | null)[] = []
+  const unsubscribeConnectionStats = onekvm.subscribeWebRTCConnectionStats((stats: WebRTCConnectionStats | null) => connectionStats.push(stats))
+  await until(() => connectionStats.at(-1)?.connectionState === 'connected')
+  assert.equal(connectionStats.at(-1)?.local, null, 'Missing ICE reports must stay unavailable')
   const oldPeer = peers.findLast((peer) => peer.control)!
   assert.equal(sockets.length, 1, 'WebRTC must also open the HID WebSocket for LED notifications')
   assert.equal(sockets[0]?.protocol, 'onekvm.hid.v1')
@@ -222,6 +229,12 @@ try {
   assert.equal(state?.connection, 'connected')
 
   await onekvm.close()
+  assert.equal(connectionStats.at(-1), null, 'Closing must clear the previous WebRTC details')
+  let lateStats: WebRTCConnectionStats | null | undefined
+  const unsubscribeLateStats = onekvm.subscribeWebRTCConnectionStats((stats: WebRTCConnectionStats | null) => { lateStats = stats })
+  assert.equal(lateStats, null, 'Late subscribers must not receive a closed connection snapshot')
+  unsubscribeLateStats()
+  unsubscribeConnectionStats()
   pendingAnswer = deferred<Answer>()
   const connecting = onekvm.connect()
   await until(() => offers.length === 4)
@@ -269,9 +282,17 @@ try {
   assert.equal(peers.at(-1)?.connectionState, 'connected')
 
   codec = 'auto'
+  telemetryCodec = 'h264'
+  await onekvm.reconnect()
+  assert.equal(state?.connection, 'connected')
+  assert.equal(offers.at(-1)?.preference, 'h265', 'Auto must prefer browser-supported HEVC even with stale H.264 telemetry')
+  assert.equal(offers.at(-1)?.codec, 'h265')
+  assert.equal(codec, 'auto', 'Negotiation must not change the saved Auto setting')
+  autoBackendCodec = 'h264'
   telemetryCodec = 'h265'
   await onekvm.reconnect()
-  assert.equal(state?.connection, 'connected', 'Auto must negotiate H.264 even while telemetry still reports H.265')
+  assert.equal(state?.connection, 'connected', 'A backend without HEVC must still negotiate H.264 from the same offer')
+  assert.equal(offers.at(-1)?.codec, 'h264')
 
   await onekvm.close()
   const pendingStatus = deferred<ReturnType<typeof snapshot>>()

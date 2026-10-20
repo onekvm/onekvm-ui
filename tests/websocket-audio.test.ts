@@ -63,6 +63,41 @@ assert.ok(output[0]!.every(sample => sample === 0.5), 'Decoded Opus feeds the sa
 assert.ok(output[1]!.every(sample => sample === -0.25), 'Decoded stereo is not mixed to mono')
 
 for (const rate of [44100, 48000]) {
+  const BatchedPlayback = processors(rate).get('onekvm-pcm-playback')!
+  const batched = new BatchedPlayback()
+  batched.port.onmessage({ data: { type: 'buffering', batched: true } })
+  const jitterMs = [0, 12, -4, 8, 0, -8]
+  let batch = 0
+  let heard = false
+  for (let rendered = 0; rendered < rate * 1.8; rendered += 128) {
+    const due = Math.round((batch * 60 + jitterMs[batch % jitterMs.length]!) * rate / 1000)
+    if (rendered >= due) {
+      for (let packet = 0; packet < 3; packet++) {
+        batched.port.onmessage({ data: { type: 'audio', buffer: stereoFrame, channels: 2, sampleRate: 48000 } })
+      }
+      batch++
+    }
+    batched.process([], [output])
+    if (output[0]!.some(sample => sample !== 0)) {
+      heard = true
+      assert.ok(output[0]!.every(sample => sample === 0.5), 'Batch buffering preserves the left channel')
+      assert.ok(output[1]!.every(sample => sample === -0.25), 'Batch buffering preserves the right channel')
+    }
+  }
+  assert.ok(heard, 'Batched audio starts playing')
+  assert.equal(batched.underruns, 0, '60ms batches tolerate normal arrival jitter without starving playback')
+  assert.equal(batched.dropped, 0, 'Normal batch jitter does not discard PCM samples')
+  for (let burst = 0; burst < 50; burst++) {
+    batched.port.onmessage({ data: { type: 'audio', buffer: stereoFrame, channels: 2, sampleRate: 48000 } })
+  }
+  assert.ok(batched.queued <= Math.ceil(rate * 0.14), 'Batched playback still bounds TCP backlog')
+  assert.ok(batched.dropped > 0, 'A stalled batch reader returns to live sound')
+  batched.port.onmessage({ data: { type: 'flush' } })
+  batched.process([], [output])
+  assert.ok(output.every(channel => channel.every(sample => sample === 0)), 'A batched reconnect clears old sound')
+}
+
+for (const rate of [44100, 48000]) {
   const Capture = processors(rate).get('onekvm-pcm-capture')!
   const capture = new Capture()
   const input = new Float32Array(rate).fill(2)

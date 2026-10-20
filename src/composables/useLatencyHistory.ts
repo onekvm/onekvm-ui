@@ -10,6 +10,7 @@ import {
 export function useLatencyHistory(values: MaybeRefOrGetter<{
   capture: number
   encode: number
+  transport?: number | null
   ice: number
   jitter: number
   decode: number
@@ -24,6 +25,7 @@ export function useLatencyHistory(values: MaybeRefOrGetter<{
       t: Date.now(),
       capture: latencyMs(next.capture),
       encode: latencyMs(next.encode),
+      transport: next.transport == null ? null : latencyMs(next.transport),
       ice: latencyMs(next.ice),
       jitter: latencyMs(next.jitter),
       decode: latencyMs(next.decode),

@@ -56,6 +56,7 @@ export class WebSocketVideo {
     private readonly url: string,
     codecName: string,
     private readonly callbacks: WebSocketVideoCallbacks,
+    private readonly automatic = false,
   ) {
     const codec = normalizeWebSocketVideoCodec(codecName)
     if (!codec || !supportsWebSocketVideo(codec)) {
@@ -167,8 +168,22 @@ export class WebSocketVideo {
     const sequence = view.getBigUint64(8)
     const durationUsec = view.getUint32(24)
     const payloadLength = view.getUint32(32)
-    if (!frameCodec || frameCodec !== this.codec || payloadLength !== buffer.byteLength - HEADER_SIZE) {
+    if (!frameCodec || payloadLength !== buffer.byteLength - HEADER_SIZE) {
       return
+    }
+    // Auto can resolve to H.264 on an older backend or when another viewer
+    // already owns the shared encoder. Use the actual first keyframe.
+    if (frameCodec !== this.codec) {
+      if (!this.automatic || !keyframe) return
+      if (!supportsWebSocketVideo(frameCodec)) {
+        this.failPlayback(`The browser cannot decode ${frameCodec.toUpperCase()} over WebSocket`, true)
+        return
+      }
+      this.codec = frameCodec
+      this.waitingForKeyframe = true
+      this.lastSequence = null
+      this.durationRemainderUs = 0
+      this.createMuxer()
     }
 
     if (this.lastSequence !== null && sequence !== this.lastSequence + 1n) {

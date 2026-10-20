@@ -1,4 +1,6 @@
 export type BrowserVideoLatencyUs = {
+  transportUs?: number | null
+  transportErrorUs?: number | null
   iceRttUs: number
   jitterBufferUs: number
   decodeUs: number

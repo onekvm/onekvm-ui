@@ -3,7 +3,6 @@ import { computed, ref } from 'vue'
 
 import { t } from '@/i18n/runtime'
 import {
-  LATENCY_STACK_KEYS,
   formatSampleTime,
   latencyScaleMax,
   latencyStackBands,
@@ -16,9 +15,10 @@ import {
   type LatencyStackKey,
 } from '@/lib/video-stream-chart'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   samples: readonly LatencySample[]
-}>()
+  kind?: 'video' | 'audio'
+}>(), { kind: 'video' })
 
 const padLeft = 28
 const padRight = 8
@@ -50,6 +50,7 @@ const hover = computed(() => {
     total: latencyKnownTotal(sample),
     parts: latencyStackParts(sample),
     ice: sample.ice,
+    transport: sample.transport,
   }
 })
 
@@ -75,13 +76,16 @@ function formatAxis(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
 }
 
-const stackLegend: { key: LatencyStackKey; label: string; fallback: string }[] = [
+const allStackLegend: { key: LatencyStackKey; label: string; fallback: string }[] = [
   { key: 'capture', label: 'screen.captureLatency', fallback: 'Capture latency' },
   { key: 'encode', label: 'screen.encodeLatency', fallback: 'Encode latency' },
+  { key: 'transport', label: 'screen.transportLatency', fallback: 'Encode to receive' },
   { key: 'jitter', label: 'screen.jitterBuffer', fallback: 'Jitter buffer' },
   { key: 'decode', label: 'screen.decodeLatency', fallback: 'Decode latency' },
   { key: 'present', label: 'screen.presentLatency', fallback: 'Display overhead' },
 ]
+
+const stackLegend = computed(() => allStackLegend.filter(item => props.kind === 'video' || ['capture', 'encode', 'jitter'].includes(item.key)))
 
 function setHover(event: PointerEvent) {
   if (props.samples.length === 0) return
@@ -127,14 +131,14 @@ function clearHover() {
           :y2="(height / 2) * (tick - 1)"
         />
         <path
-          v-for="key in LATENCY_STACK_KEYS"
-          :key="key"
-          v-show="bands[key]"
+          v-for="item in stackLegend"
+          :key="item.key"
+          v-show="bands[item.key]"
           class="stream-chart-area"
-          :class="`latency-band-${key}`"
-          :d="bands[key]"
+          :class="`latency-band-${item.key}`"
+          :d="bands[item.key]"
         />
-        <path v-if="iceLine" class="stream-chart-line latency-line-ice" :d="iceLine" />
+        <path v-if="kind === 'video' && iceLine" class="stream-chart-line latency-line-ice" :d="iceLine" />
         <line
           v-if="hover"
           class="stream-chart-cursor"
@@ -178,25 +182,15 @@ function clearHover() {
       </div>
       <div v-for="item in stackLegend" :key="item.key">
         <span class="stream-chart-swatch" :class="`latency-swatch-${item.key}`" aria-hidden="true" />
-        <span>{{ t(item.label, item.fallback) }}</span>
-        <strong>{{ formatMs(hover.parts[item.key]) }}</strong>
+        <span>{{ item.key === 'jitter' && kind === 'audio' ? t('screen.audioJitterBuffer', 'Audio jitter buffer') : t(item.label, item.fallback) }}</span>
+        <strong>{{ item.key === 'transport' && hover.transport == null ? '-' : formatMs(hover.parts[item.key]) }}</strong>
       </div>
-      <div>
+      <div v-if="kind === 'video'">
         <span class="stream-chart-swatch latency-swatch-ice" aria-hidden="true" />
         <span>{{ t('screen.iceRtt', 'ICE RTT') }}</span>
         <strong>{{ formatMs(hover.ice) }}</strong>
       </div>
     </div>
 
-    <div class="stream-chart-legend">
-      <span v-for="item in stackLegend" :key="item.key" class="stream-chart-key">
-        <span class="stream-chart-swatch" :class="`latency-swatch-${item.key}`" aria-hidden="true" />
-        {{ t(item.label, item.fallback) }}
-      </span>
-      <span class="stream-chart-key">
-        <span class="stream-chart-swatch latency-swatch-ice" aria-hidden="true" />
-        {{ t('screen.iceRtt', 'ICE RTT') }}
-      </span>
-    </div>
   </div>
 </template>

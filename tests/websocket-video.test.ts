@@ -21,12 +21,14 @@ let destroyed = 0
 let feeds = 0
 const feedDurations: number[] = []
 const readyCallbacks: (() => void)[] = []
+const muxerCodecs: string[] = []
 class Muxer {
   private feeds = 0
-  private options: { node: Video; onReady: () => void; onError: (data: unknown) => void; onUnsupportedCodec: () => void }
+  private options: { node: Video; videoCodec: string; onReady: () => void; onError: (data: unknown) => void; onUnsupportedCodec: () => void }
   constructor(options: Muxer['options']) {
     this.options = options
     muxers += 1
+    muxerCodecs.push(options.videoCodec)
     readyCallbacks.push(options.onReady)
     if (behavior !== 'late-ready') queueMicrotask(options.onReady)
   }
@@ -153,6 +155,23 @@ try {
     assert.equal(failures.length, behavior === 'decoded' ? 0 : 1, 'Destroyed players cannot report a late failure')
   }
   behavior = 'decoded'
+  {
+    const video = new Video()
+    const player = new WebSocketVideo(video, 'wss://example.test/video?video_codec=h265', 'h265', {
+      bitrate: () => {},
+      disconnected: () => assert.fail('Auto must decode the backend H.264 fallback'),
+    }, true)
+    const connected = player.connect()
+    const socket = sockets.at(-1)!
+    socket.open()
+    await connected
+    const packet = frame.slice(0)
+    new Uint8Array(packet)[5] = 1
+    socket.onmessage?.({ data: packet })
+    assert.equal(muxerCodecs.at(-1), 'H264')
+    assert.equal(video.readyState, 2)
+    player.destroy()
+  }
   for (const durationUs of [16667, 33333, 8333]) {
     const video = new Video()
     const player = new WebSocketVideo(video, 'wss://example.test/video', 'h265', { bitrate: () => {}, disconnected: () => assert.fail('Continuous video must remain connected') })

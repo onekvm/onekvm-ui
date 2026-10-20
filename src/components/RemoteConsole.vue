@@ -130,10 +130,10 @@ useVideoFps(video, (fps) => {
 }, (value) => {
   presentUs = webrtcPresent.value ? value : 0
   publishBrowserLatency()
-}, webrtcPresent)
+}, webrtcPresent, metadata => { if (webrtcPresent.value) onekvm.observeVideoFrame(metadata) })
 
 const loading = computed(
-  () => !connectionProblem.value && !playing.value && ['idle', 'connecting', 'connected'].includes(props.state.connection),
+  () => !unsupportedInput.value && !connectionProblem.value && !playing.value && ['idle', 'connecting', 'connected'].includes(props.state.connection),
 )
 const loadingMessage = computed(() => hasFrame.value
   ? t('screen.bufferingVideo', 'Buffering video…')
@@ -584,7 +584,7 @@ watch(
     </div>
 
     <Transition name="console-loading">
-      <div v-if="loading" class="console-state" aria-live="polite" aria-busy="true">
+      <div v-if="loading" class="console-state console-loading-state" aria-live="polite" aria-busy="true">
         <div
           class="console-connect-progress"
           role="progressbar"
@@ -596,7 +596,7 @@ watch(
 
     <n-modal
       :show="connectionProblem"
-      to=".console-workspace"
+      to=".console-connection-overlays"
       preset="card"
       class="connection-problem-modal"
       :title="t('screen.connectionLostTitle', 'Connection interrupted')"
@@ -604,6 +604,7 @@ watch(
       :mask-closable="false"
       :close-on-esc="false"
       :auto-focus="false"
+      :trap-focus="false"
     >
       <div class="connection-problem-content" aria-live="assertive">
         <WifiOff :size="42" />

@@ -2,20 +2,20 @@
 import { computed } from 'vue'
 import { LoaderCircle, Wrench } from '@/icons'
 import { extensionAssetURL } from '@/api/client'
+import { namedPluginIcon } from '@/lib/plugin-icons'
 import type { ToolboxTool } from '@/composables/useToolbox'
-const props = defineProps<{ tool: ToolboxTool; loading?: boolean }>()
-const icon = computed(() => props.tool.item.icon || props.tool.extension.icon)
-const lucide = computed(() => {
+const props = defineProps<{ tool: Pick<ToolboxTool, 'extension'> & Partial<Pick<ToolboxTool, 'item'>>; loading?: boolean }>()
+const icon = computed(() => props.tool.item?.icon || props.tool.extension.icon)
+const namedIcon = computed(() => {
   if (icon.value?.source !== 'lucide') return Wrench
-  const name = icon.value.name.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('')
-  return (icons as Record<string, typeof Wrench>)[name] || Wrench
+  return namedPluginIcon(icon.value.name, Wrench)
 })
 const src = computed(() => icon.value?.source === 'custom' ? extensionAssetURL(props.tool.extension, icon.value.path) : '')
 </script>
 <template>
   <span class="tool-icon">
     <img v-if="src" :src="src" alt="" width="18" height="18" />
-    <component v-else :is="lucide" :size="18" aria-hidden="true" />
+    <component v-else :is="namedIcon" :size="18" aria-hidden="true" />
     <LoaderCircle v-if="loading" class="tool-icon-spinner" :size="12" aria-hidden="true" />
   </span>
 </template>

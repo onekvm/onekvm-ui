@@ -101,7 +101,10 @@ export function useXpWindowTransition(options: {
       const hidden = { opacity: 0, transform: 'translateY(8px) scale(0.98)' }
       const visible = { opacity: 1, transform: 'none' }
       animations.push(panel.animate(entering ? [hidden, visible] : [visible, hidden], {
-        duration: entering ? 160 : 120, easing: 'cubic-bezier(0.23, 1, 0.32, 1)', fill: 'both',
+        // Ease out on entry, but ease in on close so it stays visible while shrinking.
+        duration: entering ? 160 : 200,
+        easing: entering ? 'cubic-bezier(0.23, 1, 0.32, 1)' : 'cubic-bezier(0.4, 0, 1, 1)',
+        fill: 'both',
       }))
     }
 

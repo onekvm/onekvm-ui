@@ -2,7 +2,9 @@
 import { computed, inject, nextTick, onBeforeUnmount, provide, shallowRef, useTemplateRef, watch } from 'vue'
 import type { ChildWindowRegistration, ExtensionToolHostV1 } from '@/extensions/toolboxRuntime'
 import { toolWindowOwnerKey, type ToolChildWindow } from '@/lib/tool-child-windows'
+import { CONSOLE_WINDOW_LAYER } from '@/lib/console-window-stack'
 import ToolWindow from './ToolWindow.vue'
+import ToolIcon from './ToolIcon.vue'
 
 const props = withDefaults(defineProps<{
   host: ExtensionToolHostV1; open: boolean; title: string; width?: number; height?: number
@@ -10,10 +12,14 @@ const props = withDefaults(defineProps<{
   beforeClose?: () => boolean | Promise<boolean>
 }>(), { modal: true, resizable: true, maximizable: true })
 const emit = defineEmits<{ close: [] }>()
+const iconTool = computed(() => {
+  const extension = props.host.extension.value
+  return { extension, item: extension.toolbox?.items.find(item => `${extension.id}/${item.id}` === props.host.toolId) }
+})
 const frame = useTemplateRef<InstanceType<typeof ToolWindow>>('frame')
 const state = shallowRef<'normal' | 'maximized' | 'minimized'>('normal')
 const registration = shallowRef<ChildWindowRegistration | null>(null)
-const layer = computed(() => registration.value?.layer.value || 2302)
+const layer = computed(() => registration.value?.layer.value || CONSOLE_WINDOW_LAYER + 2)
 const attention = shallowRef(false)
 let attentionTimer = 0
 let resolveClose: ((closed: boolean) => void) | null = null
@@ -100,6 +106,7 @@ defineExpose({
         :resizable="resizable" :maximizable="maximizable" :minimizable="false" :layer="layer" :active="registration?.active.value || false" :sequence="layer"
         :child-window-active="registration?.blocked.value || false" @child-attention="registration?.attention()" @focus="registration?.activate()"
         v-model:state="state" @close="close">
+        <template #title-icon><ToolIcon :tool="iconTool" /></template>
         <slot />
       </ToolWindow>
     </Transition>

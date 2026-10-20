@@ -2,7 +2,7 @@ import { nextTick, onBeforeUnmount, watch, type Ref } from 'vue'
 
 type Bounds = Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>
 type Snapshot = { rect: Bounds; ghost: HTMLElement }
-const motionItems = 'button, .hdd-activity-indicator'
+const motionItems = 'button, .hdd-activity-indicator, .toolbar-performance-drop-label'
 const easing = 'cubic-bezier(0.23, 1, 0.32, 1)'
 
 // Measure before Vue updates, then animate from the displayed layout to the new
@@ -73,12 +73,12 @@ export function useToolbarPinMotion(
           animate(button, [{ transform: `translate(${dx}px, ${dy}px) scale(${1 / sx}, ${1 / sy})`, transformOrigin: '0 0' }, { transform: 'none', transformOrigin: '0 0' }])
         }
         before.delete(button)
-      } else if (button.closest('.toolbar-pinned-tools') || button.matches('.hdd-activity-indicator')) {
+      } else if (button.closest('.toolbar-pinned-tools') || button.matches('.hdd-activity-indicator, .toolbar-performance-drop-label')) {
         animate(button, [{ opacity: 0, transform: `translateY(4px) scale(${0.85 / sx}, ${0.85 / sy})` }, { opacity: 1, transform: 'none' }])
       }
     }
     for (const [button, { rect, ghost }] of before) {
-      if (!button.matches('.toolbar-pin-button, .hdd-activity-indicator')) continue
+      if (!button.matches('.toolbar-pin-button, .hdd-activity-indicator, .toolbar-performance-drop-label')) continue
       ghost.setAttribute('aria-hidden', 'true')
       ghost.inert = true
       Object.assign(ghost.style, { position: 'fixed', left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`, pointerEvents: 'none', zIndex: '2000' })

@@ -34,8 +34,7 @@ const ringOffset = computed(() => {
 const lineText = computed(() => {
   if (!props.owner && props.recording) {
     const stats = props.recording.stats.value
-    return t('toolbox.recordingCount', '{total} reports · {kept} HID actions')
-      .replace('{total}', String(stats.receivedReports))
+    return t('toolbox.recordingCount', '{kept} actions recorded')
       .replace('{kept}', String(stats.writtenActions))
   }
   const status = progress.value

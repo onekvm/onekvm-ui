@@ -1,6 +1,6 @@
 # Extension Toolbox API v1
 
-Requires `onekvm-extension-host >= 0.1.0-r32`, `onekvm-ui >= 0.1.0-r56`
+Requires `onekvm-extension-host >= 0.1.0-r35`, `onekvm-ui >= 0.1.0-r67`
 and `onekvm-core >= 0.1.0-r113`. The trusted Vue runtime is shared with
 extension pages; bundle your component as an IIFE with Vue and Naive UI external.
 
@@ -17,10 +17,12 @@ with an active version appear in the console.
     "items": [{
       "id": "scripts",
       "title": "HID Macros",
-      "i18n": { "zh": { "title": "HID 宏" } },
+      "subtitle": "Record and run device input",
+      "i18n": { "zh": { "title": "HID 宏", "subtitle": "录制并运行设备输入" } },
       "icon": { "source": "lucide", "name": "keyboard" },
       "order": 10,
       "presentation": "window",
+      "layout": "edge-to-edge",
       "size": { "width": 560, "height": 440 },
       "view": { "renderer": "vue", "entrypoint": "web/scripts.js" }
     }]
@@ -36,10 +38,12 @@ example validator:
 | `items` | At most 16 entries |
 | `id` | Unique within the extension; 2–63 lowercase ASCII letters/digits/hyphens, starts with letter/digit |
 | `title` | Nonblank, at most 120 Unicode characters, no control characters |
-| `i18n` | At most 32 locale entries containing only `title`; locale is 1–35 ASCII letters/digits/underscore/hyphen |
+| `subtitle` | Optional second-line text; nonblank when present, at most 160 Unicode characters, no control characters |
+| `i18n` | At most 32 locale entries containing `title` and, when `subtitle` is set, a localized `subtitle`; locale is 1–35 ASCII letters/digits/underscore/hyphen |
 | `icon` | Optional Lucide `{source,name}` or custom `{source,path}`; custom SVG/PNG/WebP under `web/` |
 | `order` | Signed 32 bit integer, default 0; ties sort by full tool ID |
 | `presentation` | Required `drawer` or `window` |
+| `layout` | Optional `padded` (default) or `edge-to-edge`; the latter removes host content padding and scrolling |
 | `size` | Optional width/height, each 1–4096 CSS px; host clamps to viewport |
 | `view` | Required renderer `vue` and normalized `web/*.js` entrypoint |
 
@@ -132,8 +136,13 @@ are an interface contract, not a JavaScript security sandbox.
 One instance per full ID. Windows coexist and may be dragged/resized; only one
 drawer is open. Narrow viewports show the active tool fullscreen while retaining
 the same Vue instance. All surfaces follow the browser fullscreen mount target.
+Tools with `layout: edge-to-edge` own the complete content rectangle below the
+title bar; they must provide any internal spacing and clip their own overflow.
 Focus in a local tool/menu/pin releases remote input and pointer lock. Clicking
 uncovered video resumes control unless a device macro owns HID.
+
+Window title bars use the tool's manifest icon, falling back to the extension
+icon and then the generic tool icon. Shared owned windows inherit the same icon.
 
 Windows share normal, maximized and minimized states. Maximization retains normal
 placement; restoring, including after minimization, retains the previous state.
@@ -193,8 +202,10 @@ Pinned launchers occupy a separate section of the existing console toolbar.
 They follow its position and visibility. Closing a tool retains its pin;
 unpinning leaves the window open. The toolbox menu shows pinned tools first,
 with pointer and touch drag handles plus arrow key ordering. Unpinned tools
-appear below; pin controls use text buttons. The toolbar retains its overflow
-menu, without a separate pin management menu. Preferences remain isolated by origin and
+appear below; pin controls use text buttons. Desktop pins use the available
+toolbar width or rail height; overflow reserves one button only when needed.
+The mobile menu lists all pins in its scrollable content. The toolbar retains
+its overflow menu, without a separate pin management menu. Preferences remain isolated by origin and
 user, and legacy edge-based records migrate to toolbar order. Schema 2 stores
 only tool IDs and order. Unavailable storage preserves usable in-memory pins.
 Disabled extensions retain preferences; an authoritative catalog confirming

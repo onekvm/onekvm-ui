@@ -74,7 +74,7 @@ function dropSide(id: string) {
       </button>
       <button type="button" class="toolbox-pinned-open" :aria-busy="toolbox.openingIds.includes(tool.id)" @click="toolbox.open(tool.id, $event.currentTarget as HTMLElement)">
         <ToolIcon :tool="tool" :loading="toolbox.openingIds.includes(tool.id)" />
-        <span class="toolbox-dropdown-label"><strong>{{ tool.title }}</strong><small>{{ tool.extensionName }}</small></span>
+        <span class="toolbox-dropdown-label"><strong>{{ tool.title }}</strong><small>{{ tool.subtitle }}</small></span>
       </button>
       <n-button text class="toolbox-pin-toggle" :aria-label="`${t('toolbox.unpin')}: ${tool.title}`" @click.stop="toolbox.togglePin(tool.id)">
         <template #icon><PinOff :size="16" /></template>
@@ -98,7 +98,7 @@ function dropSide(id: string) {
 .toolbox-pinned-open { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; min-height: 44px; padding: 4px 0; text-align: left; }
 .toolbox-dropdown-label { display: grid; min-width: 0; line-height: 1.35; }
 .toolbox-dropdown-label strong { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.toolbox-dropdown-label small { opacity: .65; font-size: 12px; }
+.toolbox-dropdown-label small { overflow: hidden; color: var(--onekvm-text-tertiary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .toolbox-pin-toggle { flex: 0 0 40px; height: 44px; margin-right: 2px; }
 .toolbox-pinned-section :is(button, .n-button):focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 </style>

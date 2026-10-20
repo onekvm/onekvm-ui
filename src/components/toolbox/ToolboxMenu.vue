@@ -35,7 +35,7 @@ const options = computed<DropdownOption[]>(() => {
     key: tool.id,
     icon: () => h(ToolIcon, { tool }),
     label: () => h('div', { class: 'toolbox-dropdown-row' }, [
-      h('span', { class: 'toolbox-dropdown-label' }, [h('strong', tool.title), h('small', tool.extensionName)]),
+      h('span', { class: 'toolbox-dropdown-label' }, [h('strong', tool.title), h('small', tool.subtitle)]),
       h(NButton, {
         text: true, size: 'small', class: 'toolbox-pin-toggle',
         'aria-label': `${pinned(tool.id) ? t('toolbox.unpin') : t('toolbox.pin')}: ${tool.title}`,
@@ -57,7 +57,7 @@ function triggerKeydown(event: KeyboardEvent) {
   }
 }
 const menuProps = () => ({
-  class: 'toolbox-dropdown', 'data-toolbox-local': '', 'aria-label': t('toolbox.title'),
+  class: 'toolbox-dropdown host-menu', 'data-toolbox-local': '', 'aria-label': t('toolbox.title'),
   style: { maxWidth: 'calc(100vw - 24px)', maxHeight: 'calc(100dvh - 24px)' },
   onKeydown: (event: KeyboardEvent) => {
     if (event.key !== 'Tab') return
@@ -96,13 +96,19 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
   </n-dropdown>
 </template>
 <style>
-.toolbox-dropdown { min-width: min(300px, calc(100vw - 24px)); }
+.toolbox-dropdown { min-width: min(280px, calc(100vw - 24px)); }
+.toolbox-dropdown .n-dropdown-option-body { padding: 0 4px; }
+.toolbox-dropdown .n-dropdown-option-body__label { min-width: 0; }
+.toolbox-dropdown .n-dropdown-option .n-dropdown-option-body > .n-dropdown-option-body__suffix:empty { display: none; }
 .toolbox-menu-loading { display: grid; min-height: 96px; place-items: center; padding: 24px; }
-.toolbox-dropdown-row { display: flex; align-items: center; gap: 16px; height: 100%; min-height: 44px; line-height: 1.35; }
+.toolbox-dropdown-row { display: flex; align-items: center; gap: 8px; height: 100%; min-height: 44px; line-height: 1.35; }
 .toolbox-dropdown-label { display: grid; flex: 1; min-width: 0; }
-.toolbox-dropdown-label strong { font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
-.toolbox-dropdown-label small { opacity: .65; font-size: 12px; }
-.toolbox-dropdown .toolbox-pin-toggle { flex-shrink: 0; width: 44px; height: 44px; }
+.toolbox-dropdown-label strong { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toolbox-dropdown-label small { overflow: hidden; color: var(--onekvm-text-tertiary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.toolbox-dropdown .toolbox-pin-toggle { flex-shrink: 0; width: 36px; height: 36px; }
 .toolbox-dropdown .toolbox-other-heading { margin: 2px 8px 0; padding: 9px 10px 4px; border-top: 1px solid var(--border); color: var(--onekvm-text-tertiary); font-size: 12px; line-height: 1.4; }
 .toolbox-dropdown button:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+@media (pointer: coarse) {
+  .toolbox-dropdown .toolbox-pin-toggle { width: 44px; height: 44px; }
+}
 </style>

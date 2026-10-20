@@ -9,8 +9,9 @@ import ConsoleFloatingWindow from '../ConsoleFloatingWindow.vue'
 import type { ToolPresentation } from '@/extensions/toolboxRuntime'
 const props = withDefaults(defineProps<{
   title: string; presentation: ToolPresentation; width?: number; height?: number; layer: number; active: boolean; sequence: number; childWindowActive?: boolean
+  contentLayout?: 'padded' | 'edge-to-edge'
   state?: 'normal' | 'maximized' | 'minimized'; ownedModal?: boolean; resizable?: boolean; minimizable?: boolean; maximizable?: boolean
-}>(), { state: 'normal', resizable: true, minimizable: true, maximizable: true })
+}>(), { contentLayout: 'padded', state: 'normal', resizable: true, minimizable: true, maximizable: true })
 const emit = defineEmits<{ focus: []; close: []; childAttention: []; 'update:state': [state: 'normal' | 'maximized' | 'minimized'] }>()
 const overlayTo = useOverlayMount()
 const frame = useTemplateRef<InstanceType<typeof ConsoleFloatingWindow>>('frame')
@@ -32,7 +33,6 @@ const style = computed(() => ({
   top: `${viewport.y + (fullLayout.value || maximized.value ? 0 : box.y)}px`,
   width: `${props.presentation === 'fullscreen' || maximized.value ? viewport.width : box.width}px`,
   height: `${fullLayout.value || maximized.value ? viewport.height : box.height}px`,
-  zIndex: props.layer,
 }))
 function clamp() {
   box.width = Math.min(Math.max(240, box.width), Math.max(1, viewport.width - (fullLayout.value ? 0 : 16)))
@@ -52,6 +52,7 @@ function updateViewport() {
 }
 function start(event: PointerEvent, kind: 'move' | OverlayResizeHandle) {
   if (props.childWindowActive || fullLayout.value || event.button !== 0 || (kind !== 'move' && (!props.resizable || maximized.value)) || (kind === 'move' && (event.target as Element).closest('button'))) return
+  menuOpen.value = false
   stateAnimation?.cancel()
   gesture = { kind, id: event.pointerId, x: event.clientX, y: event.clientY, box: { ...box }, restoreOnMove: maximized.value }
   ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
@@ -238,15 +239,21 @@ onBeforeUnmount(() => {
 <template>
   <div class="tool-window-layer">
     <div v-if="presentation === 'drawer'" class="tool-drawer-mask" :style="{ zIndex: layer - 1 }" @click="emit('close')" />
-    <ConsoleFloatingWindow ref="frame" :title="title" :animate="false" :draggable="!fullLayout && !childWindowActive" :title-tabindex="fullLayout || childWindowActive ? undefined : 0" :title-label="`${title}: ${t('toolbox.moveWindow')}`" header-class="tool-window-header" class="tool-window" :class="[presentation, { active, maximized }]" :style="style" :aria-modal="modal || undefined" tabindex="-1" data-toolbox-local @pointerdown.capture="guardParent" @click.capture="guardParent" @focusin.capture="guardParent" @pointerdown="emit('focus')" @focusin="!active && emit('focus')" @dblclick="toggleMaximize" @keydown="keydown" @close="emit('close')" @header-pointerdown="start($event, 'move')" @header-pointermove="move" @header-pointerup="end" @header-pointercancel="end" @title-keydown="keyboardMove($event)">
+    <ConsoleFloatingWindow ref="frame" :title="title" :layer="layer" :animate="false" :draggable="!fullLayout && !childWindowActive" :title-tabindex="fullLayout || childWindowActive ? undefined : 0" :title-label="`${title}: ${t('toolbox.moveWindow')}`" header-class="tool-window-header" class="tool-window" :class="[presentation, { active, maximized }]" :style="style" :aria-modal="modal || undefined" tabindex="-1" data-toolbox-local @pointerdown.capture="guardParent" @click.capture="guardParent" @focusin.capture="guardParent" @pointerdown="emit('focus')" @focusin="emit('focus')" @dblclick="toggleMaximize" @keydown="keydown" @close="emit('close')" @header-pointerdown="start($event, 'move')" @header-pointermove="move" @header-pointerup="end" @header-pointercancel="end" @title-keydown="keyboardMove($event)">
+      <template #title-icon>
+        <n-dropdown v-if="!fullLayout" :options="options" :show="menuOpen" trigger="click" placement="bottom-start" @update:show="menuOpen = $event" @select="arrange" :to="overlayTo" :z-index="4000" scrollable :menu-props="() => ({ 'data-toolbox-local': '', class: 'tool-window-menu host-menu', style: { maxHeight: 'calc(100dvh - 16px)', maxWidth: 'calc(100vw - 16px)' } })">
+          <n-button quaternary size="tiny" class="tool-window-system-menu" :aria-label="t('toolbox.windowMenu')" aria-haspopup="menu" :aria-expanded="menuOpen" @pointerdown.stop @dblclick.stop>
+            <template #icon><slot name="title-icon"><AppWindow :size="18" /></slot></template>
+          </n-button>
+        </n-dropdown>
+        <slot v-else name="title-icon" />
+      </template>
       <template #actions>
         <n-button v-if="!fullLayout && minimizable && !ownedModal" quaternary circle size="tiny" :aria-label="t('toolbox.minimizeWindow')" @click="emit('update:state', 'minimized')"><template #icon><Minus /></template></n-button>
         <n-button v-if="!fullLayout && maximizable" quaternary circle size="tiny" :aria-label="t(maximized ? 'toolbox.restoreWindow' : 'toolbox.maximizeWindow')" @click="toggleMaximize()"><template #icon><Copy v-if="maximized" /><Square v-else /></template></n-button>
-        <n-dropdown v-if="!fullLayout" :options="options" :show="menuOpen" trigger="click" placement="bottom-end" @update:show="menuOpen = $event" @select="arrange" :to="overlayTo" :z-index="4000" scrollable :menu-props="() => ({ 'data-toolbox-local': '', class: 'tool-window-menu', style: { maxHeight: 'calc(100dvh - 16px)', maxWidth: 'calc(100vw - 16px)' } })">
-          <n-button quaternary circle size="tiny" :aria-label="t('toolbox.arrange')"><template #icon><Ellipsis /></template></n-button>
-        </n-dropdown>
+
       </template>
-      <div class="tool-window-content" :inert="childWindowActive"><slot /></div>
+      <div class="tool-window-content" :class="{ 'edge-to-edge': contentLayout === 'edge-to-edge' }" :inert="childWindowActive"><slot /></div>
       <button v-for="handle in !fullLayout && !maximized && resizable && !childWindowActive ? handles : []" :key="handle" type="button" class="tool-resize" :class="`tool-resize-${handle}`" :tabindex="handle === 'se' ? 0 : -1" :aria-label="t('toolbox.resizeWindow')" @pointerdown="start($event, handle)" @pointermove="move" @pointerup="end" @pointercancel="end" @lostpointercapture="end" @keydown="keyboardMove($event, true)">
         <svg v-if="handle === 'se'" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M5 17 17 5M10 17l7-7M15 17l2-2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
       </button>
@@ -261,10 +268,13 @@ onBeforeUnmount(() => {
 .tool-window.maximized { border-radius: 0; }
 .tool-window:not(.active) :deep(.console-floating-title) { color: var(--onekvm-text-tertiary); }
 .tool-window-header { flex-shrink: 0; }
+.tool-window-system-menu { width: 24px; height: 24px; padding: 0; }
 .drawer .tool-window-header, .fullscreen .tool-window-header { cursor: default; }
 .tool-window :focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 .tool-window :deep(.n-input :is(input, textarea):focus-visible) { outline: none; }
 .tool-window-content { flex: 1; min-height: 0; overflow: auto; padding: 16px; overscroll-behavior: contain; scroll-padding: 16px; }
+.tool-window-content.edge-to-edge { display: flex; flex-direction: column; overflow: hidden; padding: 0; scroll-padding: 0; }
+.tool-window-content.edge-to-edge > :deep(.extension-tool-view) { flex: 1 1 0; width: 100%; min-height: 0; }
 .tool-resize { position: absolute; display: grid; place-items: end; padding: 0; border: 0; color: var(--muted-foreground, currentColor); background: transparent; touch-action: none; }
 .tool-resize-n, .tool-resize-s { left: 16px; right: 16px; height: 5px; cursor: ns-resize; }
 .tool-resize-n { top: 0; } .tool-resize-s { bottom: 0; }
@@ -276,7 +286,8 @@ onBeforeUnmount(() => {
 .tool-resize:hover { color: var(--foreground); }
 .tool-drawer-mask { position: absolute; inset: 0; background: rgb(0 0 0 / 35%); pointer-events: auto; }
 @media (pointer: coarse) {
-  .tool-window-content { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  .tool-window-system-menu { width: 44px; height: 44px; }
+  .tool-window-content:not(.edge-to-edge) { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
   .tool-resize-n, .tool-resize-s { height: 10px; left: 24px; right: 24px; }
   .tool-resize-e, .tool-resize-w { width: 10px; top: 24px; bottom: 24px; }
   .tool-resize-nw, .tool-resize-ne, .tool-resize-sw { width: 24px; height: 24px; }

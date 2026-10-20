@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { useAsyncDialog } from '@/composables/useAsyncDialog'
-import { serviceURL } from '@/api/service-url'
+import { cloudDeviceName, serviceURL } from '@/api/service-url'
 import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import {
   Check,
   CircleUserRound,
   Command,
   Disc3,
-  GripHorizontal,
+  FolderSync,
+  HardDrive,
   GripVertical,
   Gamepad2,
   Keyboard,
   Languages,
+  Layers,
   LogOut,
   Activity,
   Maximize,
@@ -32,6 +34,7 @@ import { NIcon, useMessage, type DialogReactive, type DropdownOption } from 'nai
 import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type OneKVMStatus } from '@/api/client'
 import { type MouseMode } from '@/composables/useMouse'
 import { useOverlayMount } from '@/composables/useOverlayMount'
+import { usePerformanceDock } from '@/composables/usePerformanceDock'
 import { useToolbarPinMotion } from '@/composables/useToolbarPinMotion'
 import type { VideoFit, VideoRotation } from '@/lib/video-fit'
 import { effectiveVideoCodec } from '@/lib/video-transport'
@@ -47,8 +50,7 @@ import { resolveConsoleSubtitle } from '@/lib/console-title'
 import { machineDisplayName } from '@/lib/machine'
 import { onekvm, type InputActivity, type TransportState } from '@/lib/onekvm'
 import { sendShortcut, shortcutChordLabel } from '@/lib/keyboard-shortcuts'
-import { useOneKVMTheme } from '@/theme/runtime'
-import type { OneKVMAppearancePreference } from '@/theme/model'
+import { useThemeMenu } from '@/composables/useThemeMenu'
 import {
   clampToolbarPosition,
   parseToolbarDock,
@@ -100,6 +102,7 @@ import MediaTransferIndicator from './MediaTransferIndicator.vue'
 import type { MediaTransferState } from '@/lib/media-transfer'
 import ControlOverlay from './ControlOverlay.vue'
 import ConsoleBrandCopy from './ConsoleBrandCopy.vue'
+import CloudBackButton from './CloudBackButton.vue'
 
 const props = defineProps<{
   state: TransportState
@@ -168,6 +171,9 @@ type PowerAction = 'on' | 'off' | 'reset'
 const powerAction = ref<PowerAction | null>(null)
 const HDD_INDICATOR_KEY = 'onekvm.hddIndicator'
 const showHddIndicator = shallowRef(readHddIndicatorPreference())
+const hddIndicatorVisible = computed(() => showHddIndicator.value
+  && Boolean(props.status?.atx?.available)
+  && typeof props.status?.atx?.hdd_led === 'boolean')
 
 function readHddIndicatorPreference() {
   try { return localStorage.getItem(HDD_INDICATOR_KEY) === '1' } catch { return false }
@@ -185,6 +191,8 @@ const mouseLed = ref<HTMLElement | null>(null)
 const keyboardLed = ref<HTMLElement | null>(null)
 const gamepadLed = ref<HTMLElement | null>(null)
 const toolbarEl = ref<HTMLElement | null>(null)
+const performanceDock = usePerformanceDock()
+const performanceTarget = shallowRef<HTMLElement | null>(null)
 const trayEl = shallowRef<HTMLElement | null>(null)
 const brandLogoJelly = ref(false)
 const BRAND_LOGO_CLICK_GAP_MS = 800
@@ -194,7 +202,7 @@ const toolbarDock = ref<ToolbarDockState>(parseToolbarDock(localStorage.getItem(
 const toolbarDragging = ref(false)
 const toolbarMorphing = ref(false)
 const toolbarLiftPending = ref(false)
-useToolbarPinMotion(toolbarEl, trayEl, () => `${showHddIndicator.value}:${toolbox.pinned.map(({ tool }) => tool.id).join(',')}`, () => !toolbarDragging.value && !toolbarMorphing.value)
+useToolbarPinMotion(toolbarEl, trayEl, () => `${performanceDock.docked.value}:${performanceDock.visible.value}:${performanceDock.dragging.value}:${hddIndicatorVisible.value}:${toolbox.pinned.map(({ tool }) => tool.id).join(',')}`, () => !toolbarDragging.value && !toolbarMorphing.value)
 const toolbarSnapHint = ref<ToolbarSnapPreview>(null)
 const toolbarSnapHintText = computed(() => {
   if (!toolbarSnapHint.value) return ''
@@ -234,6 +242,9 @@ let launcherMedia: MediaQueryList | undefined
 const toolbarVertical = computed(
   () => !toolbarLauncher.value && !toolbarDragging.value && (toolbarDock.value.dock === 'left' || toolbarDock.value.dock === 'right'),
 )
+watch([performanceTarget, toolbarEl, toolbarLauncher], ([target, toolbar, launcher]) => {
+  performanceDock.register(launcher ? null : target, launcher ? null : toolbar)
+}, { flush: 'post', immediate: true })
 const toolbarCompact = computed(
   () => toolbarLauncher.value || toolbarDragging.value || toolbarDock.value.dock === 'float' || toolbarVertical.value,
 )
@@ -530,6 +541,7 @@ function armToolbarHide() {
     || pinnedOverflowOpen.value
     || launcherMenuOpen.value
     || pointerOnToolbarChrome.value
+    || performanceDock.dragging.value
     || toolbarDragging.value
     || toolbarMorphing.value
     || toolbarLiftPending.value
@@ -547,6 +559,7 @@ function armToolbarHide() {
       || pinnedOverflowOpen.value
       || launcherMenuOpen.value
       || pointerOnToolbarChrome.value
+      || performanceDock.dragging.value
       || toolbarDragging.value
     ) return
     edgeHidden.value = true
@@ -1054,12 +1067,12 @@ const powerStateLabel = computed(() => {
   return t('power.title', 'Power')
 })
 
+const audioSession = shallowRef({ speaker: false, microphone: false })
 const audioState = computed<DeviceState>(() =>
-  props.status?.audio.enabled || props.status?.audio.microphone ? 'ready' : 'waiting',
+  audioSession.value.speaker || audioSession.value.microphone ? 'ready' : 'waiting',
 )
 const audioStateLabel = computed(() => {
-  const speaker = props.status?.audio.enabled
-  const microphone = props.status?.audio.microphone
+  const { speaker, microphone } = audioSession.value
   if (speaker && microphone) return `${t('usbAudio.speaker', 'Speaker')} + ${t('usbAudio.microphone', 'Microphone')}`
   if (speaker) return t('usbAudio.speaker', 'Speaker')
   if (microphone) return t('usbAudio.microphone', 'Microphone')
@@ -1069,25 +1082,46 @@ const audioStateLabel = computed(() => {
 const mediaOpen = computed(() =>
   Boolean(props.msdStatus?.available || props.msdStatus?.mtp_available))
 
+const activeMediaFeatures = computed(() => {
+  const media = props.msdStatus
+  const features: Array<'iso' | 'drive' | 'mtp'> = []
+  if (!media) return features
+  if (media.available && media.connected) {
+    if (media.iso_mounted) features.push('iso')
+    if (media.drive_mounted) features.push('drive')
+  }
+  if (media.mtp_available && media.mtp) features.push('mtp')
+  return features
+})
+
+const mediaIcon = computed(() => {
+  const features = activeMediaFeatures.value
+  if (features.length > 1) return Layers
+  if (features[0] === 'iso') return Disc3
+  if (features[0] === 'drive') return HardDrive
+  if (features[0] === 'mtp') return FolderSync
+  return Disc3
+})
+
 const mediaState = computed<DeviceState>(() => {
   if (!props.msdStatus) return 'waiting'
   if (!mediaOpen.value) return 'error'
-  if (props.msdStatus.available && props.msdStatus.connected) {
-    return props.msdStatus.iso_mounted || props.msdStatus.drive_mounted ? 'ready' : 'waiting'
-  }
-  if (props.msdStatus.mtp) return 'ready'
-  return 'waiting'
+  return activeMediaFeatures.value.length > 0 ? 'ready' : 'waiting'
 })
 
 const mediaStateLabel = computed(() => {
   if (!props.msdStatus) return t('virtualMedia.connectingStatus', 'Connecting...')
   if (!mediaOpen.value) return t('virtualMedia.unavailable', 'Virtual media is unavailable')
-  if (props.msdStatus.available && props.msdStatus.connected) {
-    return props.msdStatus.iso_mounted || props.msdStatus.drive_mounted
-      ? t('virtualMedia.mounted', 'Virtual Media Mounted')
-      : t('virtualMedia.noMountedFile', 'No mounted media')
+  if (activeMediaFeatures.value.length > 0) {
+    return activeMediaFeatures.value.map((feature) => {
+      if (feature === 'iso') return t('virtualMedia.isoMounted', 'ISO image mounted')
+      if (feature === 'drive') return t('virtualMedia.driveMounted', 'Virtual disk mounted')
+      return t('virtualMedia.mtpOn', 'File transfer on')
+    }).join(' + ')
   }
-  if (props.msdStatus.mtp) return t('virtualMedia.mtpOn', 'File transfer on')
+  if (props.msdStatus.available && props.msdStatus.connected) {
+    return t('virtualMedia.noMountedFile', 'No mounted media')
+  }
   return t('virtualMedia.disconnected', 'Disconnected')
 })
 
@@ -1097,8 +1131,10 @@ const consoleSubtitle = computed(() => resolveConsoleSubtitle(
   props.status?.network.hostname,
   deviceModel.value,
 ))
+const cloudName = cloudDeviceName()
+const displayConsoleTitle = computed(() => cloudName || props.consoleTitle)
 const brandedConsoleTitle = computed(() => (
-  props.brandBadge ? `${props.consoleTitle} ${props.brandBadge}` : props.consoleTitle
+  props.brandBadge ? `${displayConsoleTitle.value} ${props.brandBadge}` : displayConsoleTitle.value
 ))
 const brandLabel = computed(() => consoleSubtitle.value
   ? `${brandedConsoleTitle.value} · ${consoleSubtitle.value}`
@@ -1161,22 +1197,20 @@ const languageMenuOptions = computed<DropdownOption[]>(() =>
   })),
 )
 
-const { appearance, setAppearance } = useOneKVMTheme()
-const themeChoices: { key: OneKVMAppearancePreference; label: () => string }[] = [
-  { key: 'system', label: () => t('settings.appearance.followSystem', 'System') },
-  { key: 'light', label: () => t('settings.appearance.light', 'Light') },
-  { key: 'dark', label: () => t('settings.appearance.dark', 'Dark') },
-]
+const { themeChoices, selectedThemeChoice, selectThemeChoice, themeMenuProps } = useThemeMenu()
 
 const accountOptions = computed<DropdownOption[]>(() => [
   {
     key: 'theme',
     label: t('settings.appearance.theme', 'Theme'),
     icon: icon(Palette),
-    children: themeChoices.map((choice) => ({
+    children: themeChoices.value.map((choice) => ({
       key: `theme-${choice.key}`,
-      label: choice.label(),
-      icon: appearance.value === choice.key ? icon(Check) : undefined,
+      label: () => h('span', { class: 'theme-menu-choice' }, [
+        h('span', choice.label),
+        selectedThemeChoice.value === choice.key ? h(Check, { size: 16, 'aria-hidden': true }) : null,
+      ]),
+      icon: icon(choice.icon),
     })),
   },
   { type: 'divider', key: 'account-theme-divider' },
@@ -1217,15 +1251,15 @@ function selectKeyboard(key: string | number) {
 function selectAccount(key: string | number) {
   const value = String(key)
   if (value.startsWith('theme-')) {
-    setAppearance(value.slice('theme-'.length))
+    selectThemeChoice(value.slice('theme-'.length))
     return
   }
   if (key === 'settings') emit('account')
   if (key === 'logout') emit('logout')
 }
 
-function pickTheme(preference: OneKVMAppearancePreference) {
-  setAppearance(preference)
+function pickTheme(choice: string) {
+  selectThemeChoice(choice)
   updateMenu('account', false)
 }
 
@@ -1332,6 +1366,18 @@ watch(
     emitToolbarOverlay()
   },
 )
+watch(performanceDock.dragging, (dragging) => {
+  // A performance bar can be dragged onto an auto-hidden floating toolbar.
+  // Keep the drop target visible for the whole gesture so its hit box follows
+  // the pointer instead of remaining translated off-screen.
+  if (dragging) {
+    edgeHidden.value = false
+    clearToolbarHideTimer()
+  } else {
+    refreshHideEdge()
+    armToolbarHide()
+  }
+})
 
 onMounted(() => {
   unsubscribeActivity = onekvm.subscribeActivity(pulseInputLed)
@@ -1348,6 +1394,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  performanceDock.register(null, null)
   clearToolbarHideTimer()
   window.clearTimeout(mousePulseTimer)
   window.clearTimeout(keyboardPulseTimer)
@@ -1389,6 +1436,7 @@ onBeforeUnmount(() => {
       <span class="toolbar-launcher-pip" :data-state="screenState" aria-hidden="true" />
     </button>
     <div v-else class="brand">
+      <CloudBackButton />
       <n-tooltip :disabled="!toolbarCompact">
         <template #trigger>
           <button
@@ -1409,7 +1457,7 @@ onBeforeUnmount(() => {
       </n-tooltip>
       <ConsoleBrandCopy
         v-if="!toolbarCompact"
-        :title="consoleTitle"
+        :title="displayConsoleTitle"
         :subtitle="consoleSubtitle"
         :badge="brandBadge"
       />
@@ -1427,8 +1475,7 @@ onBeforeUnmount(() => {
         :aria-label="t('toolbar.dragHandle', 'Drag menu bar')"
         @pointerdown.stop="onToolbarHandlePointerDown"
       >
-        <GripVertical v-if="toolbarVertical" :size="14" />
-        <GripHorizontal v-else :size="14" />
+        <GripVertical :size="14" />
       </button>
     </div>
 
@@ -1442,6 +1489,7 @@ onBeforeUnmount(() => {
       :inert="toolbarLauncher && !launcherMenuOpen"
     >
       <div v-if="toolbarLauncher" class="toolbar-tray-header">
+        <CloudBackButton show-label />
         <strong>{{ brandedConsoleTitle }}</strong>
         <span v-if="consoleSubtitle">{{ consoleSubtitle }}</span>
       </div>
@@ -1449,6 +1497,12 @@ onBeforeUnmount(() => {
         {{ t('deviceStatus.title', 'Device status') }}
       </div>
       <div class="device-controls" :aria-label="t('deviceStatus.title', 'Device status')">
+      <div
+        ref="performanceTarget"
+        v-show="!toolbarLauncher && ((performanceDock.docked.value && performanceDock.visible.value) || performanceDock.dragging.value)"
+        class="toolbar-performance-slot"
+        :class="{ 'is-drop-preview': performanceDock.preview.value, 'is-drop-target': performanceDock.dragging.value && !performanceDock.docked.value }"
+      ><span v-if="performanceDock.dragging.value && !performanceDock.docked.value" class="toolbar-performance-drop-label">{{ t('screen.performanceDock', 'Drop into toolbar') }}</span></div>
       <DisplaySettingsPopover
         :state="state"
         :pip-active="pipActive"
@@ -1611,17 +1665,19 @@ onBeforeUnmount(() => {
       </PowerControlPopover>
 
       <HddActivityIndicator
-        v-if="showHddIndicator"
+        v-if="hddIndicatorVisible"
         :available="Boolean(status?.atx?.available)"
         :led="status?.atx?.hdd_led"
         :expanded="toolbarLauncher"
       />
 
       <USBAudioPopover
+        v-if="status?.audio.enabled || status?.audio.microphone_available"
         :status="status"
         :placement="menuPlacement"
         :sheet="toolbarLauncher"
         @update:show="updateMenu('audio', $event)"
+        @session="audioSession = $event"
       >
         <n-tooltip :disabled="toolbarLauncher || openMenu === 'audio'">
           <template #trigger>
@@ -1651,7 +1707,7 @@ onBeforeUnmount(() => {
             :aria-label="`${t('virtualMedia.title', 'Virtual Media')}: ${mediaStateLabel}`"
             @click="emit('media', toolbarLauncher)"
           >
-            <template #icon><Disc3 /></template>
+            <template #icon><component :is="mediaIcon" /></template>
             <span class="device-led" />
             <span class="toolbar-action-label">{{ t('virtualMedia.title', 'Virtual Media') }}</span>
           </n-button>
@@ -1746,6 +1802,7 @@ onBeforeUnmount(() => {
         :show="openMenu === 'language'"
         :placement="menuPlacement"
         :options="languageMenuOptions"
+        :menu-props="() => ({ class: 'host-menu' })"
         @select="setLanguage(String($event))"
         @update:show="updateMenu('language', $event)"
       >
@@ -1795,6 +1852,7 @@ onBeforeUnmount(() => {
           :show="openMenu === 'account'"
           :placement="menuPlacement"
           :options="accountOptions"
+          :menu-props="themeMenuProps"
           @select="selectAccount"
           @update:show="updateMenu('account', $event)"
         >
@@ -1839,11 +1897,13 @@ onBeforeUnmount(() => {
                 v-for="choice in themeChoices"
                 :key="choice.key"
                 type="button"
-                class="control-sheet-row"
-                :aria-current="appearance === choice.key ? true : undefined"
+                class="control-sheet-row theme-choice-row"
+                :aria-current="selectedThemeChoice === choice.key ? true : undefined"
                 @click="pickTheme(choice.key)"
               >
-                {{ choice.label() }}
+                <component :is="choice.icon" :size="18" aria-hidden="true" />
+                <span>{{ choice.label }}</span>
+                <Check v-if="selectedThemeChoice === choice.key" :size="16" aria-hidden="true" />
               </button>
               <button type="button" class="control-sheet-row" @click="pickAccount('settings')">
                 {{ t('settings.account.manage', 'Account settings') }}

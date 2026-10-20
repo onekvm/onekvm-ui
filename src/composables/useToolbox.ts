@@ -8,11 +8,13 @@ import { currentLanguage, t } from '@/i18n/runtime'
 import { invalidateToolResources, toolCacheKey, type HIDRecordingActivity } from '@/extensions/toolboxRuntime'
 import { createToolChildWindows, type ToolChildWindow } from '@/lib/tool-child-windows'
 import { parseToolboxPins, reorderToolboxPins, toolboxPinStorageKey, type ToolboxPin } from '@/lib/toolbox-pins'
+import { registerConsoleWindowLayer } from './useConsoleWindowLayer'
+import { CONSOLE_WINDOW_LAYER } from '@/lib/console-window-stack'
 
 export interface ToolboxTool {
   id: string
   title: string
-  extensionName: string
+  subtitle: string
   extension: ConsoleExtension
   item: ExtensionToolboxItem
 }
@@ -46,16 +48,37 @@ export function useToolbox() {
   const recording = shallowRef<HIDRecordingActivity | null>(null)
   const childWindowIds = shallowRef<string[]>([])
   const childWindows = createToolChildWindows(ids => { childWindowIds.value = ids })
+  const windowGroups = new Map<string, ReturnType<typeof registerConsoleWindowLayer>>()
+  watch([instances, childWindowIds], () => {
+    for (const [id, group] of windowGroups) {
+      if (!instances.value.some(instance => instance.id === id)) { group.dispose(); windowGroups.delete(id) }
+    }
+    for (const instance of instances.value) {
+      let group = windowGroups.get(instance.id)
+      if (!group) { group = registerConsoleWindowLayer(); windowGroups.set(instance.id, group) }
+      group.reserve(1 + childWindowIds.value.filter(id => id === instance.id).length)
+    }
+  }, { flush: 'sync' })
   const mobile = ref(toolbarLauncherActive(window.innerWidth, window.innerHeight))
   const allowed = computed(() => auth.authenticated && hasPermission(auth, 'settings.view'))
   const namespace = computed(() => toolboxPinStorageKey(window.location.origin, auth.username))
   const tools = computed<ToolboxTool[]>(() => !allowed.value ? [] : catalog.value
     .filter(e => e.installed && e.enabled && e.version)
-    .flatMap(extension => (extension.toolbox?.items || []).map(item => ({
-      id: `${extension.id}/${item.id}`, item, extension,
-      title: extensionLocalizedText(Object.fromEntries(Object.entries(item.i18n || {}).map(([locale, value]) => [locale, value.title])), currentLanguage.value, item.title),
-      extensionName: extensionLocalizedText(Object.fromEntries(Object.entries(extension.i18n || {}).map(([locale, value]) => [locale, value.name])), currentLanguage.value, extension.name),
-    })))
+    .flatMap(extension => (extension.toolbox?.items || []).map(item => {
+      const extensionName = extensionLocalizedText(
+        Object.fromEntries(Object.entries(extension.i18n || {}).map(([locale, value]) => [locale, value.name])),
+        currentLanguage.value,
+        extension.name,
+      )
+      const subtitles = Object.fromEntries(Object.entries(item.i18n || {}).flatMap(([locale, value]) => (
+        value.subtitle ? [[locale, value.subtitle]] : []
+      )))
+      return {
+        id: `${extension.id}/${item.id}`, item, extension,
+        title: extensionLocalizedText(Object.fromEntries(Object.entries(item.i18n || {}).map(([locale, value]) => [locale, value.title])), currentLanguage.value, item.title),
+        subtitle: extensionLocalizedText(subtitles, currentLanguage.value, item.subtitle || extensionName),
+      }
+    }))
     .sort((a, b) => (a.item.order || 0) - (b.item.order || 0) || a.id.localeCompare(b.id)))
   const pinned = computed(() => pins.value.flatMap(pin => {
     const tool = tools.value.find(tool => tool.id === pin.toolId)
@@ -89,6 +112,7 @@ export function useToolbox() {
   function focus(id: string) {
     if (!instances.value.some(instance => instance.id === id) || (recording.value && minimizedId.value === id)) return
     activeId.value = id
+    windowGroups.get(id)?.raise()
     if (minimizedId.value === id) minimizedId.value = ''
     instances.value = instances.value.map(i => i.id === id ? { ...i, windowState: i.windowState === 'minimized' ? i.restoreState || 'normal' : i.windowState, sequence: ++sequence } : i)
     localFocus.value = true
@@ -128,7 +152,7 @@ export function useToolbox() {
     let disposed = false
     return {
       layer: computed(() => { childWindowIds.value; return windowLayer(id) + (childWindows.index(id, child) + 1) * 2 }),
-      active: computed(() => { childWindowIds.value; return activeId.value === id && childWindows.active(id) === child }),
+      active: computed(() => { childWindowIds.value; return windowActive(id) && activeId.value === id && childWindows.active(id) === child }),
       blocked: computed(() => { childWindowIds.value; return childWindows.blocked(id, child) }),
       visible: computed(() => instances.value.some(instance => instance.id === id && instance.windowState !== 'minimized') && minimizedId.value !== id && (!mobile.value || activeId.value === id)),
       activate: () => {
@@ -137,6 +161,7 @@ export function useToolbox() {
         const raise = activeId.value !== id || childWindows.active(id) !== child
         activeId.value = id
         localFocus.value = true
+        windowGroups.get(id)?.raise()
         if (raise) {
           instances.value = instances.value.map(instance => instance.id === id ? { ...instance, sequence: ++sequence } : instance)
           childWindows.activate(id, child)
@@ -157,13 +182,9 @@ export function useToolbox() {
   }
   function windowBlocked(id: string) { childWindowIds.value; return childWindows.blocked(id) }
   function childWindowFocused(id: string) { childWindowIds.value; return Boolean(childWindows.active(id)) }
+  function windowActive(id: string) { return windowGroups.get(id)?.active.value || false }
   function windowLayer(id: string) {
-    let layer = 2300
-    for (const instance of [...instances.value].sort((a, b) => a.sequence - b.sequence)) {
-      if (instance.id === id) return layer
-      layer += 2 + childWindowIds.value.filter(owner => owner === instance.id).length * 2
-    }
-    return layer
+    return windowGroups.get(id)?.layer.value || CONSOLE_WINDOW_LAYER
   }
   function setWindowState(id: string, state: 'normal' | 'maximized' | 'minimized') {
     if (windowBlocked(id)) { childWindows.focus(id, true); return }
@@ -326,6 +347,8 @@ export function useToolbox() {
     generation++
     recording.value = null
     childWindows.clear()
+    for (const group of windowGroups.values()) group.dispose()
+    windowGroups.clear()
     invalidateToolResources([])
     document.removeEventListener('visibilitychange', resume)
     window.removeEventListener('online', resume)
@@ -336,7 +359,7 @@ export function useToolbox() {
   })
   const toolbox = reactive({ allowed, tools, instances, pins, pinned, menuOpen, localFocus, inputBlocked, loading, openingIds, error, activeId, minimizedId, recording, childWindowIds,
     refresh, acceptCatalog, togglePin, reorderPin, open, focus, close, closeAll, minimizeForRecording, showRecordingStatus, registerChildWindow,
-    focusChildWindow: childWindows.focus, windowLayer, windowBlocked, childWindowFocused, setWindowState, resizeWindow, finishOpening, registerActions })
+    focusChildWindow: childWindows.focus, windowLayer, windowActive, windowBlocked, childWindowFocused, setWindowState, resizeWindow, finishOpening, registerActions })
   provide(key, toolbox)
   return toolbox
 }

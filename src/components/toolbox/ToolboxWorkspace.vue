@@ -5,6 +5,7 @@ import { useOverlayMount } from '@/composables/useOverlayMount'
 import { toolbarLauncherActive } from '@/lib/toolbar-dock'
 import type { ToolPresentation } from '@/extensions/toolboxRuntime'
 import ToolWindow from './ToolWindow.vue'
+import ToolIcon from './ToolIcon.vue'
 import ExtensionToolView from './ExtensionToolView.vue'
 import { t } from '@/i18n/runtime'
 const toolbox = useToolboxContext()
@@ -23,12 +24,14 @@ onBeforeUnmount(() => window.removeEventListener('resize', resize))
     <TransitionGroup name="win11-window" tag="div" class="toolbox-workspace">
       <ToolWindow v-for="instance in ordered" :key="instance.cacheKey" v-show="instance.windowState !== 'minimized' && toolbox.minimizedId !== instance.id && (!mobile || toolbox.activeId === instance.id)"
         :title="toolbox.tools.find(t => t.id === instance.id)?.title || instance.tool.title" :presentation="presentation(instance)"
+        :content-layout="instance.tool.item.layout || 'padded'"
         :width="instance.windowSize?.width || instance.tool.item.size?.width || (instance.tool.item.presentation === 'drawer' ? 480 : 720)" :height="instance.windowSize?.height || instance.tool.item.size?.height"
-        :layer="toolbox.windowLayer(instance.id)" :sequence="instance.sequence" :active="toolbox.activeId === instance.id && !toolbox.childWindowFocused(instance.id)"
+        :layer="toolbox.windowLayer(instance.id)" :sequence="instance.sequence" :active="toolbox.windowActive(instance.id) && toolbox.activeId === instance.id && !toolbox.childWindowFocused(instance.id)"
         :state="instance.windowState || 'normal'" @update:state="toolbox.setWindowState(instance.id, $event)"
         :child-window-active="toolbox.windowBlocked(instance.id)"
         @child-attention="toolbox.focusChildWindow(instance.id, true)"
         @focus="toolbox.focus(instance.id)" @close="toolbox.close(instance.id)">
+        <template #title-icon><ToolIcon :tool="instance.tool" /></template>
         <ExtensionToolView :instance="instance" :presentation="presentation(instance)" />
       </ToolWindow>
     </TransitionGroup>

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, h, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, h, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue'
 import { type DropdownOption } from 'naive-ui'
 import { Ellipsis, Pin } from '@/icons'
 import { useToolboxContext } from '@/composables/useToolbox'
 import { useOverlayMount } from '@/composables/useOverlayMount'
+import { useToolbarPinCapacity } from '@/composables/useToolbarPinCapacity'
 import { DISMISS_CONTROL_OVERLAY_EVENT } from '@/lib/overlay-target'
 import { t } from '@/i18n/runtime'
 import ToolIcon from './ToolIcon.vue'
@@ -13,9 +14,11 @@ const emit = defineEmits<{ overlay: [open: boolean] }>()
 const toolbox = useToolboxContext()
 const mountTo = useOverlayMount()
 const overflowOpen = ref(false)
-const visible = computed(() => toolbox.pinned.slice(0, props.mobile ? 8 : props.vertical ? 2 : 3))
+const root = useTemplateRef<HTMLElement>('root')
+const capacity = useToolbarPinCapacity(root, () => toolbox.pinned.length, () => Boolean(props.mobile), () => Boolean(props.vertical))
+const visible = computed(() => toolbox.pinned.slice(0, capacity.value))
 const overflow = computed(() => toolbox.pinned.slice(visible.value.length))
-const menuProps = () => ({ style: { maxHeight: 'calc(100dvh - 24px)' }, 'data-toolbox-local': '' })
+const menuProps = () => ({ class: 'host-menu', style: { maxHeight: 'calc(100dvh - 24px)' }, 'data-toolbox-local': '' })
 const overflowOptions = computed<DropdownOption[]>(() => overflow.value.map(({ tool }) => ({ key: tool.id, label: tool.title, icon: () => h(ToolIcon, { tool, loading: toolbox.openingIds.includes(tool.id) }) })))
 function dismiss() { overflowOpen.value = false }
 watch(overflowOpen, open => emit('overlay', open))
@@ -23,7 +26,7 @@ onMounted(() => window.addEventListener(DISMISS_CONTROL_OVERLAY_EVENT, dismiss))
 onBeforeUnmount(() => { window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, dismiss); emit('overlay', false) })
 </script>
 <template>
-  <div v-if="toolbox.pinned.length" class="toolbar-pinned-tools" :class="{ 'is-mobile': mobile, 'is-vertical': vertical }" role="group" :aria-label="t('toolbox.pinned')" data-toolbox-local>
+  <div v-if="toolbox.pinned.length" ref="root" class="toolbar-pinned-tools" :class="{ 'is-mobile': mobile, 'is-vertical': vertical }" role="group" :aria-label="t('toolbox.pinned')" data-toolbox-local>
     <span v-if="mobile" class="toolbar-pinned-heading"><Pin :size="14" />{{ t('toolbox.pinned') }}</span>
     <div class="toolbar-pinned-buttons">
       <n-tooltip v-for="{ tool } in visible" :key="tool.id" :to="mountTo" :disabled="mobile" :placement="placement?.startsWith('left') ? 'left' : placement?.startsWith('right') ? 'right' : placement?.startsWith('top') ? 'top' : 'bottom'" style="pointer-events: none">

@@ -258,6 +258,8 @@ function networkAddressOptions(name: string) {
 function kindLabel(kind: string) {
   if (kind === 'protocol') return t('settings.plugins.kindProtocol', 'Protocol')
   if (kind === 'service') return t('settings.plugins.kindService', 'Service')
+  if (kind === 'network') return t('settings.plugins.kindNetwork', 'Networking & tunnels')
+  if (kind === 'environment') return t('settings.plugins.kindEnvironment', 'Environment')
   return kind
 }
 

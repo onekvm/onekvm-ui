@@ -26,6 +26,8 @@ const kind = computed(() => {
   const value = props.status?.kind || ''
   if (value === 'protocol') return t('settings.plugins.kindProtocol', 'Protocol')
   if (value === 'service') return t('settings.plugins.kindService', 'Service')
+  if (value === 'network') return t('settings.plugins.kindNetwork', 'Networking & tunnels')
+  if (value === 'environment') return t('settings.plugins.kindEnvironment', 'Environment')
   if (value === 'cloud-provider') return t('settings.plugins.kindCloudProvider', 'Cloud service')
   if (value === 'device') return t('settings.plugins.kindDevice', 'Device backend')
   return value
@@ -44,7 +46,7 @@ function memorySize(bytes: number) {
 
 <template>
   <n-modal :show="show" :mask-closable="!busy" :close-on-esc="!busy" @update:show="(show: boolean) => { if (!show) emit('close') }" @after-leave="emit('closed')">
-    <n-card v-if="status" class="plugin-details-card" :closable="!busy" role="dialog" aria-modal="true" aria-labelledby="plugin-details-title" @close="emit('close')">
+    <n-card v-if="status" class="plugin-details-card host-window-frame host-dialog" :closable="!busy" role="dialog" aria-modal="true" aria-labelledby="plugin-details-title" @close="emit('close')">
       <template #header>
         <span id="plugin-details-title">{{ t('settings.plugins.details', 'Details') }} - {{ identity?.name }}</span>
       </template>

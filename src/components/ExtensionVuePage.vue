@@ -126,7 +126,7 @@ async function reload() {
 }
 
 watch(
-  () => [props.extension.id, props.extension.version, props.extension.page?.entrypoint],
+  [() => props.extension.id, () => props.extension.version, () => props.extension.page?.entrypoint],
   loadPage,
   { immediate: true },
 )

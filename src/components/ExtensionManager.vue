@@ -442,13 +442,14 @@ async function save(status: ExtensionStatus) {
 
 function statusType(status: ExtensionSummary) {
   if (status.error) return 'error'
-  if (status.running) return 'success'
+  if (status.running || (status.installed && status.kind === 'environment')) return 'success'
   return 'default'
 }
 
 function statusText(status: ExtensionSummary) {
   if (!status.installed) return t('settings.plugins.statusAvailable', 'Available')
   if (status.error) return t('settings.plugins.statusError', 'Error')
+  if (status.kind === 'environment') return t('settings.plugins.statusInstalled', 'Installed')
   if (!status.enabled) return t('settings.plugins.statusDisabled', 'Disabled')
   if (status.running) return t('settings.plugins.statusEnabled', 'Enabled')
   return t('settings.plugins.statusStopped', 'Stopped')
@@ -539,12 +540,13 @@ watch(() => props.active, (active) => {
                 </n-tag>
               </div>
               <p>{{ extensionDescription(status) }}</p>
+              <p v-if="status.kind === 'environment'" class="extension-environment-hint">{{ t('settings.plugins.environmentHint', 'Use this environment in Network settings after installation. No enabling is needed.') }}</p>
             </div>
             <n-tag size="small" :type="statusType(status)" :bordered="false">
               {{ statusText(status) }}
             </n-tag>
             <div class="extension-actions">
-              <template v-if="status.installed && !status.system">
+              <template v-if="status.installed && !status.system && status.kind !== 'environment'">
                 <n-button
                   size="small"
                   :type="status.enabled ? 'warning' : 'primary'"
@@ -553,7 +555,7 @@ watch(() => props.active, (active) => {
                   :disabled="busy !== ''"
                   @click="setEnabled(status, !status.enabled)"
                 >
-                  <template #icon><PowerOff v-if="status.enabled" /><Power v-else /></template>
+                  <template #icon><PowerOff v-if="status.enabled" /><Play v-else /></template>
                   {{ status.enabled ? t('settings.plugins.disable', 'Disable') : t('settings.plugins.enable', 'Enable') }}
                 </n-button>
               </template>
@@ -690,7 +692,7 @@ watch(() => props.active, (active) => {
       @update:show="(show: boolean) => { if (!show) void closeInstaller() }"
     >
       <n-card
-        class="plugin-installer-card"
+        class="plugin-installer-card host-window-frame host-dialog"
         :title="t('settings.plugins.installerTitle', 'Install plugin')"
         :closable="installPhase !== 'uploading' && installPhase !== 'installing'"
         role="dialog"

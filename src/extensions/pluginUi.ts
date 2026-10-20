@@ -43,6 +43,7 @@ import * as naiveUI from 'naive-ui'
 import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import AsyncPopconfirm from '@/components/AsyncPopconfirm'
 import ExtensionDropdown from '@/components/ExtensionDropdown'
+import ExtensionDetailsDialog from '@/components/ExtensionDetailsDialog.vue'
 import ExtensionChildWindow from '@/components/toolbox/ExtensionChildWindow.vue'
 import {
   NCard,
@@ -55,7 +56,7 @@ import {
   NUpload,
   NUploadDragger,
 } from 'naive-ui'
-import { icons as lucideIcons } from '@lucide/vue'
+import { icons } from '@/icons'
 
 import {
   api,
@@ -147,7 +148,7 @@ interface PluginUIRuntimeV1 {
   icons: Record<string, Component>
   language: () => string
   xterm: { load: () => Promise<PluginUIXtermV1> }
-  dialogs: { StorageDirectoryPicker: Component }
+  dialogs: { StorageDirectoryPicker: Component; ExtensionDetails: typeof ExtensionDetailsDialog }
   register: (id: string, definition: VueExtensionPageDefinitionV1) => void
   toolbar: { register: (id: string, definition: ToolbarRegistrationV1) => void }
   shell: { register: (id: string, definition: ExtensionShellRegistrationV1) => void }
@@ -176,6 +177,7 @@ const toolbarItemsState = shallowRef<LoadedToolbarItem[]>([])
 let loadingToolbarId: string | null = null
 let loadingPageId: string | null = null
 let loadingShellId: string | null = null
+let pageLoadQueue: Promise<void> = Promise.resolve()
 
 function publishToolbarItems() {
   const items: LoadedToolbarItem[] = []
@@ -356,10 +358,13 @@ window.OneKVMPluginUI = {
     vue: vueRuntime,
     naive: naiveRuntime,
     i18n: Object.freeze({ createTranslator, createMessages }),
-    icons: Object.freeze(lucideIcons as Record<string, Component>),
+    icons,
     language: () => currentLanguage.value,
     xterm: Object.freeze({ load: loadHostXterm }),
-    dialogs: Object.freeze({ StorageDirectoryPicker: markRaw(XpStorageDirectoryPicker) }),
+    dialogs: Object.freeze({
+      StorageDirectoryPicker: markRaw(XpStorageDirectoryPicker),
+      ExtensionDetails: markRaw(ExtensionDetailsDialog),
+    }),
     register,
     toolbar: Object.freeze({ register: registerToolbar }),
     shell: Object.freeze({ register: registerShell }),
@@ -491,7 +496,7 @@ export async function loadExtensionToolbars(extensions: ConsoleExtension[]) {
   publishToolbarItems()
 }
 
-export async function loadVueExtensionPage(extension: ExtensionStatus): Promise<LoadedVueExtensionPage> {
+async function loadVueExtensionPageNow(extension: ExtensionStatus): Promise<LoadedVueExtensionPage> {
   if (!extension.version || !extension.page || extension.page.renderer !== 'vue') {
     throw new Error('Extension does not register a Vue page')
   }
@@ -523,7 +528,7 @@ export async function loadVueExtensionPage(extension: ExtensionStatus): Promise<
       dispose: () => {
         script.remove()
         styles.forEach((style) => style.remove())
-        registrations.delete(extension.id)
+        if (registrations.get(extension.id) === definition) registrations.delete(extension.id)
       },
     }
   } catch (reason) {
@@ -533,6 +538,15 @@ export async function loadVueExtensionPage(extension: ExtensionStatus): Promise<
   } finally {
     loadingPageId = null
   }
+}
+
+export function loadVueExtensionPage(extension: ExtensionStatus): Promise<LoadedVueExtensionPage> {
+  // Extension bundles register through one shared runtime hook, so their script
+  // evaluation must not overlap. Fast settings navigation otherwise lets a
+  // later page replace loadingPageId before the earlier script registers.
+  const load = pageLoadQueue.then(() => loadVueExtensionPageNow(extension))
+  pageLoadQueue = load.then(() => undefined, () => undefined)
+  return load
 }
 
 export function validateExtensionSettings(

@@ -69,6 +69,28 @@ The curated Vue runtime also exposes the rendering helpers used by compiled
 page components and built-ins such as `Teleport`. This allows a page to mount
 host-rendered controls into placeholders inside canvas markup.
 
+## Shared extension details
+
+`runtime.dialogs.ExtensionDetails` renders the same read-only details dialog as
+Plugin management, including declared features, permissions, dependencies, and
+kernel modules. It accepts `show: boolean`, `id: string`, and an optional
+fallback `name: string`; handle `onUpdate:show` to close it. Loading, errors,
+retry, localization, and theme handling belong to the host component.
+
+```js
+h(runtime.dialogs.ExtensionDetails, {
+  show: detailsOpen.value,
+  id: entry.id,
+  name: entry.name,
+  'onUpdate:show': (show) => { detailsOpen.value = show },
+})
+```
+
+The host loads the existing extension-detail API. Installed entries describe
+the active installed version; uninstalled entries describe the available
+package from the configured feed. Opening details never installs, enables,
+or executes a plugin.
+
 ## Component host
 
 The component receives a `host` prop with this contract:

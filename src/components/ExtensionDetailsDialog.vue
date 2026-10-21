@@ -8,6 +8,8 @@ const props = defineProps<{
   show: boolean
   id: string
   name?: string
+  icon?: ExtensionSummary['icon']
+  iconDataUrl?: string
 }>()
 const emit = defineEmits<{ 'update:show': [show: boolean] }>()
 
@@ -16,13 +18,25 @@ const loading = ref(false)
 const error = ref('')
 let generation = 0
 
-const summary = computed<ExtensionSummary>(() => detail.value || {
-  id: props.id,
-  name: props.name || props.id,
-  kind: '',
-  installed: false,
-  enabled: false,
-  running: false,
+const summary = computed<ExtensionSummary>(() => {
+  const fallback: ExtensionSummary = {
+    id: props.id,
+    name: props.name || props.id,
+    kind: '',
+    installed: false,
+    enabled: false,
+    running: false,
+    icon: props.icon,
+    icon_data_url: props.iconDataUrl,
+  }
+  const current = detail.value
+  if (!current) return fallback
+  return {
+    ...fallback,
+    ...current,
+    icon: current.icon || fallback.icon,
+    icon_data_url: current.icon_data_url || fallback.icon_data_url,
+  }
 })
 
 async function load() {

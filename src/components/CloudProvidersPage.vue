@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { useAsyncDialog } from '@/composables/useAsyncDialog'
-import { computed } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import { CloudOff, RefreshCw, Store } from '@/icons'
 import { useMessage } from 'naive-ui'
 
-import type { ExtensionSummary } from '@/api/client'
+import { api, type ExtensionSummary } from '@/api/client'
 import { useCloudServices } from '@/composables/useCloudServices'
 import { t } from '@/i18n/runtime'
-import type { CloudServiceEntry } from '@/lib/cloud-services'
+import { PLUGIN_MARKETPLACE_ID, type CloudServiceEntry } from '@/lib/cloud-services'
+import { loadMarketplaceInstallPackage } from '@/lib/marketplace-install-client'
+import type { MarketplaceInstallPackage } from '@/lib/marketplace-install'
 
 import CloudProviderCard from './CloudProviderCard.vue'
+import MarketplaceInstallDialog from './MarketplaceInstallDialog.vue'
 
 const props = defineProps<{
   catalog: ExtensionSummary[]
@@ -30,8 +33,6 @@ const {
   activeService,
   activate,
   featuredService,
-  install,
-  installProgress,
   installedServices,
   loadMarketplace,
   marketplaceState,
@@ -67,29 +68,43 @@ const marketplaceProblem = computed(() => {
   return null
 })
 
+const marketplace = computed(() => props.catalog.find(
+  (item) => item.id === PLUGIN_MARKETPLACE_ID && item.installed,
+) || null)
+const preparingInstall = ref(false)
+const showInstaller = ref(false)
+const installerEntry = shallowRef<MarketplaceInstallPackage | null>(null)
+
 function operationFor(service: CloudServiceEntry) {
   return operationId.value === service.id ? operation.value : ''
 }
 
-async function runInstall(service: CloudServiceEntry) {
+async function requestInstall(service: CloudServiceEntry) {
+  if (preparingInstall.value || !marketplace.value) return
+  preparingInstall.value = true
   try {
-    await install(service)
-    message.success(t('settings.cloudProviders.installedMessage', 'Cloud service installed. Choose Start when you are ready to use it.'))
+    const entry = await loadMarketplaceInstallPackage(marketplace.value, service.id)
+    if (!entry) {
+      throw new Error(t(
+        'settings.cloudProviders.packageUnavailable',
+        'This cloud service is not available from the configured package sources.',
+      ))
+    }
+    installerEntry.value = entry
+    showInstaller.value = true
   } catch (reason) {
     message.error(reason instanceof Error ? reason.message : String(reason))
-    return false
+  } finally {
+    preparingInstall.value = false
   }
 }
 
-function requestInstall(service: CloudServiceEntry) {
-  dialog.info({
-    title: t('settings.cloudProviders.installTitle', 'Install cloud service'),
-    content: t('settings.cloudProviders.installConfirm', 'Install {name} from the Plugin Marketplace?')
-      .replace('{name}', service.name || service.id),
-    positiveText: t('settings.cloudProviders.install', 'Install'),
-    negativeText: t('common.cancel', 'Cancel'),
-    onPositiveClick: () => runInstall(service),
-  })
+async function afterCloudInstall() {
+  const entry = installerEntry.value
+  const catalog = await api.getExtensions()
+  emit('catalog', catalog)
+  await loadMarketplace(false)
+  return Boolean(entry && catalog.some((item) => item.id === entry.id && item.installed))
 }
 
 async function runActivate(service: CloudServiceEntry) {
@@ -174,7 +189,7 @@ async function stopService(service: CloudServiceEntry) {
         featured
         :marketplace-usable="marketplaceUsable"
         :operation="operationFor(featuredService)"
-        :progress="operationFor(featuredService) === 'install' ? installProgress : null"
+        :progress="null"
         @install="requestInstall"
         @start="requestActivate"
         @stop="stopService"
@@ -201,7 +216,7 @@ async function stopService(service: CloudServiceEntry) {
             :service="service"
             :marketplace-usable="marketplaceUsable"
             :operation="operationFor(service)"
-            :progress="operationFor(service) === 'install' ? installProgress : null"
+            :progress="null"
             @install="requestInstall"
             @start="requestActivate"
             @stop="stopService"
@@ -212,6 +227,14 @@ async function stopService(service: CloudServiceEntry) {
       </section>
     </n-spin>
   </section>
+  <MarketplaceInstallDialog
+    v-model:show="showInstaller"
+    :entry="installerEntry"
+    :on-installed="afterCloudInstall"
+    :failed-text="t('settings.cloudProviders.installFailed', 'Cloud service installation failed. Try again.')"
+    :timed-out-text="t('settings.cloudProviders.installTimedOut', 'Cloud service installation timed out. Try again.')"
+    :unavailable-text="t('settings.cloudProviders.installRejected', 'The Plugin Marketplace could not start this installation.')"
+  />
 </template>
 
 <style scoped>

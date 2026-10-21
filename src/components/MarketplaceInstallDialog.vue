@@ -4,6 +4,7 @@ import { CircleCheck, Download, Info, PackageCheck } from '@/icons'
 import { NAlert, NButton, NCard, NModal, NProgress, NTag } from 'naive-ui'
 
 import { currentLanguage, t } from '@/i18n/runtime'
+import { pluginIcon } from '@/lib/plugin-icons'
 import { installMarketplacePackage } from '@/lib/marketplace-install-client'
 import {
   fillMarketplaceTemplate,
@@ -56,6 +57,14 @@ const downloadSize = computed(() => props.entry ? marketplaceFormatPackageSize(p
 const installedSize = computed(() => props.entry ? marketplaceFormatPackageSize(props.entry.installedSizeBytes) : '')
 const percent = computed(() => marketplaceProgressPercent(progress.value))
 const progressPhase = computed(() => progress.value.phase || 'prepare')
+const packageIcon = computed(() => props.entry
+  ? pluginIcon({
+    id: props.entry.id,
+    version: props.entry.version,
+    icon_data_url: props.entry.iconDataUrl,
+    icon: props.entry.icon,
+  }, PackageCheck)
+  : { component: PackageCheck, url: '' })
 
 const title = computed(() => props.entry?.updateAvailable
   ? t('network.wireguard.installerUpdateTitle', 'Update extension')
@@ -251,8 +260,8 @@ async function runInstall() {
 
       <div v-else-if="phase === 'success'" class="plugin-marketplace-installer-stage plugin-marketplace-installer-centered">
         <span class="plugin-marketplace-installer-icon plugin-marketplace-installer-success">
-          <img v-if="entry.iconDataUrl" :src="entry.iconDataUrl" alt="" />
-          <PackageCheck v-else :size="32" />
+          <img v-if="packageIcon.url" :src="packageIcon.url" alt="" />
+          <component v-else :is="packageIcon.component" :size="32" />
           <span class="plugin-marketplace-installer-check">
             <CircleCheck :size="16" />
           </span>
@@ -268,8 +277,8 @@ async function runInstall() {
       <div v-else class="plugin-marketplace-installer-stage">
         <div class="plugin-marketplace-installer-preview">
           <span class="plugin-marketplace-installer-icon">
-            <img v-if="entry.iconDataUrl" :src="entry.iconDataUrl" alt="" />
-            <PackageCheck v-else :size="32" />
+            <img v-if="packageIcon.url" :src="packageIcon.url" alt="" />
+            <component v-else :is="packageIcon.component" :size="32" />
           </span>
           <div class="plugin-marketplace-installer-identity">
             <strong>{{ localized.name }}</strong>
@@ -314,6 +323,8 @@ async function runInstall() {
     v-model:show="detailsOpen"
     :id="entry.id"
     :name="localized.name"
+    :icon="entry.icon"
+    :icon-data-url="entry.iconDataUrl"
   />
 </template>
 

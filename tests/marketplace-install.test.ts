@@ -34,6 +34,7 @@ const parsed = marketplaceInstallPackageFromRecord({
   size_bytes: 4096,
   installed_size_bytes: 8192,
   icon_data_url: 'data:image/svg+xml;base64,abc',
+  icon: { source: 'lucide', name: 'cloud' },
   i18n: { zh: { name: 'WireGuard', description: '安装 wg。' } },
 }, 'wireguard')
 assert.ok(parsed)
@@ -41,12 +42,27 @@ assert.equal(parsed?.packageName, 'onekvm-extension-wireguard')
 assert.equal(parsed?.sizeBytes, 4096)
 assert.equal(parsed?.installedSizeBytes, 8192)
 assert.equal(parsed?.iconDataUrl, 'data:image/svg+xml;base64,abc')
+assert.deepEqual(parsed?.icon, {
+  source: 'lucide',
+  name: 'cloud',
+})
 assert.equal(marketplacePackageText(parsed!, 'zh').description, '安装 wg。')
 assert.equal(marketplacePackageText(parsed!, 'en').description, 'Installs wg.')
 assert.equal(marketplacePackageVersionText(parsed!), '0.1.0')
 assert.equal(marketplaceInstallPackageFromRecord({ id: 'other', package: 'onekvm-extension-other' }, 'wireguard'), null)
 assert.equal(marketplaceInstallPackageFromRecord(null, 'wireguard'), null)
 assert.equal(marketplaceInstallPackageFromRecord({ id: 'wireguard', package: 'onekvm-extension-wireguard', icon_data_url: 'text' }, 'wireguard')?.iconDataUrl, '')
+
+const customIcon = marketplaceInstallPackageFromRecord({
+  id: 'firewall',
+  package: 'onekvm-extension-firewall',
+  icon: { source: 'custom', path: 'assets/icon.svg', data: 'data:image/svg+xml;base64,xyz' },
+}, 'firewall')
+assert.deepEqual(customIcon?.icon, {
+  source: 'custom',
+  path: 'assets/icon.svg',
+  data: 'data:image/svg+xml;base64,xyz',
+})
 
 const update = marketplaceInstallPackageFromRecord({
   id: 'wireguard',

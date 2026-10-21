@@ -624,6 +624,7 @@ const deviceVariant = computed(() => machineDisplayName({
   name: props.status?.name || schema.value?.name,
   machine: props.status?.machine || schema.value?.machine,
   variant: props.status?.variant || schema.value?.variant,
+  variant_label: props.status?.variant_label || schema.value?.variant_label,
 }))
 const primaryNetworkDNS = computed({
   get: () => config.value ? physicalInterfaceConfig(config.value.network, config.value.network.primary_interface).dns || [] : [],

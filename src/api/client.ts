@@ -421,6 +421,7 @@ export interface OneKVMStatus {
   vendor?: string
   name?: string
   variant: string
+  variant_label?: string
   version: string
   uptime_seconds: number
   video: {
@@ -648,6 +649,7 @@ export interface ConfigSchema {
   vendor?: string
   name?: string
   variant: string
+  variant_label?: string
   hardware_revision?: string
   detected?: Record<string, boolean>
   read_only: string[]

@@ -2,6 +2,7 @@
    outside these selectors; they continue to consume the ordinary theme tokens. */
 html[data-onekvm-skin="classic"] {
   --classic-font: Tahoma, "MS Sans Serif", "Microsoft Sans Serif", sans-serif;
+  --classic-tooltip-background: #ffffe1;
   --classic-led-active: color-mix(in srgb, var(--success) 55%, var(--success-foreground));
   --classic-raised: inset 1px 1px 0 var(--primary-foreground),
     inset -1px -1px 0 var(--foreground),
@@ -23,6 +24,27 @@ html[data-onekvm-skin="classic"] :is(
   .control-sheet-card, .host-window-titlebar, .host-dialog > .n-card-header
 ) {
   font-family: var(--classic-font);
+}
+
+/* Tips use the InfoBackground surface, including teleported slider indicators. */
+html[data-onekvm-skin="classic"] :is(
+  .n-popover.n-tooltip, .n-slider-handle-indicator,
+  .stream-chart-tooltip, .resource-chart-tooltip
+) {
+  border: 1px solid var(--foreground);
+  border-radius: 0;
+  color: var(--foreground);
+  background: var(--classic-tooltip-background);
+  box-shadow: none;
+  font-family: var(--classic-font);
+}
+html[data-onekvm-skin="classic"] .n-tooltip.n-popover:not(.n-popover--raw),
+html[data-onekvm-skin="classic"] .n-slider-handle-indicator {
+  padding: 3px 5px;
+  font-size: 12px;
+}
+html[data-onekvm-skin="classic"] .n-tooltip .n-popover-arrow-wrapper {
+  display: none;
 }
 
 /* Taskbar: square controls, a recessed device label, and real pressed states. */
@@ -275,7 +297,17 @@ html[data-onekvm-skin="classic"] .tool-window:not(.active) .host-window-titlebar
   color: var(--primary-foreground);
   background: var(--onekvm-titlebar-inactive);
 }
-html[data-onekvm-skin="classic"] .n-dropdown-menu:is(.host-theme-menu, .host-menu) .n-dropdown-option-body.n-dropdown-option-body--pending:not(.n-dropdown-option-body--disabled) :is(.n-icon, .n-dropdown-option-body__label, .n-dropdown-option-body__suffix) {
+html[data-onekvm-skin="classic"] .n-dropdown-menu:is(.host-theme-menu, .host-menu) .n-dropdown-option-body.n-dropdown-option-body--pending:not(.n-dropdown-option-body--disabled) :is(.n-icon, .n-dropdown-option-body__label, .n-dropdown-option-body__suffix, .toolbox-dropdown-label small, .toolbox-pin-toggle) {
+  color: inherit;
+}
+html[data-onekvm-skin="classic"] .toolbox-dropdown .toolbox-pinned-row {
+  border-radius: 0;
+}
+html[data-onekvm-skin="classic"] .toolbox-dropdown .toolbox-pinned-row:is(:hover, :focus-within) {
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+html[data-onekvm-skin="classic"] .toolbox-dropdown .toolbox-pinned-row:is(:hover, :focus-within) :is(.toolbox-dropdown-label small, .toolbox-drag-handle, .toolbox-pin-toggle) {
   color: inherit;
 }
 html[data-onekvm-skin="classic"] :is(

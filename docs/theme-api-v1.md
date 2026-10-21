@@ -21,6 +21,10 @@ navy-to-blue gradient titlebars, an inset navigation tree, and rectangular host 
 Win98 titlebar uses a gray gradient. Control popovers and mobile sheets share the
 active titlebar, with square controls and readable heading subtitles. Teleported
 control menus and host help popovers also receive the classic frame.
+Tooltips, slider value tips, and chart tips use a pale-yellow information surface,
+a one-pixel text-colored border, square corners, and the classic font. Tooltips
+have no arrow or raised panel shadow. Hovered or keyboard-highlighted toolbox
+entries invert their descriptions and pin controls along with the title.
 Host select controls follow [98.css](https://jdan.github.io/98.css/#dropdown):
 an inset white field, a separate raised arrow button, and navy/white focus and
 selection states. Host switches keep NSwitch's state, loading, and keyboard

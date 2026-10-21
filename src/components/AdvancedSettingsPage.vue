@@ -2301,7 +2301,7 @@ watch(paneSection, (value) => {
                         {{ t('settings.factoryReset.action', 'Restore') }}
                       </n-button>
                     </div>
-                    <div v-if="status.machine === 'nanokvm' || status.machine === 'nanokvm-pro'" class="system-recovery-row">
+                    <div v-if="schema?.capabilities?.recovery === true" class="system-recovery-row">
                       <strong>{{ t('settings.recoveryMode.title', 'Recovery') }}</strong>
                       <n-button type="warning" secondary :loading="enteringRecovery" :disabled="systemAction !== null" @click="confirmEnterRecovery">
                         <template #icon><LifeBuoy /></template>

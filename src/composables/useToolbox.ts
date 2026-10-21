@@ -91,7 +91,6 @@ export function useToolbox() {
   const closing = new Map<string, Promise<boolean>>()
   let generation = 0
   let sequence = 0
-  let refreshTimer = 0
   let refreshPromise: Promise<void> | null = null
   let openingQueue: Promise<unknown> = Promise.resolve()
 
@@ -334,7 +333,6 @@ export function useToolbox() {
     void refresh()
   }, { immediate: true })
   onMounted(() => {
-    refreshTimer = window.setInterval(() => { if (document.visibilityState === 'visible') void refreshAuth() }, 15000)
     document.addEventListener('visibilitychange', resume)
     window.addEventListener('online', resume)
     window.addEventListener('resize', resize)
@@ -343,7 +341,6 @@ export function useToolbox() {
     document.addEventListener('focusin', onLocalFocus, true)
   })
   onBeforeUnmount(() => {
-    window.clearInterval(refreshTimer)
     generation++
     recording.value = null
     childWindows.clear()

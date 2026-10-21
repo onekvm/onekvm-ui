@@ -2,9 +2,80 @@ import { api, type OneKVMStatus } from '@/api/client'
 
 type StatusListener = (status: OneKVMStatus) => void
 type ErrorListener = () => void
+export type StatusPatchOperation = {
+  op: 'add' | 'remove' | 'replace'
+  path: string
+  value?: unknown
+}
 type StatusWaiter = {
   resolve: (status: OneKVMStatus) => void
   reject: (error: Error) => void
+}
+
+function cloneStatus(status: OneKVMStatus) {
+  return JSON.parse(JSON.stringify(status)) as OneKVMStatus
+}
+
+function decodePointer(path: string) {
+  if (path === '') return []
+  if (!path.startsWith('/')) throw new Error('Invalid status patch path')
+  return path.slice(1).split('/').map((part) => part.replace(/~1/g, '/').replace(/~0/g, '~'))
+}
+
+function patchValue(value: unknown, operations: StatusPatchOperation[]) {
+  let root = value
+  for (const operation of operations) {
+    const parts = decodePointer(operation.path)
+    if (!parts.length) {
+      if (operation.op === 'remove' || operation.value === undefined) throw new Error('Invalid root status patch')
+      root = operation.value
+      continue
+    }
+    let parent: unknown = root
+    for (const part of parts.slice(0, -1)) {
+      if (Array.isArray(parent)) {
+        const index = Number(part)
+        if (!Number.isInteger(index) || index < 0 || index >= parent.length) throw new Error('Invalid status patch parent')
+        parent = parent[index]
+      } else if (parent && typeof parent === 'object') {
+        parent = (parent as Record<string, unknown>)[part]
+      } else {
+        throw new Error('Invalid status patch parent')
+      }
+    }
+    const key = parts.at(-1) as string
+    if (Array.isArray(parent)) {
+      if (operation.op === 'remove') {
+        const index = Number(key)
+        if (!Number.isInteger(index) || index < 0 || index >= parent.length) throw new Error('Invalid status patch index')
+        parent.splice(index, 1)
+      } else if (operation.value === undefined) {
+        throw new Error('Missing status patch value')
+      } else if (key === '-') {
+        parent.push(operation.value)
+      } else {
+        const index = Number(key)
+        if (!Number.isInteger(index) || index < 0 || index > parent.length) throw new Error('Invalid status patch index')
+        if (operation.op === 'add') parent.splice(index, 0, operation.value)
+        else if (index < parent.length) parent[index] = operation.value
+        else throw new Error('Invalid status patch index')
+      }
+    } else if (parent && typeof parent === 'object') {
+      const object = parent as Record<string, unknown>
+      if (operation.op === 'remove') delete object[key]
+      else if (operation.value === undefined) throw new Error('Missing status patch value')
+      else object[key] = operation.value
+    } else {
+      throw new Error('Invalid status patch parent')
+    }
+  }
+  return root
+}
+
+export function applyStatusPatch(status: OneKVMStatus, operations: StatusPatchOperation[]) {
+  const next = patchValue(cloneStatus(status), operations)
+  if (!next || typeof next !== 'object' || Array.isArray(next)) throw new Error('Invalid patched status')
+  return next as OneKVMStatus
 }
 
 class StatusEvents {
@@ -48,18 +119,36 @@ class StatusEvents {
       if (this.source !== source) return
       try {
         const status = JSON.parse((event as MessageEvent<string>).data) as OneKVMStatus
-        this.current = status
-        this.receivedAt = Date.now()
-        for (const waiter of this.waiters) waiter.resolve(status)
-        this.waiters.clear()
-        for (const listener of this.listeners.keys()) listener(status)
+        this.publish(status)
       } catch {
         this.reportError(new Error('Invalid status event'))
+      }
+    })
+    source.addEventListener('status.patch', (event) => {
+      if (this.source !== source) return
+      if (!this.current) {
+        this.reportError(new Error('Status patch received without a snapshot'))
+        return
+      }
+      try {
+        const operations = JSON.parse((event as MessageEvent<string>).data) as StatusPatchOperation[]
+        if (!Array.isArray(operations)) throw new Error('Status patch is not an array')
+        this.publish(applyStatusPatch(this.current, operations))
+      } catch {
+        this.reportError(new Error('Invalid status patch'))
       }
     })
     source.onerror = () => {
       if (this.source === source) this.reportError(new Error('Status event stream disconnected'))
     }
+  }
+
+  private publish(status: OneKVMStatus) {
+    this.current = status
+    this.receivedAt = Date.now()
+    for (const waiter of this.waiters) waiter.resolve(status)
+    this.waiters.clear()
+    for (const listener of this.listeners.keys()) listener(status)
   }
 
   private reportError(error: Error) {

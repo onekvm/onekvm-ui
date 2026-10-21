@@ -4766,6 +4766,12 @@ select { font: inherit; }
   font-size: 13px;
 }
 .service-settings-switch-row.disabled { color: var(--muted-foreground); }
+.service-settings-disclosure { display: flex; align-items: center; gap: 12px; }
+.service-settings-disclosure .service-settings-switch-row { flex: 1; width: auto; }
+.service-settings-collapse-toggle { flex: 0 0 auto; }
+.service-settings-collapse-icon { width: 14px; transition: transform 160ms ease; }
+.service-settings-collapse-icon.expanded { transform: rotate(180deg); }
+.service-settings-disclosure-content { margin-top: 12px; }
 .service-settings-hint { margin: 0 0 12px; color: var(--muted-foreground); font-size: 12px; line-height: 1.55; }
 .certificate-status { display: grid; gap: 5px; margin: 10px 0 14px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--success) 32%, var(--border)); border-radius: 6px; color: var(--success); background: color-mix(in srgb, var(--success) 10%, var(--card)); font-size: 12px; }
 .certificate-status span { color: var(--muted-foreground); }

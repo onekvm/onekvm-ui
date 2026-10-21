@@ -394,6 +394,13 @@ export interface OneKVMServiceSettings {
   https_port: number
   tls_enabled: boolean
   tls_auto_redirect: boolean
+  login_protection_enabled: boolean
+  login_protection_max_failures: number
+  login_protection_ban_duration_seconds: number
+  login_protection_scope: 'subnet' | 'ip'
+  login_protection_ipv4_prefix: number
+  login_protection_ipv6_prefix: number
+  crash_recovery_enabled: boolean
   certificate: CertificateStatus
   certificate_mode: CertificateMode
   autossl: AutoSSLSettings
@@ -1672,7 +1679,7 @@ export const api = {
   serviceAction: (id: string, action: 'start' | 'stop' | 'restart' | 'enable' | 'disable') =>
     request<{ status: string }>(`/api/services/${encodeURIComponent(id)}/${action}`, { method: 'POST' }),
 	getOneKVMServiceSettings: () => request<OneKVMServiceSettings>('/api/services/onekvm'),
-	saveOneKVMServiceSettings: (settings: Pick<OneKVMServiceSettings, 'http_port' | 'https_port' | 'tls_enabled' | 'tls_auto_redirect'>) =>
+	saveOneKVMServiceSettings: (settings: Pick<OneKVMServiceSettings, 'http_port' | 'https_port' | 'tls_enabled' | 'tls_auto_redirect' | 'login_protection_enabled' | 'login_protection_max_failures' | 'login_protection_ban_duration_seconds' | 'login_protection_scope' | 'login_protection_ipv4_prefix' | 'login_protection_ipv6_prefix' | 'crash_recovery_enabled'>) =>
 		request<OneKVMServiceSettings>('/api/services/onekvm', {
 			method: 'PUT',
 			body: JSON.stringify(settings),

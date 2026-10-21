@@ -9,6 +9,7 @@ import {
   type CertificateStatus,
   type OneKVMServiceSettings,
 } from '@/api/client'
+import { ChevronDown } from '@/icons'
 import { t } from '@/i18n/runtime'
 
 const show = defineModel<boolean>('show', { required: true })
@@ -17,6 +18,7 @@ const message = useMessage()
 const loading = shallowRef(false)
 const saving = shallowRef(false)
 const certificateBusy = shallowRef(false)
+const loginProtectionExpanded = shallowRef(false)
 const error = shallowRef('')
 const certificateFile = shallowRef<File | null>(null)
 const privateKeyFile = shallowRef<File | null>(null)
@@ -50,6 +52,13 @@ const form = reactive({
   httpsPort: 443,
   tlsEnabled: false,
   tlsAutoRedirect: false,
+  loginProtectionEnabled: true,
+  loginProtectionMaxFailures: 5,
+  loginProtectionBanDurationHours: 24,
+  loginProtectionScope: 'subnet' as 'subnet' | 'ip',
+  loginProtectionIpv4Prefix: 24,
+  loginProtectionIpv6Prefix: 64,
+  crashRecoveryEnabled: true,
 })
 
 const title = computed(() => t('settings.advancedSettings.servicesPage.oneKVMSettings', 'OneKVM service settings'))
@@ -81,6 +90,13 @@ function assignOneKVM(settings: OneKVMServiceSettings) {
   form.httpsPort = settings.https_port
   form.tlsEnabled = settings.tls_enabled
   form.tlsAutoRedirect = settings.tls_auto_redirect
+  form.loginProtectionEnabled = settings.login_protection_enabled ?? true
+  form.loginProtectionMaxFailures = settings.login_protection_max_failures ?? 5
+  form.loginProtectionBanDurationHours = Math.max(1, Math.round((settings.login_protection_ban_duration_seconds ?? 86400) / 3600))
+  form.loginProtectionScope = settings.login_protection_scope === 'ip' ? 'ip' : 'subnet'
+  form.loginProtectionIpv4Prefix = settings.login_protection_ipv4_prefix ?? 24
+  form.loginProtectionIpv6Prefix = settings.login_protection_ipv6_prefix ?? 64
+  form.crashRecoveryEnabled = settings.crash_recovery_enabled ?? true
   certificate.value = settings.certificate
   certificateMode.value = settings.certificate_mode || 'self_signed'
   const settingsAutoSSL = settings.autossl
@@ -128,6 +144,13 @@ async function save() {
       https_port: form.httpsPort,
       tls_enabled: form.tlsEnabled,
       tls_auto_redirect: form.tlsAutoRedirect,
+      login_protection_enabled: form.loginProtectionEnabled,
+      login_protection_max_failures: form.loginProtectionMaxFailures,
+      login_protection_ban_duration_seconds: form.loginProtectionBanDurationHours * 3600,
+      login_protection_scope: form.loginProtectionScope,
+      login_protection_ipv4_prefix: form.loginProtectionIpv4Prefix,
+      login_protection_ipv6_prefix: form.loginProtectionIpv6Prefix,
+      crash_recovery_enabled: form.crashRecoveryEnabled,
     }))
     message.success(t('settings.success', 'Settings saved'))
   } catch (reason) {
@@ -263,6 +286,69 @@ watch(show, (open) => {
             <n-switch v-model:value="form.tlsAutoRedirect" :disabled="!form.tlsEnabled" />
           </div>
         </n-form>
+
+        <n-divider>{{ t('settings.advancedSettings.servicesPage.loginProtection', 'Login protection') }}</n-divider>
+        <div class="service-settings-disclosure">
+          <div class="service-settings-switch-row">
+            <span>{{ t('settings.advancedSettings.servicesPage.loginProtectionEnabled', 'Enable login protection') }}</span>
+            <n-switch v-model:value="form.loginProtectionEnabled" />
+          </div>
+          <n-button
+            text
+            size="small"
+            class="service-settings-collapse-toggle"
+            :aria-expanded="loginProtectionExpanded"
+            aria-controls="login-protection-settings"
+            :aria-label="loginProtectionExpanded
+              ? t('settings.advancedSettings.servicesPage.loginProtectionCollapse', 'Hide login protection settings')
+              : t('settings.advancedSettings.servicesPage.loginProtectionExpand', 'Show login protection settings')"
+            @click="loginProtectionExpanded = !loginProtectionExpanded"
+          >
+            {{ t('settings.advancedSettings.servicesPage.loginProtectionDetails', 'Settings') }}
+            <template #icon><ChevronDown class="service-settings-collapse-icon" :class="{ expanded: loginProtectionExpanded }" aria-hidden="true" /></template>
+          </n-button>
+        </div>
+        <n-collapse-transition :show="loginProtectionExpanded">
+          <div id="login-protection-settings" class="service-settings-disclosure-content">
+            <p class="service-settings-hint">
+              {{ t('settings.advancedSettings.servicesPage.loginProtectionHint', 'Temporarily blocks the configured IP or subnet after repeated failed logins.') }}
+            </p>
+            <n-form label-placement="top" :show-feedback="false" class="settings-form service-settings-form">
+              <n-form-item :label="t('settings.advancedSettings.servicesPage.loginProtectionMaxFailures', 'Failed attempts before blocking')">
+                <n-input-number v-model:value="form.loginProtectionMaxFailures" :min="1" :max="100" :step="1" class="service-settings-number" :disabled="!form.loginProtectionEnabled" />
+              </n-form-item>
+              <n-form-item :label="t('settings.advancedSettings.servicesPage.loginProtectionBanDuration', 'Block duration')">
+                <n-input-number v-model:value="form.loginProtectionBanDurationHours" :min="1" :max="720" :step="1" class="service-settings-number" :disabled="!form.loginProtectionEnabled">
+                  <template #suffix>{{ t('settings.advancedSettings.servicesPage.hours', 'hours') }}</template>
+                </n-input-number>
+              </n-form-item>
+              <n-form-item :label="t('settings.advancedSettings.servicesPage.loginProtectionScope', 'Block target')">
+                <n-select v-model:value="form.loginProtectionScope" :options="[
+                  { label: t('settings.advancedSettings.servicesPage.loginProtectionSubnet', 'Subnet'), value: 'subnet' },
+                  { label: t('settings.advancedSettings.servicesPage.loginProtectionIp', 'Single IP'), value: 'ip' },
+                ]" :disabled="!form.loginProtectionEnabled" />
+              </n-form-item>
+              <template v-if="form.loginProtectionScope === 'subnet'">
+                <n-form-item :label="t('settings.advancedSettings.servicesPage.loginProtectionIpv4Prefix', 'IPv4 subnet prefix')">
+                  <n-input-number v-model:value="form.loginProtectionIpv4Prefix" :min="1" :max="32" :step="1" class="service-settings-number" :disabled="!form.loginProtectionEnabled">
+                    <template #prefix>/</template>
+                  </n-input-number>
+                </n-form-item>
+                <n-form-item :label="t('settings.advancedSettings.servicesPage.loginProtectionIpv6Prefix', 'IPv6 subnet prefix')">
+                  <n-input-number v-model:value="form.loginProtectionIpv6Prefix" :min="1" :max="128" :step="1" class="service-settings-number" :disabled="!form.loginProtectionEnabled">
+                    <template #prefix>/</template>
+                  </n-input-number>
+                </n-form-item>
+              </template>
+            </n-form>
+          </div>
+        </n-collapse-transition>
+
+        <n-divider>{{ t('settings.advancedSettings.servicesPage.crashRecovery', 'Crash recovery') }}</n-divider>
+        <div class="service-settings-switch-row">
+          <span>{{ t('settings.advancedSettings.servicesPage.crashRecoveryEnabled', 'Enter Recovery after repeated crash restarts') }}</span>
+          <n-switch v-model:value="form.crashRecoveryEnabled" />
+        </div>
 
         <n-divider>{{ t('settings.advancedSettings.servicesPage.httpsCertificate', 'HTTPS certificate') }}</n-divider>
         <n-form label-placement="top" :show-feedback="false" class="settings-form certificate-source-form">

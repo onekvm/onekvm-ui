@@ -4,6 +4,7 @@ import { Cpu, Package } from '@/icons'
 import { extensionRouteURL, extensionTranslation, type ExtensionStatus, type ExtensionSummary } from '@/api/client'
 import { currentLanguage, t } from '@/i18n/runtime'
 import { pluginIcon } from '@/lib/plugin-icons'
+import { extensionCategory } from '@/lib/extension-category'
 import ExtensionPermissionList from './ExtensionPermissionList.vue'
 import ExtensionFeatureList from './ExtensionFeatureList.vue'
 import ExtensionCapabilityList from './ExtensionCapabilityList.vue'
@@ -23,10 +24,10 @@ const identity = computed(() => props.status ? extensionTranslation(props.status
 const icon = computed(() => props.status ? pluginIcon(props.status) : undefined)
 const fileRoutes = computed(() => (props.detail?.routes || []).filter(route => route.backend === 'file'))
 const kind = computed(() => {
-  const value = props.status?.kind || ''
+  const value = extensionCategory(props.status)
   if (value === 'protocol') return t('settings.plugins.kindProtocol', 'Protocol')
   if (value === 'service') return t('settings.plugins.kindService', 'Service')
-  if (value === 'network') return t('settings.plugins.kindNetwork', 'Networking & tunnels')
+  if (value === 'network') return t('settings.plugins.kindNetwork', 'Network')
   if (value === 'environment') return t('settings.plugins.kindEnvironment', 'Environment')
   if (value === 'cloud-provider') return t('settings.plugins.kindCloudProvider', 'Cloud service')
   if (value === 'device') return t('settings.plugins.kindDevice', 'Device backend')

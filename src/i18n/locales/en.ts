@@ -1836,7 +1836,7 @@ const en = {
         kindProtocol: 'Protocol',
         kindService: 'Service',
         kindEnvironment: 'Environment',
-        kindNetwork: 'Networking & tunnels',
+        kindNetwork: 'Network',
         kindCloudProvider: 'Cloud service',
         kindDevice: 'Device backend',
         allInterfacesIPv4: 'All interfaces (IPv4)',

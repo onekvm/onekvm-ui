@@ -1835,7 +1835,7 @@ const zh = {
         kindProtocol: '协议',
         kindService: '服务',
         kindEnvironment: '运行环境',
-        kindNetwork: '组网与穿透',
+        kindNetwork: '网络',
         kindCloudProvider: '云服务',
         kindDevice: '设备后端',
         allInterfacesIPv4: '所有接口（IPv4）',

@@ -14,6 +14,7 @@ import {
 } from '@/api/client'
 import { currentLanguage, t } from '@/i18n/runtime'
 import { qualityTier } from '@/lib/video-quality'
+import { extensionCategory } from '@/lib/extension-category'
 import {
   clearQpOverride,
   hasQpOverride,
@@ -258,7 +259,7 @@ function networkAddressOptions(name: string) {
 function kindLabel(kind: string) {
   if (kind === 'protocol') return t('settings.plugins.kindProtocol', 'Protocol')
   if (kind === 'service') return t('settings.plugins.kindService', 'Service')
-  if (kind === 'network') return t('settings.plugins.kindNetwork', 'Networking & tunnels')
+  if (kind === 'network') return t('settings.plugins.kindNetwork', 'Network')
   if (kind === 'environment') return t('settings.plugins.kindEnvironment', 'Environment')
   return kind
 }
@@ -322,7 +323,7 @@ watch(() => props.extension.settings, () => syncDraft())
           </div>
           <div>
             <dt>{{ t('settings.plugins.type', 'Type') }}</dt>
-            <dd>{{ kindLabel(extension.kind) }}</dd>
+            <dd>{{ kindLabel(extensionCategory(extension)) }}</dd>
           </div>
         </dl>
       </section>

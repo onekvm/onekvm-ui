@@ -1840,7 +1840,7 @@ const zh_tw = {
         kindProtocol: '通訊協定',
         kindService: '服務',
         kindEnvironment: '執行環境',
-        kindNetwork: '組網與穿透',
+        kindNetwork: '網路',
         kindCloudProvider: '雲端服務',
         kindDevice: '裝置後端',
         allInterfacesIPv4: '所有介面（IPv4）',

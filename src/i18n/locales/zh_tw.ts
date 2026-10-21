@@ -1937,7 +1937,7 @@ const zh_tw = {
         apReconnectHint: '儲存會重新啟動熱點，已連線的用戶端會斷線。',
         apNewAddressHint: '重新連線後，請開啟新的 AP 位址：{address}',
         apPassword: '熱點密碼', band: '頻段', channel: '頻道', autoChannel: '自動', currentChannel: '目前頻道：{channel}', running: '運作中', apOff: '熱點已關閉',
-        expiresIn: '{seconds} 秒後關閉', stationEnabled: '啟用 Wi-Fi', stationEnabledHint: '連線到附近的無線網路，透過 wlan0 取得位址。',
+        expiresIn: '{seconds} 秒後關閉', stationEnabled: '啟用 Wi-Fi', stationEnabledHint: '連線到附近的無線網路，取得 IP 位址。',
         available: '可用網路', scan: '掃描', scanning: '正在搜尋附近的網路…', noNetworks: '找不到網路，請重新掃描。', noOtherNetworks: '附近沒有其他網路。', scanHint: '掃描後選擇網路。',
         open: '開放', connected: '已連線', notConnected: '未連線', connect: '連線', networkPassword: '網路密碼', connecting: '正在連線至 Wi-Fi…',
         password: '密碼', connectTo: '連線至 {ssid}',

@@ -145,7 +145,7 @@ const visibleInterfaces = computed(() => {
       configured: true,
       mac: status?.mac || '',
       addresses: status?.addresses.length ? status.addresses : addresses,
-      kind: configuration.kind === 'physical' && props.wifiAvailable && /^wlan\d+$/.test(configuration.name) ? 'wifi_station' as const : configuration.kind,
+      kind: configuration.kind === 'physical' && props.wifiAvailable && status?.wifi_role === 'station' ? 'wifi_station' as const : configuration.kind,
       port_type: configuration.kind === 'physical' ? 'physical' as const : 'virtual' as const,
       link_speed_mbps: status?.link_speed_mbps || 0,
       configuration,
@@ -539,9 +539,9 @@ watch(() => props.disabled, (disabled, previous) => {
                 </div>
               </dl>
 
-              <WifiOnboarding v-if="networkInterface.kind === 'wifi_ap'" interface-name="ap0" :active="expanded === networkInterface.name" @changed="load" />
+              <WifiOnboarding v-if="networkInterface.kind === 'wifi_ap'" :interface-name="networkInterface.name" role="ap" :active="expanded === networkInterface.name" @changed="load" />
               <div v-else-if="networkInterface.kind === 'wifi_station'" class="wifi-interface-settings">
-                <WifiOnboarding :interface-name="networkInterface.name" :active="expanded === networkInterface.name" :disabled="disabled" @changed="load" />
+                <WifiOnboarding role="station" :interface-name="networkInterface.name" :active="expanded === networkInterface.name" :disabled="disabled" @changed="load" />
                 <n-collapse>
                   <n-collapse-item :title="t('network.wifi.ipAdvanced', 'IP and DNS settings')" name="ip-settings">
                     <n-form v-if="networkInterface.configured" label-placement="top" :show-feedback="false">

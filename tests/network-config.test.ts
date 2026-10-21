@@ -171,22 +171,18 @@ assert.equal(isNetworkConfigValid({ ...secondary, interfaces: [...secondary.inte
 
 console.log('network-config tests passed')
 
-// Configuring wlan0 moves it from live links to managed links; do not add a placeholder.
-const liveWifi = { name: 'wlan0', up: true, configured: false, mac: '02:00:00:00:00:01',
-  addresses: ['192.0.2.20/24'], port_type: 'physical' as const, link_speed_mbps: 0 }
-const configuredWifi = updatePhysicalInterface(base, 'wlan0', physicalInterfaceConfig(base, 'wlan0'))
-for (const live of [[], [liveWifi]]) {
-  const before = availablePhysicalInterfaces(live, base, true)
-  assert.equal(before.filter(link => link.name === 'wlan0').length, 1, 'unconfigured Wi-Fi is shown once, even before discovery')
-  const after = availablePhysicalInterfaces(live, configuredWifi, true)
-  assert.equal(after.filter(link => link.name === 'wlan0').length, 0, 'configured Wi-Fi is rendered only by the managed list')
-  assert.equal(after.filter(link => link.name === 'ap0').length, 1, 'AP placeholder remains available')
-  assert.equal(configuredWifi.interfaces.filter(link => link.name === 'wlan0').length, 1)
-}
-assert.equal(availablePhysicalInterfaces([liveWifi], updatePrimaryInterface(base, { ...primary, name: 'wlan0' }), true)
-  .filter(link => link.name === 'wlan0').length, 0, 'primary Wi-Fi is rendered by the managed list')
-assert.equal(availablePhysicalInterfaces([], base, false).some(link => link.name === 'wlan0'), false,
-  'machines without Wi-Fi do not receive placeholders')
+// Roles come from discovered links, including an inactive AP reported by Core.
+const liveWifi = { name: 'wlp2s0', up: true, configured: false, mac: '02:00:00:00:00:01',
+  addresses: ['192.0.2.20/24'], port_type: 'physical' as const, link_speed_mbps: 0, wifi_role: 'station' as const }
+const ap = { ...liveWifi, name: 'onekvm-ap1', up: false, addresses: [], port_type: 'virtual' as const, wifi_role: 'ap' as const }
+const configuredWifi = updatePhysicalInterface(base, liveWifi.name, physicalInterfaceConfig(base, liveWifi.name))
+const before = availablePhysicalInterfaces([liveWifi, ap], base, true)
+assert.equal(before.find(link => link.name === liveWifi.name)?.kind, 'wifi_station')
+assert.equal(before.find(link => link.name === ap.name)?.kind, 'wifi_ap')
+const after = availablePhysicalInterfaces([liveWifi, ap], configuredWifi, true)
+assert.equal(after.some(link => link.name === liveWifi.name), false, 'configured links appear only in the managed list')
+assert.equal(after.filter(link => link.name === ap.name).length, 1)
+assert.deepEqual(availablePhysicalInterfaces([], base, true), [], 'never invent interface names')
 
 const vlan = withManagementVLAN(secondary, 10)
 assert.equal(isNetworkConfigValid(vlan), true)

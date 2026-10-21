@@ -11,7 +11,7 @@ import WifiApSettings from './WifiApSettings.vue'
 import WifiSavedNetworks from './WifiSavedNetworks.vue'
 
 const status = shallowRef<WifiStatus | null>(null)
-const props = withDefaults(defineProps<{ initialSetup?: boolean; interfaceName?: string; active?: boolean; disabled?: boolean }>(), { active: true })
+const props = withDefaults(defineProps<{ initialSetup?: boolean; interfaceName?: string; role?: 'ap' | 'station'; active?: boolean; disabled?: boolean }>(), { active: true })
 const emit = defineEmits<{ changed: []; status: [value: WifiStatus]; connected: [value: WifiStatus] }>()
 const networks = shallowRef<WifiNetwork[]>([])
 const selected = shallowRef<WifiNetwork | null>(null)
@@ -38,9 +38,9 @@ let timer: ReturnType<typeof setInterval> | undefined
 let refreshing = false
 let scanTask: Promise<void> | null = null
 
-const showAp = computed(() => !props.interfaceName || props.interfaceName === 'ap0')
-const showStation = computed(() => !props.interfaceName || props.interfaceName !== 'ap0')
-const stationInterface = computed(() => props.interfaceName && props.interfaceName !== 'ap0' ? props.interfaceName : 'wlan0')
+const showAp = computed(() => !props.interfaceName || props.role === 'ap')
+const showStation = computed(() => !props.interfaceName || props.role !== 'ap')
+const stationInterface = computed(() => props.role === 'ap' ? '' : props.interfaceName || '')
 const savedSelection = computed(() => status.value?.saved_networks?.find(network => network.ssid === selected.value?.ssid))
 const stationEnabled = computed(() => status.value?.mode !== 'ap')
 const canSaveAp = computed(() => apDirty.value && !loading.value

@@ -1932,7 +1932,7 @@ const zh = {
         apReconnectHint: '保存会重启热点，已连接的客户端会断开。',
         apNewAddressHint: '重新连接后，请打开新的 AP 地址：{address}',
         apPassword: '热点密码', band: '频段', channel: '频道', autoChannel: '自动', currentChannel: '当前频道：{channel}', running: '运行中', apOff: '热点已关闭',
-        expiresIn: '{seconds} 秒后关闭', stationEnabled: '启用 Wi-Fi', stationEnabledHint: '连接附近的无线网络，通过 wlan0 获取地址。',
+        expiresIn: '{seconds} 秒后关闭', stationEnabled: '启用 Wi-Fi', stationEnabledHint: '连接附近的无线网络，获取 IP 地址。',
         available: '可用网络', scan: '扫描', scanning: '正在搜索附近的网络…', noNetworks: '未找到网络，请重试扫描。', noOtherNetworks: '附近没有其他网络。', scanHint: '扫描后选择网络。',
         open: '开放', connected: '已连接', notConnected: '未连接', connect: '连接', networkPassword: '网络密码', connecting: '正在连接 Wi-Fi…',
         password: '密码', connectTo: '连接 {ssid}',

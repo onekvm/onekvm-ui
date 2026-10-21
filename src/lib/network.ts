@@ -87,25 +87,14 @@ export function availablePhysicalInterfaces(
   const wireGuardNames = new Set((config.wireguard || []).map(({ name }) => name))
   const managedNames = new Set((config.interfaces || []).map(({ name }) => name))
   const vpnNames = new Set((config.vpn || []).map(({ name }) => name))
-  const reservedNames = new Set([...wireGuardNames, ...managedNames, ...vpnNames])
   const available = interfaces
     .filter(({ name }) => !wireGuardNames.has(name) && !managedNames.has(name) && !vpnNames.has(name))
     .map((networkInterface) => ({
       ...networkInterface,
-      kind: wifiAvailable && networkInterface.name === 'ap0' ? 'wifi_ap' as const
-        : wifiAvailable && /^wlan\d+$/.test(networkInterface.name) ? 'wifi_station' as const : 'physical' as const,
+      kind: wifiAvailable && networkInterface.wifi_role === 'ap' ? 'wifi_ap' as const
+        : wifiAvailable && networkInterface.wifi_role === 'station' ? 'wifi_station' as const : 'physical' as const,
       configured: false,
     }))
-  if (wifiAvailable) {
-    if (!reservedNames.has('ap0') && !available.some(({ name }) => name === 'ap0')) {
-      available.push({ name: 'ap0', up: false, configured: false, mac: '', addresses: [],
-        kind: 'wifi_ap', port_type: 'virtual', link_speed_mbps: 0 })
-    }
-    if (!reservedNames.has('wlan0') && !available.some(({ name }) => name === 'wlan0')) {
-      available.push({ name: 'wlan0', up: false, configured: false, mac: '', addresses: [],
-        kind: 'wifi_station', port_type: 'physical', link_speed_mbps: 0 })
-    }
-  }
   return available
 }
 

@@ -264,6 +264,13 @@ html[data-onekvm-skin="classic"] :is(
   background: var(--popover);
   box-shadow: var(--classic-frame);
 }
+/* Keep opaque plugin content inside the inset frame instead of painting over it. */
+html[data-onekvm-skin="classic"] .tool-window.host-window-frame {
+  padding: 3px;
+}
+html[data-onekvm-skin="classic"] .tool-window.host-window-frame > .console-floating-card > .n-card-content > .host-window-titlebar {
+  margin: 0 0 2px;
+}
 html[data-onekvm-skin="classic"] :is(.host-theme-menu, .host-menu),
 html[data-onekvm-skin="classic"] .host-control-popover.n-popover:not(.n-popover--raw) {
   padding: 3px;

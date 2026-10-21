@@ -49,7 +49,10 @@ body status icon, and raised action buttons. Their original focus, dismissal,
 and asynchronous loading behavior is retained through Naive's dialog API.
 The skin is applied to host chrome, window frames/titlebar controls, and mobile
 navigation. Plugin page contents and the contents of plugin tool windows are
-outside these structural styles. Shared host windows expose `host-window-frame`,
+outside these structural styles. Toolbox windows reserve a three-pixel outer
+frame so opaque or edge-to-edge plugin content cannot cover the classic bevel.
+The same frame applies to child windows, drawers, and maximized/fullscreen tools.
+Shared host windows expose `host-window-frame`,
 `host-window-titlebar`, and `host-window-actions` hooks for consistent chrome.
 `graphite` and `paper` use `skin: 'default'`. Custom themes inherit `skin` from
 their base and can override it independently of colors and `iconSet`.

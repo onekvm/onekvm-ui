@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, useTemplateRef, watch, type CSSProperties } from 'vue'
 
+import { h } from 'vue'
+import { Upload, Download } from '@/icons'
+import { useMinimizedWindowTask } from '@/composables/useWindowTaskbar'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { useXpWindowTransition } from '@/composables/useXpWindowTransition'
 import XpProgressCells from './XpProgressCells.vue'
@@ -40,8 +43,16 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   titlePointerdown: [event: PointerEvent]
+  restore: []
 }>()
 
+useMinimizedWindowTask(() => props.minimized ? {
+  title: props.dialogLabel,
+  icon: () => h(props.sourceIcon === 'internet' ? Download : Upload, { size: 18 }),
+  progress: props.indeterminate ? undefined : props.percentage,
+  transferId: props.minimizeTarget,
+  restore: () => emit('restore'),
+} : null)
 const overlayTo = useOverlayMount()
 const windowTransition = useXpWindowTransition({
   minimized: () => props.minimized,

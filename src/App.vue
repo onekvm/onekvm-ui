@@ -2,6 +2,7 @@
 import { defineAsyncComponent } from 'vue'
 
 import AppShell from '@/components/AppShell.vue'
+import WindowTaskbar from '@/components/WindowTaskbar.vue'
 import AuthGate from '@/components/AuthGate.vue'
 import UIUpdateGuard from '@/components/UIUpdateGuard.vue'
 import UninstallExtensionDialog from '@/components/UninstallExtensionDialog.vue'
@@ -30,6 +31,7 @@ const { noticeVisible, checking } = useAccessRevokedRoute()
           <UninstallExtensionDialog />
           <AuthGate>
             <AppShell />
+            <WindowTaskbar />
           </AuthGate>
         </template>
       </n-message-provider>

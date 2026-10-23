@@ -155,6 +155,8 @@ select { font: inherit; }
 }
 
 .app-shell {
+  padding-bottom: var(--onekvm-taskbar-height, 0px);
+  box-sizing: border-box;
   display: grid;
   grid-template-rows: var(--onekvm-toolbar-bar) minmax(0, 1fr);
   width: 100%;
@@ -3443,7 +3445,7 @@ select { font: inherit; }
 
 .advanced-settings-layer {
   position: fixed;
-  inset: 0;
+  inset: 0 0 var(--onekvm-taskbar-height, 0px);
   z-index: 200;
   display: grid;
   grid-row: 1 / -1;
@@ -3464,6 +3466,18 @@ select { font: inherit; }
   min-height: 0;
   grid-template-rows: 48px minmax(0, 1fr);
   background: var(--background);
+}
+.advanced-settings-page.is-embedded { grid-template-rows: minmax(0, 1fr); }
+.advanced-settings-page.is-embedded.is-settings-app.is-settings-detail .advanced-settings-section-header h1 {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip: auto;
+}
+.advanced-settings-page.is-embedded.is-settings-app .advanced-settings-section-header {
+  justify-content: flex-start;
+  gap: 8px;
 }
 
 .advanced-settings-header {
@@ -5429,6 +5443,11 @@ body .n-drawer.slide-in-from-right-transition-leave-active {
   .control-sheet-leave-active .control-sheet-card { animation: none; }
 }
 
+.n-base-select-menu.edid-preset-menu .n-base-select-option .n-base-select-option__content {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 /* OneKVM semantic skin. Keep product CSS on stable tokens so themes do not
    depend on Naive UI internals or the toolbar-extension ABI. */
 html,
@@ -5901,3 +5920,6 @@ body {
   .n-tab { transition: none !important; }
   .n-button:not(.n-button--disabled):active { transform: none; }
 }
+
+/* Fullscreen is a viewport of its own; keep the remote picture above the taskbar. */
+.console-workspace:fullscreen { padding-bottom: var(--onekvm-taskbar-height, 0px); box-sizing: border-box; }

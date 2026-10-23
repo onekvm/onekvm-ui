@@ -5,7 +5,7 @@ import { useMessage } from 'naive-ui'
 
 import { api, APIError, type EDIDApplyRequired, type EDIDStatus } from '@/api/client'
 import { t } from '@/i18n/runtime'
-import { edidSelectOptions, parseEdidSelection } from '@/lib/edid'
+import { edidSelectOptions, filterEdidOption, parseEdidSelection } from '@/lib/edid'
 import SettingsPanel from './SettingsPanel.vue'
 import EdidIdentitySummary from './EdidIdentitySummary.vue'
 
@@ -18,8 +18,9 @@ const busy = ref(false)
 const selection = ref('')
 
 const options = computed(() => edidSelectOptions(status.value, {
-  factory: t('settings.advancedSettings.displayPage.edidFactory', 'Factory'),
+  factory: t('settings.advancedSettings.displayPage.edidFactory', 'Factory preset'),
   presets: t('settings.advancedSettings.displayPage.edidMachinePresets', 'Machine presets'),
+  common: t('settings.advancedSettings.displayPage.edidCommonPresets', 'Common'),
   custom: t('settings.advancedSettings.displayPage.edidCustomFiles', 'Custom files'),
 }))
 
@@ -109,7 +110,12 @@ onMounted(() => {
     </n-alert>
     <n-select
       v-model:value="selection"
+      class="edid-preset-select"
       :options="options"
+      filterable
+      :filter="filterEdidOption"
+      :menu-props="{ class: 'edid-preset-menu' }"
+      :virtual-scroll="false"
       :disabled="disabled || busy || !status.writable"
       :placeholder="t('settings.advancedSettings.displayPage.edidSelect', 'Choose a machine preset or a custom file')"
     />
@@ -120,5 +126,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.edid-preset-select { width: 100%; min-width: 0; }
 .display-setting-field-hint { margin: 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.6; }
 </style>

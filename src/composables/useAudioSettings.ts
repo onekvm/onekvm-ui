@@ -17,7 +17,7 @@ export function useAudioSettings(getQuality: () => string | undefined) {
   const quality = computed<AudioQuality>(() => format.value === 'pcm' ? 'pcm' : opusQuality.value)
   const formatOptions = computed(() => [
     { label: t('usbAudio.formatOpus', 'Opus (save bandwidth)'), value: 'opus' },
-    { label: t('usbAudio.formatPCM', 'PCM (lower CPU use)'), value: 'pcm' },
+    { label: t('usbAudio.formatPCM', 'PCM (lossless, lower CPU use)'), value: 'pcm' },
   ])
   const qualityOptions = computed(() => format.value === 'pcm'
     ? [{ label: t('settings.advancedSettings.audioPage.qualityPCM', 'Original (48 kHz / 16-bit, lossless)'), value: 'pcm' }]

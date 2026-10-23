@@ -25,6 +25,7 @@ export function useXpWindowTransition(options: {
   function findTask() {
     if (!options.target()) return null
     return [...document.querySelectorAll<HTMLElement>(`[data-transfer-task="${options.target()}"]`)]
+      .sort((a, b) => Number(b.hasAttribute('data-window-task')) - Number(a.hasAttribute('data-window-task')))
       .find((element) => {
         const bounds = element.getBoundingClientRect()
         return bounds.width > 0 && bounds.height > 0

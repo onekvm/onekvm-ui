@@ -20,6 +20,7 @@ import { api } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { onekvm, type BrowserAudioStats, type BrowserVideoLatencyUs, type TransportState } from '@/lib/onekvm'
 import { emptyBrowserAudioStats, emptyBrowserVideoLatency } from '@/lib/webrtc-playback-stats'
+import { encodeConsoleFrame, registerConsoleFrameProvider } from '@/lib/console-frame'
 
 const props = defineProps<{
   state: TransportState
@@ -74,6 +75,12 @@ const mediaError = ref(false)
 const reconnecting = ref(false)
 const mjpegReload = ref(0)
 let detachVideo: (() => void) | undefined
+const detachFrameProvider = registerConsoleFrameProvider(async () => {
+  const source = isMJPEG.value ? canvas.value : video.value
+  if (!source || !hasFrame.value || mediaError.value || transportFailed.value || props.serverUnavailable ||
+      props.signalConnected !== true || props.hdmiError) throw new Error('CONSOLE_FRAME_UNAVAILABLE')
+  return encodeConsoleFrame(source)
+}, () => stage.value)
 let detachAudio: (() => void) | undefined
 let unsubscribeBitrate: (() => void) | undefined
 let unsubscribeBrowserLatency: (() => void) | undefined
@@ -445,6 +452,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  detachFrameProvider()
   pixelRatioQuery?.removeEventListener('change', onPixelRatioChange)
   pixelRatioQuery = undefined
   canvasObserver?.disconnect()

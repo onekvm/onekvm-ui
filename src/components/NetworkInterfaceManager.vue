@@ -307,21 +307,21 @@ function environmentInstallCopy(kind: NetworkEnvironmentId) {
     return {
       title: t('network.tunnels.notInstalledTitle', 'IP tunnel environment is not installed'),
       content: t('network.tunnels.notInstalled', 'Install the IP tunnel environment from Plugin Marketplace before adding tunnel interfaces.'),
-      positiveText: t('network.tunnels.installEnvironment', 'Install IP tunnel environment'),
+      positiveText: t('network.tunnels.installEnvironment', 'Install'),
     }
   }
   if (kind === 'wireguard') {
     return {
       title: t('network.wireguard.notInstalledTitle', 'WireGuard is not installed'),
       content: t('network.wireguard.notInstalled', 'Install the WireGuard environment from Plugin Marketplace before adding a WireGuard interface.'),
-      positiveText: t('network.wireguard.installEnvironment', 'Install the WireGuard environment from Plugin Marketplace'),
+      positiveText: t('network.wireguard.installEnvironment', 'Install'),
     }
   }
   const name = networkKindLabel(kind)
   return {
     title: fillMarketplaceTemplate(t('network.vpnEnvironment.notInstalledTitle', '{name} environment is not installed'), { name }),
     content: fillMarketplaceTemplate(t('network.vpnEnvironment.notInstalled', 'Install the {name} environment from Plugin Marketplace before adding a {name} interface.'), { name }),
-    positiveText: fillMarketplaceTemplate(t('network.vpnEnvironment.installEnvironment', 'Install the {name} environment from Plugin Marketplace'), { name }),
+    positiveText: t('network.vpnEnvironment.installEnvironment', 'Install'),
   }
 }
 

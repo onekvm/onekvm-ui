@@ -181,6 +181,7 @@ function dropFiles(event: DragEvent) {
       :show="manager.uploading.value && !uploadMinimized"
       :minimized="manager.uploading.value && uploadMinimized"
       minimize-target="files"
+      @restore="restoreUploadDialog"
       draggable
       :dialog-label="uploadTitle"
       :status="uploadStatus"

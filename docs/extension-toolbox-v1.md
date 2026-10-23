@@ -93,6 +93,12 @@ interface ExtensionToolHostV1 {
   readonly presentation: Readonly<ComputedRef<'drawer' | 'window' | 'fullscreen'>>
   readonly getStatus: () => Promise<OneKVMStatus>
   readonly assetURL: (path: string) => string
+  readonly captureFrame: () => Promise<{ blob: Blob; width: number; height: number }>
+  readonly beginFrameSelection: (cancel: () => void) => Promise<{
+    frame: { blob: Blob; width: number; height: number }
+    target: HTMLElement
+    dispose: () => void
+  }>
   readonly invoke: <T = unknown>(method: string, payload?: unknown) => Promise<T>
   readonly subscribeHIDReports: (listener: (report: Uint8Array, timestamp: number) => void) => () => void
   readonly subscribeKeyboardText: (listener: (text: string, timestamp: number) => void) => () => void
@@ -125,6 +131,23 @@ compatibility. Recording is browser-local; playback timing is device-owned.
 [Vue Page API v1](extension-vue-page-v1.md). The host validates/saves settings
 and asks Save/Discard/Cancel before ordinary close or drawer switching.
 Invalidation from disable, removal, upgrade or lost permissions overrides drafts.
+
+`beginFrameSelection(cancel)` captures native pixels and temporarily hides the calling
+window without unmounting it. Teleport the selection UI to the returned `target`
+and use absolute positioning within that video stage. The console toolbar stays
+visible and remote input is blocked until `dispose()` restores the tool window.
+Always dispose on selection, cancellation and unmount. Switching or closing tools,
+losing permission or leaving the console cancels the selection through `cancel`.
+This is a local selection region, not a page-wide modal; keep toolbar keyboard
+navigation available. Feature-detect this API for compatibility with older UIs.
+
+`captureFrame()` captures a PNG of the current console's native video pixels in
+this browser (WebRTC, WebSocket and MJPEG), without CSS rotation, fit or zoom.
+It rejects with `CONSOLE_FRAME_UNAVAILABLE` when no connected frame is available,
+and rejects after tool invalidation. Call it only in response to a user action;
+release any object URLs and workers on unmount. Older UI releases lack this
+method, so tools should check for it and explain that a UI update is required.
+This does not enable a device encoder or send the frame to a server.
 
 This is the trusted main UI execution model. Core checks `settings.view` for
 catalog/resources and `settings.manage` for mutation/invoke; the extension host
@@ -219,3 +242,11 @@ the leave transition has finished. Reduced motion removes the visual motion.
 
 See `onekvm-extension-example/examples/toolbox` for two tools in one extension,
 including a dirty settings adapter, an instance-local counter and Pin steps.
+
+Explicitly minimized tool windows remain mounted and appear in the shared bottom
+taskbar. Restoring a task raises its window and retains its previous maximized
+state. Titles and icons follow the current locale and theme. The taskbar disappears
+when no minimized windows remain and reserves space above the remote picture;
+it follows fullscreen and safe-area changes. Temporary frame selection and HID
+recording visibility changes do not create minimized tasks. Transfer dialogs and
+the advanced settings window share the same taskbar.

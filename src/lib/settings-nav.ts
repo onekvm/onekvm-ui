@@ -103,6 +103,8 @@ export function settingsSidebarGroupActive(itemKey: string, section: string, ext
 
 export function settingsBackTarget(section: string, parent?: string) {
   if (isSettingsIndex(section)) return null
-  if (parent === 'cloud' || parent === 'plugins') return parent
+  // Plugin pages are listed directly in the mobile settings menu.
+  // Their desktop sidebar group is not an intermediate navigation page.
+  if (parent === 'cloud') return parent
   return SETTINGS_INDEX
 }

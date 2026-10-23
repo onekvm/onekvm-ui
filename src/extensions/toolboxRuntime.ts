@@ -3,6 +3,7 @@ import type { ToolChildWindow } from '@/lib/tool-child-windows'
 import { extensionAssetURL, type ExtensionStatus, type ConsoleExtension, type ExtensionToolboxItem, type OneKVMStatus } from '@/api/client'
 import type { ExtensionPageSettingsAdapterV1, VueExtensionPageDefinitionV1 } from './pluginUi'
 import type { HIDReportListener, KeyboardTextListener } from '@/lib/onekvm'
+import type { ConsoleFrame } from '@/lib/console-frame'
 
 export type ToolPresentation = 'drawer' | 'window' | 'fullscreen'
 export interface HIDRecordingActivity {
@@ -26,6 +27,12 @@ export interface ExtensionToolHostV1 {
   readonly presentation: Readonly<ComputedRef<ToolPresentation>>
   readonly getStatus: () => Promise<OneKVMStatus>
   readonly assetURL: (path: string) => string
+  readonly captureFrame: () => Promise<ConsoleFrame>
+  readonly beginFrameSelection: (cancel: () => void) => Promise<{
+    readonly frame: ConsoleFrame
+    readonly target: HTMLElement
+    readonly dispose: () => void
+  }>
   readonly invoke: <T = unknown>(method: string, payload?: unknown) => Promise<T>
   readonly subscribeHIDReports: (listener: HIDReportListener) => () => void
   readonly subscribeKeyboardText: (listener: KeyboardTextListener) => () => void

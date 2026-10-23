@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { useAsyncDialog } from '@/composables/useAsyncDialog'
-import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
-import { useMessage } from 'naive-ui'
+import { computed, defineAsyncComponent, h, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
+import { NButton, NSpace, useMessage } from 'naive-ui'
+import AdvancedSettingsWindow from './AdvancedSettingsWindow.vue'
 
 import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type OneKVMStatus } from '@/api/client'
 import ToolboxWorkspace from './toolbox/ToolboxWorkspace.vue'
 import MacroRunBanner from './toolbox/MacroRunBanner.vue'
+import { useWindowTaskbarInset } from '@/composables/useWindowTaskbar'
 import { useToolbox } from '@/composables/useToolbox'
 import { providePerformanceDock } from '@/composables/usePerformanceDock'
 import { useAuth } from '@/composables/useAuth'
@@ -84,6 +86,7 @@ const pictureInPicture = usePictureInPicture(() => state.value.videoMode)
 const { active: pipActive, busy: pipBusy, supported: pipSupported } = pictureInPicture
 const { auth, logout, refresh } = useAuth()
 const toolbox = useToolbox()
+const taskbarInset = useWindowTaskbarInset()
 providePerformanceDock()
 const dialog = useAsyncDialog()
 const message = useMessage()
@@ -117,6 +120,8 @@ const toolbarStageStyle = computed(() => ({
   '--toolbar-stage-ms': `${toolbarStageDuration(toolbarDock.value)}ms`,
   '--toolbar-stage-ease': toolbarStageEase(toolbarDock.value),
 }))
+const settingsWindowOpen = shallowRef(false)
+const settingsWindow = useTemplateRef<InstanceType<typeof AdvancedSettingsWindow>>('settingsWindow')
 const advancedSettingsOpen = ref(isAdvancedSettingsRoute(window.location.hash))
 const advancedSettingsRoute = ref(advancedRouteFromHash(window.location.hash))
 const consoleWorkspace = ref<HTMLElement | null>(null)
@@ -275,7 +280,7 @@ function updateUserShortcuts(shortcuts: KeyboardShortcut[]) {
 }
 
 function closeSession() {
-  void onekvm.close()
+  return onekvm.close()
 }
 
 function setMetadata(width: number, height: number) {
@@ -414,14 +419,18 @@ function onPopState() {
   lockConsoleHistory()
 }
 
-function syncRoute() {
+async function syncRoute() {
+  const hash = window.location.hash
   const advanced = isAdvancedSettingsRoute(window.location.hash)
   if (advanced && !canSettings.value) {
     window.location.hash = ''
     advancedSettingsOpen.value = false
     return
   }
-  if (advanced && !advancedSettingsOpen.value) closeSession()
+  if (advanced && !advancedSettingsOpen.value) {
+    await closeSession()
+    if (window.location.hash !== hash) return
+  }
   advancedSettingsOpen.value = advanced
   if (advanced) {
     advancedSettingsRoute.value = advancedRouteFromHash(window.location.hash)
@@ -430,6 +439,7 @@ function syncRoute() {
 
 function openAdvancedSettings() {
   if (advancedSettingsOpen.value || !canSettings.value) return
+  settingsWindowOpen.value = false
   window.location.hash = advancedSettingsHash(phoneSettingsActive() ? '' : 'system')
 }
 
@@ -440,16 +450,27 @@ function openMedia(sheet: boolean) {
 
 function confirmAdvancedSettings() {
   if (advancedSettingsOpen.value || !canSettings.value) return
-  dialog.warning({
-    title: t('settings.advancedSettings.confirmTitle', 'Open advanced settings?'),
-    content: t(
-      'settings.advancedSettings.sessionWarning',
-      'Opening advanced settings will interrupt the current remote-control session. It will reconnect after you return.',
-    ),
-    positiveText: t('settings.advancedSettings.continue', 'Continue'),
-    negativeText: t('common.cancel', 'Cancel'),
-    onPositiveClick: () => openAdvancedSettings(),
+  if (settingsWindowOpen.value) { settingsWindow.value?.focus(); return }
+  const prompt = dialog.warning({
+    title: t('settings.advancedSettings.confirmTitle'),
+    content: t('settings.advancedSettings.windowWarning'),
+    action: () => h(NSpace, { justify: 'end', wrap: true }, { default: () => [
+      h(NButton, { onClick: () => prompt.destroy() }, { default: () => t('common.cancel') }),
+      h(NButton, { onClick: () => { settingsWindowOpen.value = true; prompt.destroy() } }, { default: () => t('settings.advancedSettings.openWindow') }),
+      h(NButton, { type: 'primary', onClick: () => { openAdvancedSettings(); prompt.destroy() } }, { default: () => t('settings.advancedSettings.openPage') }),
+    ] }),
   })
+}
+
+function focusSettingsWindow() {
+  toolbox.cancelFrameSelection(false)
+  toolbox.localFocus = true
+}
+
+function closeSettingsWindow() {
+  settingsWindowOpen.value = false
+  toolbox.localFocus = false
+  focusConsole()
 }
 
 function closeAdvancedSettings() {
@@ -484,6 +505,7 @@ function navigateAdvancedSettings(route: string) {
 
 watch(advancedSettingsOpen, (open) => {
   if (open) {
+    settingsWindowOpen.value = false
     toolbox.closeAll()
     return
   }
@@ -546,8 +568,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :style="{ '--onekvm-taskbar-height': `${taskbarInset}px` }">
     <KeyboardLockOverlay :changes="keyboardLockChanges" />
+    <AdvancedSettingsWindow v-if="settingsWindowOpen && canSettings && !advancedSettingsOpen" ref="settingsWindow"
+      :status="status" :can-change-video="canChangeVideo" :video-session-id="state.webRTCSessionId" :media-transfer="mediaTransfer"
+      @close="closeSettingsWindow" @focus="focusSettingsWindow"
+      @restore-media-transfer="virtualMediaPopover?.restoreUploadDialog()" />
     <VirtualMediaPopover
       ref="virtualMediaPopover"
       :console-active="!advancedSettingsOpen"

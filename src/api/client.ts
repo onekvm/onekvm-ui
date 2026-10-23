@@ -731,6 +731,7 @@ export interface ConfigSchema {
   read_only: string[]
   capabilities: Record<string, boolean>
   video_codecs?: string[]
+  video_settings_writable?: boolean
   video_bitrate_kbps?: {
     minimum: number
     maximum: number
@@ -997,6 +998,7 @@ export interface MSDDownloadTask {
 }
 
 export interface ExtensionService {
+  unit?: string
   id: string
   name: string
   description?: string
@@ -1663,7 +1665,9 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(input),
     }),
-  getConfigSchema: () => request<ConfigSchema>('/api/config/schema'),
+  getConfigSchema: (webRTCSessionId = '') => request<ConfigSchema>('/api/config/schema', {
+    headers: webRTCSessionId ? { 'X-OneKVM-WebRTC-Session': webRTCSessionId } : undefined,
+  }),
   saveConfig: (config: OneKVMConfig, webRTCSessionId = '') =>
 		request<ConfigSaveResponse>('/api/config', {
       method: 'PUT',

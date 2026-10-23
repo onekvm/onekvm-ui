@@ -22,7 +22,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', resize))
 <template>
   <Teleport :to="mountTo">
     <TransitionGroup name="win11-window" tag="div" class="toolbox-workspace">
-      <ToolWindow v-for="instance in ordered" :key="instance.cacheKey" v-show="instance.windowState !== 'minimized' && toolbox.minimizedId !== instance.id && (!mobile || toolbox.activeId === instance.id)"
+      <ToolWindow v-for="instance in ordered" :key="instance.cacheKey" v-show="instance.windowState !== 'minimized' && toolbox.minimizedId !== instance.id && toolbox.frameSelectionId !== instance.id && (!mobile || toolbox.activeId === instance.id)"
         :title="toolbox.tools.find(t => t.id === instance.id)?.title || instance.tool.title" :presentation="presentation(instance)"
         :content-layout="instance.tool.item.layout || 'padded'"
         :width="instance.windowSize?.width || instance.tool.item.size?.width || (instance.tool.item.presentation === 'drawer' ? 480 : 720)" :height="instance.windowSize?.height || instance.tool.item.size?.height"

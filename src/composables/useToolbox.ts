@@ -45,6 +45,8 @@ export function useToolbox() {
   const error = ref('')
   const activeId = ref('')
   const minimizedId = ref('')
+  const frameSelectionId = shallowRef('')
+  let frameSelection: { id: string; cancel: () => void } | null = null
   const recording = shallowRef<HIDRecordingActivity | null>(null)
   const childWindowIds = shallowRef<string[]>([])
   const childWindows = createToolChildWindows(ids => { childWindowIds.value = ids })
@@ -84,7 +86,7 @@ export function useToolbox() {
     const tool = tools.value.find(tool => tool.id === pin.toolId)
     return tool ? [{ pin, tool }] : []
   }).sort((a, b) => a.pin.order - b.pin.order || a.tool.id.localeCompare(b.tool.id)))
-  const inputBlocked = computed(() => menuOpen.value || localFocus.value ||
+  const inputBlocked = computed(() => Boolean(frameSelectionId.value) || menuOpen.value || localFocus.value ||
     (mobile.value ? Boolean(activeId.value) : instances.value.some(i => i.tool.item.presentation === 'drawer' && i.windowState !== 'minimized')))
   const actions = new Map<string, ToolActions>()
   const opening = new Map<string, Promise<void>>()
@@ -110,6 +112,7 @@ export function useToolbox() {
   }
   function focus(id: string) {
     if (!instances.value.some(instance => instance.id === id) || (recording.value && minimizedId.value === id)) return
+    cancelFrameSelection(false)
     activeId.value = id
     windowGroups.get(id)?.raise()
     if (minimizedId.value === id) minimizedId.value = ''
@@ -117,6 +120,32 @@ export function useToolbox() {
     localFocus.value = true
     if (document.pointerLockElement) void document.exitPointerLock()
     if (!childWindows.focus(id)) childWindows.activate(id)
+  }
+  function cancelFrameSelection(restore = true) {
+    const current = frameSelection
+    if (!current) return
+    frameSelection = null
+    frameSelectionId.value = ''
+    current.cancel()
+    if (restore && instances.value.some(instance => instance.id === current.id)) focus(current.id)
+  }
+  function beginFrameSelection(id: string, cancel: () => void) {
+    if (!allowed.value || recording.value || closing.has(id) || !instances.value.some(instance => instance.id === id)) {
+      throw new Error(t('toolbox.invalidated'))
+    }
+    cancelFrameSelection(false)
+    const current = { id, cancel }
+    frameSelection = current
+    frameSelectionId.value = id
+    activeId.value = ''
+    localFocus.value = true
+    if (document.pointerLockElement) void document.exitPointerLock()
+    return () => {
+      if (frameSelection !== current) return
+      frameSelection = null
+      frameSelectionId.value = ''
+      if (instances.value.some(instance => instance.id === id)) focus(id)
+    }
   }
   function minimizeForRecording(id: string) {
     if (!mobile.value || activeId.value !== id || !instances.value.some(instance => instance.id === id)) return
@@ -153,7 +182,7 @@ export function useToolbox() {
       layer: computed(() => { childWindowIds.value; return windowLayer(id) + (childWindows.index(id, child) + 1) * 2 }),
       active: computed(() => { childWindowIds.value; return windowActive(id) && activeId.value === id && childWindows.active(id) === child }),
       blocked: computed(() => { childWindowIds.value; return childWindows.blocked(id, child) }),
-      visible: computed(() => instances.value.some(instance => instance.id === id && instance.windowState !== 'minimized') && minimizedId.value !== id && (!mobile.value || activeId.value === id)),
+      visible: computed(() => instances.value.some(instance => instance.id === id && instance.windowState !== 'minimized') && minimizedId.value !== id && frameSelectionId.value !== id && (!mobile.value || activeId.value === id)),
       activate: () => {
         if (disposed || closing.has(id)) return
         if (childWindows.focus(id, false, child)) return
@@ -200,6 +229,7 @@ export function useToolbox() {
   async function closeNow(id: string, force: boolean) {
     const instance = instances.value.find(i => i.id === id)
     if (!instance) return true
+    if (frameSelectionId.value === id) cancelFrameSelection(false)
     if (!force && actions.has(id) && !await actions.get(id)!.closeCheck()) return false
     if (!await childWindows.close(id, null, force)) return false
     instances.value = instances.value.filter(i => i.id !== id)
@@ -320,6 +350,7 @@ export function useToolbox() {
   }
   watch([() => auth.username, allowed, () => auth.permissions.join(',')], () => {
     generation++
+    cancelFrameSelection(false)
     instances.value = []
     openingIds.value = []
     minimizedId.value = ''
@@ -341,6 +372,7 @@ export function useToolbox() {
     document.addEventListener('focusin', onLocalFocus, true)
   })
   onBeforeUnmount(() => {
+    cancelFrameSelection(false)
     generation++
     recording.value = null
     childWindows.clear()
@@ -354,8 +386,8 @@ export function useToolbox() {
     document.removeEventListener('pointerdown', onLocalFocus, true)
     document.removeEventListener('focusin', onLocalFocus, true)
   })
-  const toolbox = reactive({ allowed, tools, instances, pins, pinned, menuOpen, localFocus, inputBlocked, loading, openingIds, error, activeId, minimizedId, recording, childWindowIds,
-    refresh, acceptCatalog, togglePin, reorderPin, open, focus, close, closeAll, minimizeForRecording, showRecordingStatus, registerChildWindow,
+  const toolbox = reactive({ allowed, tools, instances, pins, pinned, menuOpen, localFocus, inputBlocked, loading, openingIds, error, activeId, minimizedId, frameSelectionId, recording, childWindowIds,
+    refresh, acceptCatalog, togglePin, reorderPin, open, focus, close, closeAll, beginFrameSelection, cancelFrameSelection, minimizeForRecording, showRecordingStatus, registerChildWindow,
     focusChildWindow: childWindows.focus, windowLayer, windowActive, windowBlocked, childWindowFocused, setWindowState, resizeWindow, finishOpening, registerActions })
   provide(key, toolbox)
   return toolbox

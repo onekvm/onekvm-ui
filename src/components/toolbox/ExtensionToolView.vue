@@ -9,6 +9,7 @@ import { useToolboxContext, type ToolInstance } from '@/composables/useToolbox'
 import { t } from '@/i18n/runtime'
 import { onekvm, type HIDReportListener, type KeyboardTextListener } from '@/lib/onekvm'
 import { useOverlayMount } from '@/composables/useOverlayMount'
+import { captureConsoleFrame, captureConsoleSelectionFrame } from '@/lib/console-frame'
 
 const props = defineProps<{ instance: ToolInstance; presentation: ToolPresentation }>()
 const toolbox = useToolboxContext()
@@ -82,6 +83,21 @@ const host = markRaw(Object.freeze<ExtensionToolHostV1>({
   presentation: computed(() => props.presentation),
   getStatus: api.getStatus,
   assetURL: (path: string) => extensionAssetURL(extension.value, path),
+  captureFrame: async () => {
+    const valid = () => toolbox.allowed && toolbox.instances.some(instance => instance.cacheKey === props.instance.cacheKey)
+    if (!valid()) throw new Error(t('toolbox.invalidated'))
+    const frame = await captureConsoleFrame()
+    if (!valid()) throw new Error(t('toolbox.invalidated'))
+    return frame
+  },
+  beginFrameSelection: async cancel => {
+    const valid = () => toolbox.allowed && toolbox.instances.some(instance => instance.cacheKey === props.instance.cacheKey)
+    if (!valid()) throw new Error(t('toolbox.invalidated'))
+    const selection = await captureConsoleSelectionFrame()
+    if (!valid()) throw new Error(t('toolbox.invalidated'))
+    const dispose = toolbox.beginFrameSelection(props.instance.id, cancel)
+    return { ...selection, dispose }
+  },
   invoke: <T = unknown>(method: string, payload: unknown = null) => {
     if (!toolbox.allowed || !toolbox.instances.some(instance => instance.cacheKey === props.instance.cacheKey)) {
       return Promise.reject(new Error(t('toolbox.invalidated')))

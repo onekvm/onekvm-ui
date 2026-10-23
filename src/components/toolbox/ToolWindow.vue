@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, shallowRef, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, shallowRef, useSlots, useTemplateRef, watch } from 'vue'
 import { AppWindow, Copy, Minus, Square } from '@/icons'
 import { t } from '@/i18n/runtime'
+import { useWindowMinimizeTransition } from '@/composables/useWindowMinimizeTransition'
+import { useMinimizedWindowTask, useWindowTaskbarInset } from '@/composables/useWindowTaskbar'
 import { readSafeAreaInsets } from '@/lib/fullscreen-inset'
 import { clampOverlayPosition, resizeAnchoredBox, type OverlayResizeHandle } from '@/lib/overlay-drag'
 import { useOverlayMount } from '@/composables/useOverlayMount'
@@ -14,8 +16,14 @@ const props = withDefaults(defineProps<{
 }>(), { contentLayout: 'padded', state: 'normal', resizable: true, minimizable: true, maximizable: true })
 const emit = defineEmits<{ focus: []; close: []; childAttention: []; 'update:state': [state: 'normal' | 'maximized' | 'minimized'] }>()
 const overlayTo = useOverlayMount()
+const taskbarInset = useWindowTaskbarInset()
+const slots = useSlots()
+const taskId = useMinimizedWindowTask(() => props.state === 'minimized' ? {
+  title: props.title, icon: slots['title-icon'], restore: () => emit('focus'),
+} : null)
 const frame = useTemplateRef<InstanceType<typeof ConsoleFloatingWindow>>('frame')
 const root = computed(() => frame.value?.element || null)
+const minimizing = useWindowMinimizeTransition({ state: () => props.state, element: () => root.value, taskId })
 const viewport = reactive({ width: window.innerWidth, height: window.innerHeight, x: 0, y: 0 })
 const box = reactive({ x: props.ownedModal ? (viewport.width - (props.width || 720)) / 2 : 48, y: props.ownedModal ? (viewport.height - (props.height || 480)) / 2 : 64, width: props.width || 720, height: props.height || 480 })
 let gesture: { kind: 'move' | OverlayResizeHandle; id: number; x: number; y: number; box: typeof box; restoreOnMove: boolean } | null = null
@@ -42,10 +50,10 @@ function clamp() {
 function updateViewport() {
   const visual = window.visualViewport
   const safe = readSafeAreaInsets()
-  Object.assign(viewport, { width: (visual?.width || window.innerWidth) - safe.left - safe.right, height: (visual?.height || window.innerHeight) - safe.top - safe.bottom, x: (visual?.offsetLeft || 0) + safe.left, y: (visual?.offsetTop || 0) + safe.top })
+  Object.assign(viewport, { width: (visual?.width || window.innerWidth) - safe.left - safe.right, height: (visual?.height || window.innerHeight) - safe.top - safe.bottom - taskbarInset.value, x: (visual?.offsetLeft || 0) + safe.left, y: (visual?.offsetTop || 0) + safe.top })
   clamp()
   void nextTick(() => {
-    if (document.activeElement instanceof HTMLElement && root.value?.contains(document.activeElement)) {
+    if (!minimizing.value && document.activeElement instanceof HTMLElement && root.value?.contains(document.activeElement)) {
       document.activeElement.scrollIntoView({ block: 'nearest', inline: 'nearest' })
     }
   })
@@ -156,7 +164,7 @@ function arrange(action: string) {
   }
   if (action === 'move' || action === 'size') {
     keyboardStart = { ...box }; keyboardAction.value = action
-    root.value?.focus(); return
+    root.value?.focus({ preventScroll: true }); return
   }
   if (action === 'center') {
     if (maximized.value) emit('update:state', 'normal')
@@ -166,13 +174,13 @@ function arrange(action: string) {
   clamp()
 }
 watch(() => [props.active, props.sequence], async () => {
-  if (!props.active || props.childWindowActive) return
+  if (!props.active || props.childWindowActive || props.state === 'minimized') return
   await nextTick()
-  if (!root.value?.contains(document.activeElement)) root.value?.focus()
+  if (root.value?.getClientRects().length && !root.value.contains(document.activeElement)) root.value.focus({ preventScroll: true })
 })
 watch(maximized, async () => {
   const element = root.value
-  if (!element || gesture || fullLayout.value || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  if (!element || gesture || minimizing.value || props.state === 'minimized' || fullLayout.value || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
   const before = { left: element.style.left, top: element.style.top, width: element.style.width, height: element.style.height }
   stateAnimation?.cancel()
   await nextTick()
@@ -192,6 +200,10 @@ function applyRequestedSize() {
   box.height = height
   clamp()
 }
+watch([taskbarInset, () => props.state], () => {
+  // The taskbar changes the space for visible windows, not a saved hidden box.
+  if (props.state !== 'minimized') updateViewport()
+}, { flush: 'post' })
 watch(() => props.presentation, () => {
   updateViewport()
   applyRequestedSize()
@@ -220,11 +232,11 @@ function setBounds(bounds: Partial<{ x: number; y: number; width: number; height
   clamp()
   return true
 }
-defineExpose({ element: root, focus: () => root.value?.focus(), getBounds, setBounds })
+defineExpose({ element: root, focus: () => root.value?.focus({ preventScroll: true }), getBounds, setBounds })
 watch(() => [props.width, props.height], applyRequestedSize)
 onMounted(() => {
   updateViewport()
-  if (props.active) root.value?.focus()
+  if (props.active && props.state !== 'minimized') root.value?.focus({ preventScroll: true })
   window.addEventListener('resize', updateViewport)
   window.visualViewport?.addEventListener('resize', updateViewport)
   window.visualViewport?.addEventListener('scroll', updateViewport)
@@ -272,10 +284,10 @@ onBeforeUnmount(() => {
 .drawer .tool-window-header, .fullscreen .tool-window-header { cursor: default; }
 .tool-window :focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 .tool-window :deep(.n-input :is(input, textarea):focus-visible) { outline: none; }
-.tool-window-content { flex: 1; min-height: 0; overflow: auto; padding: 16px; overscroll-behavior: contain; scroll-padding: 16px; }
+.tool-window-content { flex: 1; min-height: 0; overflow: auto; padding: 16px; overscroll-behavior: contain; scroll-padding: 16px; isolation: isolate; }
 .tool-window-content.edge-to-edge { display: flex; flex-direction: column; overflow: hidden; padding: 0; scroll-padding: 0; }
 .tool-window-content.edge-to-edge > :deep(.extension-tool-view) { flex: 1 1 0; width: 100%; min-height: 0; }
-.tool-resize { position: absolute; display: grid; place-items: end; padding: 0; border: 0; color: var(--muted-foreground, currentColor); background: transparent; touch-action: none; }
+.tool-resize { position: absolute; z-index: 1; display: grid; place-items: end; padding: 0; border: 0; color: var(--muted-foreground, currentColor); background: transparent; touch-action: none; }
 .tool-resize-n, .tool-resize-s { left: 16px; right: 16px; height: 5px; cursor: ns-resize; }
 .tool-resize-n { top: 0; } .tool-resize-s { bottom: 0; }
 .tool-resize-e, .tool-resize-w { top: 16px; bottom: 16px; width: 5px; cursor: ew-resize; }

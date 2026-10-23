@@ -12,6 +12,7 @@ import {
   edidCurrentSummary,
   edidRequiresRestart,
   edidSelectOptions,
+  filterEdidOption,
   parseEdidSelection,
   supportsHdmiReset,
 } from '@/lib/edid'
@@ -121,8 +122,9 @@ const fpsOptions = [10, 15, 24, 30, 45, 60, 120].map((value) => ({
 }))
 const videoDisabled = computed(() => !props.canChangeVideo || saving.value || edidBusy.value || !!switchingProtocol.value)
 const edidOptions = computed(() => edidSelectOptions(edid.value, {
-  factory: t('settings.advancedSettings.displayPage.edidFactory', 'Factory'),
+  factory: t('settings.advancedSettings.displayPage.edidFactory', 'Factory preset'),
   presets: t('settings.advancedSettings.displayPage.edidMachinePresets', 'Machine presets'),
+  common: t('settings.advancedSettings.displayPage.edidCommonPresets', 'Common'),
   custom: t('settings.advancedSettings.displayPage.edidCustomFiles', 'Custom files'),
 }))
 const edidDisabled = computed(() => saving.value || edidBusy.value || !!switchingProtocol.value || !edid.value?.writable)
@@ -609,7 +611,7 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
         collapsible
       >
         <EdidIdentitySummary :status="edid" compact />
-        <div>
+        <div class="display-edid-field">
           <span class="display-edid-label">
             {{ t('screen.edid', 'EDID') }}
             <n-tooltip :to="overlayTo" :show="edidHelpHovered || edidHelpFocused" style="max-width: 300px">
@@ -631,8 +633,13 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
           </span>
           <n-select
             v-bind="selectProps"
+            :consistent-menu-width="true"
             :value="edidSelection || null"
             :options="edidOptions"
+            filterable
+            :filter="filterEdidOption"
+            :menu-props="{ class: 'edid-preset-menu' }"
+            :virtual-scroll="false"
             :placeholder="edidPlaceholder"
             :disabled="edidDisabled"
             @update:value="updateEdid"
@@ -679,6 +686,16 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
 </template>
 
 <style scoped>
+.display-status-popover .display-edid-field {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.display-status-popover .display-edid-field :deep(.n-select) {
+  width: 100%;
+  min-width: 0;
+}
+
 .display-hdmi-reset {
   justify-self: stretch;
   margin-top: 4px;

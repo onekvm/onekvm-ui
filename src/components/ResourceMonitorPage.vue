@@ -10,8 +10,10 @@ import {
 } from '@/api/client'
 import { currentLanguage, t } from '@/i18n/runtime'
 import {
+  buildResourceServiceRows,
   defaultResourceServiceSortDir,
   visibleResourceServices,
+  type ResourceServiceRow,
   type ResourceServiceSortDir,
   type ResourceServiceSortKey,
   type ResourceServiceStatusFilter,
@@ -67,7 +69,6 @@ const networkSeries = computed<ResourceChartSeries[]>(() => [
 ])
 const networkMaximum = computed(() => Math.max(1, ...networkSeries.value.flatMap((item) => item.values)) * 1.12)
 
-type ServiceRow = ServiceResourceUsage & { name: string; running: boolean }
 const serviceQuery = ref('')
 const serviceStatusFilter = ref<ResourceServiceStatusFilter>('running')
 const serviceSortKey = ref<ResourceServiceSortKey>('memory')
@@ -86,71 +87,11 @@ const serviceSortOptions = computed(() => [
   { label: t('settings.advancedSettings.resourcesPage.sortName', 'Name'), value: 'name' },
 ])
 
-const serviceRows = computed<ServiceRow[]>(() => {
-  const usage = new Map((history.value?.services || []).map((service) => [`${service.kind}:${service.id}`, service]))
-  const rows: ServiceRow[] = []
-  const core = usage.get('core:onekvm-server')
-  const host = usage.get('system:plugin-host')
-  if (host) {
-    rows.push({
-      ...host,
-      name: t('settings.advancedSettings.resourcesPage.pluginHost', 'Plugin host'),
-      running: true,
-    })
-  }
-  const included = new Set<string>()
-  const includedSystems = new Set<string>(['plugin-host'])
-  for (const extension of props.extensions.filter((item) => item.installed && item.system)) {
-    const resource = usage.get(`system:${extension.id}`)
-    if (!resource && !extension.running) continue
-    includedSystems.add(extension.id)
-    rows.push({
-      id: extension.id,
-      kind: 'system',
-      name: extensionTranslation(extension, currentLanguage.value).name,
-      cpu_percent: resource?.cpu_percent || 0,
-      memory_bytes: resource?.memory_bytes || 0,
-      running: Boolean(extension.running),
-    })
-  }
-  for (const resource of history.value?.services || []) {
-    if (resource.kind !== 'system' || includedSystems.has(resource.id)) continue
-    rows.push({
-      ...resource,
-      name: resource.id,
-      running: resource.memory_bytes > 0,
-    })
-  }
-  for (const extension of props.extensions.filter((item) => item.installed && !item.system)) {
-    const resource = usage.get(`extension:${extension.id}`)
-    included.add(extension.id)
-    rows.push({
-      id: extension.id,
-      kind: 'extension',
-      name: `${t('settings.advancedSettings.resourcesPage.pluginPrefix', 'Plugin')}: ${extensionTranslation(extension, currentLanguage.value).name}`,
-      cpu_percent: resource?.cpu_percent || 0,
-      memory_bytes: resource?.memory_bytes || 0,
-      running: Boolean(extension.running),
-    })
-  }
-  for (const resource of history.value?.services || []) {
-    if (resource.kind !== 'extension' || included.has(resource.id)) continue
-    rows.push({
-      ...resource,
-      name: `${t('settings.advancedSettings.resourcesPage.pluginPrefix', 'Plugin')}: ${resource.id}`,
-      running: resource.memory_bytes > 0,
-    })
-  }
-  rows.push({
-    id: 'onekvm-server',
-    kind: 'core',
-    name: 'onekvm-server',
-    cpu_percent: core?.cpu_percent || 0,
-    memory_bytes: core?.memory_bytes || 0,
-    running: true,
-  })
-  return rows
-})
+const serviceRows = computed(() => buildResourceServiceRows(history.value?.services || [], props.extensions, {
+  pluginHost: t('settings.advancedSettings.resourcesPage.pluginHost', 'Plugin host'),
+  pluginPrefix: t('settings.advancedSettings.resourcesPage.pluginPrefix', 'Plugin'),
+  extensionName: extension => extensionTranslation(extension, currentLanguage.value).name,
+}))
 
 const visibleServiceRows = computed(() => visibleResourceServices(
   serviceRows.value,
@@ -165,8 +106,23 @@ const serviceFilterCount = computed(() => t(
   'Showing {visible} of {total}',
 ).replace('{visible}', String(visibleServiceRows.value.length)).replace('{total}', String(serviceRows.value.length)))
 
-function serviceStatusText(running: boolean) {
-  return running ? runningLabel.value : stoppedLabel.value
+function serviceStatusText(service: ResourceServiceRow) {
+  if (service.no_resident_process) return t('settings.advancedSettings.resourcesPage.enabled', 'Enabled')
+  return service.running ? runningLabel.value : stoppedLabel.value
+}
+
+function serviceCpuText(service: ResourceServiceRow) {
+  return service.sampled || !service.running ? `${service.cpu_percent.toFixed(1)}%` : '—'
+}
+
+function serviceMemoryText(service: ResourceServiceRow) {
+  return service.sampled || !service.running ? formatBytes(service.memory_bytes) : '—'
+}
+
+function serviceUsageNote(service: ResourceServiceRow) {
+  if (service.shared_with === 'core') return t('settings.advancedSettings.resourcesPage.sharedCore')
+  if (service.shared_with === 'plugin-host') return t('settings.advancedSettings.resourcesPage.sharedHost')
+  return t(service.no_resident_process ? 'settings.advancedSettings.resourcesPage.noResidentProcess' : 'settings.advancedSettings.resourcesPage.unavailable')
 }
 
 function setServiceSortKey(key: string) {
@@ -283,8 +239,9 @@ onBeforeUnmount(() => {
   <section class="resource-services-section">
     <header>
       <h2>{{ t('settings.advancedSettings.resourcesPage.services', 'OneKVM and plugin usage') }}</h2>
-      <span>{{ t('settings.advancedSettings.resourcesPage.lastFiveMinutes', 'Last 5 minutes') }}</span>
+      <span>{{ t('settings.advancedSettings.resourcesPage.now', 'Now') }}</span>
     </header>
+    <p class="resource-usage-note">{{ t('settings.advancedSettings.resourcesPage.usageNote') }}</p>
     <div class="resource-services-tools">
       <n-input
         v-model:value="serviceQuery"
@@ -339,10 +296,11 @@ onBeforeUnmount(() => {
         <tbody>
           <tr v-for="service in visibleServiceRows" :key="`${service.kind}:${service.id}`">
             <td><strong>{{ service.name }}</strong><small>{{ service.id }}</small></td>
-            <td><span class="resource-service-state" :class="{ running: service.running }"><i />{{ serviceStatusText(service.running) }}</span></td>
-            <td>{{ service.cpu_percent.toFixed(1) }}%</td>
+            <td><span class="resource-service-state" :class="{ running: service.running }"><i />{{ serviceStatusText(service) }}</span></td>
+            <td>{{ serviceCpuText(service) }}</td>
             <td>
-              <span class="resource-memory-total">{{ formatBytes(service.memory_bytes) }}</span>
+              <span class="resource-memory-total">{{ serviceMemoryText(service) }}</span>
+              <small v-if="!service.sampled && service.running" class="resource-memory-breakdown">{{ serviceUsageNote(service) }}</small>
               <small v-if="hasMemoryBreakdown(service)" class="resource-memory-breakdown">
                 {{ t('settings.advancedSettings.resourcesPage.pluginProcesses', 'Processes') }}
                 {{ formatBytes(service.process_memory_bytes || 0) }} ·
@@ -371,18 +329,19 @@ onBeforeUnmount(() => {
               <dt>{{ t('settings.advancedSettings.resourcesPage.status', 'Status') }}</dt>
               <dd>
                 <span class="resource-service-state" :class="{ running: service.running }">
-                  <i />{{ serviceStatusText(service.running) }}
+                  <i />{{ serviceStatusText(service) }}
                 </span>
               </dd>
             </div>
             <div>
               <dt>CPU</dt>
-              <dd>{{ service.cpu_percent.toFixed(1) }}%</dd>
+              <dd>{{ serviceCpuText(service) }}</dd>
             </div>
             <div>
               <dt>{{ t('settings.advancedSettings.resourcesPage.memory', 'Memory') }}</dt>
               <dd>
-                <span class="resource-memory-total">{{ formatBytes(service.memory_bytes) }}</span>
+                <span class="resource-memory-total">{{ serviceMemoryText(service) }}</span>
+                <small v-if="!service.sampled && service.running" class="resource-memory-breakdown">{{ serviceUsageNote(service) }}</small>
                 <small v-if="hasMemoryBreakdown(service)" class="resource-memory-breakdown">
                   {{ t('settings.advancedSettings.resourcesPage.pluginProcesses', 'Processes') }}
                   {{ formatBytes(service.process_memory_bytes || 0) }} ·
@@ -398,3 +357,7 @@ onBeforeUnmount(() => {
   </section>
 </section>
 </template>
+
+<style scoped>
+.resource-usage-note { margin: 12px 14px 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.6; }
+</style>

@@ -184,6 +184,7 @@ function routeFromSection(value: Section) {
 }
 
 const props = defineProps<{
+  embedded?: boolean
   status: OneKVMStatus | null
   route: string
   canChangeVideo: boolean
@@ -213,10 +214,14 @@ const canManageSettings = computed(() => hasPermission(auth, 'settings.manage'))
 const accountOpen = ref(false)
 const section = ref<Section>(sectionFromRoute(props.route))
 const lastDetailSection = ref<Section>(isSettingsIndex(section.value) ? 'system' : section.value)
-const mobileSettings = shallowRef(window.matchMedia(SETTINGS_APP_QUERY).matches)
+const settingsRoot = shallowRef<HTMLElement | null>(null)
+let settingsResizeObserver: ResizeObserver | null = null
+const mobileSettings = shallowRef(props.embedded ? false : window.matchMedia(SETTINGS_APP_QUERY).matches)
 let settingsAppQuery: MediaQueryList | null = null
 const config = ref<OneKVMConfig | null>(null)
 const schema = ref<ConfigSchema | null>(null)
+const canEditVideo = computed(() => props.canChangeVideo
+  || (!props.embedded && schema.value?.video_settings_writable === true))
 const extensions = ref<ExtensionSummary[]>([])
 const extensionDetails = ref<Record<string, ExtensionStatus>>({})
 const extensionsLoaded = ref(false)
@@ -547,6 +552,7 @@ const activeExtensionParent = computed(() => {
     : undefined
 })
 const settingsPageClass = computed(() => ({
+  'is-embedded': props.embedded,
   'is-settings-app': mobileSettings.value,
   'is-settings-index': mobileSettings.value && isSettingsIndex(section.value),
   'is-settings-detail': mobileDetail.value,
@@ -569,11 +575,9 @@ const settingsBackLabel = computed(() => {
   if (!mobileDetail.value) return t('settings.advancedSettings.console', 'Console')
   const current = sections.value.find((item) => item.key === section.value)
   const target = settingsBackTarget(section.value, current?.parent)
-  if (target === 'cloud' || target === 'plugins') {
+  if (target === 'cloud') {
     return sections.value.find((item) => item.key === target)?.label
-      || (target === 'cloud'
-        ? t('settings.advancedSettings.cloudProviders', 'Cloud services')
-        : t('settings.advancedSettings.plugins', 'Plugins'))
+      || t('settings.advancedSettings.cloudProviders', 'Cloud services')
   }
   return t('settings.advancedSettings.title', 'Advanced settings')
 })
@@ -1056,7 +1060,7 @@ async function load() {
   try {
     const [loadedConfig, loadedSchema, dnsStatus] = await Promise.all([
       api.getConfig(),
-      api.getConfigSchema(),
+      api.getConfigSchema(props.videoSessionId),
       api.getNetworkDNS().catch(() => null),
     ])
 		automaticDNSServers.value = dnsStatus?.automatic_servers || []
@@ -1668,14 +1672,21 @@ function confirmEnterRecovery() {
 }
 
 function syncSettingsAppLayout(event?: MediaQueryListEvent) {
-  mobileSettings.value = event?.matches ?? Boolean(settingsAppQuery?.matches)
+  // Window restore scales its visual bounds; responsive layout uses the unscaled content width.
+  const width = settingsRoot.value?.clientWidth ?? window.innerWidth
+  if (props.embedded && width <= 0) return
+  mobileSettings.value = props.embedded ? width <= 760 : event?.matches ?? Boolean(settingsAppQuery?.matches)
 }
 
 onMounted(() => {
   window.addEventListener('onekvm:extensions-changed', onExtensionsChanged)
   window.addEventListener('onekvm-themechange', applyPluginFrameTheme)
   settingsAppQuery = window.matchMedia(SETTINGS_APP_QUERY)
-  mobileSettings.value = settingsAppQuery.matches
+  syncSettingsAppLayout()
+  if (props.embedded && settingsRoot.value) {
+    settingsResizeObserver = new ResizeObserver(() => syncSettingsAppLayout())
+    settingsResizeObserver.observe(settingsRoot.value)
+  }
   settingsAppQuery.addEventListener('change', syncSettingsAppLayout)
   void load()
   void loadExtensions()
@@ -1694,6 +1705,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('onekvm-themechange', applyPluginFrameTheme)
   settingsAppQuery?.removeEventListener('change', syncSettingsAppLayout)
   settingsAppQuery = null
+  settingsResizeObserver?.disconnect()
   systemActionRun += 1
   stopPluginFrameObserver()
   stopUpdatePolling()
@@ -1747,9 +1759,9 @@ watch(paneSection, (value) => {
 </script>
 
 <template>
-  <div class="advanced-settings-root">
+  <div ref="settingsRoot" class="advanced-settings-root">
   <section class="advanced-settings-page" :class="settingsPageClass">
-    <header class="advanced-settings-header">
+    <header v-if="!embedded" class="advanced-settings-header">
       <n-button
         quaternary
         size="small"
@@ -1843,6 +1855,9 @@ watch(paneSection, (value) => {
         <Transition name="advanced-section" mode="out-in">
           <div :key="paneSection" class="advanced-settings-view">
             <header class="advanced-settings-section-header">
+              <n-button v-if="embedded && mobileDetail" quaternary size="small" :aria-label="settingsBackLabel" @click="onSettingsBack">
+                <template #icon><ArrowLeft /></template>
+              </n-button>
               <h1>{{ activeTitle }}</h1>
               <n-button
                 v-if="activeExtensionStandaloneURL"
@@ -1861,19 +1876,19 @@ watch(paneSection, (value) => {
             <n-alert v-if="error || extensionError || systemDetailsError" type="error" :bordered="false">{{ error || extensionError || systemDetailsError }}</n-alert>
             <n-spin class="advanced-settings-content" :show="loading || systemDetailsLoading">
               <section v-if="paneSection === 'display' && config" class="advanced-settings-section">
-                <n-alert v-if="!canChangeVideo" type="info" :bordered="false">
+                <n-alert v-if="!canEditVideo" type="info" :bordered="false">
                   {{ t('settings.advancedSettings.displaySecondary', 'Video settings are controlled by the primary WebRTC client. This client shares its stream.') }}
                 </n-alert>
                 <DisplaySettingsForm
                   v-model="config.video"
-                  :disabled="saving || !canChangeVideo"
+                  :disabled="saving || !canEditVideo"
                   :read-only="schema?.read_only"
                   :video-codecs="schema?.video_codecs"
                   :video-bitrate-range="schema?.video_bitrate_kbps"
                 />
                 <footer class="advanced-settings-actions">
                   <n-button @click="load">{{ t('common.refresh', 'Reload') }}</n-button>
-                  <n-button type="primary" :loading="saving" :disabled="!canChangeVideo" @click="save">
+                  <n-button type="primary" :loading="saving" :disabled="!canEditVideo" @click="save">
                     <template #icon><Save /></template>
                     {{ t('common.save', 'Save') }}
                   </n-button>
@@ -2601,7 +2616,7 @@ watch(paneSection, (value) => {
     />
   </section>
   <Transition name="onekvm-page-loading">
-    <AdvancedSettingsLoading v-if="loading && !config" />
+    <AdvancedSettingsLoading v-if="!embedded && loading && !config" />
   </Transition>
   </div>
 

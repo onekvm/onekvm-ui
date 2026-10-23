@@ -84,31 +84,31 @@ const qualityBudgetSelection = computed<QualityBudgetSelection>({
 })
 
 function hasCustomQp(value: OneKVMConfig['video']) {
-  return hasQpOverride(value)
+  return hasQpOverride(value.h26x)
 }
 
 // Bitrate-constrained VBR must be free to raise QP when the frame is too
 // complex. Prefer the bitrate mode when loading an older configuration that
 // enabled both overrides; the next save persists the unambiguous form.
-if ((video.value.bitrate_kbps ?? 0) > 0 && hasCustomQp(video.value)) {
-  video.value.initial_qp = 0
-  video.value.min_qp = 0
-  video.value.max_qp = 0
+if ((video.value.h26x.bitrate_kbps ?? 0) > 0 && hasCustomQp(video.value)) {
+  video.value.h26x.initial_qp = 0
+  video.value.h26x.min_qp = 0
+  video.value.h26x.max_qp = 0
 }
 
 // Keep this derived from the draft itself. A separate boolean can lag one
 // render behind when a QP preset clears bitrate_kbps, leaving the quality
 // budget visibly disabled even though the two settings are compatible.
-const customBitrateEnabled = computed(() => (video.value.bitrate_kbps ?? 0) > 0)
+const customBitrateEnabled = computed(() => (video.value.h26x.bitrate_kbps ?? 0) > 0)
 const qpPresetMode = ref<QpPresetMode>(
-  hasCustomQp(video.value) ? (matchingQpPreset(video.value)?.value ?? 'custom') : 'balanced',
+  hasCustomQp(video.value) ? (matchingQpPreset(video.value.h26x)?.value ?? 'custom') : 'balanced',
 )
 // MJPEG maps quality_factor directly to JPEG QFactor. Hidden H.26x bitrate/QP
 // overrides must not disable the shared quality control after switching codecs.
 // A QP preset and the relative VBR quality budget are independent inputs and
 // intentionally coexist. Only an explicit bitrate ceiling replaces the
 // relative quality budget.
-const qualityBudgetDisabled = computed(() => video.value.codec !== 'mjpeg' && (video.value.bitrate_kbps ?? 0) > 0)
+const qualityBudgetDisabled = computed(() => video.value.codec !== 'mjpeg' && (video.value.h26x.bitrate_kbps ?? 0) > 0)
 const qualityBudgetLabel = computed(() => video.value.codec === 'mjpeg'
   ? t('settings.advancedSettings.displayPage.jpegQuality', 'JPEG quality')
   : t('settings.advancedSettings.displayPage.quality', 'Quality budget (Bitrate)'))
@@ -145,7 +145,7 @@ const qpPresetDescription = computed(() => {
 function applyQpPreset(value: QpPresetMode) {
   qpPresetMode.value = value
   if (value === 'auto') {
-    clearQpOverride(video.value)
+    clearQpOverride(video.value.h26x)
     // Automatic is an internal state used while enabling a bitrate ceiling;
     // keep the user-facing selector on the balanced preset.
     qpPresetMode.value = 'balanced'
@@ -153,23 +153,23 @@ function applyQpPreset(value: QpPresetMode) {
   }
   // QP presets and the relative quality budget are independent. Only the
   // explicit maximum-bitrate override conflicts with QP, so clear that one.
-  video.value.bitrate_kbps = 0
+  video.value.h26x.bitrate_kbps = 0
   if (value === 'custom') {
-    if (!hasCustomQp(video.value)) setQpPreset(video.value, 'balanced')
+    if (!hasCustomQp(video.value)) setQpPreset(video.value.h26x, 'balanced')
     return
   }
-  setQpPreset(video.value, value)
+  setQpPreset(video.value.h26x, value)
 }
 
 watch(video, (value) => {
-  if ((value.bitrate_kbps ?? 0) > 0 && hasCustomQp(value)) {
-    value.initial_qp = 0
-    value.min_qp = 0
-    value.max_qp = 0
+  if ((value.h26x.bitrate_kbps ?? 0) > 0 && hasCustomQp(value)) {
+    value.h26x.initial_qp = 0
+    value.h26x.min_qp = 0
+    value.h26x.max_qp = 0
   }
   qualityBudgetCustomEnabled.value = Math.round(value.quality_factor * 100) % 10 !== 0
   qpPresetMode.value = hasCustomQp(value)
-    ? (matchingQpPreset(value)?.value ?? 'custom')
+    ? (matchingQpPreset(value.h26x)?.value ?? 'custom')
     : 'balanced'
 })
 
@@ -177,11 +177,11 @@ function setCustomBitrateEnabled(enabled: boolean) {
   if (enabled) {
     applyQpPreset('auto')
   }
-  if (enabled && (video.value.bitrate_kbps ?? 0) === 0 && props.videoBitrateRange) {
-    video.value.bitrate_kbps = props.videoBitrateRange.default
+  if (enabled && (video.value.h26x.bitrate_kbps ?? 0) === 0 && props.videoBitrateRange) {
+    video.value.h26x.bitrate_kbps = props.videoBitrateRange.default
   }
   if (!enabled) {
-    video.value.bitrate_kbps = 0
+    video.value.h26x.bitrate_kbps = 0
   }
 }
 
@@ -278,7 +278,7 @@ function fieldReadOnly(path: string) {
         <n-form-item v-if="video.codec !== 'mjpeg' && customBitrateEnabled && videoBitrateRange" :label="t('settings.advancedSettings.displayPage.maxBitrate', 'Maximum bitrate')">
           <div class="display-setting-stack">
             <n-input-number
-              v-model:value="video.bitrate_kbps"
+              v-model:value="video.h26x.bitrate_kbps"
               :min="videoBitrateRange.minimum"
               :max="videoBitrateRange.maximum"
               :step="videoBitrateRange.step"
@@ -297,14 +297,14 @@ function fieldReadOnly(path: string) {
         </n-form-item>
         <template v-if="video.codec !== 'mjpeg' && qpPresetMode === 'custom'">
           <n-form-item :label="t('settings.advancedSettings.displayPage.initialQp', 'Initial QP')">
-            <n-input-number v-model:value="video.initial_qp" :min="0" :max="51" :disabled="disabled" />
+            <n-input-number v-model:value="video.h26x.initial_qp" :min="0" :max="51" :disabled="disabled" />
           </n-form-item>
           <n-form-item :label="t('settings.advancedSettings.displayPage.minQp', 'Minimum QP')">
-            <n-input-number v-model:value="video.min_qp" :min="0" :max="51" :disabled="disabled" />
+            <n-input-number v-model:value="video.h26x.min_qp" :min="0" :max="51" :disabled="disabled" />
           </n-form-item>
           <n-form-item :label="t('settings.advancedSettings.displayPage.maxQp', 'Maximum QP')">
             <div class="display-setting-stack">
-              <n-input-number v-model:value="video.max_qp" :min="0" :max="51" :disabled="disabled" />
+              <n-input-number v-model:value="video.h26x.max_qp" :min="0" :max="51" :disabled="disabled" />
               <span class="display-setting-field-hint">{{ t('settings.advancedSettings.displayPage.qpAutoHint', 'Use 0 to let the device backend choose automatically. Lower QP improves quality and increases bitrate.') }}</span>
             </div>
           </n-form-item>
@@ -312,12 +312,12 @@ function fieldReadOnly(path: string) {
         <n-form-item v-if="video.codec !== 'mjpeg'" :label="t('settings.advancedSettings.displayPage.gop', 'Keyframe interval')">
           <div class="display-setting-stack">
             <n-input-number
-              v-model:value="video.gop"
+              v-model:value="video.h26x.gop"
               :min="0"
               :max="300"
               :disabled="disabled"
             >
-              <template #suffix>{{ video.gop === 0 ? t('screen.auto', 'Automatic') : t('settings.advancedSettings.displayPage.frames', 'frames') }}</template>
+              <template #suffix>{{ video.h26x.gop === 0 ? t('screen.auto', 'Automatic') : t('settings.advancedSettings.displayPage.frames', 'frames') }}</template>
             </n-input-number>
             <span class="display-setting-field-hint">
               {{ t('settings.advancedSettings.displayPage.gopHint', 'Use 0 for a 5 second interval at the target frame rate.') }}
@@ -341,7 +341,7 @@ function fieldReadOnly(path: string) {
         </n-form-item>
         <n-form-item v-if="video.codec === 'mjpeg'" :label="t('screen.frameDetect', 'Frame Detect')">
           <div class="frame-detect-field">
-            <n-switch v-model:value="video.frame_detect" :disabled="disabled" />
+            <n-switch v-model:value="video.mjpeg.frame_detect" :disabled="disabled" />
             <span>{{ t('screen.frameDetectTip', 'Pause transmission while the image is still and resume when it changes.') }}</span>
           </div>
         </n-form-item>

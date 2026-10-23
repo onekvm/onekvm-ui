@@ -15,6 +15,9 @@ import {
   updatePhysicalInterface,
   updatePrimaryInterface,
   withManagementVLAN,
+  cloneNetworkConfig,
+  vpnClientConfig,
+  vpnInterfaceConfig,
 } from '../src/lib/network.ts'
 
 const base = defaultNetworkConfig()
@@ -26,6 +29,30 @@ assert.equal(base.discovery_url, 'https://find.onekvm.org', 'default discovery p
 assert.equal(base.discovery_enabled, true, 'discovery is enabled by default')
 assert.equal(base.use_custom_discovery_url, false, 'custom URL is folded by default')
 assert.equal(isNetworkConfigValid(base), true, 'default config is valid')
+
+const mixed = {
+  ...base,
+  interfaces: [
+    ...base.interfaces,
+    { kind: 'wireguard' as const, name: 'wg0', private_key: '',
+      public_key: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=', addresses: ['10.0.0.2/24'], listen_port: 51820,
+      peers: [{ public_key: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=', preshared_key: '', endpoint: '', allowed_ips: ['10.0.0.0/24'], persistent_keepalive: 0 }] },
+    { kind: 'pppoe' as const, name: 'ppp0', parent: 'eth0', username: 'user', password: 'secret', disabled: true },
+  ],
+}
+assert.equal(isNetworkConfigValid(mixed), true, 'all interface kinds share one collection')
+assert.equal(configuredIPv4Address(mixed), configuredIPv4Address(base), 'VPN entries do not replace physical management addressing')
+const mixedClone = cloneNetworkConfig(mixed)
+const clonedWG = mixedClone.interfaces.find(item => item.kind === 'wireguard')!
+if (clonedWG.kind !== 'wireguard') throw new Error('missing WireGuard interface')
+clonedWG.addresses.push('10.1.0.2/24')
+clonedWG.peers[0]!.allowed_ips.push('10.1.0.0/24')
+assert.equal(mixed.interfaces[1]!.kind === 'wireguard' && mixed.interfaces[1].addresses.length, 1, 'cloning separates WireGuard address lists')
+assert.equal(isNetworkConfigDirty(mixedClone, networkConfigSnapshot(mixed)), true, 'nested WireGuard changes are detected')
+const renamedMixed = updatePrimaryInterface(mixed, { ...primary, name: 'eth1' })
+assert.equal(renamedMixed.interfaces.find(item => item.kind === 'pppoe')?.parent, 'eth1', 'renaming the primary preserves VPN parents')
+assert.deepEqual(vpnInterfaceConfig(vpnClientConfig({ kind: 'pppoe', name: 'ppp0', disabled: true })), { kind: 'pppoe', name: 'ppp0', disabled: true })
+assert.equal(isNetworkConfigValid({ ...mixed, interfaces: [...mixed.interfaces, { kind: 'pppoe', name: 'wg0', username: 'user' }] }), false, 'duplicate names are rejected across interface kinds')
 assert.equal(usesCustomDiscoveryURL({ ...base, use_custom_discovery_url: undefined, discovery_url: 'https://finder.example/devices' }), true, 'legacy custom URL stays active')
 assert.equal(isNetworkConfigValid({ ...base, use_custom_discovery_url: true, discovery_url: 'https://finder.example/devices' }), true, 'custom discovery page is valid')
 assert.equal(isNetworkConfigValid({ ...base, use_custom_discovery_url: true, discovery_url: 'javascript:alert(1)' }), false, 'non-web discovery URL is rejected')

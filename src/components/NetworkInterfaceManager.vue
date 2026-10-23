@@ -14,7 +14,7 @@ import {
 import { t } from '@/i18n/runtime'
 import { fillMarketplaceTemplate } from '@/lib/marketplace-install'
 import { IP_TUNNELS_MARKETPLACE_ID, type NetworkEnvironmentId } from '@/lib/network-environment'
-import { availablePhysicalInterfaces, defaultManagedTunnel, networkKindLabel, physicalInterfaceConfig, updatePhysicalInterface } from '@/lib/network'
+import { isManagedInterface, isWireGuardInterface, isVpnConfig, vpnClientConfig, vpnInterfaceConfig, availablePhysicalInterfaces, defaultManagedTunnel, networkKindLabel, physicalInterfaceConfig, updatePhysicalInterface } from '@/lib/network'
 import { createWireGuardInterface } from '@/lib/wireguard-config'
 
 import ExpandablePanel from './ExpandablePanel.vue'
@@ -120,7 +120,8 @@ const addOptions = computed(() => [
 
 const visibleInterfaces = computed(() => {
   const available = availablePhysicalInterfaces(interfaces.value, props.modelValue, props.wifiAvailable)
-  const wireGuard = (props.modelValue.wireguard || []).map((configuration, wireGuardIndex) => {
+  const wireGuard = props.modelValue.interfaces.flatMap((configuration, wireGuardIndex) => {
+    if (!isWireGuardInterface(configuration)) return []
     const status = interfaces.value.find(({ name }) => name === configuration.name)
     return {
       name: configuration.name,
@@ -136,7 +137,8 @@ const visibleInterfaces = computed(() => {
       wireGuardIndex,
     }
   })
-  const managed = (props.modelValue.interfaces || []).map((configuration, managedIndex) => {
+  const managed = props.modelValue.interfaces.flatMap((configuration, managedIndex) => {
+    if (!isManagedInterface(configuration)) return []
     const status = interfaces.value.find(({ name }) => name === configuration.name)
     const addresses = [configuration.ipv4_address, configuration.ipv6_address].filter(Boolean)
     return {
@@ -152,7 +154,9 @@ const visibleInterfaces = computed(() => {
       managedIndex,
     }
   })
-  const vpn = (props.modelValue.vpn || []).map((configuration, vpnIndex) => {
+  const vpn = props.modelValue.interfaces.flatMap((item, vpnIndex) => {
+    if (!isVpnConfig(item)) return []
+    const configuration = vpnClientConfig(item)
     const status = interfaces.value.find(({ name }) => name === configuration.name)
     return {
       name: configuration.name,
@@ -220,7 +224,7 @@ function addWireGuard() {
   let index = 0
   while (names.has(`wg${index}`)) index++
   const wireGuard = createWireGuardInterface(`wg${index}`)
-  emit('update:modelValue', { ...props.modelValue, wireguard: [...(props.modelValue.wireguard || []), wireGuard] })
+  emit('update:modelValue', { ...props.modelValue, interfaces: [...props.modelValue.interfaces, { ...wireGuard, kind: 'wireguard' }] })
   expanded.value = wireGuard.name
 }
 
@@ -247,9 +251,7 @@ function addVLAN() {
 
 function usedNames() {
   return new Set([
-    ...(props.modelValue.wireguard || []).map(({ name }) => name),
     ...(props.modelValue.interfaces || []).map(({ name }) => name),
-    ...(props.modelValue.vpn || []).map(({ name }) => name),
   ])
 }
 
@@ -280,7 +282,7 @@ function addVpn(kind: VpnKind) {
     config: '',
     default_route: kind === 'pppoe',
   }
-  emit('update:modelValue', { ...props.modelValue, vpn: [...(props.modelValue.vpn || []), client] })
+  emit('update:modelValue', { ...props.modelValue, interfaces: [...props.modelValue.interfaces, vpnInterfaceConfig(client)] })
   expanded.value = client.name
 }
 
@@ -364,22 +366,22 @@ function addInterface(kind: string) {
 }
 
 function updateWireGuard(index: number, value: WireGuardConfig) {
-  const wireguard = [...(props.modelValue.wireguard || [])]
-  const oldName = wireguard[index]?.name
-  wireguard[index] = value
+  const interfaces = [...props.modelValue.interfaces]
+  const oldName = interfaces[index]?.name
+  interfaces[index] = { ...value, kind: 'wireguard' }
   if (oldName && oldName !== value.name && oldName in wireGuardValidity.value) {
     wireGuardValidity.value = { ...wireGuardValidity.value, [value.name]: wireGuardValidity.value[oldName] }
     delete wireGuardValidity.value[oldName]
   }
-  emit('update:modelValue', { ...props.modelValue, wireguard })
+  emit('update:modelValue', { ...props.modelValue, interfaces })
   if (expanded.value === oldName) expanded.value = value.name
 }
 
 function removeWireGuard(index: number) {
-  const removed = props.modelValue.wireguard[index]
+  const removed = props.modelValue.interfaces[index]
   emit('update:modelValue', {
     ...props.modelValue,
-    wireguard: props.modelValue.wireguard.filter((_, wireGuardIndex) => wireGuardIndex !== index),
+    interfaces: props.modelValue.interfaces.filter((_, wireGuardIndex) => wireGuardIndex !== index),
   })
   if (expanded.value === removed?.name) expanded.value = ''
   if (removed?.name) setWireGuardValidity(removed.name, true, true)
@@ -411,22 +413,22 @@ function removeManagedInterface(index: number) {
 }
 
 function updateVpn(index: number, value: VpnClientConfig) {
-  const vpn = [...(props.modelValue.vpn || [])]
-  const oldName = vpn[index]?.name
-  vpn[index] = value
+  const interfaces = [...props.modelValue.interfaces]
+  const oldName = interfaces[index]?.name
+  interfaces[index] = vpnInterfaceConfig(value)
   if (oldName && oldName !== value.name && oldName in wireGuardValidity.value) {
     wireGuardValidity.value = { ...wireGuardValidity.value, [value.name]: wireGuardValidity.value[oldName] }
     delete wireGuardValidity.value[oldName]
   }
-  emit('update:modelValue', { ...props.modelValue, vpn })
+  emit('update:modelValue', { ...props.modelValue, interfaces })
   if (expanded.value === oldName) expanded.value = value.name
 }
 
 function removeVpn(index: number) {
-  const removed = props.modelValue.vpn?.[index]
+  const removed = props.modelValue.interfaces[index]
   emit('update:modelValue', {
     ...props.modelValue,
-    vpn: (props.modelValue.vpn || []).filter((_, vpnIndex) => vpnIndex !== index),
+    interfaces: props.modelValue.interfaces.filter((_, vpnIndex) => vpnIndex !== index),
   })
   if (expanded.value === removed?.name) expanded.value = ''
   if (removed?.name) setWireGuardValidity(removed.name, true, true)

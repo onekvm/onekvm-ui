@@ -1,4 +1,24 @@
-import type { IPv4Mode, ManagedNetworkInterface, NetworkConfig, NetworkInterfaceStatus } from '@/api/client'
+import type { IPv4Mode, ManagedNetworkInterface, NetworkConfig, NetworkInterfaceConfig, NetworkInterfaceStatus, VpnClientConfig, VpnInterface, WireGuardInterface } from '@/api/client'
+
+export function isWireGuardInterface(item: NetworkInterfaceConfig): item is WireGuardInterface {
+  return item.kind === 'wireguard'
+}
+
+export function isVpnConfig(item: NetworkInterfaceConfig): item is VpnInterface {
+  return ['openvpn', 'pppoe', 'pptp', 'l2tp'].includes(item.kind)
+}
+
+export function isManagedInterface(item: NetworkInterfaceConfig): item is ManagedNetworkInterface {
+  return !isWireGuardInterface(item) && !isVpnConfig(item)
+}
+
+export function vpnInterfaceConfig({ enabled, ...config }: VpnClientConfig): VpnInterface {
+  return { ...config, disabled: !enabled }
+}
+
+export function vpnClientConfig({ disabled, ...config }: VpnInterface): VpnClientConfig {
+  return { ...config, enabled: !disabled }
+}
 
 export type ManagedTunnelKind = Exclude<ManagedNetworkInterface['kind'], 'vlan' | 'physical'>
 
@@ -29,6 +49,7 @@ export function usesCustomDiscoveryURL(config: NetworkConfig) {
 export function configuredIPv4Address(config: NetworkConfig) {
   const candidates = [
     ...(config.interfaces || [])
+      .filter(isManagedInterface)
       .filter((networkInterface) => ipv4ModeUsesStaticAddress(networkInterface.ipv4_mode))
       .map((networkInterface) => networkInterface.ipv4_address),
   ]
@@ -46,6 +67,7 @@ export function configuredStaticAddresses(config: NetworkConfig) {
     }
   }
   for (const networkInterface of config.interfaces || []) {
+    if (!isManagedInterface(networkInterface)) continue
     add(networkInterface.ipv4_mode, networkInterface.ipv4_address)
     add(networkInterface.ipv6_mode, networkInterface.ipv6_address)
   }
@@ -68,13 +90,11 @@ export function defaultNetworkConfig(): NetworkConfig {
     tls_auto_redirect: true,
     tls_cert_path: '/etc/onekvm/tls/server.crt',
     tls_key_path: '/etc/onekvm/tls/server.key',
-    wireguard: [],
     interfaces: [{
       ...defaultPhysicalInterface('eth0'),
       ipv4_mode: 'dhcp-static', ipv4_address: DEFAULT_FALLBACK_IPV4, route_metric: 100,
       dns: [], use_custom_dns: false,
     }],
-    vpn: [],
     proxy: { http: '', https: '', no_proxy: '' },
     webrtc: {},
   }
@@ -84,11 +104,9 @@ export function defaultNetworkConfig(): NetworkConfig {
 export function availablePhysicalInterfaces(
   interfaces: NetworkInterfaceStatus[], config: NetworkConfig, wifiAvailable = false,
 ) {
-  const wireGuardNames = new Set((config.wireguard || []).map(({ name }) => name))
   const managedNames = new Set((config.interfaces || []).map(({ name }) => name))
-  const vpnNames = new Set((config.vpn || []).map(({ name }) => name))
   const available = interfaces
-    .filter(({ name }) => !wireGuardNames.has(name) && !managedNames.has(name) && !vpnNames.has(name))
+    .filter(({ name }) => !managedNames.has(name))
     .map((networkInterface) => ({
       ...networkInterface,
       kind: wifiAvailable && networkInterface.wifi_role === 'ap' ? 'wifi_ap' as const
@@ -108,8 +126,9 @@ function defaultPhysicalInterface(name: string): ManagedNetworkInterface {
 
 /** Address forms edit one link; DNS defaults inherit from the primary link. */
 export function physicalInterfaceConfig(config: NetworkConfig, name: string): ManagedNetworkInterface {
-  const primary = config.interfaces.find(item => item.name === config.primary_interface)
-  const link = config.interfaces.find(item => item.kind === 'physical' && item.name === name)
+  const links = config.interfaces.filter(isManagedInterface)
+  const primary = links.find(item => item.name === config.primary_interface)
+  const link = links.find(item => item.kind === 'physical' && item.name === name)
   return {
     ...defaultPhysicalInterface(name), ...link,
     dns: [...(link?.dns?.length || link?.use_custom_dns !== undefined ? link.dns || [] : primary?.dns || [])],
@@ -136,9 +155,8 @@ export function updatePrimaryInterface(config: NetworkConfig, value: ManagedNetw
       .map(item => ({
         ...item,
         name: item.name === previous ? value.name : item.name,
-        parent: item.parent === previous ? value.name : item.parent,
+        ...('parent' in item && { parent: item.parent === previous ? value.name : item.parent }),
       })),
-    vpn: updated.vpn?.map(client => ({ ...client, parent: client.parent === previous ? value.name : client.parent })),
     static_routes: updated.static_routes.map(route => ({ ...route, interface: route.interface === previous ? value.name : route.interface })),
   }
 }
@@ -147,13 +165,11 @@ export function cloneNetworkConfig(config: NetworkConfig): NetworkConfig {
   return {
     ...config,
 		static_routes: (config.static_routes || []).map((route) => ({ ...route })),
-    wireguard: (config.wireguard || []).map((wireGuard) => ({
-      ...wireGuard,
-      addresses: [...(wireGuard.addresses || [])],
-      peers: (wireGuard.peers || []).map((peer) => ({ ...peer, allowed_ips: [...(peer.allowed_ips || [])] })),
-    })),
-		interfaces: (config.interfaces || []).map((networkInterface) => ({ ...networkInterface, dns: networkInterface.dns ? [...networkInterface.dns] : undefined })),
-    vpn: (config.vpn || []).map((client) => ({ ...client })),
+    interfaces: (config.interfaces || []).map((item) => isWireGuardInterface(item) ? {
+      ...item, dns: item.dns ? [...item.dns] : undefined,
+      addresses: [...item.addresses],
+      peers: item.peers.map(peer => ({ ...peer, allowed_ips: [...peer.allowed_ips] })),
+    } : isManagedInterface(item) ? { ...item, dns: item.dns ? [...item.dns] : undefined } : { ...item }),
     proxy: { ...(config.proxy || {}) },
     webrtc: {
       ...(config.webrtc || {}),
@@ -297,7 +313,7 @@ export function isNetworkConfigValid(config: NetworkConfig) {
   if (!config.interfaces.some(item => item.name === config.primary_interface && item.kind === 'physical')) return false
   if (config.discovery_enabled !== false && usesCustomDiscoveryURL(config) && !validDiscoveryURL(config.discovery_url ?? '')) return false
   const names = new Set<string>()
-  for (const wireGuard of config.wireguard || []) {
+  for (const wireGuard of config.interfaces.filter(isWireGuardInterface)) {
     if (!/^[A-Za-z0-9_.:@-]+$/.test(wireGuard.name) || names.has(wireGuard.name)) return false
     names.add(wireGuard.name)
     if ((wireGuard.private_key && !validWireGuardKey(wireGuard.private_key)) || !validWireGuardKey(wireGuard.public_key) ||
@@ -310,7 +326,7 @@ export function isNetworkConfigValid(config: NetworkConfig) {
       if (peer.persistent_keepalive < 0 || peer.persistent_keepalive > 65535) return false
     }
   }
-  for (const networkInterface of config.interfaces || []) {
+  for (const networkInterface of config.interfaces.filter(isManagedInterface)) {
     if (!/^[A-Za-z0-9_.:@-]+$/.test(networkInterface.name) ||
         names.has(networkInterface.name)) return false
     names.add(networkInterface.name)
@@ -353,7 +369,7 @@ export function isNetworkConfigValid(config: NetworkConfig) {
     }
 		if (networkInterface.route_metric < 0) return false
 	}
-  for (const client of config.vpn || []) {
+  for (const client of config.interfaces.filter(isVpnConfig)) {
     if (!/^[A-Za-z0-9_.:@-]+$/.test(client.name) || names.has(client.name)) return false
     names.add(client.name)
     if (client.kind === 'openvpn') {
@@ -374,9 +390,7 @@ export function isNetworkConfigValid(config: NetworkConfig) {
   }
 	const destinations = new Set<string>()
 	const routeInterfaces = new Set([
-		...(config.wireguard || []).map(({ name }) => name),
 		...(config.interfaces || []).map(({ name }) => name),
-    ...(config.vpn || []).map(({ name }) => name),
 	])
 	for (const route of config.static_routes || []) {
 		const family = route.destination.includes(':') ? 6 : 4

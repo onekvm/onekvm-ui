@@ -20,9 +20,7 @@ export interface NetworkConfig {
   tls_auto_redirect: boolean
   tls_cert_path: string
   tls_key_path: string
-  wireguard: WireGuardConfig[]
-  interfaces: ManagedNetworkInterface[]
-  vpn?: VpnClientConfig[]
+  interfaces: NetworkInterfaceConfig[]
   proxy?: ProxyConfig
   webrtc?: WebRtcIceConfig
 }
@@ -199,7 +197,13 @@ export interface WireGuardConfig {
   addresses: string[]
   listen_port: number
   peers: WireGuardPeer[]
+  disabled?: boolean
+  dns?: string[]
 }
+
+export type WireGuardInterface = WireGuardConfig & { kind: 'wireguard' }
+export type VpnInterface = Omit<VpnClientConfig, 'enabled'> & { disabled?: boolean }
+export type NetworkInterfaceConfig = ManagedNetworkInterface | WireGuardInterface | VpnInterface
 
 export interface StaticRoute {
   destination: string
@@ -260,14 +264,16 @@ export interface OneKVMConfig {
   video: {
     codec: string
     quality_factor: number
-    bitrate_kbps?: number
-    initial_qp?: number
-    min_qp?: number
-    max_qp?: number
+    h26x: {
+      bitrate_kbps?: number
+      initial_qp?: number
+      min_qp?: number
+      max_qp?: number
+      gop: number
+    }
     fps: number
     resolution: number
-    gop: number
-    frame_detect: boolean
+    mjpeg: { frame_detect: boolean }
     source_device: string
   }
   audio: {
@@ -713,6 +719,8 @@ export interface SystemUpdateLocalFile {
 }
 
 export interface ConfigSchema {
+  schema_version?: number
+  json_schema?: Record<string, unknown>
   machine: string
   vendor?: string
   name?: string

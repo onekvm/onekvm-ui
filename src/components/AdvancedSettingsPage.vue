@@ -650,7 +650,6 @@ const routeInterfaceNames = computed(() => {
 	if (!config.value) return []
 	return [
 		...(config.value.network.interfaces || []).map(({ name }) => name),
-		...(config.value.network.wireguard || []).map(({ name }) => name),
 	].filter((name, index, values) => name && values.indexOf(name) === index)
 })
 const timezoneOptions = computed(() => {
@@ -1062,9 +1061,7 @@ async function load() {
     ])
 		automaticDNSServers.value = dnsStatus?.automatic_servers || []
 		loadedConfig.network.static_routes ||= []
-		loadedConfig.network.wireguard ||= []
 		loadedConfig.network.interfaces ||= []
-		loadedConfig.network.vpn ||= []
 		loadedConfig.network.discovery_url ??= DEFAULT_DISCOVERY_URL
 		loadedConfig.network.discovery_enabled ??= true
 		loadedConfig.network.use_custom_discovery_url ??= usesCustomDiscoveryURL(loadedConfig.network)
@@ -1086,11 +1083,13 @@ async function load() {
     loadedConfig.personalization.console_subtitle_parts = normalizeConsoleSubtitleParts(legacyPersonalization)
     loadedConfig.personalization.custom_console_subtitle ??= ''
     delete legacyPersonalization.show_device_model
-    loadedConfig.video.frame_detect ??= false
-    loadedConfig.video.bitrate_kbps ??= 0
-    loadedConfig.video.initial_qp ??= 0
-    loadedConfig.video.min_qp ??= 0
-    loadedConfig.video.max_qp ??= 0
+    loadedConfig.video.mjpeg ??= { frame_detect: false }
+    loadedConfig.video.h26x ??= { gop: 0 }
+    loadedConfig.video.mjpeg.frame_detect ??= false
+    loadedConfig.video.h26x.bitrate_kbps ??= 0
+    loadedConfig.video.h26x.initial_qp ??= 0
+    loadedConfig.video.h26x.min_qp ??= 0
+    loadedConfig.video.h26x.max_qp ??= 0
     networkEditorsValid.value = true
     config.value = loadedConfig
     schema.value = loadedSchema

@@ -174,7 +174,7 @@ const qualityBudgetSelection = computed<QualityBudgetSelection>({
 })
 const qualityBudgetDisabled = computed(() => {
   const current = video.value
-  return !!current && current.codec !== 'mjpeg' && (current.bitrate_kbps ?? 0) > 0
+  return !!current && current.codec !== 'mjpeg' && (current.h26x.bitrate_kbps ?? 0) > 0
 })
 const qualityBudgetLabel = computed(() => video.value?.codec === 'mjpeg'
   ? t('settings.advancedSettings.displayPage.jpegQuality', 'JPEG quality')
@@ -194,18 +194,18 @@ const simpleQpOptions = computed(() => [
 const simpleQpSelection = computed<SimpleQpSelection>({
   get: () => {
     const current = video.value
-    if (!current || !hasQpOverride(current)) return 'balanced'
-    return matchingQpPreset(current)?.value ?? 'custom'
+    if (!current || !hasQpOverride(current.h26x)) return 'balanced'
+    return matchingQpPreset(current.h26x)?.value ?? 'custom'
   },
   set: (selection) => {
     const current = video.value
     if (!current || selection === 'custom') return
     if (selection === 'auto') {
-      clearQpOverride(current)
+      clearQpOverride(current.h26x)
       return
     }
-    current.bitrate_kbps = 0
-    setQpPreset(current, selection)
+    current.h26x.bitrate_kbps = 0
+    setQpPreset(current.h26x, selection)
   },
 })
 
@@ -249,11 +249,13 @@ async function loadVideo() {
         throw error
       }),
     ])
-    loadedConfig.video.frame_detect ??= false
-    loadedConfig.video.bitrate_kbps ??= 0
-    loadedConfig.video.initial_qp ??= 0
-    loadedConfig.video.min_qp ??= 0
-    loadedConfig.video.max_qp ??= 0
+    loadedConfig.video.mjpeg ??= { frame_detect: false }
+    loadedConfig.video.h26x ??= { gop: 0 }
+    loadedConfig.video.mjpeg.frame_detect ??= false
+    loadedConfig.video.h26x.bitrate_kbps ??= 0
+    loadedConfig.video.h26x.initial_qp ??= 0
+    loadedConfig.video.h26x.min_qp ??= 0
+    loadedConfig.video.h26x.max_qp ??= 0
     qualityBudgetCustomEnabled.value = Math.round(loadedConfig.video.quality_factor * 100) % 10 !== 0
     video.value = loadedConfig.video
     schema.value = loadedSchema
@@ -426,17 +428,17 @@ function updateQpPreset(value: string | number | null) {
   if (value === simpleQpSelection.value) return
   simpleQpSelection.value = value as SimpleQpSelection
   void patchVideo([
-    ['video.bitrate_kbps', video.value.bitrate_kbps ?? 0],
-    ['video.initial_qp', video.value.initial_qp ?? 0],
-    ['video.min_qp', video.value.min_qp ?? 0],
-    ['video.max_qp', video.value.max_qp ?? 0],
+    ['video.h26x.bitrate_kbps', video.value.h26x.bitrate_kbps ?? 0],
+    ['video.h26x.initial_qp', video.value.h26x.initial_qp ?? 0],
+    ['video.h26x.min_qp', video.value.h26x.min_qp ?? 0],
+    ['video.h26x.max_qp', video.value.h26x.max_qp ?? 0],
   ])
 }
 
 function updateFrameDetect(value: boolean) {
-  if (!video.value || video.value.frame_detect === value) return
-  video.value.frame_detect = value
-  void patchVideo('video.frame_detect', value)
+  if (!video.value || video.value.mjpeg.frame_detect === value) return
+  video.value.mjpeg.frame_detect = value
+  void patchVideo('video.mjpeg.frame_detect', value)
 }
 
 watch(popoverOpen, (open) => {
@@ -594,7 +596,7 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
           <span>{{ t('screen.frameDetect', 'Frame Detect') }}</span>
           <n-switch
             size="small"
-            :value="video.frame_detect"
+            :value="video.mjpeg.frame_detect"
             :disabled="videoDisabled"
             @update:value="updateFrameDetect"
           />

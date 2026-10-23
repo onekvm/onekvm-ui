@@ -7,48 +7,27 @@ OneKVM 的 Vue 3 Web 界面，将低延迟远程控制台、设备管理、扩�
 
 ## 主要功能
 
-- WebRTC 音视频，支持 MJPEG，并可在 WebRTC 连接失败时切换到 H.264/H.265
-  WebSocket 视频回退
-- 通过 HID 控制键盘和五键鼠标，支持绝对/相对鼠标、文字输入、键盘布局和
-  可复用快捷键
-- ATX 电源控制、全屏键盘锁，以及支持 ISO 上传和可写虚拟磁盘文件管理的
-  虚拟介质
-- 首次启动时完成账户、网络、语言、时区和 NTP 初始化
-- 网络、VLAN、WireGuard、DNS、静态路由、USB 标识、视频、服务、用户、
-  在线会话、日志、资源、时间、更新与恢复管理
-- 扩展目录、安装、配置、生命周期、健康恢复，以及 HTML、Layout、Vue
-  三种扩展页面
-- 基于权限的导航，以及面向品牌化构建的产品接口
-- 英文、简体中文和繁体中文界面
-- 独立的 Recovery UI 构建，提供固件刷写、重置默认用户和重启
+- 低延迟远程控制台，支持 WebRTC 音视频、MJPEG 视频以及 H.264/H.265 WebSocket 视频传输。
+- 键盘、鼠标、游戏手柄和文字输入控制，支持鼠标模式、键盘布局、快捷键及键盘锁。
+- 虚拟介质，支持 ISO 上传/下载、可写虚拟磁盘和文件管理。
+- 首次初始化和设备管理，涵盖账户、网络、显示、服务、安全、用户、诊断、更新与恢复。
+- 扩展发现、安装、配置和生命周期管理，支持 HTML、Layout 和可信 Vue 扩展页面。
+- 响应式、基于权限的界面，支持浅色/深色主题、英文、简体中文和繁体中文，以及产品集成接口。
+- 独立的 Recovery UI，提供固件安装、重置用户、恢复出厂设置和重启。
 
 ## 运行架构
 
-浏览器通过 OneKVM Core 的 HTTP API 和状态事件流工作。WebRTC 使用
-`control` DataChannel 发送 HID 报告；MJPEG 和 WebSocket 视频回退使用独立
-HID WebSocket。回退所需的 Muxer、高级设置和关闭状态的抽屉均按需加载，
-以缩短控制台启动路径。
+浏览器通过 OneKVM Core 的 HTTP API 和状态事件流工作。视频使用 WebRTC，
+必要时可使用 MJPEG 或 WebSocket；HID 报告会根据当前视频模式选择传输方式。
 
 生产版本适合由 OneKVM Core 同源提供。高级设置使用
 `#/settings/advanced/system` 这样的 Hash 路由，静态服务器不需要配置
 History 路由回退。
 
-`#/banned` 路由通过公开登录状态接口的 HTTP 423（Locked）判断当前连接被封禁，
-响应不附加封禁状态字段。
-实际被封禁时展示通知，落款为“OneKVM Linux”；未被封禁时返回主页。页面每五秒
-复查一次，解除封禁后自动返回主页，支持在页面内切换英文、简体中文和繁体中文。
-登录失败或 API 返回 429 时立即复查，确认封禁后自动进入该页；打开或刷新主页也会检查。
-安全页面可以配置未登录 API 防扫描，查看和解除对应的临时封禁；还可开关默认启用的过时软件响应头伪装、固定 MySQL 3306／Redis 6379 蜜罐。蜜罐仅在收到可识别的协议探测数据后封禁，单纯建立 TCP 连接不会触发。
-
-登录、API 和反代策略通过开关旁的“高级设置”打开抽屉。抽屉使用独立草稿，取消丢弃草稿，保存写入配置。反向代理安全默认关闭，可设置可信代理 CIDR、真实 IP 头、外部 HTTPS／Origin 校验，以及包含可选 HSTS 的安全响应头。
-
-使用 `/?preview=true#/banned` 或 `/#/banned?preview=true` 可以预览通知。
-仅精确值 `true` 启用预览；此参数只控制展示，不会启用封禁或更改设备访问策略。
-
 ## 环境要求
 
-- 推荐 Node.js 20 LTS 或更高版本
-- 支持 lockfile 9 格式的 pnpm
+- Node.js 22.6 或更高版本
+- pnpm 9 或更高版本
 - 使用 API 功能时需要兼容的 OneKVM Core
 
 ## 本地开发
@@ -92,6 +71,8 @@ pnpm build:recovery # 只生成 Recovery 生产包
 pnpm preview        # 本地预览 dist/
 pnpm test:recovery  # Recovery API 与语言包测试
 ```
+
+项目还提供 `pnpm test:*` 形式的专项回归测试；请根据修改范围运行相关测试。
 
 生产文件输出到 `dist/`。Recovery 是第二次 Vite 构建，把 JS/CSS 内联进
 `dist-recovery/index.html`，供 initramfs 网页服务器使用。该页面提供固件刷写
@@ -153,6 +134,8 @@ pnpm check
 pnpm build
 git diff --check
 ```
+
+涉及行为的修改还应运行相关的 `pnpm test:*` 专项测试。
 
 传输、网络、更新或恢复相关修改还需要连接实际设备测试，因为浏览器端类型
 检查无法验证 Core 协议兼容性和断线重连行为。

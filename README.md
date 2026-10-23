@@ -8,52 +8,36 @@ responsive application.
 
 ## Highlights
 
-- Remote video and audio over WebRTC, with MJPEG support and an optional
-  H.264/H.265 WebSocket fallback when WebRTC cannot connect
-- Keyboard and five-button mouse HID control, absolute and relative pointer
-  modes, text input, keyboard layouts, and reusable shortcuts
-- ATX power operations, fullscreen keyboard lock, and virtual media with ISO
-  upload and writable virtual-drive file management
-- First-run account, network, locale, timezone, and NTP setup
-- Network, VLAN, WireGuard, DNS, static route, USB identity, video, service,
-  user, session, log, resource, time, update, and recovery administration
-- Runtime extension catalog, installation, configuration, lifecycle, health
-  recovery, and HTML/layout/Vue extension pages
-- Permission-aware navigation and product hooks for branded builds
-- English, Simplified Chinese, and Traditional Chinese UI catalogs
-- A separate Recovery UI build for firmware flash, default-user reset, and reboot
+- Low-latency remote console with WebRTC audio/video, MJPEG video, and
+  H.264/H.265 WebSocket video transports.
+- Keyboard, mouse, gamepad, and text input control with pointer modes,
+  keyboard layouts, shortcuts, and keyboard-lock support.
+- Virtual media with ISO upload/download, writable virtual drives, and file
+  management.
+- First-run setup and device administration for accounts, networking, display,
+  services, security, users, diagnostics, updates, and recovery.
+- Extension discovery, installation, configuration, lifecycle management, and
+  HTML, layout, and trusted Vue extension pages.
+- Responsive, permission-aware UI with light/dark themes, English, Simplified
+  Chinese, and Traditional Chinese catalogs, plus product integration hooks.
+- A standalone Recovery UI for firmware installation, user reset, factory reset,
+  and reboot.
 
 ## Runtime architecture
 
-The browser consumes the OneKVM Core HTTP API and status event stream. WebRTC
-uses a `control` DataChannel for HID reports. MJPEG and the WebSocket video
-fallback use a dedicated HID WebSocket. The fallback muxer, advanced settings,
-and closed drawers are loaded on demand to keep the console startup path small.
+The browser consumes the OneKVM Core HTTP API and status event stream. Video
+uses WebRTC, with MJPEG and WebSocket transports available when needed; HID
+reports use the transport selected for the active video mode.
 
 Production builds are designed to be served by OneKVM Core on the same origin.
 The advanced settings page uses hash routes such as
 `#/settings/advanced/system`, so a static server does not need history-mode
 fallback rules.
 
-The `#/banned` route checks for HTTP 423 (Locked) from the public auth-status API.
-The response uses no extra ban-state fields. It displays the notice signed “OneKVM Linux” only
-while that connection is banned; other visitors return to the home page.
-The page rechecks the state every five seconds and returns home after unblocking.
-Its language switcher supports English and both Chinese locales.
-Login failures and API 429 responses recheck the real state and immediately open
-the notice when a ban is confirmed. Opening or refreshing the home page also checks.
-The Security page configures anonymous API scan protection and lists its temporary bans. It also controls default-on legacy server headers and fixed MySQL 3306 / Redis 6379 honeypots. Honeypots block recognizable protocol probes; a TCP connection alone does not trigger a ban.
-
-Login, API, and reverse proxy policies open in drawers using the Advanced settings button beside each switch. Drawers keep independent drafts; Cancel discards the draft and Save persists settings. Reverse proxy security is opt-in and supports trusted proxy CIDRs, client IP headers, external HTTPS/origin checks, and configurable security headers including optional HSTS.
-
-To preview the notice, use `/?preview=true#/banned` or `/#/banned?preview=true`.
-Only the exact value `true` enables preview. This changes presentation only;
-it does not enable network blocking or change the device's access policy.
-
 ## Requirements
 
-- Node.js 20 LTS or newer is recommended
-- pnpm compatible with lockfile format 9
+- Node.js 22.6 or newer
+- pnpm 9 or newer
 - A compatible OneKVM Core instance for API-backed features
 
 ## Development
@@ -98,6 +82,9 @@ pnpm build:recovery # emit only the Recovery production bundle
 pnpm preview        # serve dist/ locally for inspection
 pnpm test:recovery  # Recovery API and locale tests
 ```
+
+Focused regression tests are also available as `pnpm test:*` scripts; run the
+tests related to the code you change.
 
 Production assets are written to `dist/`. Recovery is a second Vite build that
 inlines JS and CSS into `dist-recovery/index.html` for the initramfs web
@@ -165,6 +152,8 @@ pnpm check
 pnpm build
 git diff --check
 ```
+
+Run the relevant `pnpm test:*` scripts for behavioral changes.
 
 For transport, network, update, or recovery changes, also exercise the feature
 against a device because browser-only type checks cannot validate Core protocol

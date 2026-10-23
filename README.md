@@ -35,6 +35,21 @@ The advanced settings page uses hash routes such as
 `#/settings/advanced/system`, so a static server does not need history-mode
 fallback rules.
 
+The `#/banned` route checks for HTTP 423 (Locked) from the public auth-status API.
+The response uses no extra ban-state fields. It displays the notice signed “OneKVM Linux” only
+while that connection is banned; other visitors return to the home page.
+The page rechecks the state every five seconds and returns home after unblocking.
+Its language switcher supports English and both Chinese locales.
+Login failures and API 429 responses recheck the real state and immediately open
+the notice when a ban is confirmed. Opening or refreshing the home page also checks.
+The Security page configures anonymous API scan protection and lists its temporary bans. It also controls default-on legacy server headers and fixed MySQL 3306 / Redis 6379 honeypots. Honeypots block recognizable protocol probes; a TCP connection alone does not trigger a ban.
+
+Login, API, and reverse proxy policies open in drawers using the Advanced settings button beside each switch. Drawers keep independent drafts; Cancel discards the draft and Save persists settings. Reverse proxy security is opt-in and supports trusted proxy CIDRs, client IP headers, external HTTPS/origin checks, and configurable security headers including optional HSTS.
+
+To preview the notice, use `/?preview=true#/banned` or `/#/banned?preview=true`.
+Only the exact value `true` enables preview. This changes presentation only;
+it does not enable network blocking or change the device's access policy.
+
 ## Requirements
 
 - Node.js 20 LTS or newer is recommended

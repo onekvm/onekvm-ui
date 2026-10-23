@@ -21,7 +21,7 @@ const SETTINGS_LIST_GROUPS: { id: string; keys: string[] }[] = [
   { id: 'device', keys: ['system', 'personalization', 'display', 'keyboard', 'usb'] },
   { id: 'network', keys: ['network', 'firewall', 'time'] },
   { id: 'extensions', keys: ['cloud', 'plugins'] },
-  { id: 'admin', keys: ['services', 'logs', 'resources', 'sessions', 'users', 'files', 'update'] },
+  { id: 'admin', keys: ['services', 'security', 'logs', 'resources', 'sessions', 'users', 'files', 'update'] },
 ]
 
 export function isSettingsIndex(section: string) {

@@ -350,6 +350,7 @@ export interface SSHConfig {
 
 export interface CertificateStatus {
   configured: boolean
+  fingerprint_sha256?: string
   curve?: string
   subject?: string
   not_before?: string
@@ -391,12 +392,39 @@ export interface AutoSSLIssueRequest {
   webhook_bearer_token?: string
 }
 
+export interface ReverseProxySettings {
+  enabled: boolean
+  trusted_proxies: string[]
+  client_ip_header: string
+  require_https: boolean
+  public_origin: string
+  security_headers_enabled: boolean
+  frame_options: 'off' | 'sameorigin' | 'deny'
+  referrer_policy: 'no-referrer' | 'same-origin' | 'strict-origin-when-cross-origin'
+  hsts_enabled: boolean
+  hsts_max_age_seconds: number
+  hsts_include_subdomains: boolean
+}
+
 export interface OneKVMServiceSettings {
+  reverse_proxy: ReverseProxySettings
   http_port: number
   https_port: number
   tls_enabled: boolean
   tls_auto_redirect: boolean
   login_protection_enabled: boolean
+  api_protection_enabled: boolean
+  api_protection_max_failures: number
+  api_protection_ban_duration_seconds: number
+  api_protection_scope: 'ip' | 'subnet'
+  api_protection_ipv4_prefix: number
+  api_protection_ipv6_prefix: number
+  api_protection_window_seconds: number
+  api_protection_requests_per_second: number
+  api_protection_burst: number
+  honeypot_enabled: boolean
+  server_disguise_enabled: boolean
+  login_protection_block_weak_credentials: boolean
   login_protection_max_failures: number
   login_protection_ban_duration_seconds: number
   login_protection_scope: 'subnet' | 'ip'
@@ -411,6 +439,44 @@ export interface OneKVMServiceSettings {
 export interface SSHServiceSettings {
   port: number
   authorized_keys: string[]
+}
+
+export type OneKVMSecuritySettings = Pick<OneKVMServiceSettings,
+  'api_protection_enabled' | 'login_protection_enabled' | 'login_protection_block_weak_credentials' | 'login_protection_max_failures'
+  | 'api_protection_max_failures'
+  | 'api_protection_ban_duration_seconds'
+  | 'api_protection_scope'
+  | 'api_protection_ipv4_prefix'
+  | 'api_protection_ipv6_prefix'
+  | 'api_protection_window_seconds'
+  | 'api_protection_requests_per_second'
+  | 'api_protection_burst'
+  | 'honeypot_enabled'
+  | 'reverse_proxy'
+  | 'server_disguise_enabled'
+  | 'login_protection_ban_duration_seconds' | 'login_protection_scope' |
+  'login_protection_ipv4_prefix' | 'login_protection_ipv6_prefix' | 'crash_recovery_enabled'>
+
+export interface LoginBan {
+  id: string
+  address: string
+  source: 'manual' | 'login_failures' | 'weak_credentials' | 'api_scan' | 'honeypot'
+  reason: string
+  failures: number
+  trigger_ip?: string | null
+  expires_at: number | null
+}
+
+export interface ManualLoginBanRequest {
+  address: string
+  reason: string
+  expires_at: number | null
+}
+
+export interface HoneypotStatus {
+  enabled: boolean
+  mysql: { port: number; listening: boolean; error: string | null }
+  redis: { port: number; listening: boolean; error: string | null }
 }
 
 export interface ZramServiceSettings {
@@ -1102,6 +1168,7 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
       window.dispatchEvent(new Event('onekvm:unauthorized'))
     }
     if (response.status === 403) window.dispatchEvent(new Event('onekvm:permissions-changed'))
+    if ([423, 429].includes(response.status) && path !== '/api/auth/status') window.dispatchEvent(new Event('onekvm:access-check'))
     throw new APIError(body?.error || `HTTP ${response.status}`, response.status)
   }
 
@@ -1683,7 +1750,13 @@ export const api = {
   serviceAction: (id: string, action: 'start' | 'stop' | 'restart' | 'enable' | 'disable') =>
     request<{ status: string }>(`/api/services/${encodeURIComponent(id)}/${action}`, { method: 'POST' }),
 	getOneKVMServiceSettings: () => request<OneKVMServiceSettings>('/api/services/onekvm'),
-	saveOneKVMServiceSettings: (settings: Pick<OneKVMServiceSettings, 'http_port' | 'https_port' | 'tls_enabled' | 'tls_auto_redirect' | 'login_protection_enabled' | 'login_protection_max_failures' | 'login_protection_ban_duration_seconds' | 'login_protection_scope' | 'login_protection_ipv4_prefix' | 'login_protection_ipv6_prefix' | 'crash_recovery_enabled'>) =>
+	getLoginBans: () => request<LoginBan[]>('/api/security/login-bans', { cache: 'no-store' }),
+  getHoneypotStatus: () => request<HoneypotStatus>('/api/security/honeypot', { cache: 'no-store' }),
+	addLoginBan: (ban: ManualLoginBanRequest) => request<LoginBan[]>('/api/security/login-bans', { method: 'POST', body: JSON.stringify(ban) }),
+	removeLoginBan: (id: string) => request<void>(`/api/security/login-bans/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+	saveOneKVMSecuritySettings: (settings: OneKVMSecuritySettings) =>
+		request<OneKVMServiceSettings>('/api/services/onekvm', { method: 'PUT', body: JSON.stringify(settings) }),
+	saveOneKVMServiceSettings: (settings: Pick<OneKVMServiceSettings, 'http_port' | 'https_port' | 'tls_enabled' | 'tls_auto_redirect'>) =>
 		request<OneKVMServiceSettings>('/api/services/onekvm', {
 			method: 'PUT',
 			body: JSON.stringify(settings),

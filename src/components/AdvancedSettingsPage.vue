@@ -35,6 +35,7 @@ import {
   Save,
   ScrollText,
   ServerCog,
+  ShieldCheck,
   Trash2,
   Upload,
 	Usb,
@@ -114,6 +115,7 @@ import ResourceMonitorPage from './ResourceMonitorPage.vue'
 import OnlineSessionsPage from './OnlineSessionsPage.vue'
 import LogsPage from './LogsPage.vue'
 import ServicesPage from './ServicesPage.vue'
+import SecuritySettingsPage from './SecuritySettingsPage.vue'
 import StaticRoutesForm from './StaticRoutesForm.vue'
 import TimezoneMap from './TimezoneMap.vue'
 import SystemUpdateSourceSelector, { type UpdateMethod } from './SystemUpdateSourceSelector.vue'
@@ -130,6 +132,7 @@ import { pendingDiagnostics } from '@/lib/diagnostics-pending'
 import FileManagerPage from './file-manager/FileManagerPage.vue'
 import SettingsAppList from './SettingsAppList.vue'
 import SystemMemorySpec from './SystemMemorySpec.vue'
+import SystemCertificateFingerprint from './SystemCertificateFingerprint.vue'
 import SystemSpecBadge from './SystemSpecBadge.vue'
 
 type Section = string
@@ -165,7 +168,7 @@ function sectionFromRoute(route: string): Section {
   }
   if (uiProduct.settingsSections?.some((item) => item.key === normalized)) return normalized
   if (normalized === 'audio') return 'usb'
-  return ['display', 'personalization', 'network', 'firewall', 'keyboard', 'usb', 'cloud', 'plugins', 'services', 'logs', 'resources', 'sessions', 'system', 'files', 'users', 'time', 'update'].includes(normalized) ? normalized : 'system'
+  return ['display', 'personalization', 'network', 'firewall', 'keyboard', 'usb', 'cloud', 'plugins', 'services', 'security', 'logs', 'resources', 'sessions', 'system', 'files', 'users', 'time', 'update'].includes(normalized) ? normalized : 'system'
 }
 
 function routeFromSection(value: Section) {
@@ -506,6 +509,7 @@ const sections = computed<SidebarSection[]>(() => {
     { key: 'plugins', label: t('settings.advancedSettings.plugins', 'Plugins'), icon: Box },
     ...pluginPages,
     { key: 'services', label: t('settings.advancedSettings.services', 'Services'), icon: ListRestart },
+    { key: 'security', label: t('settings.advancedSettings.security', 'Security'), icon: ShieldCheck },
     { key: 'logs', label: t('settings.advancedSettings.logs', 'Logs'), icon: ScrollText },
     { key: 'resources', label: t('settings.advancedSettings.resources', 'Resource monitor'), icon: Activity },
     { key: 'sessions', label: t('settings.advancedSettings.sessions', 'Online sessions'), icon: RadioTower },
@@ -2072,6 +2076,10 @@ watch(paneSection, (value) => {
                 <ServicesPage :extensions="extensions" @navigate="navigateFromService" />
               </section>
 
+              <section v-else-if="paneSection === 'security'" class="advanced-settings-section">
+                <SecuritySettingsPage />
+              </section>
+
               <section v-else-if="paneSection === 'logs'" class="advanced-settings-section">
                 <LogsPage />
               </section>
@@ -2239,6 +2247,7 @@ watch(paneSection, (value) => {
                         <dt>{{ t('settings.advancedSettings.systemPage.kernelVersion', 'Linux kernel') }}</dt>
                         <dd>{{ status.system?.kernel_version || '-' }}</dd>
                       </div>
+                      <SystemCertificateFingerprint />
                       <div>
                         <dt>{{ t('settings.advancedSettings.systemPage.uptime', 'Uptime') }}</dt>
                         <dd>{{ formatUptime(deviceUptime) }}</dd>

@@ -1,7 +1,8 @@
 import { reactive, readonly } from 'vue'
 
-import { api, invalidateExtensionCaches, isUnauthorizedError, type AuthStatus, type NetworkConfig, type SetupSystemSettings } from '@/api/client'
+import { api, APIError, invalidateExtensionCaches, isUnauthorizedError, type AuthStatus, type NetworkConfig, type SetupSystemSettings } from '@/api/client'
 import { isCloudHosted } from '@/api/service-url'
+import { accessRevokedRoute, accessRevokedURL, isAccessRevoked } from '@/lib/access-revoked-route'
 
 const state = reactive<AuthStatus & { loading: boolean }>({
   configured: false,
@@ -33,6 +34,14 @@ function assign(status: AuthStatus) {
   Object.assign(state, status, { loading: false, mfa })
 }
 
+function showAccessRevoked() {
+  const url = new URL(window.location.href)
+  if (!accessRevokedRoute(url).requested) {
+    window.history.replaceState(window.history.state, '', accessRevokedURL(url))
+    window.dispatchEvent(new HashChangeEvent('hashchange'))
+  }
+}
+
 function scheduleRefreshRetry() {
   if (refreshRetryTimer !== null) return
   refreshRetryTimer = window.setTimeout(() => {
@@ -53,6 +62,14 @@ async function refresh() {
         refreshRetryTimer = null
       }
     } catch (error) {
+      if (isAccessRevoked(error)) {
+        if (refreshRetryTimer !== null) {
+          window.clearTimeout(refreshRetryTimer)
+          refreshRetryTimer = null
+        }
+        showAccessRevoked()
+        return
+      }
       // Core's public auth status returns 200 for an expired device session.
       // A 401 here comes from the cloud transport's independent session gate.
       if (isCloudHosted() && isUnauthorizedError(error)) {
@@ -74,9 +91,14 @@ async function refresh() {
 async function login(username: string, password: string) {
   // HttpOnly session cookies must be expired by the server before a fresh login.
   await api.authLogout()
-  const status = await api.authLogin(username, password)
-  assign(status)
-  return status
+  try {
+    const status = await api.authLogin(username, password)
+    assign(status)
+    return status
+  } catch (error) {
+    if (error instanceof APIError && [401, 403, 429].includes(error.status)) await refresh()
+    throw error
+  }
 }
 
 async function completeMfa(body: {
@@ -126,6 +148,7 @@ async function logout() {
 export function useAuth() {
   if (!initialized) {
     initialized = true
+    window.addEventListener('onekvm:access-check', () => { void refresh() })
     window.addEventListener('onekvm:permissions-changed', () => { void refresh() })
     window.addEventListener('onekvm:unauthorized', () => {
       invalidateExtensionCaches()

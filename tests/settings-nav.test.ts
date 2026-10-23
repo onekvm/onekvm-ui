@@ -38,6 +38,7 @@ const grouped = groupSettingsSections([
   { key: 'plugins' },
   { key: 'extension:oled', parent: 'plugins' },
   { key: 'services' },
+  { key: 'security' },
   { key: 'logs' },
   { key: 'resources' },
   { key: 'sessions' },
@@ -57,6 +58,7 @@ assert.deepEqual(grouped[2].items.map((item) => item.key), [
 ])
 assert.deepEqual(grouped[3].items.map((item) => item.key), [
   'services',
+  'security',
   'logs',
   'resources',
   'sessions',

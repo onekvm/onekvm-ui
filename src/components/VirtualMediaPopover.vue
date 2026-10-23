@@ -1631,6 +1631,7 @@ onBeforeUnmount(() => {
     :show="uploadDialogOpen"
     :minimized="uploading && !uploadDialogOpen"
     minimize-target="media"
+    @restore="restoreUploadDialog"
     :dialog-label="uploadProgressTitle"
     :window-style="uploadWindowStyle"
     :status="uploadStatusLabel"

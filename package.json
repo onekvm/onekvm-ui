@@ -70,6 +70,13 @@
     "test:upload-speed": "node --experimental-strip-types tests/upload-speed.test.ts",
     "preview": "vite preview"
   },
+  "pnpm": {
+    "overrides": {
+      "brace-expansion": "2.1.7",
+      "nanoid": "3.3.20",
+      "source-map-js": "1.2.2"
+    }
+  },
   "dependencies": {
     "@lucide/vue": "^1.55.0",
     "@xterm/addon-fit": "^0.11.0",

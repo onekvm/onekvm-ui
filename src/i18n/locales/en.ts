@@ -1848,6 +1848,10 @@ const en = {
             label: 'Video devices',
             description: 'Read and control video capture devices.',
           },
+          'device-kvm': {
+            label: 'KVM virtualization',
+            description: 'Open the host KVM acceleration device for virtual machines.',
+          },
           'device-hid': {
             label: 'Keyboard and mouse devices',
             description: 'Access USB HID devices to send keyboard and mouse input.',

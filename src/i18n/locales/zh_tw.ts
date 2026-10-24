@@ -1852,6 +1852,10 @@ const zh_tw = {
             label: '視訊裝置',
             description: '讀取和控制影像擷取裝置。',
           },
+          'device-kvm': {
+            label: 'KVM 虛擬化',
+            description: '開啟主機 KVM 加速裝置以執行虛擬機。',
+          },
           'device-hid': {
             label: '鍵盤和滑鼠裝置',
             description: '存取 USB HID 裝置，傳送鍵盤和滑鼠輸入。',

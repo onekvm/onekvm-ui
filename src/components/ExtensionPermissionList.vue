@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue'
-import { CircuitBoard, Globe, Keyboard, Monitor, Network, Package, ScanLine, Settings2, ShieldAlert, ShieldCheck, Video } from '@/icons'
+import { CircuitBoard, Cpu, Globe, Keyboard, Monitor, Network, Package, ScanLine, Settings2, ShieldAlert, ShieldCheck, Video } from '@/icons'
 import { t } from '@/i18n/runtime'
 import IconDescriptionList from './IconDescriptionList.vue'
 import PluginDetailsSectionTitle from './PluginDetailsSectionTitle.vue'
@@ -12,6 +12,7 @@ const permissionIcons: Readonly<Record<string, Component>> = {
   'network-info': Network,
   'network-admin': Settings2,
   'device-video': Video,
+  'device-kvm': Cpu,
   'device-hid': Keyboard,
   'device-i2c': CircuitBoard,
   'device-fb': Monitor,

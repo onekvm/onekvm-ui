@@ -1847,6 +1847,10 @@ const zh = {
             label: '视频设备',
             description: '读取和控制视频采集设备。',
           },
+          'device-kvm': {
+            label: 'KVM 虚拟化',
+            description: '打开宿主机 KVM 加速设备以运行虚拟机。',
+          },
           'device-hid': {
             label: '键盘和鼠标设备',
             description: '访问 USB HID 设备，发送键盘和鼠标输入。',

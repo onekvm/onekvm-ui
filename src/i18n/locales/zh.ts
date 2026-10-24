@@ -1660,6 +1660,10 @@ const zh = {
         manage: '管理插件'
       },
       plugins: {
+        installLogDetails: '详情',
+        installLog: '安装日志',
+        installLogWaiting: '等待安装日志输出…',
+        installLogTruncated: '仅显示最近的安装输出。',
 		memoryBudget: '插件内存预算',
 		memoryBudgetInsufficient: '无法启用此插件：需要 {required} 内存预算，但仅剩 {available} 可用（已分配 {used} / {total}）。',
         title: '插件',

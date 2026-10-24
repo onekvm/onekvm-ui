@@ -75,6 +75,13 @@ host-rendered controls into placeholders inside canvas markup.
 
 ## Shared extension details
 
+`runtime.components.InstallLogDetails` renders a collapsible, read-only terminal
+for installation progress. Pass `log: string`, `truncated?: boolean`, and
+`failed?: boolean`. It loads the host's xterm chunk only when expanded, follows
+new output while the user is at the bottom, and expands on failure. Place it
+below the progress bar and retain it on success or failure. Pages supporting
+older host UIs should provide a text fallback when this component is absent.
+
 `runtime.dialogs.ExtensionDetails` renders the same read-only details dialog as
 Plugin management, including declared features, permissions, dependencies, and
 kernel modules. It accepts `show: boolean`, `id: string`, and an optional

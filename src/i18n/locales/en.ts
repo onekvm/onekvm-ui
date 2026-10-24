@@ -1661,6 +1661,10 @@ const en = {
         manage: 'Manage plugin'
       },
       plugins: {
+        installLogDetails: 'Details',
+        installLog: 'Installation log',
+        installLogWaiting: 'Waiting for installation output…',
+        installLogTruncated: 'Showing the most recent installation output.',
 		memoryBudget: 'Plugin memory budget',
 		memoryBudgetInsufficient: 'Cannot enable this plugin: it needs {required} of memory budget, but only {available} is available ({used} of {total} already allocated).',
         title: 'Plugins',

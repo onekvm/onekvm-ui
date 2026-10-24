@@ -38,6 +38,8 @@ export interface MarketplaceInstallProgress {
   message: string
   status: string
   error: string
+  log: string
+  logTruncated: boolean
 }
 
 export function marketplacePackageMatches(entry: { id?: string; package?: string }, id: string) {
@@ -170,6 +172,8 @@ export function marketplaceInstallProgressFromRecord(value: unknown): Marketplac
     message: readText(record.message),
     status: readText(record.status),
     error: readText(record.error),
+    log: readText(record.log),
+    logTruncated: record.log_truncated === true,
   }
 }
 

@@ -27,6 +27,8 @@ interface MarketplaceProgressResponse {
   percent?: number | null
   bytes?: number
   total_bytes?: number
+  log?: string
+  log_truncated?: boolean
 }
 
 function delay(milliseconds: number) {

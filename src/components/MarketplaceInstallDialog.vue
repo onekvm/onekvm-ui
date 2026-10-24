@@ -18,6 +18,7 @@ import {
   type MarketplaceInstallProgress,
 } from '@/lib/marketplace-install'
 import ExtensionDetailsDialog from './ExtensionDetailsDialog.vue'
+import InstallLogDetails from './InstallLogDetails.vue'
 
 const props = defineProps<{
   show: boolean
@@ -45,6 +46,8 @@ const progress = ref<MarketplaceInstallProgress>({
   message: '',
   status: '',
   error: '',
+  log: '',
+  logTruncated: false,
 })
 
 const installing = computed(() => phase.value === 'installing')
@@ -146,6 +149,8 @@ watch(() => props.show, (open) => {
     message: '',
     status: '',
     error: '',
+    log: '',
+    logTruncated: false,
   }
 })
 
@@ -180,6 +185,8 @@ async function runInstall() {
       : t('network.wireguard.installerPreparing', 'Preparing to install'),
     status: 'running',
     error: '',
+    log: '',
+    logTruncated: false,
   }
   phase.value = 'installing'
   try {
@@ -297,6 +304,13 @@ async function runInstall() {
         <n-alert v-if="error" type="error" :show-icon="false">{{ error }}</n-alert>
         <p class="plugin-marketplace-installer-copy">{{ confirmCopy }}</p>
       </div>
+
+      <InstallLogDetails
+        v-if="phase !== 'confirm' || error"
+        :log="progress.log || error"
+        :truncated="progress.logTruncated"
+        :failed="!!error"
+      />
 
       <template #footer>
         <div class="plugin-marketplace-installer-actions">

@@ -79,5 +79,11 @@ assert.equal(marketplaceProgressPercent({ percent: 140, bytes: 1, totalBytes: 2 
 assert.equal(marketplaceProgressPercent({ percent: null, bytes: 50, totalBytes: 200 }), 25)
 assert.equal(marketplaceProgressPercent({ percent: null, bytes: 0, totalBytes: 0 }), null)
 assert.equal(marketplaceInstallProgressFromRecord({ phase: 'download', percent: null, bytes: 10, total_bytes: 20, status: 'running' }).totalBytes, 20)
+const failureProgress = marketplaceInstallProgressFromRecord({
+  phase: 'error', status: 'error', log: 'opkg diagnostic\nPrevious extension restored\n', log_truncated: true,
+})
+assert.equal(failureProgress.log, 'opkg diagnostic\nPrevious extension restored\n')
+assert.equal(failureProgress.logTruncated, true)
+assert.equal(marketplaceInstallProgressFromRecord({ phase: 'prepare' }).log, '')
 assert.equal(marketplaceFormatPackageSize(2048), '2 KiB')
 assert.equal(fillMarketplaceTemplate('Install "{name}"', { name: 'WireGuard' }), 'Install "WireGuard"')

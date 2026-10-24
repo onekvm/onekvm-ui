@@ -15,6 +15,7 @@ import {
 import { currentLanguage, t } from '@/i18n/runtime'
 import { qualityTier } from '@/lib/video-quality'
 import { extensionCategory } from '@/lib/extension-category'
+import VideoBitrateControl from './VideoBitrateControl.vue'
 import {
   clearQpOverride,
   hasQpOverride,
@@ -102,8 +103,11 @@ function property(name: string) {
 }
 
 function settingTitle(name: string) {
+  if (hasIndependentVideoSettings.value && name === 'bitrate_kbps') {
+    return t('screen.bitrateBudget', 'Bitrate budget ceiling')
+  }
   if (hasIndependentVideoSettings.value && name === 'quality_factor') {
-    return t('settings.advancedSettings.displayPage.quality', 'Quality budget (Bitrate)')
+    return t('settings.advancedSettings.displayPage.jpegQuality', 'JPEG quality')
   }
   if (hasIndependentVideoSettings.value && name === 'initial_qp') {
     return t('settings.advancedSettings.displayPage.qpPreset', 'Picture preset')
@@ -138,6 +142,21 @@ function numericDraft(name: string, fallback = 0) {
 }
 
 const hasIndependentVideoSettings = computed(() => props.extension.video?.settings === 'all')
+// A native label forwards clicks to the first number input, closing a select
+// in the same compound control. Give these fields an explicitly named group.
+function isVideoSettingGroup(name: string) {
+  return hasIndependentVideoSettings.value && ['bitrate_kbps', 'quality_factor', 'initial_qp'].includes(name)
+}
+const videoBitrateRange = computed(() => {
+  const field = property('bitrate_kbps')
+  if (!field || !field.maximum || field.maximum <= 0) return undefined
+  return {
+    minimum: Math.max(1, field.minimum ?? 1),
+    maximum: field.maximum,
+    step: 1,
+    default: typeof field.default === 'number' ? field.default : 0,
+  }
+})
 const qualityPercentMinimum = computed(() => Math.round((property('quality_factor')?.minimum ?? 0.01) * 100))
 const qualityPercentMaximum = computed(() => Math.round((property('quality_factor')?.maximum ?? 1) * 100))
 const qualityPercent = computed({
@@ -186,8 +205,12 @@ const videoQpDescription = computed(() => {
 })
 
 function visibleSettingNames(settings: string[]) {
-  if (!hasIndependentVideoSettings.value || !settings.includes('initial_qp')) return settings
-  return settings.filter((name) => name !== 'min_qp' && name !== 'max_qp')
+  if (!hasIndependentVideoSettings.value) return settings
+  if (draft.codec === 'mjpeg') {
+    return settings.filter(name => !['bitrate_kbps', 'initial_qp', 'min_qp', 'max_qp', 'gop'].includes(name))
+  }
+  return settings.filter(name => name !== 'quality_factor'
+    && (!settings.includes('initial_qp') || !['min_qp', 'max_qp'].includes(name)))
 }
 
 function applyVideoQpMode(value: VideoQpMode) {
@@ -341,10 +364,14 @@ watch(() => props.extension.settings, () => syncDraft())
             </p>
           </div>
           <div class="extension-layout-fields" :style="{ '--section-columns': section.columns }">
-            <label
+            <component
+              :is="isVideoSettingGroup(name) ? 'div' : 'label'"
               v-for="name in visibleSettingNames(section.settings)"
               :key="name"
+              class="extension-setting-field"
               :class="{ 'boolean-field': property(name)?.type === 'boolean' }"
+              :role="isVideoSettingGroup(name) ? 'group' : undefined"
+              :aria-label="isVideoSettingGroup(name) ? settingTitle(name) : undefined"
             >
               <span>{{ settingTitle(name) }}<b v-if="settingRequired(name)" class="required-mark"> *</b></span>
               <n-switch
@@ -382,7 +409,7 @@ watch(() => props.extension.settings, () => syncDraft())
                   </n-input-number>
                 </div>
                 <span class="video-setting-hint">{{ qualityDescription }}</span>
-                <span class="video-setting-hint">{{ t('settings.advancedSettings.displayPage.qualityPercentHint', 'VBR bitrate budget') }}</span>
+                <span class="video-setting-hint">{{ t('settings.advancedSettings.displayPage.jpegQualityHint', 'Controls JPEG compression quality; higher values retain more detail and use more bandwidth.') }}</span>
               </div>
               <div
                 v-else-if="hasIndependentVideoSettings && name === 'initial_qp'"
@@ -408,6 +435,23 @@ watch(() => props.extension.settings, () => syncDraft())
                     />
                   </div>
                 </div>
+              </div>
+              <div
+                v-else-if="hasIndependentVideoSettings && name === 'bitrate_kbps'"
+                class="video-setting-stack"
+              >
+                <VideoBitrateControl
+                  :value="numericDraft(name)"
+                  :range="videoBitrateRange"
+                  :disabled="property(name)?.readOnly || saving || !settingEnabled(name)"
+                  @update:value="(value: number) => setNumberValue(name, value)"
+                />
+                <span class="video-setting-hint">{{ t('screen.bitrateHelp') }}</span>
+                <span v-if="videoBitrateRange" class="video-setting-hint">
+                  {{ t('settings.advancedSettings.displayPage.deviceBitrateRange', 'Configurable ceiling range:') }}
+                  {{ videoBitrateRange.minimum / 1000 }}–{{ videoBitrateRange.maximum / 1000 }} Mbps
+                </span>
+                <span v-else class="video-setting-hint">{{ t('settings.advancedSettings.displayPage.customBitrateUnavailable', 'This device does not report a configurable bitrate range.') }}</span>
               </div>
               <n-input-number
                 v-else-if="property(name)?.type === 'integer' || property(name)?.type === 'number'"
@@ -461,7 +505,7 @@ watch(() => props.extension.settings, () => syncDraft())
                 :disabled="property(name)?.readOnly || saving || !settingEnabled(name)"
                 @update:value="(value: string) => draft[name] = value"
               />
-            </label>
+            </component>
           </div>
         </section>
         <footer>
@@ -523,8 +567,8 @@ watch(() => props.extension.settings, () => syncDraft())
   grid-template-columns: repeat(var(--section-columns), minmax(0, 1fr));
   gap: 14px 18px;
 }
-.extension-layout-fields label { display: grid; min-width: 0; align-content: start; gap: 6px; }
-.extension-layout-fields label > span { color: var(--muted-foreground); font-size: 11px; }
+.extension-setting-field { display: grid; min-width: 0; align-content: start; gap: 6px; }
+.extension-setting-field > span { color: var(--muted-foreground); font-size: 11px; }
 .required-mark { color: var(--destructive); font-weight: 600; }
 .extension-layout-fields .boolean-field { display: flex; align-items: center; justify-content: space-between; }
 .video-setting-stack { display: grid; width: 100%; gap: 7px; }

@@ -46,6 +46,7 @@ import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import AsyncPopconfirm from '@/components/AsyncPopconfirm'
 import ExtensionDropdown from '@/components/ExtensionDropdown'
 import ExtensionDetailsDialog from '@/components/ExtensionDetailsDialog.vue'
+import InstallLogDetails from '@/components/InstallLogDetails.vue'
 import ExtensionChildWindow from '@/components/toolbox/ExtensionChildWindow.vue'
 import {
   NCard,
@@ -151,6 +152,7 @@ interface PluginUIRuntimeV1 {
   language: () => string
   xterm: { load: () => Promise<PluginUIXtermV1> }
   dialogs: { StorageDirectoryPicker: Component; ExtensionDetails: typeof ExtensionDetailsDialog }
+  components: { InstallLogDetails: typeof InstallLogDetails }
   register: (id: string, definition: VueExtensionPageDefinitionV1) => void
   toolbar: { register: (id: string, definition: ToolbarRegistrationV1) => void }
   shell: { register: (id: string, definition: ExtensionShellRegistrationV1) => void }
@@ -369,6 +371,7 @@ window.OneKVMPluginUI = {
       StorageDirectoryPicker: markRaw(XpStorageDirectoryPicker),
       ExtensionDetails: markRaw(ExtensionDetailsDialog),
     }),
+    components: Object.freeze({ InstallLogDetails: markRaw(InstallLogDetails) }),
     register,
     toolbar: Object.freeze({ register: registerToolbar }),
     shell: Object.freeze({ register: registerShell }),

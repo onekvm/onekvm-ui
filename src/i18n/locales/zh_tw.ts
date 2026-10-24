@@ -1665,6 +1665,10 @@ const zh_tw = {
         manage: '管理外掛程式'
       },
       plugins: {
+        installLogDetails: '詳情',
+        installLog: '安裝日誌',
+        installLogWaiting: '等待安裝日誌輸出…',
+        installLogTruncated: '僅顯示最近的安裝輸出。',
 		memoryBudget: '外掛程式記憶體預算',
 		memoryBudgetInsufficient: '無法啟用此外掛程式：需要 {required} 記憶體預算，但僅剩 {available} 可用（已分配 {used} / {total}）。',
         title: '外掛程式',

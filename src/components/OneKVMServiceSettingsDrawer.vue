@@ -130,6 +130,7 @@ async function save() {
       tls_auto_redirect: form.tlsAutoRedirect,
     }))
     message.success(t('settings.success', 'Settings saved'))
+    show.value = false
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : String(reason)
   } finally {

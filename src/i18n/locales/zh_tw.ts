@@ -998,6 +998,8 @@ const zh_tw = {
           settings: '設定',
           notSupported: '不支援',
           oneKVMSettings: 'OneKVM 服務設定',
+          loggingLevel: '日誌等級',
+          loggingLevelHint: '過濾低於此等級的日誌，修改後立即生效。',
           sshSettings: 'SSH 設定',
           zramSettings: 'ZRAM 設定',
           zramSize: '大小',

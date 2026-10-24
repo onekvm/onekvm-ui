@@ -11,6 +11,8 @@ import {
 } from '@/api/client'
 import { t } from '@/i18n/runtime'
 
+type LoggingLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'off'
+
 const show = defineModel<boolean>('show', { required: true })
 
 const message = useMessage()
@@ -28,6 +30,7 @@ const letsEncryptDirectory = 'https://acme-v02.api.letsencrypt.org/directory'
 const letsEncryptStagingDirectory = 'https://acme-staging-v02.api.letsencrypt.org/directory'
 const autoSSLCA = shallowRef<'letsencrypt' | 'staging' | 'custom'>('letsencrypt')
 const autoSSLCredentialsConfigured = shallowRef(false)
+const savedLoggingLevel = shallowRef<LoggingLevel>('info')
 const autoSSL = reactive({
   challenge: 'web' as 'web' | 'dns',
   email: '',
@@ -50,6 +53,7 @@ const form = reactive({
   httpsPort: 443,
   tlsEnabled: false,
   tlsAutoRedirect: false,
+  loggingLevel: 'info' as LoggingLevel,
 })
 
 const title = computed(() => t('settings.advancedSettings.servicesPage.oneKVMSettings', 'OneKVM service settings'))
@@ -75,6 +79,20 @@ const dnsProviderOptions = computed(() => [
   { label: 'Cloudflare', value: 'cloudflare' },
   { label: t('settings.advancedSettings.servicesPage.dnsWebhook', 'DNS webhook'), value: 'webhook' },
 ])
+
+const loggingLevelOptions = computed(() => [
+  { label: 'Trace', value: 'trace' as const },
+  { label: 'Debug', value: 'debug' as const },
+  { label: 'Info', value: 'info' as const },
+  { label: 'Warn', value: 'warn' as const },
+  { label: 'Error', value: 'error' as const },
+  { label: 'Off', value: 'off' as const },
+])
+
+function isLoggingLevel(value: unknown): value is LoggingLevel {
+  return value === 'trace' || value === 'debug' || value === 'info'
+    || value === 'warn' || value === 'error' || value === 'off'
+}
 
 function assignOneKVM(settings: OneKVMServiceSettings) {
   form.httpPort = settings.http_port
@@ -110,7 +128,14 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    assignOneKVM(await api.getOneKVMServiceSettings())
+    const [settings, config] = await Promise.all([
+      api.getOneKVMServiceSettings(),
+      api.getConfig(),
+    ])
+    assignOneKVM(settings)
+    const level = isLoggingLevel(config.logging?.level) ? config.logging.level : 'info'
+    form.loggingLevel = level
+    savedLoggingLevel.value = level
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : String(reason)
   } finally {
@@ -129,6 +154,10 @@ async function save() {
       tls_enabled: form.tlsEnabled,
       tls_auto_redirect: form.tlsAutoRedirect,
     }))
+    if (form.loggingLevel !== savedLoggingLevel.value) {
+      await api.patchConfig('logging.level', form.loggingLevel)
+      savedLoggingLevel.value = form.loggingLevel
+    }
     message.success(t('settings.success', 'Settings saved'))
     show.value = false
   } catch (reason) {
@@ -255,6 +284,12 @@ watch(show, (open) => {
           <n-form-item :label="t('settings.advancedSettings.servicesPage.httpsPort', 'HTTPS port')">
             <n-input-number v-model:value="form.httpsPort" :min="1" :max="65535" :step="1" class="service-settings-number" />
           </n-form-item>
+          <n-form-item :label="t('settings.advancedSettings.servicesPage.loggingLevel', 'Log level')">
+            <n-select v-model:value="form.loggingLevel" :options="loggingLevelOptions" />
+          </n-form-item>
+          <p class="service-settings-hint logging-level-hint">
+            {{ t('settings.advancedSettings.servicesPage.loggingLevelHint', 'Filters messages below this level. Changes take effect immediately.') }}
+          </p>
           <div class="service-settings-switch-row">
             <span>{{ t('settings.advancedSettings.servicesPage.httpsEnabled', 'Enable HTTPS') }}</span>
             <n-switch v-model:value="form.tlsEnabled" />

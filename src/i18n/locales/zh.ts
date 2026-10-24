@@ -998,6 +998,8 @@ const zh = {
           settings: '设置',
           notSupported: '不支持',
           oneKVMSettings: 'OneKVM 服务设置',
+          loggingLevel: '日志等级',
+          loggingLevelHint: '过滤低于此等级的日志，修改后立即生效。',
           sshSettings: 'SSH 设置',
           zramSettings: 'ZRAM 设置',
           zramSize: '大小',

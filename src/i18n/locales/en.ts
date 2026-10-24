@@ -999,6 +999,8 @@ const en = {
           settings: 'Settings',
           notSupported: 'Not supported',
           oneKVMSettings: 'OneKVM service settings',
+          loggingLevel: 'Log level',
+          loggingLevelHint: 'Filters messages below this level. Changes take effect immediately.',
           sshSettings: 'SSH settings',
           zramSettings: 'ZRAM settings',
           zramSize: 'Size',

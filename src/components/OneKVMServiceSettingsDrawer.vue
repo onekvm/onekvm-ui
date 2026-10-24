@@ -30,7 +30,7 @@ const letsEncryptDirectory = 'https://acme-v02.api.letsencrypt.org/directory'
 const letsEncryptStagingDirectory = 'https://acme-staging-v02.api.letsencrypt.org/directory'
 const autoSSLCA = shallowRef<'letsencrypt' | 'staging' | 'custom'>('letsencrypt')
 const autoSSLCredentialsConfigured = shallowRef(false)
-const savedLoggingLevel = shallowRef<LoggingLevel>('info')
+const savedLoggingLevel = shallowRef<LoggingLevel>('error')
 const autoSSL = reactive({
   challenge: 'web' as 'web' | 'dns',
   email: '',
@@ -53,7 +53,7 @@ const form = reactive({
   httpsPort: 443,
   tlsEnabled: false,
   tlsAutoRedirect: false,
-  loggingLevel: 'info' as LoggingLevel,
+  loggingLevel: 'error' as LoggingLevel,
 })
 
 const title = computed(() => t('settings.advancedSettings.servicesPage.oneKVMSettings', 'OneKVM service settings'))
@@ -133,7 +133,7 @@ async function load() {
       api.getConfig(),
     ])
     assignOneKVM(settings)
-    const level = isLoggingLevel(config.logging?.level) ? config.logging.level : 'info'
+    const level = isLoggingLevel(config.logging?.level) ? config.logging.level : 'error'
     form.loggingLevel = level
     savedLoggingLevel.value = level
   } catch (reason) {

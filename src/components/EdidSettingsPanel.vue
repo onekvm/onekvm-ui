@@ -105,9 +105,6 @@ onMounted(() => {
   >
     <EdidIdentitySummary :status="status" />
     <p v-if="!status.summary" class="display-setting-field-hint">{{ t('settings.advancedSettings.displayPage.edidReadUnavailable', 'Current EDID could not be read. Presets and custom files are still available.') }}</p>
-    <n-alert :type="applyPolicyType" :show-icon="false">
-      {{ applyPolicyText }}
-    </n-alert>
     <n-select
       v-model:value="selection"
       class="edid-preset-select"
@@ -119,13 +116,19 @@ onMounted(() => {
       :disabled="disabled || busy || !status.writable"
       :placeholder="t('settings.advancedSettings.displayPage.edidSelect', 'Choose a machine preset or a custom file')"
     />
-    <n-button type="primary" :disabled="disabled || !selection || !status.writable" :loading="busy" @click="applySelection">
+    <div class="edid-apply-row">
+      <span class="display-setting-field-hint">{{ applyPolicyText }}</span>
+      <n-button secondary :type="applyPolicyType" :disabled="disabled || !selection || !status.writable" :loading="busy" @click="applySelection">
       {{ t('settings.advancedSettings.displayPage.edidApply', 'Apply EDID') }}
-    </n-button>
+      </n-button>
+    </div>
   </SettingsPanel>
 </template>
 
 <style scoped>
+.edid-apply-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.edid-apply-row .n-button { flex-shrink: 0; }
 .edid-preset-select { width: 100%; min-width: 0; }
 .display-setting-field-hint { margin: 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.6; }
+@media (max-width: 480px) { .edid-apply-row { align-items: stretch; flex-direction: column; } }
 </style>

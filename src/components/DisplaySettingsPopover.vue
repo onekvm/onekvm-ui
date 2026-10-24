@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
-import { Cable, CircleHelp, Monitor, PictureInPicture2, RotateCcw, SlidersHorizontal, Waypoints } from '@/icons'
+import { Cable, Monitor, PictureInPicture2, RotateCcw, SlidersHorizontal, Waypoints } from '@/icons'
 import { useMessage, type SelectOption } from 'naive-ui'
 
 import { api, APIError, type ConfigSchema, type EDIDStatus, type OneKVMConfig } from '@/api/client'
@@ -33,8 +33,10 @@ import {
 } from '@/lib/video-qp'
 import ControlOverlay from './ControlOverlay.vue'
 import ControlPopoverHeading from './ControlPopoverHeading.vue'
+import DisplaySettingHelp from './DisplaySettingHelp.vue'
 import DisplaySettingsGroup from './DisplaySettingsGroup.vue'
 import EdidIdentitySummary from './EdidIdentitySummary.vue'
+import VideoBitrateControl from './VideoBitrateControl.vue'
 
 const props = defineProps<{
   state: TransportState
@@ -61,8 +63,6 @@ const emit = defineEmits<{
 const message = useMessage()
 const dialog = useAsyncDialog()
 const overlayTo = useOverlayMount()
-const edidHelpHovered = shallowRef(false)
-const edidHelpFocused = shallowRef(false)
 const popoverOpen = ref(false)
 const menuOpen = ref(false)
 const saving = ref(false)
@@ -116,10 +116,13 @@ const codecOptions = computed(() => {
     ? allCodecOptions.value.filter((option) => supported.includes(option.value))
     : allCodecOptions.value
 })
-const fpsOptions = [10, 15, 24, 30, 45, 60, 120].map((value) => ({
-  label: `${value} FPS`,
-  value,
-}))
+const fpsOptions = computed(() => [
+  { label: t('screen.auto', 'Automatic'), value: 0 },
+  ...[10, 15, 24, 30, 45, 60, 120].map((value) => ({
+    label: `${value} FPS`,
+    value,
+  })),
+])
 const videoDisabled = computed(() => !props.canChangeVideo || saving.value || edidBusy.value || !!switchingProtocol.value)
 const edidOptions = computed(() => edidSelectOptions(edid.value, {
   factory: t('settings.advancedSettings.displayPage.edidFactory', 'Factory preset'),
@@ -174,13 +177,16 @@ const qualityBudgetSelection = computed<QualityBudgetSelection>({
     qualityPercent.value = selection
   },
 })
-const qualityBudgetDisabled = computed(() => {
-  const current = video.value
-  return !!current && current.codec !== 'mjpeg' && (current.h26x.bitrate_kbps ?? 0) > 0
-})
 const qualityBudgetLabel = computed(() => video.value?.codec === 'mjpeg'
   ? t('settings.advancedSettings.displayPage.jpegQuality', 'JPEG quality')
-  : t('screen.bitrate', 'Bitrate'))
+  : t('screen.bitrateBudget', 'Bitrate budget ceiling'))
+const qualityBudgetHelpTitle = computed(() => video.value?.codec === 'mjpeg'
+  ? t('screen.jpegQualityHelpTitle', 'About JPEG quality')
+  : t('screen.bitrateHelpTitle', 'About the bitrate ceiling'))
+const qualityBudgetHelp = computed(() => video.value?.codec === 'mjpeg'
+  ? t('settings.advancedSettings.displayPage.jpegQualityHint', 'Controls JPEG compression quality; higher values retain more detail and use more bandwidth.')
+  : [t('screen.bitrateHelp'), !schema.value?.video_bitrate_kbps
+    ? t('settings.advancedSettings.displayPage.customBitrateUnavailable', 'This device does not report a configurable bitrate range.') : ''].filter(Boolean).join('\n\n'))
 type SimpleQpSelection = 'auto' | QpPresetKey | 'custom'
 const simpleQpOptions = computed(() => [
   ...qpPresets.map((preset) => ({
@@ -209,6 +215,14 @@ const simpleQpSelection = computed<SimpleQpSelection>({
     current.h26x.bitrate_kbps = 0
     setQpPreset(current.h26x, selection)
   },
+})
+const qpPresetHelp = computed(() => {
+  const overview = t('screen.qpPresetHelp')
+  const preset = qpPresets.find((candidate) => candidate.value === simpleQpSelection.value)
+  const description = preset
+    ? t(preset.descriptionKey, preset.descriptionFallback)
+    : t('settings.advancedSettings.displayPage.qpCustomSimpleHint', 'Custom picture parameters are active. Edit them in Advanced settings.')
+  return `${overview}\n\n${description}`
 })
 
 const selectProps = computed(() => ({
@@ -393,7 +407,7 @@ function updateResolution(value: string | number | null) {
 }
 
 function updateFps(value: string | number | null) {
-  if (typeof value !== 'number' || value < 1) return
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) return
   if (value === fps.value) return
   fps.value = value
   if (video.value) video.value.fps = value
@@ -424,6 +438,22 @@ function updateCustomQuality(value: number | null) {
   void patchVideo('video.quality_factor', percent / 100)
 }
 
+function updateBitrateBudget(value: number) {
+  if (!video.value || value === (video.value.h26x.bitrate_kbps ?? 0)) return
+  video.value.h26x.bitrate_kbps = value
+  if (value > 0) {
+    clearQpOverride(video.value.h26x)
+    void patchVideo([
+      ['video.h26x.initial_qp', 0],
+      ['video.h26x.min_qp', 0],
+      ['video.h26x.max_qp', 0],
+      ['video.h26x.bitrate_kbps', value],
+    ])
+  } else {
+    void patchVideo('video.h26x.bitrate_kbps', 0)
+  }
+}
+
 function updateQpPreset(value: string | number | null) {
   if (!video.value) return
   if (value !== 'auto' && value !== 'custom' && !qpPresets.some((preset) => preset.value === value)) return
@@ -445,10 +475,6 @@ function updateFrameDetect(value: boolean) {
 
 watch(popoverOpen, (open) => {
   if (open) void loadVideo()
-  else {
-    edidHelpHovered.value = false
-    edidHelpFocused.value = false
-  }
 })
 
 onMounted(() => window.addEventListener(DISMISS_CONTROL_OVERLAY_EVENT, forceClose))
@@ -557,18 +583,32 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
         :icon="SlidersHorizontal"
       >
         <div>
-          <span>{{ qualityBudgetLabel }}</span>
+          <span class="display-setting-label">
+            {{ qualityBudgetLabel }}
+            <DisplaySettingHelp :active="popoverOpen" :label="qualityBudgetHelpTitle" :text="qualityBudgetHelp" />
+          </span>
+          <VideoBitrateControl
+            v-if="video?.codec !== 'mjpeg'"
+            class="display-status-select"
+            :value="video?.h26x.bitrate_kbps"
+            :range="schema?.video_bitrate_kbps"
+            :select-props="selectProps"
+            :disabled="videoDisabled || !video"
+            @update:value="updateBitrateBudget"
+            @update:show="menuOpen = $event"
+          />
           <n-select
+            v-else
             v-bind="selectProps"
             :value="qualityBudgetSelection"
             :options="qualityOptions"
-            :disabled="videoDisabled || !video || qualityBudgetDisabled"
+            :disabled="videoDisabled || !video"
             :render-label="renderQualityLabel"
             @update:value="updateQualityBudget"
             @update:show="menuOpen = $event"
           />
         </div>
-        <div v-if="qualityBudgetCustomEnabled">
+        <div v-if="video?.codec === 'mjpeg' && qualityBudgetCustomEnabled">
           <span>{{ t('screen.qualityCustom', 'Custom') }}</span>
           <n-input-number
             class="display-status-select"
@@ -577,14 +617,17 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
             :min="1"
             :max="100"
             :step="1"
-            :disabled="videoDisabled || !video || qualityBudgetDisabled"
+            :disabled="videoDisabled || !video"
             @update:value="updateCustomQuality"
           >
             <template #suffix>%</template>
           </n-input-number>
         </div>
         <div v-if="video && video.codec !== 'mjpeg'">
-          <span>{{ t('settings.advancedSettings.displayPage.qpPreset', 'Picture preset') }}</span>
+          <span class="display-setting-label">
+            {{ t('settings.advancedSettings.displayPage.qpPreset', 'Picture preset') }}
+            <DisplaySettingHelp :active="popoverOpen" :label="t('screen.qpPresetHelpTitle', 'About picture presets')" :text="qpPresetHelp" />
+          </span>
           <n-select
             v-bind="selectProps"
             :value="simpleQpSelection"
@@ -612,24 +655,13 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
       >
         <EdidIdentitySummary :status="edid" compact />
         <div class="display-edid-field">
-          <span class="display-edid-label">
+          <span class="display-setting-label">
             {{ t('screen.edid', 'EDID') }}
-            <n-tooltip :to="overlayTo" :show="edidHelpHovered || edidHelpFocused" style="max-width: 300px">
-              <template #trigger>
-                <button
-                  type="button"
-                  class="display-edid-help"
-                  :aria-label="t('screen.edidHelpTitle', 'What is EDID?')"
-                  aria-describedby="display-edid-help-text"
-                  @mouseenter="edidHelpHovered = true"
-                  @mouseleave="edidHelpHovered = false"
-                  @focus="edidHelpFocused = true"
-                  @blur="edidHelpFocused = false"
-                  @click="edidHelpFocused = true"
-                ><CircleHelp :size="14" aria-hidden="true" /></button>
-              </template>
-              <span id="display-edid-help-text">{{ t('screen.edidHelp', 'EDID tells the remote computer which resolutions, refresh rates, and audio formats the display supports. The computer uses it to choose its HDMI output. Changing EDID can help with resolution and compatibility issues.') }}</span>
-            </n-tooltip>
+            <DisplaySettingHelp
+              :active="popoverOpen"
+              :label="t('screen.edidHelpTitle', 'What is EDID?')"
+              :text="t('screen.edidHelp', 'EDID tells the remote computer which resolutions, refresh rates, and audio formats the display supports. The computer uses it to choose its HDMI output. Changing EDID can help with resolution and compatibility issues.')"
+            />
           </span>
           <n-select
             v-bind="selectProps"
@@ -701,22 +733,7 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
   margin-top: 4px;
 }
 
-.display-edid-label { display: inline-flex; align-items: center; gap: 4px; }
-.display-edid-help {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--onekvm-text-secondary);
-  cursor: help;
-}
-.display-edid-help:hover { color: var(--foreground); background: var(--secondary-hover); }
-.display-edid-help:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.display-setting-label { display: inline-flex; align-items: center; gap: 4px; }
 .display-pip-divider { margin: 12px 0; border: 0; border-top: 1px solid var(--border); }
 .display-pip-action { display: block; }
 </style>

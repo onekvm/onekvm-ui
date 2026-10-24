@@ -1404,13 +1404,18 @@ async function save() {
   }).show_device_model
   saving.value = true
   try {
-		const response = await api.saveConfig(config.value, props.videoSessionId)
+    // Display edits must preserve current settings in other domains. Form
+    // defaults and a stale network draft do not belong in a video save.
+    const nextConfig = paneSection.value === 'display'
+      ? { ...await api.getConfig(), video: config.value.video }
+      : config.value
+		const response = await api.saveConfig(nextConfig, props.videoSessionId)
 		if (response.network_apply?.pending) {
 			setNetworkApplyStatus(response.network_apply)
 		} else {
 			message.success(t('settings.success', 'Settings saved'))
 		}
-		savedNetworkSnapshot.value = networkConfigSnapshot(config.value.network)
+		savedNetworkSnapshot.value = networkConfigSnapshot(nextConfig.network)
 	} catch (reason) {
 		if (section.value === 'network' && !(reason instanceof APIError)) {
 			const status = pendingNetworkStatus()
@@ -1891,8 +1896,8 @@ watch(paneSection, (value) => {
                   :video-codecs="schema?.video_codecs"
                   :video-bitrate-range="schema?.video_bitrate_kbps"
                 />
-                <footer class="advanced-settings-actions">
-                  <n-button @click="load">{{ t('common.refresh', 'Reload') }}</n-button>
+                <footer class="advanced-settings-actions display-settings-actions">
+                  <n-button :disabled="saving" @click="load">{{ t('common.refresh', 'Reload') }}</n-button>
                   <n-button type="primary" :loading="saving" :disabled="!canEditVideo" @click="save">
                     <template #icon><Save /></template>
                     {{ t('common.save', 'Save') }}

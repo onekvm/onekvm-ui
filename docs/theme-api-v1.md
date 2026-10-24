@@ -52,8 +52,15 @@ navigation. Plugin page contents and the contents of plugin tool windows are
 outside these structural styles. Toolbox windows reserve a three-pixel outer
 frame so opaque or edge-to-edge plugin content cannot cover the classic bevel.
 The same frame applies to child windows, drawers, and maximized/fullscreen tools.
+Desktop classic titlebars share a 24-pixel minimum height, 16-pixel icons, and
+18-pixel system-menu buttons; touch layouts retain 44-pixel button targets.
 Shared host windows expose `host-window-frame`,
 `host-window-titlebar`, and `host-window-actions` hooks for consistent chrome.
+
+When the KVM input surface has native focus, all `host-window-frame` windows
+render at 50% opacity. Focusing a window restores full opacity. The shared CSS
+focus rule also covers teleported windows and respects reduced motion; window
+entry, exit and minimize animations retain their own opacity controls.
 `graphite` and `paper` use `skin: 'default'`. Custom themes inherit `skin` from
 their base and can override it independently of colors and `iconSet`.
 Theme summaries include `skin`, reflected as `data-onekvm-skin` on `<html>`.

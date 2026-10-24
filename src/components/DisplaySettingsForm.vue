@@ -16,8 +16,10 @@ import {
   setQpPreset,
   type QpPresetKey,
 } from '@/lib/video-qp'
+import DisplaySettingHelp from './DisplaySettingHelp.vue'
 import EdidSettingsPanel from './EdidSettingsPanel.vue'
 import SettingsPanel from './SettingsPanel.vue'
+import VideoBitrateControl from './VideoBitrateControl.vue'
 
 const props = defineProps<{
   disabled?: boolean
@@ -49,10 +51,13 @@ function updateCodec(value: string | number | null) {
   if (props.disabled || !option || option.disabled) return
   video.value.codec = option.value
 }
-const fpsOptions = [10, 15, 24, 30, 45, 60, 120].map((value) => ({
-  label: `${value} FPS`,
-  value,
-}))
+const fpsOptions = computed(() => [
+  { label: t('screen.auto', 'Automatic'), value: 0 },
+  ...[10, 15, 24, 30, 45, 60, 120].map((value) => ({
+    label: `${value} FPS`,
+    value,
+  })),
+])
 const qualityPercent = computed({
   get: () => Math.round(video.value.quality_factor * 100),
   set: (value: number) => { video.value.quality_factor = value / 100 },
@@ -96,25 +101,15 @@ if ((video.value.h26x.bitrate_kbps ?? 0) > 0 && hasCustomQp(video.value)) {
   video.value.h26x.max_qp = 0
 }
 
-// Keep this derived from the draft itself. A separate boolean can lag one
-// render behind when a QP preset clears bitrate_kbps, leaving the quality
-// budget visibly disabled even though the two settings are compatible.
-const customBitrateEnabled = computed(() => (video.value.h26x.bitrate_kbps ?? 0) > 0)
 const qpPresetMode = ref<QpPresetMode>(
   hasCustomQp(video.value) ? (matchingQpPreset(video.value.h26x)?.value ?? 'custom') : 'balanced',
 )
-// MJPEG maps quality_factor directly to JPEG QFactor. Hidden H.26x bitrate/QP
-// overrides must not disable the shared quality control after switching codecs.
-// A QP preset and the relative VBR quality budget are independent inputs and
-// intentionally coexist. Only an explicit bitrate ceiling replaces the
-// relative quality budget.
-const qualityBudgetDisabled = computed(() => video.value.codec !== 'mjpeg' && (video.value.h26x.bitrate_kbps ?? 0) > 0)
 const qualityBudgetLabel = computed(() => video.value.codec === 'mjpeg'
   ? t('settings.advancedSettings.displayPage.jpegQuality', 'JPEG quality')
-  : t('settings.advancedSettings.displayPage.quality', 'Quality budget (Bitrate)'))
+  : t('screen.bitrateBudget', 'Bitrate budget ceiling'))
 const qualityBudgetHint = computed(() => video.value.codec === 'mjpeg'
   ? t('settings.advancedSettings.displayPage.jpegQualityHint', 'Controls JPEG compression quality; higher values retain more detail and use more bandwidth.')
-  : t('settings.advancedSettings.displayPage.qualityPercentHint', 'VBR bitrate budget'))
+  : t('screen.bitrateHelp'))
 const qpPresetOptions = computed(() => [
   ...qpPresets.map((preset) => ({
     label: t(preset.labelKey, preset.labelFallback),
@@ -151,8 +146,7 @@ function applyQpPreset(value: QpPresetMode) {
     qpPresetMode.value = 'balanced'
     return
   }
-  // QP presets and the relative quality budget are independent. Only the
-  // explicit maximum-bitrate override conflicts with QP, so clear that one.
+  // Return to the automatic bitrate budget when selecting picture parameters.
   video.value.h26x.bitrate_kbps = 0
   if (value === 'custom') {
     if (!hasCustomQp(video.value)) setQpPreset(video.value.h26x, 'balanced')
@@ -173,20 +167,13 @@ watch(video, (value) => {
     : 'balanced'
 })
 
-function setCustomBitrateEnabled(enabled: boolean) {
-  if (enabled) {
-    applyQpPreset('auto')
-  }
-  if (enabled && (video.value.h26x.bitrate_kbps ?? 0) === 0 && props.videoBitrateRange) {
-    video.value.h26x.bitrate_kbps = props.videoBitrateRange.default
-  }
-  if (!enabled) {
-    video.value.h26x.bitrate_kbps = 0
-  }
-}
-
 function fieldReadOnly(path: string) {
   return props.readOnly?.includes(path) ?? false
+}
+
+function setBitrateBudget(value: number) {
+  video.value.h26x.bitrate_kbps = value
+  if (value > 0) applyQpPreset('auto')
 }
 </script>
 
@@ -194,158 +181,103 @@ function fieldReadOnly(path: string) {
   <n-form label-placement="top" :show-feedback="false" class="display-settings-form">
     <SettingsPanel
       :title="t('settings.advancedSettings.displayPage.outputGroup', 'Video output')"
-      :description="t('settings.advancedSettings.displayPage.outputGroupHint', 'Choose the stream format and target cadence delivered to viewers.')"
+      :description="t('settings.advancedSettings.displayPage.outputGroupHint', 'Format, resolution, and frame rate sent to viewers.')"
     >
-      <div class="display-settings-fields">
+      <div class="display-settings-fields display-output-fields">
+        <n-form-item :label="t('screen.codec', 'Codec')">
+          <n-select :value="video.codec" :options="codecOptions" :disabled="disabled" @update:value="updateCodec" />
+        </n-form-item>
         <n-form-item :label="t('settings.advancedSettings.displayPage.outputResolution', 'Output resolution')">
           <div class="display-setting-stack">
             <n-select v-model:value="video.resolution" :options="resolutionOptions" :disabled="disabled" />
-            <span class="display-setting-field-hint">
-              {{ t('settings.advancedSettings.displayPage.outputResolutionHint', 'Sets the pipeline output sent to the encoder and stream. Options match Cube HDMI input modes; Automatic follows the current input.') }}
-            </span>
+            <span class="display-setting-field-hint">{{ t('settings.advancedSettings.displayPage.outputResolutionHint', 'Automatic follows the HDMI input; select a size to scale the stream.') }}</span>
           </div>
-        </n-form-item>
-        <n-form-item :label="t('screen.codec', 'Codec')">
-          <n-select :value="video.codec" :options="codecOptions" :disabled="disabled" @update:value="updateCodec" />
         </n-form-item>
         <n-form-item :label="t('screen.targetFps', 'Target FPS')">
           <div class="display-setting-stack">
             <n-select v-model:value="video.fps" :options="fpsOptions" :disabled="disabled" />
-            <span class="display-setting-field-hint">
-              {{ t('settings.advancedSettings.displayPage.fpsHint', 'The live stream may run slower than this target if HDMI input or capture cannot keep up.') }}
-            </span>
+            <span class="display-setting-field-hint">{{ t('settings.advancedSettings.displayPage.fpsHint', 'Automatic follows the input; a fixed value limits the frame rate.') }}</span>
           </div>
         </n-form-item>
       </div>
     </SettingsPanel>
 
     <SettingsPanel
-      :title="t('settings.advancedSettings.displayPage.encodingGroup', 'Encoding quality')"
-      :description="t('settings.advancedSettings.displayPage.encodingGroupHint', 'Balance picture detail, bandwidth, and recovery after packet loss.')"
+      :title="t('settings.advancedSettings.displayPage.encodingGroup', 'Quality and bandwidth')"
+      :description="t('settings.advancedSettings.displayPage.encodingGroupHint', 'Balance picture detail and bandwidth use.')"
     >
       <div class="display-settings-fields">
-        <n-form-item :label="qualityBudgetLabel">
+        <n-form-item>
+          <template #label>
+            <span class="display-setting-label">{{ qualityBudgetLabel }}
+              <DisplaySettingHelp :label="qualityBudgetLabel" :text="qualityBudgetHint" :active="true" />
+            </span>
+          </template>
           <div class="display-setting-stack">
-            <n-select
-              v-model:value="qualityBudgetSelection"
-              :options="qualityBudgetOptions"
-              :disabled="disabled || qualityBudgetDisabled"
+            <VideoBitrateControl
+              v-if="video.codec !== 'mjpeg'"
+              :value="video.h26x.bitrate_kbps"
+              :range="videoBitrateRange"
+              :disabled="disabled"
+              @update:value="setBitrateBudget"
             />
-            <div v-if="qualityBudgetCustomEnabled" class="quality-custom-field">
-              <n-slider v-model:value="qualityPercent" :min="1" :max="100" :step="1" :disabled="disabled || qualityBudgetDisabled" />
-              <n-input-number v-model:value="qualityPercent" :min="1" :max="100" :step="1" :disabled="disabled || qualityBudgetDisabled">
+            <n-select v-else v-model:value="qualityBudgetSelection" :options="qualityBudgetOptions" :disabled="disabled" />
+            <div v-if="video.codec === 'mjpeg' && qualityBudgetCustomEnabled" class="quality-custom-field">
+              <n-slider v-model:value="qualityPercent" :min="1" :max="100" :step="1" :disabled="disabled" />
+              <n-input-number v-model:value="qualityPercent" :min="1" :max="100" :step="1" :disabled="disabled">
                 <template #suffix>%</template>
               </n-input-number>
             </div>
-            <span class="display-setting-field-hint">{{ qualityDescription }}</span>
-            <span class="display-setting-field-hint">{{ qualityBudgetHint }}</span>
+            <span v-if="video.codec === 'mjpeg'" class="display-setting-field-hint">{{ qualityDescription }}</span>
+            <span v-else class="display-setting-field-hint">
+              {{ t('settings.advancedSettings.displayPage.bitrateShortHint', 'A soft ceiling; complex scenes may briefly exceed it.') }}
+              <template v-if="videoBitrateRange">{{ videoBitrateRange.minimum / 1000 }}–{{ videoBitrateRange.maximum / 1000 }} Mbps</template>
+              <template v-else>{{ t('settings.advancedSettings.displayPage.customBitrateUnavailable', 'This device does not report a configurable bitrate range.') }}</template>
+            </span>
           </div>
         </n-form-item>
         <n-form-item v-if="video.codec !== 'mjpeg'" :label="t('settings.advancedSettings.displayPage.qpPreset', 'Picture preset')">
           <div class="display-setting-stack">
-            <n-select
-              :value="qpPresetMode"
-              :options="qpPresetOptions"
-              :disabled="disabled"
-              @update:value="applyQpPreset"
-            />
+            <n-select :value="qpPresetMode" :options="qpPresetOptions" :disabled="disabled" @update:value="applyQpPreset" />
             <span class="display-setting-field-hint">{{ qpPresetDescription }}</span>
           </div>
         </n-form-item>
-        <n-collapse v-if="video.codec !== 'mjpeg'" class="encoding-advanced-collapse display-settings-wide">
-          <n-collapse-item name="encoding-advanced">
-            <template #header>
-              {{ t('settings.advancedSettings.displayPage.encodingAdvanced', 'Advanced encoding settings') }}
-            </template>
-            <div class="custom-encoding-field">
-              <n-checkbox
-                :checked="customBitrateEnabled"
-                :disabled="disabled || !videoBitrateRange"
-                @update:checked="setCustomBitrateEnabled"
-              >
-                {{ t('settings.advancedSettings.displayPage.customBitrate', 'Customize maximum bitrate') }}
-              </n-checkbox>
-              <span v-if="videoBitrateRange" class="custom-encoding-limit">
-                {{ t('settings.advancedSettings.displayPage.deviceBitrateRange', 'Range reported by this device:') }}
-                {{ videoBitrateRange.minimum }}–{{ videoBitrateRange.maximum }} kbps
-              </span>
-              <span v-else class="custom-encoding-limit">
-                {{ t('settings.advancedSettings.displayPage.customBitrateUnavailable', 'This device does not report a configurable bitrate range.') }}
-              </span>
-            </div>
-          </n-collapse-item>
-        </n-collapse>
-        <n-form-item v-if="video.codec !== 'mjpeg' && customBitrateEnabled && videoBitrateRange" :label="t('settings.advancedSettings.displayPage.maxBitrate', 'Maximum bitrate')">
-          <div class="display-setting-stack">
-            <n-input-number
-              v-model:value="video.h26x.bitrate_kbps"
-              :min="videoBitrateRange.minimum"
-              :max="videoBitrateRange.maximum"
-              :step="videoBitrateRange.step"
-              :disabled="disabled"
-            >
-              <template #suffix>kbps</template>
-            </n-input-number>
-            <span class="display-setting-field-hint">
-              {{ t('settings.advancedSettings.displayPage.vbrBitrateHint', 'This is a VBR soft ceiling, not a minimum bitrate. Static scenes can use less; complex frames and keyframes may briefly exceed it.') }}
-            </span>
-            <span class="display-setting-field-hint">
-              {{ t('settings.advancedSettings.displayPage.deviceBitrateRange', 'Range reported by this device:') }}
-              {{ videoBitrateRange.minimum }}–{{ videoBitrateRange.maximum }} kbps
-            </span>
-          </div>
-        </n-form-item>
-        <template v-if="video.codec !== 'mjpeg' && qpPresetMode === 'custom'">
-          <n-form-item :label="t('settings.advancedSettings.displayPage.initialQp', 'Initial QP')">
-            <n-input-number v-model:value="video.h26x.initial_qp" :min="0" :max="51" :disabled="disabled" />
-          </n-form-item>
-          <n-form-item :label="t('settings.advancedSettings.displayPage.minQp', 'Minimum QP')">
-            <n-input-number v-model:value="video.h26x.min_qp" :min="0" :max="51" :disabled="disabled" />
-          </n-form-item>
-          <n-form-item :label="t('settings.advancedSettings.displayPage.maxQp', 'Maximum QP')">
-            <div class="display-setting-stack">
-              <n-input-number v-model:value="video.h26x.max_qp" :min="0" :max="51" :disabled="disabled" />
-              <span class="display-setting-field-hint">{{ t('settings.advancedSettings.displayPage.qpAutoHint', 'Use 0 to let the device backend choose automatically. Lower QP improves quality and increases bitrate.') }}</span>
-            </div>
-          </n-form-item>
-        </template>
-        <n-form-item v-if="video.codec !== 'mjpeg'" :label="t('settings.advancedSettings.displayPage.gop', 'Keyframe interval')">
-          <div class="display-setting-stack">
-            <n-input-number
-              v-model:value="video.h26x.gop"
-              :min="0"
-              :max="300"
-              :disabled="disabled"
-            >
-              <template #suffix>{{ video.h26x.gop === 0 ? t('screen.auto', 'Automatic') : t('settings.advancedSettings.displayPage.frames', 'frames') }}</template>
-            </n-input-number>
-            <span class="display-setting-field-hint">
-              {{ t('settings.advancedSettings.displayPage.gopHint', 'Use 0 for a 5 second interval at the target frame rate.') }}
-            </span>
-          </div>
-        </n-form-item>
-      </div>
-    </SettingsPanel>
-
-    <SettingsPanel
-      :title="t('settings.advancedSettings.displayPage.captureGroup', 'Capture')"
-      :description="t('settings.advancedSettings.displayPage.captureGroupHint', 'Select the video source and configure capture-specific behavior.')"
-    >
-      <div class="display-settings-fields">
-        <n-form-item :label="t('settings.advancedSettings.displayPage.sourceDevice', 'Capture device')">
-          <n-input
-            v-model:value="video.source_device"
-            :disabled="disabled || fieldReadOnly('video.source_device')"
-            placeholder="/dev/video0"
-          />
-        </n-form-item>
-        <n-form-item v-if="video.codec === 'mjpeg'" :label="t('screen.frameDetect', 'Frame Detect')">
+        <n-form-item v-else :label="t('screen.frameDetect', 'Frame Detect')">
           <div class="frame-detect-field">
             <n-switch v-model:value="video.mjpeg.frame_detect" :disabled="disabled" />
             <span>{{ t('screen.frameDetectTip', 'Pause transmission while the image is still and resume when it changes.') }}</span>
           </div>
         </n-form-item>
       </div>
+      <div v-if="video.codec !== 'mjpeg' && qpPresetMode === 'custom'" class="display-settings-fields display-qp-fields">
+        <n-form-item :label="t('settings.advancedSettings.displayPage.initialQp', 'Initial QP')">
+          <n-input-number v-model:value="video.h26x.initial_qp" :min="0" :max="51" :disabled="disabled" />
+        </n-form-item>
+        <n-form-item :label="t('settings.advancedSettings.displayPage.minQp', 'Minimum QP')">
+          <n-input-number v-model:value="video.h26x.min_qp" :min="0" :max="51" :disabled="disabled" />
+        </n-form-item>
+        <n-form-item :label="t('settings.advancedSettings.displayPage.maxQp', 'Maximum QP')">
+          <n-input-number v-model:value="video.h26x.max_qp" :min="0" :max="51" :disabled="disabled" />
+        </n-form-item>
+        <span class="display-setting-field-hint display-settings-wide">{{ t('settings.advancedSettings.displayPage.qpAutoHint', 'Use 0 to let the device backend choose automatically. Lower QP improves quality and increases bitrate.') }}</span>
+      </div>
+      <n-collapse class="display-advanced-fields">
+        <n-collapse-item name="advanced" :title="t('settings.advancedSettings.displayPage.advancedParameters', 'Advanced parameters')">
+          <div class="display-settings-fields">
+            <n-form-item v-if="video.codec !== 'mjpeg'" :label="t('settings.advancedSettings.displayPage.gop', 'Keyframe interval')">
+              <div class="display-setting-stack">
+                <n-input-number v-model:value="video.h26x.gop" :min="0" :max="300" :disabled="disabled">
+                  <template #suffix>{{ video.h26x.gop === 0 ? t('screen.auto', 'Automatic') : t('settings.advancedSettings.displayPage.frames', 'frames') }}</template>
+                </n-input-number>
+                <span class="display-setting-field-hint">{{ t('settings.advancedSettings.displayPage.gopHint', 'Use 0 for a 5 second interval at the target frame rate.') }}</span>
+              </div>
+            </n-form-item>
+            <n-form-item :label="t('settings.advancedSettings.displayPage.sourceDevice', 'Capture device')">
+              <n-input v-model:value="video.source_device" :disabled="disabled || fieldReadOnly('video.source_device')" placeholder="/dev/video0" />
+            </n-form-item>
+          </div>
+        </n-collapse-item>
+      </n-collapse>
     </SettingsPanel>
 
     <EdidSettingsPanel :disabled="disabled" />
@@ -353,24 +285,26 @@ function fieldReadOnly(path: string) {
 </template>
 
 <style scoped>
-.display-settings-form { display: grid; gap: 18px; }
+.display-settings-form { display: grid; gap: 16px; }
 .display-settings-fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 18px 20px;
+  gap: 16px 20px;
   align-items: start;
 }
+.display-output-fields, .display-qp-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .display-settings-fields :deep(.n-form-item) { align-self: start; margin-bottom: 0; }
 .display-settings-fields :deep(.n-form-item-blank) { flex: none; }
 .display-settings-fields :deep(.n-select),
 .display-settings-fields :deep(.n-input),
 .display-settings-fields :deep(.n-input-number) { width: 100%; }
 .display-settings-wide { grid-column: 1 / -1; }
-.display-setting-stack { display: grid; width: 100%; gap: 10px; }
+.display-setting-stack { display: grid; width: 100%; gap: 6px; }
 .quality-custom-field { display: grid; grid-template-columns: minmax(0, 1fr) 120px; align-items: center; gap: 14px; width: 100%; }
 .display-setting-field-hint { display: block; color: var(--muted-foreground); font-size: 12px; line-height: 1.6; }
-.encoding-advanced-collapse { width: 100%; }
-.encoding-advanced-collapse :deep(.n-collapse-item__header-main) { font-weight: 600; }
+.display-setting-label { display: inline-flex; align-items: center; gap: 4px; }
+.display-advanced-fields { padding-top: 12px; border-top: 1px solid var(--border); }
+.display-advanced-fields :deep(.n-collapse-item__header-main) { color: var(--muted-foreground); font-size: 13px; font-weight: 500; }
 .custom-encoding-field { display: grid; justify-items: start; gap: 7px; width: 100%; color: var(--muted-foreground); font-size: 12px; }
 .custom-encoding-field span { display: block; width: 100%; line-height: 1.6; }
 .custom-encoding-field :deep(.n-form-item) { width: 100%; margin: 8px 0 0; }

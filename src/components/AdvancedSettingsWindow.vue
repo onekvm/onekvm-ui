@@ -4,7 +4,6 @@ import { Settings } from '@/icons'
 import { t } from '@/i18n/runtime'
 import type { OneKVMStatus } from '@/api/client'
 import type { MediaTransferState } from '@/lib/media-transfer'
-import { useOverlayMount } from '@/composables/useOverlayMount'
 import { registerConsoleWindowLayer } from '@/composables/useConsoleWindowLayer'
 import ToolWindow from './toolbox/ToolWindow.vue'
 import AdvancedSettingsLoading from './AdvancedSettingsLoading.vue'
@@ -21,7 +20,6 @@ const Page = defineAsyncComponent({
   loadingComponent: () => h(AdvancedSettingsLoading, { embedded: true }),
   delay: 200,
 })
-const mountTo = useOverlayMount()
 const group = registerConsoleWindowLayer()
 const state = shallowRef<'normal' | 'maximized' | 'minimized'>('normal')
 let restoreState: 'normal' | 'maximized' = 'normal'
@@ -43,7 +41,6 @@ onBeforeUnmount(group.dispose)
 defineExpose({ focus })
 </script>
 <template>
-  <Teleport :to="mountTo">
     <ToolWindow v-show="visible" class="advanced-settings-window" :title="t('settings.advancedSettings.title')"
       presentation="window" content-layout="edge-to-edge" :width="1060" :height="720"
       :layer="group.layer.value" :active="group.active.value" :sequence="sequence" :state="state"
@@ -53,7 +50,6 @@ defineExpose({ focus })
         :video-session-id="videoSessionId" :media-transfer="mediaTransfer"
         @navigate="route = $event" @close="emit('close')" @restore-media-transfer="emit('restore-media-transfer')" />
     </ToolWindow>
-  </Teleport>
 </template>
 <style scoped>
 .advanced-settings-window :deep(.tool-window-content) { height: 100%; overflow: hidden; }

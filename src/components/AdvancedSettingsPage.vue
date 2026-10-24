@@ -120,6 +120,7 @@ import StaticRoutesForm from './StaticRoutesForm.vue'
 import TimezoneMap from './TimezoneMap.vue'
 import SystemUpdateSourceSelector, { type UpdateMethod } from './SystemUpdateSourceSelector.vue'
 import SystemUpdatePreflight from './SystemUpdatePreflight.vue'
+import SystemUpdateVersions from './SystemUpdateVersions.vue'
 import { timezones } from '@/lib/timezones'
 import KeyboardShortcutEditor from './KeyboardShortcutEditor.vue'
 import UserManagement from './UserManagement.vue'
@@ -2435,37 +2436,17 @@ watch(paneSection, (value) => {
               </section>
 
               <section v-else-if="paneSection === 'update'" class="advanced-settings-section">
+                <SystemUpdateVersions
+                  :current-version="status?.system?.os_version || onlineUpdate?.current_version || status?.version"
+                  :current-build-id="status?.system?.build_id"
+                  :update="systemUpdate"
+                  :switching-slot="slotSwitching"
+                  @select-slot="confirmSlotSwitch"
+                />
                 <n-alert v-if="systemUpdateUnavailable" type="info" :bordered="false">
                   {{ t('settings.advancedSettings.systemPage.updateUnavailable', 'System update service is temporarily unavailable. Please try again later.') }}
                 </n-alert>
                 <template v-if="systemUpdate">
-                  <section class="system-settings-group">
-                    <h2>{{ t('settings.advancedSettings.systemPage.bootSlots', 'A/B boot slots') }}</h2>
-                    <ul class="system-slot-list">
-                      <li v-for="slot in systemUpdate.slots" :key="slot.name">
-                        <div class="system-slot-name">
-                          <strong>{{ t('settings.advancedSettings.systemPage.slot', 'Slot') }} {{ slot.bootname || slot.name }}</strong>
-                          <span>{{ slot.version || slot.device }}</span>
-                        </div>
-                        <div class="system-slot-badges">
-                          <span v-if="slot.state === 'booted'" class="system-slot-badge active">{{ t('settings.advancedSettings.systemPage.booted', 'Booted') }}</span>
-                          <span v-if="slot.name === systemUpdate.primary_slot" class="system-slot-badge primary">{{ t('settings.advancedSettings.systemPage.nextBoot', 'Next boot') }}</span>
-                          <span class="system-slot-badge" :class="{ bad: slot.boot_status === 'bad' }">
-                            {{ slot.boot_status === 'bad' ? t('settings.advancedSettings.systemPage.bad', 'Bad') : t('settings.advancedSettings.systemPage.good', 'Good') }}
-                          </span>
-                        </div>
-                        <n-button
-                          secondary
-                          :disabled="slot.name === systemUpdate.primary_slot || systemUpdate.operation !== 'idle'"
-                          :loading="slotSwitching === slot.name"
-                          @click="confirmSlotSwitch(slot)"
-                        >
-                          {{ t('settings.advancedSettings.systemPage.useNextBoot', 'Use for next boot') }}
-                        </n-button>
-                      </li>
-                    </ul>
-                  </section>
-
                   <section class="system-settings-group">
                     <h2>{{ t('settings.advancedSettings.systemPage.systemUpdate', 'System update') }}</h2>
                     <div class="system-update-panel">
@@ -2484,7 +2465,7 @@ watch(paneSection, (value) => {
                           <strong v-if="onlineUpdateLoading">{{ t('settings.advancedSettings.systemPage.checkingOnlineUpdate', 'Checking for updates…') }}</strong>
                           <template v-else-if="onlineUpdate">
                             <strong>{{ onlineUpdateLabel(onlineUpdate) }}</strong>
-                            <span>{{ t('settings.advancedSettings.systemPage.currentVersion', '当前版本') }} {{ onlineUpdate.current_version }}<template v-if="onlineUpdate.available && onlineUpdate.latest_version"> · {{ t('settings.advancedSettings.systemPage.latestVersion', '最新版本') }} {{ onlineUpdate.latest_version }}</template></span>
+                            <span>{{ t('settings.advancedSettings.systemPage.currentVersion', '当前版本') }} {{ onlineUpdate.current_version }}<template v-if="onlineUpdate.latest_version"> · {{ t('settings.advancedSettings.systemPage.latestVersion', '最新版本') }} {{ onlineUpdate.latest_version }}</template></span>
                           </template>
                         </div>
                       </div>

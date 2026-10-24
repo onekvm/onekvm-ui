@@ -32,6 +32,7 @@ import {
 import { NIcon, useMessage, type DialogReactive, type DropdownOption } from 'naive-ui'
 
 import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type OneKVMStatus } from '@/api/client'
+import type { BrowserISOProgress } from '@/lib/browser-iso'
 import { type MouseMode } from '@/composables/useMouse'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { usePerformanceDock } from '@/composables/usePerformanceDock'
@@ -124,8 +125,8 @@ const props = defineProps<{
   videoRotation: VideoRotation
   status: OneKVMStatus | null
   msdStatus: MSDStatus | null
+  browserIsoProgress?: BrowserISOProgress | null
   mediaTransfer: MediaTransferState
-  mediaPopoverOpen: boolean
   canvasWidth: number
   canvasHeight: number
   videoFps: number
@@ -144,7 +145,7 @@ const emit = defineEmits<{
   account: []
   logout: []
   keyboard: []
-  media: [sheet: boolean]
+  media: []
   'restore-media-transfer': []
   fullscreen: []
   'picture-in-picture': []
@@ -163,7 +164,7 @@ const emit = defineEmits<{
 }>()
 
 type DeviceState = 'ready' | 'waiting' | 'error'
-type MenuName = 'display' | 'mouse' | 'keyboard' | 'gamepad' | 'power' | 'audio' | 'media' | 'language' | 'account'
+type MenuName = 'display' | 'mouse' | 'keyboard' | 'gamepad' | 'power' | 'audio' | 'language' | 'account'
 const dialog = useAsyncDialog()
 const overlayTo = useOverlayMount()
 const message = useMessage()
@@ -1082,6 +1083,12 @@ const audioStateLabel = computed(() => {
 const mediaOpen = computed(() =>
   Boolean(props.msdStatus?.available || props.msdStatus?.mtp_available))
 
+function formatMediaReadSpeed(value: number) {
+  if (value >= 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MiB/s`
+  if (value >= 1024) return `${Math.round(value / 1024)} KiB/s`
+  return `${Math.max(0, Math.round(value))} B/s`
+}
+
 const activeMediaFeatures = computed(() => {
   const media = props.msdStatus
   const features: Array<'iso' | 'drive' | 'mtp'> = []
@@ -1321,8 +1328,6 @@ function updateMenu(name: MenuName, visible: boolean) {
   else if (openMenu.value === name) openMenu.value = null
   emitToolbarOverlay()
 }
-
-watch(() => props.mediaPopoverOpen, (visible) => updateMenu('media', visible), { immediate: true })
 
 function onTrackpadToggle(open: boolean) {
   emit('update:trackpad', open)
@@ -1697,7 +1702,7 @@ onBeforeUnmount(() => {
         </n-tooltip>
       </USBAudioPopover>
 
-      <n-tooltip :disabled="toolbarLauncher || openMenu === 'media'">
+      <n-tooltip :disabled="toolbarLauncher">
         <template #trigger>
           <n-button
             quaternary
@@ -1705,7 +1710,7 @@ onBeforeUnmount(() => {
             class="device-indicator"
             :data-state="mediaState"
             :aria-label="`${t('virtualMedia.title', 'Virtual Media')}: ${mediaStateLabel}`"
-            @click="emit('media', toolbarLauncher)"
+            @click="emit('media')"
           >
             <template #icon><component :is="mediaIcon" /></template>
             <span class="device-led" />
@@ -1713,6 +1718,10 @@ onBeforeUnmount(() => {
           </n-button>
         </template>
         {{ t('virtualMedia.title', 'Virtual Media') }}: {{ mediaStateLabel }}
+        <template v-if="browserIsoProgress && msdStatus?.iso_mounted === 'browser'">
+          <br />{{ browserIsoProgress.name }}
+          <br />{{ t('virtualMedia.readSpeed', 'Read speed:') }} {{ formatMediaReadSpeed(browserIsoProgress.bytesPerSecond) }}
+        </template>
       </n-tooltip>
 
       <component

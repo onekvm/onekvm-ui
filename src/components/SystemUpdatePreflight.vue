@@ -33,6 +33,7 @@ async function discard() {
     <h2>{{ t(key + 'title', 'Pre-update check') }}</h2>
     <div class="plugin-update-panel">
       <div class="plugin-update-kernels">
+        <div v-if="plan.target_build" class="plugin-update-build-id"><span>{{ t('settings.advancedSettings.systemPage.targetBuildId', 'Target build ID') }}</span><code>{{ plan.target_build }}</code></div>
         <div><span>{{ t(key + 'currentKernel', 'Current kernel version') }}</span><code>{{ plan.current_kernel }}</code></div>
         <div><span>{{ t(key + 'targetKernel', 'Kernel version after update') }}</span><code>{{ plan.target_kernel }}</code></div>
       </div>
@@ -66,6 +67,7 @@ async function discard() {
 .plugin-update-panel { display: grid; gap: 14px; }
 .plugin-update-kernels { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .plugin-update-kernels > div { display: grid; gap: 5px; }
+.plugin-update-build-id { grid-column: 1 / -1; }
 .plugin-update-kernels span, .plugin-update-packages span { color: var(--muted-foreground); font-size: 12px; }
 .plugin-update-panel p { margin: 0; color: var(--muted-foreground); line-height: 1.6; }
 .plugin-update-panel strong { font-size: 13px; font-weight: 600; }

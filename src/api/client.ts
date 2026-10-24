@@ -564,6 +564,8 @@ export interface OneKVMStatus {
   identity?: PersonalizationConfig
   system: {
     processor: string
+    os_version?: string
+    build_id?: string
     architecture?: string
     soc_name?: string
     kernel_version: string

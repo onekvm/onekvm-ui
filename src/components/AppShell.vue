@@ -3,6 +3,7 @@ import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { computed, defineAsyncComponent, h, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import { NButton, NSpace, useMessage } from 'naive-ui'
 import AdvancedSettingsWindow from './AdvancedSettingsWindow.vue'
+import ConsoleWindowTransition from './ConsoleWindowTransition.vue'
 
 import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type OneKVMStatus } from '@/api/client'
 import ToolboxWorkspace from './toolbox/ToolboxWorkspace.vue'
@@ -48,6 +49,7 @@ import { uiProduct } from '@/product'
 
 import ControlToolbar from './ControlToolbar.vue'
 import VirtualMediaPopover from './VirtualMediaPopover.vue'
+import type { BrowserISOProgress } from '@/lib/browser-iso'
 import { emptyMediaTransfer } from '@/lib/media-transfer'
 import RemoteConsole from './RemoteConsole.vue'
 import VideoPerformanceOverlay from './VideoPerformanceOverlay.vue'
@@ -107,8 +109,6 @@ watch(virtualKeyboardOpen, (open) => {
 })
 const shortcutDialogOpen = ref(false)
 const toolbarOverlayOpen = ref(false)
-const mediaPopoverOpen = shallowRef(false)
-const mediaSheet = shallowRef(false)
 const mediaTransfer = shallowRef(emptyMediaTransfer())
 const virtualMediaPopover = useTemplateRef<InstanceType<typeof VirtualMediaPopover>>('virtualMediaPopover')
 const toolbarDock = ref<ToolbarDock>(
@@ -156,6 +156,7 @@ const trackpadOpen = ref(false)
 const hideLocalCursor = ref(storedHideLocalCursor(localStorage.getItem(HIDE_LOCAL_CURSOR_KEY)))
 const status = ref<OneKVMStatus | null>(null)
 const msdStatus = ref<MSDStatus | null>(null)
+const browserISOProgress = shallowRef<BrowserISOProgress | null>(null)
 const serverUnavailable = ref(false)
 const videoWidth = ref(0)
 const videoHeight = ref(0)
@@ -443,8 +444,7 @@ function openAdvancedSettings() {
   window.location.hash = advancedSettingsHash(phoneSettingsActive() ? '' : 'system')
 }
 
-function openMedia(sheet: boolean) {
-  mediaSheet.value = sheet
+function openMedia() {
   virtualMediaPopover.value?.updateShow(true)
 }
 
@@ -469,6 +469,10 @@ function focusSettingsWindow() {
 
 function closeSettingsWindow() {
   settingsWindowOpen.value = false
+}
+
+function afterSettingsWindowLeave() {
+  if (settingsWindowOpen.value || advancedSettingsOpen.value) return
   toolbox.localFocus = false
   focusConsole()
 }
@@ -570,17 +574,19 @@ onBeforeUnmount(() => {
 <template>
   <div class="app-shell" :style="{ '--onekvm-taskbar-height': `${taskbarInset}px` }">
     <KeyboardLockOverlay :changes="keyboardLockChanges" />
-    <AdvancedSettingsWindow v-if="settingsWindowOpen && canSettings && !advancedSettingsOpen" ref="settingsWindow"
+    <ConsoleWindowTransition :show="settingsWindowOpen && canSettings && !advancedSettingsOpen" @after-leave="afterSettingsWindowLeave">
+      <AdvancedSettingsWindow ref="settingsWindow"
       :status="status" :can-change-video="canChangeVideo" :video-session-id="state.webRTCSessionId" :media-transfer="mediaTransfer"
       @close="closeSettingsWindow" @focus="focusSettingsWindow"
       @restore-media-transfer="virtualMediaPopover?.restoreUploadDialog()" />
+    </ConsoleWindowTransition>
     <VirtualMediaPopover
       ref="virtualMediaPopover"
       :console-active="!advancedSettingsOpen"
-      :sheet="mediaSheet"
+      :cached-status="msdStatus"
       @status="msdStatus = $event"
+      @browser-progress="browserISOProgress = $event"
       @upload-state="mediaTransfer = $event"
-      @update:show="mediaPopoverOpen = $event"
     />
     <Transition name="onekvm-page-loading" @after-leave="focusConsole">
       <div v-if="advancedSettingsOpen" class="advanced-settings-layer">
@@ -627,8 +633,8 @@ onBeforeUnmount(() => {
           :video-rotation="videoRotation"
           :status="status"
           :msd-status="msdStatus"
+          :browser-iso-progress="browserISOProgress"
           :media-transfer="mediaTransfer"
-          :media-popover-open="mediaPopoverOpen"
           :canvas-width="canvasWidth"
           :canvas-height="canvasHeight"
           :video-fps="videoFps"

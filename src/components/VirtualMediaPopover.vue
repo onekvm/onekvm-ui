@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useAsyncDialog } from '@/composables/useAsyncDialog'
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import { ArrowLeft, Check, CircleCheck, CirclePlus, ClipboardPaste, Copy, Database, Disc3, Download, File, Folder, FolderOpen, FolderPlus, FolderSync, HardDrive, House, Info, Laptop, LayoutGrid, Link, LoaderCircle, Pencil, Scissors, Server, Trash2, Unlink, Unplug, Upload, X } from '@/icons'
 import { useMessage, type TabsProps } from 'naive-ui'
 
@@ -18,17 +18,18 @@ import XpProgressCells from './XpProgressCells.vue'
 import MediaDownloadForm from './MediaDownloadForm.vue'
 import StoredISORenameForm from './StoredISORenameForm.vue'
 import NetworkMediaBrowser from './NetworkMediaBrowser.vue'
-import ExpandablePanel from './ExpandablePanel.vue'
+import VirtualMediaWindow from './VirtualMediaWindow.vue'
+import ConsoleWindowTransition from './ConsoleWindowTransition.vue'
 
 const props = withDefaults(defineProps<{
   consoleActive?: boolean
-  sheet?: boolean
+  cachedStatus?: MSDStatus | null
 }>(), { consoleActive: true })
 
 const emit = defineEmits<{
   status: [status: MSDStatus]
-  'update:show': [show: boolean]
   'upload-state': [state: MediaTransferState]
+  'browser-progress': [progress: BrowserISOProgress | null]
 }>()
 
 type DriveClipboard = {
@@ -87,7 +88,7 @@ const mediaSourceTabsTheme: TabsProps['themeOverrides'] = {
 const driveCreateOpen = ref(false)
 const folderCreateOpen = ref(false)
 const popoverOpen = ref(false)
-const modalContentOpen = ref(false)
+const mediaWindow = useTemplateRef<InstanceType<typeof VirtualMediaWindow>>('mediaWindow')
 let uploadSampleAt = 0
 let uploadSampleBytes = 0
 const uploadRequestControllers = new Set<AbortController>()
@@ -123,6 +124,7 @@ const browserMounting = ref(false)
 const mountingID = ref<string | null>(null)
 const deletingID = ref<string | null>(null)
 const browserProgress = ref<BrowserISOProgress | null>(null)
+watch(browserProgress, (progress) => emit('browser-progress', progress))
 const renamingPath = ref('')
 const renameValue = ref('')
 const fileDeletePopoverPath = ref('')
@@ -292,6 +294,7 @@ function closeDrive() {
 }
 
 function navigateFeature(next: MediaTab | null, direction: FeatureNavDirection) {
+  featureNavigationRevision++
   featureNavAnimated.value = true
   featureNavDirection.value = direction
   if (next !== 'drive') closeDrive()
@@ -322,32 +325,29 @@ function resetFeatureView() {
   fileDeletePopoverPath.value = ''
 }
 
-function afterPopoverLeave() {
-  modalContentOpen.value = false
-  resetFeatureView()
-}
-
 function openCreateDrive() {
   closeDrive()
   driveCreateOpen.value = true
 }
 
 function updateShow(show: boolean) {
-  if (!show) {
-    driveCreateOpen.value = false
-    folderCreateOpen.value = false
-    fileDeletePopoverPath.value = ''
+  if (show && popoverOpen.value) {
+    mediaWindow.value?.focus()
+    return
   }
   popoverOpen.value = show
-  emit('update:show', show)
   featureNavAnimated.value = false
   if (!show) return
-  modalContentOpen.value = true
+  if (props.cachedStatus) status.value = props.cachedStatus
+  feature.value = featureFromStatus()
+  const navigationRevision = ++featureNavigationRevision
   deviceDownload.discover()
   browserISO.value?.requestStatus()
-  void refresh().then(() => {
-    if (!feature.value) feature.value = featureFromStatus()
-  })
+  void refresh(false, navigationRevision)
+}
+
+function afterMediaWindowLeave() {
+  if (!popoverOpen.value) resetFeatureView()
 }
 
 function clampUploadPosition() {
@@ -452,7 +452,8 @@ function onExtensionsChanged() {
 }
 
 let refreshGeneration = 0
-async function refresh(forceSources = false) {
+let featureNavigationRevision = 0
+async function refresh(forceSources = false, navigationRevision?: number) {
   const generation = ++refreshGeneration
   loading.value = true
   try {
@@ -460,6 +461,9 @@ async function refresh(forceSources = false) {
     if (generation !== refreshGeneration) return
     status.value = nextStatus
     emit('status', nextStatus)
+    if (popoverOpen.value && navigationRevision === featureNavigationRevision && !feature.value) {
+      feature.value = featureFromStatus()
+    }
     if (!nextStatus.available) {
       media.value = []
       networkSources.value = []
@@ -1190,40 +1194,21 @@ onBeforeUnmount(() => {
 <template>
   <span v-if="$slots.default" class="virtual-media-trigger" @click="updateShow(true)"><slot /></span>
 
-  <n-modal
-    :show="popoverOpen"
-    :to="overlayTo"
-    mask-closable
-    close-on-esc
-    @update:show="updateShow"
-    @after-leave="afterPopoverLeave"
-  >
-      <n-card
-        class="virtual-media-dialog host-window-frame host-dialog"
-        :class="{ 'is-sheet': sheet }"
-        :bordered="false"
-        closable
-        role="dialog"
-        aria-modal="true"
-        :aria-label="t('virtualMedia.title', 'Virtual Media')"
-        @close="updateShow(false)"
-      >
-        <template #header>
+  <ConsoleWindowTransition :show="popoverOpen" @after-leave="afterMediaWindowLeave">
+    <VirtualMediaWindow ref="mediaWindow" @close="updateShow(false)">
+      <div class="virtual-media-dialog">
+        <header v-if="feature" class="virtual-media-navigation">
           <span class="virtual-media-heading">
             <n-button v-if="feature" quaternary circle size="small" :aria-label="t('virtualMedia.back', 'Back')" @click="backToHome">
               <template #icon><ArrowLeft /></template>
             </n-button>
             <component :is="featureIcon" :size="16" /><strong>{{ featureTitle }}</strong>
           </span>
-        </template>
-        <template #header-extra>
           <n-tag v-if="status && mediaOpen && feature" :type="activeConnection ? 'success' : 'default'" size="small" round>
             <Link v-if="activeConnection" :size="12" /><Unlink v-else :size="12" />
             {{ activeConnectionLabel }}
           </n-tag>
-        </template>
-
-        <ExpandablePanel :show="modalContentOpen" class="virtual-media-content-shell">
+        </header>
         <div class="virtual-media-content">
           <div v-if="!status && loading" class="virtual-media-loading"><n-spin size="small" /></div>
           <n-alert v-else-if="status && !mediaOpen" type="warning" :title="t('virtualMedia.unavailable', 'Virtual media is unavailable')">
@@ -1559,9 +1544,9 @@ onBeforeUnmount(() => {
           </div>
           </Transition>
         </div>
-        </ExpandablePanel>
-      </n-card>
-  </n-modal>
+      </div>
+    </VirtualMediaWindow>
+  </ConsoleWindowTransition>
 
   <n-modal
     v-model:show="driveCreateOpen"
@@ -1724,19 +1709,14 @@ onBeforeUnmount(() => {
 <style scoped>
 .virtual-media-trigger { display: inline-flex; }
 .virtual-media-dialog {
-  width: min(820px, calc(100vw - 24px));
-  max-height: calc(100vh - 32px);
-  overflow: hidden;
-}
-.virtual-media-dialog :deep(.n-card-header) { padding: 15px 18px 12px; }
-.virtual-media-dialog :deep(.n-card-header__main) { min-width: 0; overflow: hidden; }
-.virtual-media-dialog :deep(.n-card-header__extra) { display: flex; align-items: center; overflow: hidden; }
-.virtual-media-dialog :deep(.n-card__content) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   min-height: 0;
-  max-height: calc(100vh - 96px);
-  padding: 0 18px 18px;
+  padding: 16px;
   overflow: hidden;
 }
+.virtual-media-navigation { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .virtual-media-heading { display: inline-flex; min-width: 0; align-items: center; gap: 8px; }
 .virtual-media-home { padding: 6px 0 4px; }
 .media-title, .storage-free, .drag-hint { display: inline-flex; align-items: center; gap: 6px; }
@@ -1770,20 +1750,18 @@ onBeforeUnmount(() => {
 .virtual-media-home-card > span { color: var(--n-text-color-3); font-size: 12px; line-height: 1.45; }
 .iso-source-hint { display: flex; margin: 0 0 12px; align-items: flex-start; gap: 6px; color: var(--n-text-color-3); font-size: 12px; line-height: 1.5; }
 .iso-source-hint > svg { flex: 0 0 auto; margin-top: 2px; }
-.virtual-media-content-shell { width: 100%; }
 .virtual-media-content {
   display: grid;
   grid-template-areas: "pane";
   position: relative;
-  min-height: 120px;
-  max-height: calc(100vh - 168px);
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 .virtual-media-pane {
   grid-area: pane;
   width: 100%;
   min-height: 0;
-  max-height: calc(100vh - 168px);
   overflow-y: auto;
   padding-right: 3px;
   scrollbar-width: thin;
@@ -1908,12 +1886,8 @@ onBeforeUnmount(() => {
 .file-open span { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
 .file-open small { margin-left: auto; color: var(--n-text-color-3); }
 .file-icon-action { display: inline-flex; color: inherit; }
-@media (max-width: 760px) {
-  .virtual-media-dialog { width: 100vw; max-width: 100vw; max-height: 92dvh; border-radius: 16px 16px 0 0; }
-  .virtual-media-dialog :deep(.n-card-header) { padding: 12px 14px 10px; }
-  .virtual-media-dialog :deep(.n-card__content) { max-height: calc(92dvh - 58px); padding: 0 12px 12px; }
-  .virtual-media-content,
-  .virtual-media-pane { max-height: calc(92dvh - 122px); }
+@container virtual-media (max-width: 760px) {
+  .virtual-media-dialog { padding: 12px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
   .virtual-media-home-grid { grid-template-columns: 1fr; }
   .virtual-media-home-card { min-height: 96px; padding: 16px 14px; }
   .iso-mode-grid { grid-template-columns: 1fr; }
@@ -1929,6 +1903,6 @@ onBeforeUnmount(() => {
   .virtual-media-back-leave-to { opacity: 1; transform: none; }
   .iso-list-status .spin { animation: none; }
 }
-@media (max-width: 620px) { .media-mode-header { flex-direction: column; align-items: stretch; } .media-mode-header-actions { width: 100%; } .media-row { flex-wrap: wrap; } .media-copy { flex-basis: calc(100% - 44px); } }
-@media (max-width: 620px) { .virtual-media-disconnected { grid-template-columns: auto minmax(0, 1fr); } .virtual-media-disconnected :deep(.n-button) { grid-column: 1 / -1; justify-self: stretch; } .virtual-media-disconnect-button { padding-inline: 8px; } }
+@container virtual-media (max-width: 620px) { .media-mode-header { flex-direction: column; align-items: stretch; } .media-mode-header-actions { width: 100%; flex-wrap: wrap; } .media-row { flex-wrap: wrap; } .media-copy { flex-basis: calc(100% - 44px); } }
+@container virtual-media (max-width: 620px) { .virtual-media-disconnected { grid-template-columns: auto minmax(0, 1fr); } .virtual-media-disconnected :deep(.n-button) { grid-column: 1 / -1; justify-self: stretch; } .virtual-media-disconnect-button { padding-inline: 8px; } }
 </style>

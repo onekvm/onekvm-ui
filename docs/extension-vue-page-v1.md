@@ -17,9 +17,13 @@ Naive UI instances, including theme, message, and dialog providers.
 ```
 
 The entrypoint must be a compiled JavaScript file under `web/`. Source `.vue`
-files are not accepted by extension package validation. Page assets use an
-immutable versioned URL, so every changed entrypoint requires a new extension
-version.
+files are not accepted by extension package validation. Page assets use a
+versioned URL, so every changed entrypoint requires a new extension version.
+The versioned static endpoint uses `Cache-Control: private, no-cache` and ETag
+validation: browsers store models, WASM and scripts, then revalidate before reuse.
+Unchanged resources return 304 without transferring their bodies. Replacement
+files invalidate the validator even if the package keeps its version, length
+and modification time. MFA assets and extension file routes retain `no-store`.
 
 ## Runtime sharing
 

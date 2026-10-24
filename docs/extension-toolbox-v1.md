@@ -240,6 +240,13 @@ rounded clipping and the existing Win11 enter/leave transitions (250ms in,
 167ms out). Drawers slide from the right. Tool styles stay mounted until
 the leave transition has finished. Reduced motion removes the visual motion.
 
+`ToolWindow` disables its inner frame transition because toolbox instances
+already use the outer transition group. Standalone virtual media and advanced
+settings windows use `ConsoleWindowTransition` around their conditional mount;
+the shared wrapper owns teleporting and enter/leave so removal waits for the
+exit animation. Post-close cleanup runs after leave and guards against reopening.
+Minimize and restore keep their existing taskbar animation and mounted content.
+
 See `onekvm-extension-example/examples/toolbox` for two tools in one extension,
 including a dirty settings adapter, an instance-local counter and Pin steps.
 

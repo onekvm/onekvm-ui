@@ -1058,7 +1058,7 @@ const zh = {
           lastAttempt: '上次尝试',
           sshPort: 'SSH 端口',
           authorizedKeys: '允许的 SSH 公钥',
-          authorizedKeysHint: '只有列表中的密钥可以使用公钥认证。留空则使用密码认证。',
+          authorizedKeysHint: 'SSH 仅允许列表中的公钥登录，不支持密码认证。留空将无法通过 SSH 登录。',
           authorizedKeyPlaceholder: 'ssh-ed25519 AAAA...',
           addAuthorizedKey: '添加公钥'
         },

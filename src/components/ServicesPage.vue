@@ -141,7 +141,11 @@ function serviceSettingsHref(service: ManagedService) {
   return `#/settings/advanced/plugins/${encodeURIComponent(service.provider_id)}`
 }
 
-function openSettings(service: ManagedService) {
+function openSettings(service: ManagedService, event: MouseEvent) {
+  if (serviceSettingsHref(service)) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    event.preventDefault()
+  }
   if (service.id === 'system.onekvm') onekvmSettingsOpen.value = true
   else if (service.id === 'system.ssh') sshSettingsOpen.value = true
   else if (service.id === 'system.zram') zramSettingsOpen.value = true
@@ -208,7 +212,7 @@ onBeforeUnmount(() => {
                       size="small"
                       :disabled="!supportsSettings(service) || busy !== ''"
                       :aria-label="`${t('settings.advancedSettings.servicesPage.settings', 'Settings')} ${translation(service).name}`"
-                      @click="openSettings(service)"
+                      @click="openSettings(service, $event)"
                     >
                       <template #icon><Settings2 /></template>
                     </n-button>

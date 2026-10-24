@@ -112,7 +112,7 @@ watch(show, (open) => {
         </n-form>
         <n-divider>{{ t('settings.advancedSettings.servicesPage.authorizedKeys', 'Allowed SSH public keys') }}</n-divider>
         <p class="service-settings-hint">
-          {{ t('settings.advancedSettings.servicesPage.authorizedKeysHint', 'Only the keys listed here can use public-key authentication. Leave the list empty to use password authentication.') }}
+          {{ t('settings.advancedSettings.servicesPage.authorizedKeysHint', 'SSH login requires a public key listed here. Password authentication is disabled. An empty list prevents SSH login.') }}
         </p>
         <div class="authorized-key-list">
           <div v-for="(_, index) in form.authorizedKeys" :key="index" class="authorized-key-row">

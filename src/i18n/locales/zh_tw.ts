@@ -1058,7 +1058,7 @@ const zh_tw = {
           lastAttempt: '上次嘗試',
           sshPort: 'SSH 連接埠',
           authorizedKeys: '允許的 SSH 公鑰',
-          authorizedKeysHint: '只有清單中的金鑰可以使用公鑰驗證。留空則使用密碼驗證。',
+          authorizedKeysHint: 'SSH 僅允許清單中的公鑰登入，不支援密碼驗證。留空將無法透過 SSH 登入。',
           authorizedKeyPlaceholder: 'ssh-ed25519 AAAA...',
           addAuthorizedKey: '新增公鑰'
         },

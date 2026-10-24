@@ -1059,7 +1059,7 @@ const en = {
           lastAttempt: 'Last attempt',
           sshPort: 'SSH port',
           authorizedKeys: 'Allowed SSH public keys',
-          authorizedKeysHint: 'Only the keys listed here can use public-key authentication. Leave the list empty to use password authentication.',
+          authorizedKeysHint: 'SSH login requires a public key listed here. Password authentication is disabled. An empty list prevents SSH login.',
           authorizedKeyPlaceholder: 'ssh-ed25519 AAAA...',
           addAuthorizedKey: 'Add public key'
         },

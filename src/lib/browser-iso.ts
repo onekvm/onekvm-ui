@@ -32,7 +32,7 @@ export class BrowserISO {
   private transferred = 0
   private sampleBytes = 0
   private sampleStartedAt = 0
-  private lastProgressAt = 0
+  private progressTimer: ReturnType<typeof setInterval> | null = null
   private connectResolve: (() => void) | null = null
   private connectReject: ((error: Error) => void) | null = null
   private ejectResolve: (() => void) | null = null
@@ -87,6 +87,7 @@ export class BrowserISO {
         if (!this.mounted) this.rejectConnect(new Error('Virtual-media WebSocket connection failed'))
       }
       socket.onclose = () => {
+        this.stopProgressTimer()
         if (this.socket === socket) this.socket = null
         const wasMounted = this.mounted
         this.mounted = false
@@ -131,6 +132,7 @@ export class BrowserISO {
   }
 
   destroy() {
+    this.stopProgressTimer()
     this.closed = true
     this.mounted = false
     this.file = null
@@ -152,8 +154,12 @@ export class BrowserISO {
         if (bytes.length !== 20 + nameLength) return this.failProtocol(socket, 'Invalid virtual-media status')
         if (bytes[1] === STATE_MOUNTED) {
           this.mounted = true
+          if (this.progressTimer === null) {
+            this.sampleStartedAt = performance.now()
+            this.progressTimer = setInterval(() => this.emitProgress(), 1000)
+            this.emitProgress()
+          }
           this.resolveConnect()
-          this.emitProgress(true)
         }
         break
       }
@@ -161,6 +167,7 @@ export class BrowserISO {
         this.handleReadBatch(socket, bytes, view)
         break
       case FRAME_EJECTED:
+        this.stopProgressTimer()
         if (bytes.length < 5) return this.failProtocol(socket, 'Invalid virtual-media eject message')
         let ejectFailure = ''
         const wasMounted = this.mounted
@@ -189,6 +196,7 @@ export class BrowserISO {
         socket.close()
         break
       case FRAME_ERROR: {
+        this.stopProgressTimer()
         if (bytes.length < 5) return this.failProtocol(socket, 'Invalid virtual-media error')
         const messageLength = view.getUint16(3)
         if (bytes.length !== 5 + messageLength) return this.failProtocol(socket, 'Invalid virtual-media error')
@@ -240,17 +248,15 @@ export class BrowserISO {
       socket.send(new Blob(parts, { type: 'application/octet-stream' }))
       this.transferred += transferred
       this.sampleBytes += transferred
-      this.emitProgress(false)
     } catch (error) {
       this.failProtocol(socket, error instanceof Error ? error.message : String(error))
     }
   }
 
-  private emitProgress(force: boolean) {
+  private emitProgress() {
     const file = this.file
     if (!file) return
     const now = performance.now()
-    if (!force && now - this.lastProgressAt < 250) return
     const elapsed = Math.max(1, now - this.sampleStartedAt)
     this.callbacks.progress({
       name: file.name,
@@ -258,7 +264,6 @@ export class BrowserISO {
       transferred: this.transferred,
       bytesPerSecond: Math.round(this.sampleBytes * 1000 / elapsed),
     })
-    this.lastProgressAt = now
     if (elapsed >= 1000) {
       this.sampleStartedAt = now
       this.sampleBytes = 0
@@ -289,7 +294,13 @@ export class BrowserISO {
     this.ejectTimer = null
   }
 
+  private stopProgressTimer() {
+    if (this.progressTimer !== null) clearInterval(this.progressTimer)
+    this.progressTimer = null
+  }
+
   private failProtocol(socket: WebSocket, message: string) {
+    this.stopProgressTimer()
     const wasMounted = this.mounted
     this.rejectConnect(new Error(message))
     this.rejectEject(new Error(message))

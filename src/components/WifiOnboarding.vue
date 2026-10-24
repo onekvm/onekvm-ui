@@ -2,11 +2,15 @@
 import { computed, onUnmounted, shallowRef, watch } from 'vue'
 import { RefreshCw, Wifi } from '@/icons'
 
-import { api, type WifiNetwork, type WifiStatus } from '@/api/client'
+import { api, type NetworkApplyStatus, type WifiNetwork, type WifiStatus } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { defaultWifiApNetwork, wifiApNetworkError } from '@/lib/wifi-ap-network'
+import { defaultWifiApRadio, wifiApRadioError } from '@/lib/wifi-ap-radio'
 import { wifiErrorText } from '@/lib/wifi-error'
 import { normalizeApChannel, validApChannel } from '@/lib/wifi-radio'
+import { defaultWifiIpConfig, wifiIpConfigValid } from '@/lib/wifi-profile'
+import NetworkApplyConfirmation from './NetworkApplyConfirmation.vue'
+import WifiIpSettings from './WifiIpSettings.vue'
 import WifiApSettings from './WifiApSettings.vue'
 import WifiSavedNetworks from './WifiSavedNetworks.vue'
 
@@ -17,9 +21,12 @@ const networks = shallowRef<WifiNetwork[]>([])
 const selected = shallowRef<WifiNetwork | null>(null)
 const showConnectModal = shallowRef(false)
 const password = shallowRef('')
+const ip = shallowRef(defaultWifiIpConfig())
+const networkApply = shallowRef<NetworkApplyStatus | null>(null)
 const apSsid = shallowRef('')
 const apPassword = shallowRef('')
 const apChannel = shallowRef(6)
+const apRadio = shallowRef(defaultWifiApRadio())
 const apBand = shallowRef<'2.4' | '5'>('2.4')
 const apAddress = shallowRef(defaultWifiApNetwork.address)
 const apDhcpEnabled = shallowRef(true)
@@ -45,6 +52,7 @@ const savedSelection = computed(() => status.value?.saved_networks?.find(network
 const stationEnabled = computed(() => status.value?.mode !== 'ap')
 const canSaveAp = computed(() => apDirty.value && !loading.value
   && !wifiApNetworkError(apNetwork.value)
+  && !wifiApRadioError(status.value, apBand.value, apChannel.value, apRadio.value)
   && new TextEncoder().encode(apSsid.value).length >= 1
   && new TextEncoder().encode(apSsid.value).length <= 32
   && !/[\x00-\x1f\x7f]/.test(apSsid.value)
@@ -55,7 +63,7 @@ const canSaveAp = computed(() => apDirty.value && !loading.value
 const connectionPending = computed(() => loading.value || !!status.value?.connecting)
 
 const canConnect = computed(() =>
-  !props.disabled && !!selected.value && !loading.value && !status.value?.connecting
+  !props.disabled && !!selected.value && !loading.value && !status.value?.connecting && wifiIpConfigValid(ip.value)
     && (!selected.value.secure || !!savedSelection.value || (new TextEncoder().encode(password.value).length >= 8
       && new TextEncoder().encode(password.value).length <= 63 && !/[\x00-\x1f\x7f-\x9f]/.test(password.value))),
 )
@@ -114,6 +122,7 @@ async function refresh() {
       apSsid.value = status.value.ap_ssid
       apPassword.value = status.value.ap_password
       apChannel.value = status.value.ap_channel
+      apRadio.value = { ...(status.value.ap_radio || defaultWifiApRadio()) }
       const savedBand = status.value.ap_band || (apChannel.value > 14 ? '5' : '2.4')
       const selection = normalizeApChannel(status.value, savedBand, apChannel.value)
       apBand.value = selection.band
@@ -166,7 +175,7 @@ async function connect() {
   loading.value = true
   connectError.value = ''
   try {
-    const nextStatus = await api.connectWifi(ssid, savedSelection.value && !password.value ? undefined : password.value, stationInterface.value)
+    const nextStatus = await api.connectWifi(ssid, savedSelection.value && !password.value ? undefined : password.value, stationInterface.value, ip.value)
     attemptedSsid.value = ssid
     status.value = nextStatus
     password.value = ''
@@ -179,6 +188,7 @@ async function connect() {
 
 function selectNetwork(network: WifiNetwork) {
   selected.value = network
+  ip.value = { ...(savedSelection.value?.ip || defaultWifiIpConfig()) }
   password.value = ''
   connectError.value = ''
   attemptedSsid.value = ''
@@ -213,7 +223,7 @@ async function saveApConfig() {
   loading.value = true
   error.value = ''
   try {
-    status.value = await api.setWifiApConfig(apSsid.value, apPassword.value, apChannel.value, apBand.value, apNetwork.value)
+    status.value = await api.setWifiApConfig(apSsid.value, apPassword.value, apChannel.value, apBand.value, apNetwork.value, apRadio.value)
     apDirty.value = false
     emit('changed')
   } catch (reason) {
@@ -240,6 +250,7 @@ async function selectMode(mode: WifiStatus['mode']) {
 
 watch(status, (value) => {
   if (!value) return
+  if (value.network_apply?.pending && !networkApply.value) networkApply.value = value.network_apply
   emit('status', value)
   if (!attemptedSsid.value || connectError.value || value.error || !value.connected || value.connecting || value.station_ssid !== attemptedSsid.value) return
   attemptedSsid.value = ''
@@ -286,11 +297,13 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
     <WifiApSettings
       v-if="showAp && !props.initialSetup"
       :status="status" :ssid="apSsid" :password="apPassword" :channel="apChannel" :band="apBand"
+      :radio="apRadio"
       :address="apAddress" :dhcp-enabled="apDhcpEnabled" :dhcp-start="apDhcpStart" :dhcp-end="apDhcpEnd"
       :busy="loading" :can-save="canSaveAp"
       @update:ssid="apSsid = $event; apDirty = true"
       @update:password="apPassword = $event; apDirty = true"
       @update:channel="apChannel = $event; apDirty = true"
+      @update:radio="apRadio = $event; apDirty = true"
       @update:band="apBand = $event; apDirty = true"
       @update:address="apAddress = $event; apDirty = true"
       @update:dhcp-enabled="apDhcpEnabled = $event; apDirty = true"
@@ -342,7 +355,7 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
         <p v-else class="wifi-muted wifi-setup-empty">{{ t('network.wifi.notConnected', '未连接') }}</p>
       </section>
 
-      <WifiSavedNetworks v-if="!props.initialSetup" :status="status" :interface-name="stationInterface"
+      <WifiSavedNetworks :status="status" :interface-name="stationInterface"
         :disabled="props.disabled || loading || status.connecting" @updated="status = $event; emit('changed')" />
 
       <div v-if="stationEnabled || props.initialSetup" class="wifi-scan-heading">
@@ -405,7 +418,8 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
     </div>
     <p v-if="error || (showStation && status.error)" class="wifi-error" role="alert">{{ wifiErrorText(error || status.error || '', t) }}</p>
 
-    <n-modal v-model:show="showConnectModal" preset="card" :style="{ width: '420px', maxWidth: 'calc(100vw - 32px)' }" :title="selected ? t('network.wifi.connectTo', 'Connect to {ssid}').replace('{ssid}', selected.ssid) : t('network.wifi.connect', '连接')" :mask-closable="!loading">
+    <NetworkApplyConfirmation v-if="networkApply" :initial="networkApply" @finished="networkApply = null; refresh(); emit('changed')" />
+    <n-modal v-model:show="showConnectModal" preset="card" :style="{ width: '560px', maxWidth: 'calc(100vw - 32px)', maxHeight: 'calc(100dvh - 48px)', overflowY: 'auto' }" :title="selected ? t('network.wifi.connectTo', 'Connect to {ssid}').replace('{ssid}', selected.ssid) : t('network.wifi.connect', '连接')" :mask-closable="!loading">
       <template v-if="selected">
         <n-form v-if="selected.secure && !connectionPending" label-placement="top" :show-feedback="false" @submit.prevent.stop="connect">
           <n-form-item :label="t('network.wifi.password', '密码')">
@@ -419,6 +433,12 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
             />
           </n-form-item>
         </n-form>
+        <n-collapse v-if="!connectionPending">
+          <n-collapse-item :title="t('network.wifi.ipAdvanced', 'Advanced IP settings')" name="ip-settings">
+            <p class="wifi-muted">{{ t('network.wifi.ipProfileHint', 'Applies only to this saved network and is restored when you reconnect.') }}</p>
+            <n-form label-placement="top" :show-feedback="false"><WifiIpSettings v-model="ip" :disabled="loading" /></n-form>
+          </n-collapse-item>
+        </n-collapse>
         <p v-if="connectionPending" class="wifi-muted" role="status">{{ t('network.wifi.connecting', '正在连接 Wi-Fi…') }}</p>
         <p v-if="status.connected && status.station_ssid === selected.ssid" class="wifi-success">{{ t('network.wifi.connected', '已连接') }} · {{ status.station_address }}</p>
         <p v-if="!connectionPending && (connectError || (attemptedSsid === selected.ssid && status.error))" class="wifi-error" role="alert">{{ wifiErrorText(connectError || status.error || '', t) }}</p>

@@ -1317,6 +1317,18 @@ const en = {
           3600: '1 hour'
         },
         wifi: {
+        apStandard: "Wireless standard",
+        apChannelWidth: "Channel width",
+        apTxPower: "Transmit power",
+        apRadioAutoHint: "Auto uses the newest supported AP standard, 20 MHz bandwidth, and automatic transmit power. Wider channels require a fixed channel.",
+        apPowerLimit: "Reported limit for this channel: {power} dBm. Interfaces on the same radio may share the power limit.",
+        apOperatingRadio: "Operating",
+        apReportedPower: "Driver-reported power",
+        apStandardInvalid: "This Wi-Fi standard is unavailable in the selected band.",
+        apWidthInvalid: "This bandwidth is unavailable for the selected standard or channel.",
+        apWideFixedChannel: "Choose a fixed channel for 40/80 MHz operation.",
+        apPowerInvalid: "Transmit power must be within the reported channel limit.",
+
           title: 'Wi-Fi',
           description: 'Configure Wi-Fi',
           setBtn: 'Config'
@@ -1993,7 +2005,9 @@ const en = {
         bssidHint: "Optional: lock to an access point MAC address",
         saveConnect: "Save and connect",
         anyBand: "Automatic",
-        ipAdvanced: "IP and DNS settings",
+        ipAdvanced: 'Advanced IP settings',
+        ipProfileHint: 'Applies only to this saved network and is restored when you reconnect.',
+        invalid_ip: 'Check the IP address, prefix, gateway and route metric.',
         stationInterfaceHint: "Connect nearby networks using {interface}.",
         invalid_ssid: "SSID must be 1–32 bytes without control characters.",
         invalid_password: "Password must be 8–63 UTF-8 bytes without control characters; leave blank for open networks.",
@@ -2150,7 +2164,7 @@ const en = {
 	  },
 	  proxy: {
 		title: 'Proxy server',
-		description: 'Route device-originated traffic such as updates and ACME through an HTTP(S) or SOCKS proxy.',
+		description: 'System-wide proxy for packages, online downloads and proxy-aware system services.',
 		enable: 'Enable proxy server',
 		http: 'HTTP proxy',
 		https: 'HTTPS proxy',
@@ -2159,7 +2173,7 @@ const en = {
 	  },
 	  webrtc: {
 		title: 'WebRTC ICE',
-		description: 'Cloudflare and Google STUN servers are enabled by default. LAN viewing can use host candidates; configure TURN when remote access requires it.',
+		description: 'With custom settings off, Cloudflare and Google STUN are used automatically. Enable custom settings to edit STUN or TURN servers.',
 		custom: 'Custom',
 		enableCustom: 'Enable custom ICE servers',
 		stun: 'STUN servers',

@@ -65,7 +65,7 @@ function update<K extends keyof ProxyConfig>(key: K, value: ProxyConfig[K]) {
     <header>
       <div>
         <h2>{{ t('network.proxy.title', 'Proxy server') }}</h2>
-        <p>{{ t('network.proxy.description', 'Route device-originated traffic such as updates and ACME through an HTTP(S) or SOCKS proxy.') }}</p>
+        <p>{{ t('network.proxy.description', 'System-wide proxy for packages, online downloads and proxy-aware system services.') }}</p>
       </div>
       <n-switch
         :value="enabled"

@@ -1,4 +1,4 @@
-import type { IPv4Mode, ManagedNetworkInterface, NetworkConfig, NetworkInterfaceConfig, NetworkInterfaceStatus, VpnClientConfig, VpnInterface, WireGuardInterface } from '@/api/client'
+import type { IPv4Mode, ManagedNetworkInterface, NetworkConfig, NetworkInterfaceConfig, NetworkInterfaceStatus, VpnClientConfig, VpnInterface, WebRtcIceConfig, WireGuardInterface } from '@/api/client'
 
 export function isWireGuardInterface(item: NetworkInterfaceConfig): item is WireGuardInterface {
   return item.kind === 'wireguard'
@@ -29,6 +29,14 @@ export const DEFAULT_WEBRTC_STUN_SERVERS = [
   'stun:stun.l.google.com:19302',
   'stun:stun1.l.google.com:19302',
 ].join('\n')
+
+export function usesCustomWebRtcIce(config?: WebRtcIceConfig) {
+  if (config?.turn_servers?.some(server => server.url?.trim() || server.username?.trim() || server.credential?.trim())) return true
+  const stun = new Set((config?.stun || '').split(/\r?\n/).map(url => url.trim().toLowerCase()).filter(Boolean)
+    .map(url => /^stuns?:/.test(url) ? url : `stun:${url}`))
+  const defaults = DEFAULT_WEBRTC_STUN_SERVERS.split('\n')
+  return stun.size > 0 && (stun.size !== defaults.length || defaults.some(url => !stun.has(url)))
+}
 
 export function ipv4ModeUsesDHCP(mode: IPv4Mode | string) {
   return mode === 'dhcp' || mode === 'dhcp-static'
@@ -82,6 +90,8 @@ export function configuredStaticAddresses(config: NetworkConfig) {
 export function defaultNetworkConfig(): NetworkConfig {
   return {
     primary_interface: 'eth0',
+    dns: [],
+    use_custom_dns: false,
     static_routes: [],
     hostname: '',
     mdns: true,
@@ -98,10 +108,9 @@ export function defaultNetworkConfig(): NetworkConfig {
     interfaces: [{
       ...defaultPhysicalInterface('eth0'),
       ipv4_mode: 'dhcp-static', ipv4_address: DEFAULT_FALLBACK_IPV4, route_metric: 100,
-      dns: [], use_custom_dns: false,
     }],
     proxy: { http: '', https: '', no_proxy: '' },
-    webrtc: { stun: DEFAULT_WEBRTC_STUN_SERVERS },
+    webrtc: {},
   }
 }
 
@@ -129,20 +138,19 @@ function defaultPhysicalInterface(name: string): ManagedNetworkInterface {
   }
 }
 
-/** Address forms edit one link; DNS defaults inherit from the primary link. */
+/** Link settings remain separate from SSID address policies and system-wide DNS. */
 export function physicalInterfaceConfig(config: NetworkConfig, name: string): ManagedNetworkInterface {
   const links = config.interfaces.filter(isManagedInterface)
-  const primary = links.find(item => item.name === config.primary_interface)
   const link = links.find(item => item.kind === 'physical' && item.name === name)
   return {
     ...defaultPhysicalInterface(name), ...link,
-    dns: [...(link?.dns?.length || link?.use_custom_dns !== undefined ? link.dns || [] : primary?.dns || [])],
-    use_custom_dns: link?.use_custom_dns ?? (link?.dns?.length ? true : primary?.use_custom_dns),
   }
 }
 
 export function updatePhysicalInterface(config: NetworkConfig, name: string, value: ManagedNetworkInterface): NetworkConfig {
-  const link = { ...value, kind: 'physical' as const, name, dns: [...(value.dns || [])] }
+  const link = { ...value, kind: 'physical' as const, name }
+  delete link.dns
+  delete link.use_custom_dns
   const interfaces = config.interfaces.some(item => item.name === name)
     ? config.interfaces.map(item => item.name === name ? link : item)
     : [...config.interfaces, link]
@@ -169,6 +177,7 @@ export function updatePrimaryInterface(config: NetworkConfig, value: ManagedNetw
 export function cloneNetworkConfig(config: NetworkConfig): NetworkConfig {
   return {
     ...config,
+    dns: [...(config.dns || [])],
 		static_routes: (config.static_routes || []).map((route) => ({ ...route })),
     interfaces: (config.interfaces || []).map((item) => isWireGuardInterface(item) ? {
       ...item, dns: item.dns ? [...item.dns] : undefined,
@@ -315,6 +324,7 @@ export function validCIDR(value: string, family: 4 | 6) {
 }
 
 export function isNetworkConfigValid(config: NetworkConfig) {
+  if (usesCustomDNS(config) && (!config.dns?.length || !config.dns.every(isDNSServer))) return false
   if (!config.interfaces.some(item => item.name === config.primary_interface && item.kind === 'physical')) return false
   if (config.discovery_enabled !== false && usesCustomDiscoveryURL(config) && !validDiscoveryURL(config.discovery_url ?? '')) return false
   const names = new Set<string>()
@@ -369,9 +379,6 @@ export function isNetworkConfigValid(config: NetworkConfig) {
         (networkInterface.ipv4_gateway && !isIPv4(networkInterface.ipv4_gateway)))) return false
     if (networkInterface.ipv6_mode === 'static' && (!validCIDR(networkInterface.ipv6_address, 6) ||
         (networkInterface.ipv6_gateway && !isIPv6(networkInterface.ipv6_gateway)))) return false
-    if (networkInterface.use_custom_dns ?? Boolean(networkInterface.dns?.length)) {
-      if (!networkInterface.dns?.length || !networkInterface.dns.every(isDNSServer)) return false
-    }
 		if (networkInterface.route_metric < 0) return false
 	}
   for (const client of config.interfaces.filter(isVpnConfig)) {

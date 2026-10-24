@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { WifiStatus } from '@/api/client'
+import type { WifiApRadioConfig, WifiStatus } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { apBands, apChannels, validApChannel } from '@/lib/wifi-radio'
 import { defaultWifiApNetwork, wifiApNetworkError } from '@/lib/wifi-ap-network'
+import WifiApRadioSettings from './WifiApRadioSettings.vue'
 
 const props = defineProps<{
   status: WifiStatus
+  radio: WifiApRadioConfig
   ssid: string
   password: string
   channel: number
@@ -20,6 +22,7 @@ const props = defineProps<{
   canSave: boolean
 }>()
 const emit = defineEmits<{
+  'update:radio': [value: WifiApRadioConfig]
   'update:ssid': [value: string]
   'update:password': [value: string]
   'update:channel': [value: number]
@@ -51,6 +54,7 @@ const availableChannelOptions = computed(() => [
 function changeBand(value: '2.4' | '5') {
   emit('update:band', value)
   emit('update:channel', 0)
+  emit('update:radio', { ...props.radio, standard: 'auto', channel_width: 0 })
 }
 </script>
 
@@ -85,6 +89,7 @@ function changeBand(value: '2.4' | '5') {
           </span>
         </div>
       </n-form-item>
+      <WifiApRadioSettings v-if="status.ap_radio_capabilities" class="wifi-ap-full-row" :model-value="radio" :status="status" :band="band" :channel="channel" :disabled="busy" @update:model-value="emit('update:radio', $event)" />
       <n-form-item :label="t('network.wifi.apAddress', 'AP IPv4 address / prefix')" class="wifi-ap-full-row">
         <n-input :value="address" placeholder="192.168.77.1/24" :disabled="busy" :status="networkError === 'apAddressInvalid' ? 'error' : undefined" @update:value="emit('update:address', $event)" />
       </n-form-item>

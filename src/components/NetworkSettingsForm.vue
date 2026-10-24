@@ -16,6 +16,7 @@ const props = withDefaults(defineProps<{
   allowIPv4Disabled?: boolean
   hideRouteMetric?: boolean
   inset?: boolean
+  showAddress?: boolean
 }>(), {
   disabled: false,
   showDevice: true,
@@ -23,6 +24,7 @@ const props = withDefaults(defineProps<{
   allowIPv4Disabled: true,
   hideRouteMetric: false,
   inset: false,
+  showAddress: true,
 })
 const emit = defineEmits<{ 'update:modelValue': [value: ManagedNetworkInterface] }>()
 
@@ -91,6 +93,7 @@ const interfaceOptions = computed(() => {
     </n-form-item>
 
     <NetworkAddressSettingsForm
+      v-if="showAddress"
       :model-value="modelValue"
       :disabled="disabled"
       :hide-disabled-ipv4="!allowIPv4Disabled"

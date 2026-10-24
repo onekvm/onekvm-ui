@@ -7,6 +7,8 @@ export type DeviceLanguage = 'en' | 'zh' | 'zh_tw'
 
 export interface NetworkConfig {
   primary_interface: string
+  dns?: string[]
+  use_custom_dns?: boolean
   static_routes: StaticRoute[]
   hostname: string
   mdns?: boolean
@@ -81,7 +83,10 @@ export interface WifiNetwork {
   bands?: { band: string; generation: string | null }[]
 }
 
+export type WifiIpConfig = Pick<ManagedNetworkInterface, 'ipv4_mode' | 'ipv4_address' | 'ipv4_gateway' | 'ipv6_mode' | 'ipv6_address' | 'ipv6_gateway' | 'route_metric'>
+
 export interface SavedWifiNetwork {
+  ip?: WifiIpConfig
   ssid: string
   secure: boolean
   auto_connect: boolean
@@ -92,6 +97,7 @@ export interface SavedWifiNetwork {
 }
 
 export interface WifiProfileSettings {
+  ip?: WifiIpConfig
   interface: string
   ssid: string
   password?: string
@@ -102,7 +108,23 @@ export interface WifiProfileSettings {
   bssid: string
 }
 
+export type WifiApStandard = 'auto' | 'legacy' | 'n' | 'ac' | 'ax'
+export interface WifiApRadioConfig {
+  standard: WifiApStandard
+  channel_width: number
+  tx_power_dbm: number | null
+}
+export interface WifiApBandCapabilities {
+  band: '2.4' | '5'
+  standards: WifiApStandard[]
+  channel_widths: number[]
+  tx_power_limits: Record<string, number>
+}
 export interface WifiStatus {
+  ap_radio?: WifiApRadioConfig
+  ap_radio_capabilities?: WifiApBandCapabilities[]
+  ap_operating_radio?: { standard: WifiApStandard | null; channel_width: number; tx_power_dbm: number | null } | null
+  network_apply?: NetworkApplyStatus
   ap_interface?: string
   interface?: string
   saved_networks?: SavedWifiNetwork[]
@@ -1831,11 +1853,11 @@ export const api = {
 	getNetworkInterfaces: () => request<NetworkInterfaceStatus[]>('/api/network/interfaces'),
 	getWifiStatus: (interfaceName = '') => request<WifiStatus>(`/api/network/wifi?interface=${encodeURIComponent(interfaceName)}`, { cache: 'no-store' }),
 	scanWifi,
-	connectWifi: (ssid: string, password?: string, interfaceName = '') => request<WifiStatus>('/api/network/wifi/connect', { method: 'POST', body: JSON.stringify({ interface: interfaceName, ssid, password }) }),
+	connectWifi: (ssid: string, password?: string, interfaceName = '', ip?: WifiIpConfig) => request<WifiStatus>('/api/network/wifi/connect', { method: 'POST', body: JSON.stringify({ interface: interfaceName, ssid, password, ip }) }),
   saveWifiNetwork: (profile: WifiProfileSettings) => request<WifiStatus>('/api/network/wifi/saved', { method: 'POST', body: JSON.stringify(profile) }),
   forgetWifiNetwork: (ssid: string, interfaceName = '') => request<WifiStatus>('/api/network/wifi/saved', { method: 'DELETE', body: JSON.stringify({ interface: interfaceName, ssid }) }),
 	setWifiAp: (enabled: boolean) => request<WifiStatus>('/api/network/wifi/ap', { method: 'POST', body: JSON.stringify({ enabled }) }),
-	setWifiApConfig: (ssid: string, password: string, channel: number, band: '2.4' | '5', network: WifiApNetwork) => request<WifiStatus>('/api/network/wifi/ap/config', { method: 'POST', body: JSON.stringify({ ssid, password, channel, band, network }) }),
+	setWifiApConfig: (ssid: string, password: string, channel: number, band: '2.4' | '5', network: WifiApNetwork, radio?: WifiApRadioConfig) => request<WifiStatus>('/api/network/wifi/ap/config', { method: 'POST', body: JSON.stringify({ ssid, password, channel, band, network, radio }) }),
 	setWifiMode: (mode: WifiStatus['mode']) => request<WifiStatus>('/api/network/wifi/mode', { method: 'POST', body: JSON.stringify({ mode }) }),
 	getNetworkApplyStatus: () => request<NetworkApplyStatus>('/api/network/apply', { cache: 'no-store' }),
 	confirmNetworkApply: () => request<{ status: string }>('/api/network/apply/confirm', { method: 'POST' }),

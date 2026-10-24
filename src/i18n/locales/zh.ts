@@ -1316,6 +1316,18 @@ const zh = {
           3600: '1小时'
         },
         wifi: {
+        apStandard: "无线标准",
+        apChannelWidth: "信道带宽",
+        apTxPower: "发射功率",
+        apRadioAutoHint: "自动使用硬件支持的最新热点标准、20 MHz 带宽和自动发射功率。更宽带宽需选择固定信道。",
+        apPowerLimit: "当前信道报告的功率上限：{power} dBm。同一无线芯片上的接口可能共享功率限制。",
+        apOperatingRadio: "实际运行",
+        apReportedPower: "驱动报告功率",
+        apStandardInvalid: "所选频段不支持此无线标准。",
+        apWidthInvalid: "所选无线标准或信道不支持此带宽。",
+        apWideFixedChannel: "使用 40/80 MHz 带宽时请选择固定信道。",
+        apPowerInvalid: "发射功率必须在当前信道报告的上限以内。",
+
           title: 'Wi-Fi',
           description: '配置 Wi-Fi 信息',
           setBtn: '设置'
@@ -1992,7 +2004,9 @@ const zh = {
         bssidHint: "可选：固定连接某个接入点的 MAC 地址",
         saveConnect: "保存并连接",
         anyBand: "自动",
-        ipAdvanced: "IP 与 DNS 高级设置",
+        ipAdvanced: 'IP 高级设置',
+        ipProfileHint: '仅用于此热点，重新连接时自动应用。',
+        invalid_ip: '请检查 IP 地址、前缀、网关和路由优先级。',
         stationInterfaceHint: "连接附近的无线网络，通过 {interface} 接入。",
         invalid_ssid: "SSID 必须为 1–32 字节，且不能包含控制字符。",
         invalid_password: "密码需为 8–63 个 UTF-8 字节，不含控制字符；开放网络请留空。",
@@ -2149,7 +2163,7 @@ const zh = {
 	  },
 	  proxy: {
 		title: '代理服务器',
-		description: '让设备主动发出的流量（如更新、ACME）通过 HTTP(S) 或 SOCKS 代理。',
+		description: '系统全局代理，适用于软件包、在线下载和支持代理的系统服务。',
 		enable: '启用代理服务器',
 		http: 'HTTP 代理',
 		https: 'HTTPS 代理',
@@ -2158,7 +2172,7 @@ const zh = {
 	  },
 	  webrtc: {
 		title: 'WebRTC ICE',
-		description: '默认使用 Cloudflare 和 Google STUN；局域网观看可直接使用主机候选，远程访问仍可配置 TURN。',
+		description: '关闭自定义时自动使用 Cloudflare 和 Google STUN；开启自定义后可编辑 STUN 或 TURN 服务器。',
 		custom: '自定义',
 		enableCustom: '启用自定义 ICE 服务器',
 		stun: 'STUN 服务器',

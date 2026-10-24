@@ -123,7 +123,7 @@ class OneKVMTransport {
   private micAnalyser: AnalyserNode | null = null
   private micDestination: MediaStreamAudioDestinationNode | null = null
   private speakerVolume = readStoredVolume(SPEAKER_VOLUME_KEY)
-  private speakerPlaybackEnabled = readStoredBoolean(SPEAKER_ENABLED_KEY, true)
+  private speakerPlaybackEnabled = readStoredBoolean(SPEAKER_ENABLED_KEY, false)
   private deviceSpeakerEnabled = false
   private microphoneVolume = readStoredVolume(MICROPHONE_VOLUME_KEY)
   private wantMicrophone = false

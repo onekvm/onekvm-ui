@@ -4,7 +4,7 @@ import { Plus, Trash2 } from '@/icons'
 
 import type { WebRtcIceConfig, WebRtcTurnServerConfig } from '@/api/client'
 import { t } from '@/i18n/runtime'
-import { validIceURL } from '@/lib/network'
+import { usesCustomWebRtcIce, validIceURL } from '@/lib/network'
 
 const props = defineProps<{ modelValue?: WebRtcIceConfig; disabled?: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [value: WebRtcIceConfig] }>()
@@ -28,14 +28,7 @@ function cloneIce(value?: WebRtcIceConfig): WebRtcIceConfig {
   }
 }
 
-function hasIceConfig(value?: WebRtcIceConfig) {
-  return Boolean(
-    value?.stun?.trim()
-    || turnServers(value).some((server) => server.url.trim() || server.username.trim() || server.credential.trim()),
-  )
-}
-
-const enabled = shallowRef(hasIceConfig(props.modelValue))
+const enabled = shallowRef(usesCustomWebRtcIce(props.modelValue))
 const disabledDraft = shallowRef<WebRtcIceConfig | null>(null)
 let nextTurnRowKey = 0
 const newTurnRowKey = () => `turn-${nextTurnRowKey++}`
@@ -59,9 +52,9 @@ watch(() => props.modelValue, (value) => {
     lastEmittedSnapshot = null
     return
   }
-  enabled.value = hasIceConfig(value)
+  enabled.value = usesCustomWebRtcIce(value)
   turnRowKeys.value = currentTurnRowKeys(turnServers(value).length)
-  if (hasIceConfig(value)) disabledDraft.value = null
+  if (usesCustomWebRtcIce(value)) disabledDraft.value = null
 })
 
 function updateModel(value: WebRtcIceConfig) {
@@ -83,7 +76,7 @@ function setEnabled(value: boolean) {
     updateModel(emptyIce())
     return
   }
-  if (disabledDraft.value && hasIceConfig(disabledDraft.value)) {
+  if (disabledDraft.value && usesCustomWebRtcIce(disabledDraft.value)) {
     updateModel(cloneIce(disabledDraft.value))
   }
 }
@@ -131,7 +124,7 @@ function removeTurnServer(index: number) {
           />
         </div>
       </div>
-      <p>{{ t('network.webrtc.description', 'LAN viewing can use host candidates. Configure STUN or TURN only when remote access requires it.') }}</p>
+      <p>{{ t('network.webrtc.description', 'With custom settings off, Cloudflare and Google STUN are used automatically. Enable custom settings to edit STUN or TURN servers.') }}</p>
     </header>
 
     <n-collapse-transition :show="enabled">

@@ -1329,6 +1329,18 @@ const zh_tw = {
           3600: '1小時'
         },
         wifi: {
+        apStandard: "無線標準",
+        apChannelWidth: "通道頻寬",
+        apTxPower: "發射功率",
+        apRadioAutoHint: "自動使用硬體支援的最新熱點標準、20 MHz 頻寬和自動發射功率。更寬頻寬需選擇固定通道。",
+        apPowerLimit: "目前通道報告的功率上限：{power} dBm。同一無線晶片上的介面可能共用功率限制。",
+        apOperatingRadio: "實際運行",
+        apReportedPower: "驅動回報功率",
+        apStandardInvalid: "所選頻段不支援此無線標準。",
+        apWidthInvalid: "所選無線標準或通道不支援此頻寬。",
+        apWideFixedChannel: "使用 40/80 MHz 頻寬時請選擇固定通道。",
+        apPowerInvalid: "發射功率必須在目前通道報告的上限以內。",
+
           title: 'Wi-Fi',
           description: '配置 Wi-Fi 資訊',
           setBtn: '設定'
@@ -1997,7 +2009,9 @@ const zh_tw = {
         bssidHint: "選填：固定連線至某個基地台的 MAC 位址",
         saveConnect: "儲存並連線",
         anyBand: "自動",
-        ipAdvanced: "IP 與 DNS 進階設定",
+        ipAdvanced: 'IP 進階設定',
+        ipProfileHint: '僅用於此熱點，重新連線時自動套用。',
+        invalid_ip: '請檢查 IP 位址、前綴、閘道和路由優先順序。',
         stationInterfaceHint: "連線至附近的無線網路，透過 {interface} 接入。",
         invalid_ssid: "SSID 必須為 1–32 位元組，且不能包含控制字元。",
         invalid_password: "密碼需為 8–63 個 UTF-8 位元組，不含控制字元；開放網路請留空。",
@@ -2154,7 +2168,7 @@ const zh_tw = {
 	  },
 	  proxy: {
 		title: '代理伺服器',
-		description: '讓裝置主動發出的流量（如更新、ACME）透過 HTTP(S) 或 SOCKS 代理。',
+		description: '系統全域代理，適用於軟體套件、線上下載及支援代理的系統服務。',
 		enable: '啟用代理伺服器',
 		http: 'HTTP 代理',
 		https: 'HTTPS 代理',
@@ -2163,7 +2177,7 @@ const zh_tw = {
 	  },
 	  webrtc: {
 		title: 'WebRTC ICE',
-		description: '預設使用 Cloudflare 和 Google STUN；區域網路觀看可直接使用主機候選，遠端存取仍可設定 TURN。',
+		description: '關閉自訂時自動使用 Cloudflare 和 Google STUN；開啟自訂後可編輯 STUN 或 TURN 伺服器。',
 		custom: '自訂',
 		enableCustom: '啟用自訂 ICE 伺服器',
 		stun: 'STUN 伺服器',

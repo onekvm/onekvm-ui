@@ -11,6 +11,7 @@ import {
   isNetworkConfigValid,
   networkConfigSnapshot,
   usesCustomDiscoveryURL,
+  usesCustomWebRtcIce,
   physicalInterfaceConfig,
   updatePhysicalInterface,
   updatePrimaryInterface,
@@ -29,7 +30,13 @@ assert.equal(primary.ipv4_address, '192.168.233.10/24', 'default fallback IPv4 a
 assert.equal(base.discovery_url, 'https://find.onekvm.org', 'default discovery page is configured')
 assert.equal(base.discovery_enabled, true, 'discovery is enabled by default')
 assert.equal(base.use_custom_discovery_url, false, 'custom URL is folded by default')
-assert.equal(base.webrtc?.stun, DEFAULT_WEBRTC_STUN_SERVERS, 'public STUN servers are enabled by default')
+assert.deepEqual(base.webrtc, {}, 'default ICE is resolved by Core without enabling custom settings')
+assert.equal(usesCustomWebRtcIce(base.webrtc), false)
+assert.equal(usesCustomWebRtcIce({ stun: DEFAULT_WEBRTC_STUN_SERVERS }), false, 'saved built-in STUN defaults stay folded')
+assert.equal(usesCustomWebRtcIce({ stun: DEFAULT_WEBRTC_STUN_SERVERS.split('\n').reverse().join('\r\n') + '\n' }), false, 'default STUN order and line endings do not enable custom settings')
+assert.equal(usesCustomWebRtcIce({ stun: 'stun:custom.example:3478' }), true, 'a custom STUN server unfolds the editor')
+assert.equal(usesCustomWebRtcIce({ stun: 'stun:stun.cloudflare.com:3478' }), true, 'an intentional subset of built-in servers remains custom')
+assert.equal(usesCustomWebRtcIce({ stun: DEFAULT_WEBRTC_STUN_SERVERS, turn_servers: [{ url: 'turn:relay.example:3478', username: 'user', credential: 'secret' }] }), true, 'TURN enables custom settings even alongside default STUN')
 assert.equal(isNetworkConfigValid(base), true, 'default config is valid')
 
 const mixed = {

@@ -4,7 +4,8 @@ import { Plus, Settings2 } from '@/icons'
 import { api, type SavedWifiNetwork, type WifiProfileSettings, type WifiStatus } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { wifiErrorText } from '@/lib/wifi-error'
-import { wifiProfileError } from '@/lib/wifi-profile'
+import { defaultWifiIpConfig, wifiProfileError } from '@/lib/wifi-profile'
+import WifiIpSettings from './WifiIpSettings.vue'
 
 const props = defineProps<{ status: WifiStatus; interfaceName: string; disabled?: boolean }>()
 const emit = defineEmits<{ updated: [status: WifiStatus] }>()
@@ -15,7 +16,7 @@ const error = shallowRef('')
 const modalError = shallowRef('')
 const replacePassword = shallowRef(false)
 const forgetTarget = shallowRef<SavedWifiNetwork | null>(null)
-const draft = reactive({ ssid: '', password: '', auto_connect: true, priority: 0, hidden: false, band: '', bssid: '' })
+const draft = reactive({ ssid: '', password: '', auto_connect: true, priority: 0, hidden: false, band: '', bssid: '', ip: defaultWifiIpConfig() })
 const saved = computed(() => props.status.saved_networks || [])
 const locked = computed(() => props.disabled || busy.value || props.status.connecting)
 const payload = computed<WifiProfileSettings>(() => ({ ...draft, interface: props.interfaceName,
@@ -30,7 +31,7 @@ function open(profile?: SavedWifiNetwork) {
   replacePassword.value = !profile
   modalError.value = ''
   Object.assign(draft, { ssid: profile?.ssid || '', password: '', auto_connect: profile?.auto_connect ?? true,
-    priority: profile?.priority ?? 0, hidden: profile?.hidden ?? true, band: profile?.band || '', bssid: profile?.bssid || '' })
+    priority: profile?.priority ?? 0, hidden: profile?.hidden ?? true, band: profile?.band || '', bssid: profile?.bssid || '', ip: { ...(profile?.ip || defaultWifiIpConfig()) } })
   modal.value = true
 }
 async function run(action: () => Promise<WifiStatus>, inModal = false): Promise<boolean> {
@@ -100,6 +101,12 @@ async function forget() {
         </div>
         <p class="wifi-saved-muted">{{ t('network.wifi.priorityHint', 'A higher priority is preferred when several saved networks are available.') }}</p>
         <n-form-item label="BSSID"><n-input v-model:value="draft.bssid" :disabled="busy" :placeholder="t('network.wifi.bssidHint', 'Optional: lock to an access point MAC address')" /></n-form-item>
+        <n-collapse :default-expanded-names="['ip-settings']">
+          <n-collapse-item :title="t('network.wifi.ipAdvanced', 'Advanced IP settings')" name="ip-settings">
+            <p class="wifi-saved-muted">{{ t('network.wifi.ipProfileHint', 'Applies only to this saved network and is restored when you reconnect.') }}</p>
+            <WifiIpSettings v-model="draft.ip" :disabled="busy" />
+          </n-collapse-item>
+        </n-collapse>
         <p v-if="(draft.ssid && invalidHint) || modalError" class="wifi-saved-error" role="alert">{{ modalError || invalidHint }}</p>
       </n-form>
       <template #footer><div class="wifi-profile-footer">
@@ -131,5 +138,5 @@ async function forget() {
 @media (max-width: 400px) { .wifi-profile-grid { grid-template-columns: 1fr; } }
 </style>
 <style>
-.wifi-profile-modal { width: min(520px, calc(100vw - 32px)); }
+.wifi-profile-modal { width: min(580px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); overflow-y: auto; }
 </style>

@@ -23,7 +23,6 @@ import TunnelSettingsForm from './TunnelSettingsForm.vue'
 import VLANSettingsForm from './VLANSettingsForm.vue'
 import VpnSettingsForm from './VpnSettingsForm.vue'
 import WifiOnboarding from './WifiOnboarding.vue'
-import WifiIpSettings from './WifiIpSettings.vue'
 import WireGuardSettingsForm from './WireGuardSettingsForm.vue'
 
 const TUNNEL_KINDS = ['gre', 'ipip', 'sit', 'vxlan', 'geneve', 'fou', 'bareudp', 'gretap'] as const
@@ -543,15 +542,10 @@ watch(() => props.disabled, (disabled, previous) => {
 
               <WifiOnboarding v-if="networkInterface.kind === 'wifi_ap'" :interface-name="networkInterface.name" role="ap" :active="expanded === networkInterface.name" @changed="load" />
               <div v-else-if="networkInterface.kind === 'wifi_station'" class="wifi-interface-settings">
+                <n-form label-placement="top" :show-feedback="false">
+                  <NetworkSettingsForm :model-value="physicalInterfaceConfig(modelValue, networkInterface.name)" :disabled="disabled" :show-device="false" :show-address="false" @update:model-value="updateConfig(networkInterface.name, $event)" />
+                </n-form>
                 <WifiOnboarding role="station" :interface-name="networkInterface.name" :active="expanded === networkInterface.name" :disabled="disabled" @changed="load" />
-                <n-collapse>
-                  <n-collapse-item :title="t('network.wifi.ipAdvanced', 'IP and DNS settings')" name="ip-settings">
-                    <n-form v-if="networkInterface.configured" label-placement="top" :show-feedback="false">
-                      <WifiIpSettings :model-value="physicalInterfaceConfig(modelValue, networkInterface.name)" :disabled="disabled" @update:model-value="updateConfig(networkInterface.name, $event)" />
-                    </n-form>
-                    <n-button v-else secondary :disabled="disabled" @click="selectInterface(networkInterface.name)">{{ t('network.interfaces.configure', 'Configure this interface') }}</n-button>
-                  </n-collapse-item>
-                </n-collapse>
               </div>
 
               <n-form v-else-if="networkInterface.kind === 'wireguard'" label-placement="top" :show-feedback="false">

@@ -4,8 +4,8 @@ import { api, type NetworkConfig, type NetworkInterfaceStatus, type WifiStatus }
 import { Cable, ChevronRight, Wifi } from '@/icons'
 import { physicalInterfaceConfig } from '@/lib/network'
 import { t } from '@/i18n/runtime'
-import WifiOnboarding from '../WifiOnboarding.vue'
 import SetupEthernetForm from './SetupEthernetForm.vue'
+import WifiOnboarding from '../WifiOnboarding.vue'
 
 const props = defineProps<{ disabled: boolean; valid: boolean }>()
 const network = defineModel<NetworkConfig>({ required: true })
@@ -21,9 +21,9 @@ const selectedNetwork = shallowRef<'wifi' | 'ethernet'>('wifi')
 const ethernetFormID = useId()
 let disposed = false
 
-const wifiInterface = computed(() => interfaces.value.find(item => item.port_type === 'physical' && /^wlan\d+$/.test(item.name)))
+const wifiInterface = computed(() => interfaces.value.find(item => item.wifi_role === 'station'))
 const hasWifi = computed(() => !!wifiInterface.value && wifiStatus.value?.available !== false)
-const hasEthernet = computed(() => interfaces.value.some(item => item.port_type === 'physical' && !/^(wl|ap|lo)/.test(item.name)))
+const hasEthernet = computed(() => interfaces.value.some(item => item.port_type === 'physical' && !item.wifi_role))
 const separateNetworks = computed(() => hasWifi.value && hasEthernet.value)
 const wiredTitle = computed(() => t('auth.wiredNetwork', 'Wired network'))
 const wifiSummary = computed(() => {
@@ -71,7 +71,7 @@ function openNetwork(kind: 'wifi' | 'ethernet') {
 }
 
 function finishNetwork() {
-  if (!props.disabled && (selectedNetwork.value === 'wifi' || props.valid)) showDialog.value = false
+  if (!props.disabled && props.valid) showDialog.value = false
 }
 
 onMounted(loadNetworks)
@@ -134,7 +134,7 @@ onUnmounted(() => { disposed = true })
             type="primary"
             :attr-type="selectedNetwork === 'ethernet' ? 'submit' : 'button'"
             :form="selectedNetwork === 'ethernet' ? ethernetFormID : undefined"
-            :disabled="disabled || (selectedNetwork === 'ethernet' && !valid)"
+            :disabled="disabled || !valid"
             @click="selectedNetwork === 'wifi' && finishNetwork()"
           >{{ t('auth.done', 'Done') }}</n-button>
         </div>
@@ -144,7 +144,7 @@ onUnmounted(() => { disposed = true })
   <div v-else class="setup-network-inline">
     <template v-if="hasWifi">
       <h2 class="setup-network-heading">Wi-Fi</h2>
-      <WifiOnboarding initial-setup :interface-name="wifiInterface?.name" :disabled="disabled" />
+      <WifiOnboarding initial-setup :interface-name="wifiInterface?.name" :disabled="disabled" @status="wifiStatus = $event" />
     </template>
     <template v-if="hasEthernet || !hasWifi">
       <h2 class="setup-network-heading">{{ wiredTitle }}</h2>

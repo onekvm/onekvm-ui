@@ -47,7 +47,12 @@ const primary = physicalInterfaceConfig(base, base.primary_interface)
 assert.equal(usesCustomDNS(primary), false)
 const legacy = { ...primary, dns: ['1.1.1.1'], use_custom_dns: undefined }
 assert.equal(usesCustomDNS(legacy), true, 'legacy configured DNS stays custom')
-assert.equal(isNetworkConfigValid(updatePhysicalInterface(base, 'eth0', { ...legacy, use_custom_dns: true, dns: [] })), false)
-assert.equal(isNetworkConfigValid(updatePhysicalInterface(base, 'eth0', { ...legacy, use_custom_dns: false, dns: ['invalid'] })), true)
+assert.equal(isNetworkConfigValid({ ...base, use_custom_dns: true, dns: [] }), false)
+assert.equal(isNetworkConfigValid({ ...base, use_custom_dns: false, dns: ['invalid'] }), true)
 
 console.log('network-dns tests passed')
+
+const custom = { ...base, use_custom_dns: true, dns: ['1.1.1.1'] }
+const edited = updatePhysicalInterface(custom, 'eth0', { ...primary, dns: ['9.9.9.9'] })
+assert.deepEqual(edited.dns, ['1.1.1.1'], 'interface edits preserve the system DNS policy')
+assert.equal(edited.interfaces[0]?.dns, undefined, 'interface edits do not reintroduce link DNS')

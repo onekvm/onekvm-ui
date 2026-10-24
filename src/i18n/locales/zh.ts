@@ -2170,7 +2170,7 @@ const zh = {
 	  },
 	  webrtc: {
 		title: 'WebRTC ICE',
-		description: '局域网观看可直接使用主机候选；仅在远程访问需要时配置 STUN 或 TURN。',
+		description: '默认使用 Cloudflare 和 Google STUN；局域网观看可直接使用主机候选，远程访问仍可配置 TURN。',
 		custom: '自定义',
 		enableCustom: '启用自定义 ICE 服务器',
 		stun: 'STUN 服务器',

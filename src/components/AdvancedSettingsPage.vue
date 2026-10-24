@@ -77,7 +77,7 @@ import { loadMarketplaceInstallPackage } from '@/lib/marketplace-install-client'
 import { fillMarketplaceTemplate, WIREGUARD_MARKETPLACE_ID, type MarketplaceInstallPackage } from '@/lib/marketplace-install'
 import { IP_TUNNELS_MARKETPLACE_ID, networkEnvironmentAvailable, type NetworkEnvironmentId } from '@/lib/network-environment'
 import { brandPluginIconUrl, namedPluginIcon } from '@/lib/plugin-icons'
-import { DEFAULT_DISCOVERY_URL, configuredStaticAddresses, isNetworkConfigDirty, isNetworkConfigValid, networkConfigSnapshot, networkKindLabel, physicalInterfaceConfig, updatePhysicalInterface, usesCustomDNS, usesCustomDiscoveryURL, validHostname } from '@/lib/network'
+import { DEFAULT_DISCOVERY_URL, DEFAULT_WEBRTC_STUN_SERVERS, configuredStaticAddresses, isNetworkConfigDirty, isNetworkConfigValid, networkConfigSnapshot, networkKindLabel, physicalInterfaceConfig, updatePhysicalInterface, usesCustomDNS, usesCustomDiscoveryURL, validHostname } from '@/lib/network'
 import {
   SETTINGS_APP_QUERY,
   SETTINGS_INDEX,
@@ -1069,6 +1069,7 @@ async function load() {
 		loadedConfig.network.discovery_url ??= DEFAULT_DISCOVERY_URL
 		loadedConfig.network.discovery_enabled ??= true
 		loadedConfig.network.use_custom_discovery_url ??= usesCustomDiscoveryURL(loadedConfig.network)
+		loadedConfig.network.webrtc ??= { stun: DEFAULT_WEBRTC_STUN_SERVERS }
 		loadedConfig.keyboard ||= { layout: 'us', shortcuts: [] }
 		loadedConfig.keyboard.layout ||= 'us'
     loadedConfig.keyboard.shortcuts ||= []

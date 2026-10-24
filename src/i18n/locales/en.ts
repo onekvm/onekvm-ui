@@ -2171,7 +2171,7 @@ const en = {
 	  },
 	  webrtc: {
 		title: 'WebRTC ICE',
-		description: 'LAN viewing can use host candidates. Configure STUN or TURN only when remote access requires it.',
+		description: 'Cloudflare and Google STUN servers are enabled by default. LAN viewing can use host candidates; configure TURN when remote access requires it.',
 		custom: 'Custom',
 		enableCustom: 'Enable custom ICE servers',
 		stun: 'STUN servers',

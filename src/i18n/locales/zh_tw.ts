@@ -2175,7 +2175,7 @@ const zh_tw = {
 	  },
 	  webrtc: {
 		title: 'WebRTC ICE',
-		description: '區域網路觀看可直接使用主機候選；僅在遠端存取需要時設定 STUN 或 TURN。',
+		description: '預設使用 Cloudflare 和 Google STUN；區域網路觀看可直接使用主機候選，遠端存取仍可設定 TURN。',
 		custom: '自訂',
 		enableCustom: '啟用自訂 ICE 伺服器',
 		stun: 'STUN 伺服器',

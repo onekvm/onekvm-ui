@@ -16,6 +16,7 @@ import {
   updatePrimaryInterface,
   withManagementVLAN,
   cloneNetworkConfig,
+  DEFAULT_WEBRTC_STUN_SERVERS,
   vpnClientConfig,
   vpnInterfaceConfig,
 } from '../src/lib/network.ts'
@@ -28,6 +29,7 @@ assert.equal(primary.ipv4_address, '192.168.233.10/24', 'default fallback IPv4 a
 assert.equal(base.discovery_url, 'https://find.onekvm.org', 'default discovery page is configured')
 assert.equal(base.discovery_enabled, true, 'discovery is enabled by default')
 assert.equal(base.use_custom_discovery_url, false, 'custom URL is folded by default')
+assert.equal(base.webrtc?.stun, DEFAULT_WEBRTC_STUN_SERVERS, 'public STUN servers are enabled by default')
 assert.equal(isNetworkConfigValid(base), true, 'default config is valid')
 
 const mixed = {

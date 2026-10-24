@@ -24,6 +24,11 @@ export type ManagedTunnelKind = Exclude<ManagedNetworkInterface['kind'], 'vlan' 
 
 export const DEFAULT_FALLBACK_IPV4 = '192.168.233.10/24'
 export const DEFAULT_DISCOVERY_URL = 'https://find.onekvm.org'
+export const DEFAULT_WEBRTC_STUN_SERVERS = [
+  'stun:stun.cloudflare.com:3478',
+  'stun:stun.l.google.com:19302',
+  'stun:stun1.l.google.com:19302',
+].join('\n')
 
 export function ipv4ModeUsesDHCP(mode: IPv4Mode | string) {
   return mode === 'dhcp' || mode === 'dhcp-static'
@@ -96,7 +101,7 @@ export function defaultNetworkConfig(): NetworkConfig {
       dns: [], use_custom_dns: false,
     }],
     proxy: { http: '', https: '', no_proxy: '' },
-    webrtc: {},
+    webrtc: { stun: DEFAULT_WEBRTC_STUN_SERVERS },
   }
 }
 

@@ -634,6 +634,9 @@ const en = {
         time: 'Region and time',
         update: 'System update',
         personalizationPage: {
+          windowBehavior: 'Window behavior',
+          dimWindowsOnKvmFocus: 'Translucent windows when KVM has focus',
+          dimWindowsOnKvmFocusHint: 'Set all windows to 50% opacity while controlling KVM. Focusing a window restores its opacity.',
           deviceIdentity: 'Device identity',
           deviceIdentityHint: 'Give this OneKVM a friendly name without changing its network hostname.',
           deviceName: 'Device name',

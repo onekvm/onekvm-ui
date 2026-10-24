@@ -1083,12 +1083,14 @@ async function load() {
       custom_console_title: '',
       console_subtitle_parts: ['device_model'],
       custom_console_subtitle: '',
+      dim_windows_on_kvm_focus: true,
     }
     const legacyPersonalization = loadedConfig.personalization as typeof loadedConfig.personalization & {
       show_device_model?: boolean
     }
     loadedConfig.personalization.console_subtitle_parts = normalizeConsoleSubtitleParts(legacyPersonalization)
     loadedConfig.personalization.custom_console_subtitle ??= ''
+    loadedConfig.personalization.dim_windows_on_kvm_focus ??= true
     delete legacyPersonalization.show_device_model
     loadedConfig.video.mjpeg ??= { frame_detect: false }
     loadedConfig.video.h26x ??= { gop: 0 }

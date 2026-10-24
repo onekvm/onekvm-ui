@@ -633,6 +633,9 @@ const zh_tw = {
         time: '區域和時間',
         update: '系統升級',
         personalizationPage: {
+          windowBehavior: '視窗行為',
+          dimWindowsOnKvmFocus: 'KVM 聚焦時視窗半透明',
+          dimWindowsOnKvmFocusHint: '操作 KVM 時將所有視窗透明度設為 50%，返回視窗後恢復。',
           deviceIdentity: '裝置識別',
           deviceIdentityHint: '為這台 OneKVM 設定容易識別的名稱，不會修改網路主機名稱。',
           deviceName: '裝置名稱',

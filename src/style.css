@@ -5310,6 +5310,13 @@ select { font: inherit; }
   .metric-resolution { display: none; }
 }
 
+/* Native focus also covers windows teleported outside the console workspace. */
+body:has(.app-shell[data-dim-windows-on-kvm-focus="true"]):has(.console-hid-layer:focus) { --onekvm-window-opacity: 0.5; }
+:where(.host-window-frame) { opacity: var(--onekvm-window-opacity, 1); transition: opacity 140ms ease; }
+@media (prefers-reduced-motion: reduce) {
+  :where(.host-window-frame) { transition: none; }
+}
+
 .win11-window-enter-active,
 .tool-window-layer.win11-window-enter-active .console-floating-window {
   transition: opacity var(--win11-enter) var(--win11-ease-out), transform var(--win11-enter) var(--win11-ease-out);

@@ -572,7 +572,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="app-shell" :style="{ '--onekvm-taskbar-height': `${taskbarInset}px` }">
+  <div class="app-shell" :data-dim-windows-on-kvm-focus="status?.identity?.dim_windows_on_kvm_focus !== false" :style="{ '--onekvm-taskbar-height': `${taskbarInset}px` }">
     <KeyboardLockOverlay :changes="keyboardLockChanges" />
     <ConsoleWindowTransition :show="settingsWindowOpen && canSettings && !advancedSettingsOpen" @after-leave="afterSettingsWindowLeave">
       <AdvancedSettingsWindow ref="settingsWindow"

@@ -105,6 +105,25 @@ function updateSubtitleParts(values: Array<string | number>) {
   <div class="personalization-settings">
     <section class="personalization-section">
       <header>
+        <h2>{{ t('settings.advancedSettings.personalizationPage.windowBehavior', 'Window behavior') }}</h2>
+      </header>
+      <div class="personalization-switch-row">
+        <div>
+          <label id="dim-windows-label">{{ t('settings.advancedSettings.personalizationPage.dimWindowsOnKvmFocus', 'Translucent windows when KVM has focus') }}</label>
+          <p id="dim-windows-hint">{{ t('settings.advancedSettings.personalizationPage.dimWindowsOnKvmFocusHint', 'Set all windows to 50% opacity while controlling KVM. Focusing a window restores its opacity.') }}</p>
+        </div>
+        <n-switch
+          :value="modelValue.dim_windows_on_kvm_focus ?? true"
+          :disabled="disabled"
+          aria-labelledby="dim-windows-label"
+          aria-describedby="dim-windows-hint"
+          @update:value="update({ dim_windows_on_kvm_focus: $event })"
+        />
+      </div>
+    </section>
+
+    <section class="personalization-section">
+      <header>
         <h2>{{ t('settings.advancedSettings.personalizationPage.deviceIdentity', 'Device identity') }}</h2>
         <p>{{ t('settings.advancedSettings.personalizationPage.deviceIdentityHint', 'Give this OneKVM a friendly name without changing its network hostname.') }}</p>
       </header>
@@ -274,6 +293,9 @@ function updateSubtitleParts(values: Array<string | number>) {
 .personalization-section header h2 { margin: 0; color: var(--foreground); font-size: 14px; }
 .personalization-section header p { margin: 4px 0 0; color: var(--muted-foreground); font-size: 11px; line-height: 1.5; }
 .personalization-section :deep(.n-form-item) { margin-bottom: 0; }
+.personalization-switch-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px; }
+.personalization-switch-row label { color: var(--foreground); font-size: 13px; }
+.personalization-switch-row p { margin: 4px 0 0; color: var(--muted-foreground); font-size: 11px; line-height: 1.5; }
 .personalization-reference { margin: -2px 0 0; }
 .personalization-reference > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px; min-height: 36px; }
 .personalization-reference dt { color: var(--muted-foreground); font-size: 12px; }

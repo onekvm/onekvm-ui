@@ -633,6 +633,9 @@ const zh = {
         time: '区域和时间',
         update: '系统升级',
         personalizationPage: {
+          windowBehavior: '窗口行为',
+          dimWindowsOnKvmFocus: 'KVM 聚焦时窗口半透明',
+          dimWindowsOnKvmFocusHint: '操作 KVM 时将所有窗口透明度设为 50%，返回窗口后恢复。',
           deviceIdentity: '设备标识',
           deviceIdentityHint: '为这台 OneKVM 设置易识别的名称，不会修改网络主机名。',
           deviceName: '设备名称',

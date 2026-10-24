@@ -313,6 +313,7 @@ export interface PersonalizationConfig {
   custom_console_title: string
   console_subtitle_parts: ConsoleSubtitlePart[]
   custom_console_subtitle: string
+  dim_windows_on_kvm_focus: boolean
 }
 
 export interface InputConfig {

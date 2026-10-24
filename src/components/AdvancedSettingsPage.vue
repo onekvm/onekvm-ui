@@ -95,6 +95,7 @@ import { statusEvents } from '@/lib/status-events'
 
 import ExtensionLayoutPage from './ExtensionLayoutPage.vue'
 import ExtensionServiceRecovery from './ExtensionServiceRecovery.vue'
+import ConfigurationTransferPanel from './ConfigurationTransferPanel.vue'
 import RecoveryEntryModal from './RecoveryEntryModal.vue'
 import ExtensionVuePage from './ExtensionVuePage.vue'
 import CloudProvidersPage from './CloudProvidersPage.vue'
@@ -2310,6 +2311,13 @@ watch(paneSection, (value) => {
                       </li>
                     </ul>
                   </section>
+
+                  <ConfigurationTransferPanel
+                    v-if="hasPermission(auth, 'settings.manage')"
+                    :disabled="systemAction !== null || Boolean(networkApply?.pending)"
+                    :video-session-id="props.videoSessionId"
+                    @applied="(response) => { if (response.network_apply) setNetworkApplyStatus(response.network_apply); void load() }"
+                  />
 
                   <section class="system-settings-group system-recovery-group">
                     <h2>{{ t('settings.advancedSettings.systemPage.recovery', 'Recovery') }}</h2>

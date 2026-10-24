@@ -259,6 +259,15 @@ export interface ConfigSaveResponse {
   network_apply?: NetworkApplyStatus
 }
 
+export interface ConfigImportPreview {
+  revision: string
+  commands: number
+  sections: string[]
+  has_changes: boolean
+  network_changed: boolean
+  diff: string
+}
+
 export interface OneKVMConfig {
   schema_version: number
   video: {
@@ -1565,6 +1574,17 @@ export const api = {
   deleteAuthUser: (username: string) =>
     request<void>(`/api/auth/users/${encodeURIComponent(username)}`, { method: 'DELETE' }),
   getConfig: () => request<OneKVMConfig>('/api/config'),
+  exportConfig: () => request<{ text: string }>('/api/config/export', { cache: 'no-store' }),
+  previewConfigImport: (text: string, webRTCSessionId = '') =>
+    request<ConfigImportPreview>('/api/config/import/preview', {
+      method: 'POST', body: JSON.stringify({ text }),
+      headers: webRTCSessionId ? { 'X-OneKVM-WebRTC-Session': webRTCSessionId } : undefined,
+    }),
+  importConfig: (text: string, revision: string, webRTCSessionId = '') =>
+    request<ConfigSaveResponse>('/api/config/import', {
+      method: 'POST', body: JSON.stringify({ text, revision }),
+      headers: webRTCSessionId ? { 'X-OneKVM-WebRTC-Session': webRTCSessionId } : undefined,
+    }),
   getVideoEDID: () => request<EDIDStatus>('/api/video/edid', { cache: 'no-store' }),
   applyVideoEDID: (body: { data_hex?: string; library?: { extension: string; directory: string; id: string }; preset?: string; custom?: string }) =>
     request<{ status: string; apply_required: EDIDApplyRequired }>('/api/video/edid', {

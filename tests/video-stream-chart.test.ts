@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 
 import {
   STREAM_HISTORY_CAPACITY,
+  PacketLossSampler,
+  packetLossBands,
   areaPath,
   bitrateScaleMax,
   formatLatencyUs,
@@ -40,10 +42,13 @@ assert.equal(niceCeiling(61, 60), 100)
 assert.equal(niceCeiling(1200, 1000), 2000)
 
 assert.equal(fpsScaleMax([], 0), 60)
+assert.equal(fpsScaleMax([120], 0), 120)
+assert.equal(fpsScaleMax([120], 120), 120)
+assert.equal(fpsScaleMax([NaN, Infinity, 60], 0), 60)
 assert.equal(fpsScaleMax([24], 24), 24)
 assert.equal(fpsScaleMax([60], 60), 60)
-assert.equal(fpsScaleMax([80], 60), 60)
-assert.equal(fpsScaleMax([80], 30), 30)
+assert.equal(fpsScaleMax([80], 60), 90)
+assert.equal(fpsScaleMax([80], 30), 90)
 
 assert.equal(bitrateScaleMax([]), 1000)
 assert.equal(bitrateScaleMax([800]), 1000)
@@ -115,3 +120,15 @@ const bands = latencyStackBands([latencySample], 50, 240, 72)
 assert.equal(Boolean(bands.capture && bands.encode && bands.present), true)
 
 console.log('video-stream-chart tests passed')
+
+const loss = new PacketLossSampler()
+assert.equal(loss.sample('first', 5), null)
+assert.equal(loss.sample('first', 8), 3)
+assert.equal(loss.sample('first', 8), 0)
+assert.equal(loss.sample('first', 6), 0)
+assert.equal(loss.sample('second', 20), null)
+assert.equal(loss.sample(null, null), null)
+assert.equal(loss.sample('second', 22), null)
+const lossSample = { t: 1, capture: 0, encode: 0, ice: 0, jitter: 0, decode: 0, present: 0 }
+assert.deepEqual(packetLossBands([{ ...lossSample, packetsLost: 0 }, { ...lossSample, packetsLost: 3 }, { ...lossSample, packetsLost: 0 }], 252), [{ x: 0, width: 126, packetsLost: 3 }])
+assert.deepEqual(packetLossBands([{ ...lossSample, packetsLost: 1 }], 252), [{ x: 0, width: 252, packetsLost: 1 }])

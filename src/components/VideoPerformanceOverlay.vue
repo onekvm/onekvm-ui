@@ -89,6 +89,8 @@ let launcherMedia: MediaQueryList | undefined
 
 const { samples } = useVideoStreamHistory(() => props.videoFps, () => props.videoBitrate)
 const { samples: latencySamples } = useLatencyHistory(() => ({
+  packetSource: props.transport === 'webrtc' ? props.webrtcConnection?.inboundId : null,
+  packetsLost: props.webrtcConnection?.packetsLost,
   capture: props.captureLatencyUs,
   encode: props.encodeLatencyUs,
   transport: props.transportUs ?? null,

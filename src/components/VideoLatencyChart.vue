@@ -11,6 +11,7 @@ import {
   linePath,
   nearestSampleIndex,
   sampleX,
+  packetLossBands,
   type LatencySample,
   type LatencyStackKey,
 } from '@/lib/video-stream-chart'
@@ -33,6 +34,8 @@ const hoverIndex = ref(-1)
 const tooltip = ref({ x: 0, y: 0, align: 'center' as 'left' | 'center' | 'right' })
 
 const scaleMax = computed(() => latencyScaleMax(props.samples))
+const hasPacketLossStats = computed(() => props.samples.some(sample => sample.packetsLost != null))
+const lossBands = computed(() => packetLossBands(props.samples, width))
 const bands = computed(() => latencyStackBands(props.samples, scaleMax.value, width, height))
 const iceLine = computed(() => linePath(
   props.samples.map((sample) => sample.ice),
@@ -51,6 +54,7 @@ const hover = computed(() => {
     parts: latencyStackParts(sample),
     ice: sample.ice,
     transport: sample.transport,
+    packetsLost: sample.packetsLost,
   }
 })
 
@@ -121,6 +125,15 @@ function clearHover() {
       :aria-label="t('screen.latencyChart', 'Latency')"
     >
       <g :transform="`translate(${padLeft},${padTop})`">
+        <rect
+          v-for="(band, index) in lossBands"
+          :key="index"
+          class="latency-packet-loss-background"
+          :x="band.x"
+          y="0"
+          :width="band.width"
+          :height="height"
+        />
         <line
           v-for="tick in 3"
           :key="tick"
@@ -170,6 +183,14 @@ function clearHover() {
     </svg>
 
     <div
+      v-if="hasPacketLossStats"
+      class="latency-loss-legend"
+      :title="t('screen.packetLossBackground', 'Red background marks intervals with packet loss')"
+    >
+      <span class="latency-loss-key" aria-hidden="true" />
+      {{ t('screen.packetLoss', 'Packet loss') }}
+    </div>
+    <div
       v-if="hover"
       class="stream-chart-tooltip"
       :data-align="tooltip.align"
@@ -184,6 +205,11 @@ function clearHover() {
         <span class="stream-chart-swatch" :class="`latency-swatch-${item.key}`" aria-hidden="true" />
         <span>{{ item.key === 'jitter' && kind === 'audio' ? t('screen.audioJitterBuffer', 'Audio jitter buffer') : t(item.label, item.fallback) }}</span>
         <strong>{{ item.key === 'transport' && hover.transport == null ? '-' : formatMs(hover.parts[item.key]) }}</strong>
+      </div>
+      <div v-if="hover.packetsLost != null">
+        <span class="stream-chart-swatch latency-swatch-loss" aria-hidden="true" />
+        <span>{{ t('screen.packetLoss', 'Packet loss') }}</span>
+        <strong>{{ hover.packetsLost }}</strong>
       </div>
       <div v-if="kind === 'video'">
         <span class="stream-chart-swatch latency-swatch-ice" aria-hidden="true" />

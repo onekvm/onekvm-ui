@@ -6,6 +6,7 @@ export type StreamSample = {
 
 export type LatencySample = {
   t: number
+  packetsLost?: number | null
   capture: number
   encode: number
   transport?: number | null
@@ -167,10 +168,10 @@ export function niceCeiling(value: number, fallback: number): number {
 
 export const FPS_AXIS_MAX = 60
 
-export function fpsScaleMax(_values: readonly number[], targetFps: number): number {
-  if (Number.isFinite(targetFps) && targetFps > 0)
-    return Math.min(FPS_AXIS_MAX, targetFps)
-  return FPS_AXIS_MAX
+export function fpsScaleMax(values: readonly number[], targetFps: number): number {
+  const baseline = Number.isFinite(targetFps) && targetFps > 0 ? targetFps : FPS_AXIS_MAX
+  const peak = values.reduce((max, value) => Number.isFinite(value) ? Math.max(max, value) : max, 0)
+  return peak <= baseline ? baseline : Math.ceil(peak / 30) * 30
 }
 
 export function bitrateScaleMax(values: readonly number[]): number {
@@ -249,4 +250,30 @@ export function nearestSampleIndex(offsetX: number, count: number, width: number
     }
   }
   return best
+}
+
+// RTP loss counters are cumulative and may decrease after late packets arrive.
+// A new source/peer must establish a baseline before reporting interval loss.
+export class PacketLossSampler {
+  private previous: { id: string; count: number } | null = null
+  sample(id: string | null, count: number | null | undefined): number | null {
+    if (!id || count == null || !Number.isFinite(count)) {
+      this.previous = null
+      return null
+    }
+    const previous = this.previous
+    this.previous = { id, count }
+    return previous?.id === id ? Math.max(0, count - previous.count) : null
+  }
+}
+
+export function packetLossBands(samples: readonly LatencySample[], width: number) {
+  if (!samples.length) return []
+  const step = samples.length === 1 ? width : width / (samples.length - 1)
+  return samples.flatMap((sample, index) => {
+    if (!(sample.packetsLost != null && sample.packetsLost > 0)) return []
+    const right = sampleX(index, samples.length, width)
+    const left = Math.max(0, right - step)
+    return [{ x: left, width: Math.max(0, right - left), packetsLost: sample.packetsLost }]
+  }).filter(band => band.width > 0)
 }

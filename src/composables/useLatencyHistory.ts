@@ -2,12 +2,15 @@ import { onBeforeUnmount, onMounted, ref, toValue, type MaybeRefOrGetter } from 
 
 import {
   STREAM_SAMPLE_MS,
+  PacketLossSampler,
   latencyMs,
   pushStreamSample,
   type LatencySample,
 } from '@/lib/video-stream-chart'
 
 export function useLatencyHistory(values: MaybeRefOrGetter<{
+  packetSource?: string | null
+  packetsLost?: number | null
   capture: number
   encode: number
   transport?: number | null
@@ -18,11 +21,13 @@ export function useLatencyHistory(values: MaybeRefOrGetter<{
 }>) {
   const samples = ref<LatencySample[]>([])
   let timer = 0
+  const loss = new PacketLossSampler()
 
   const take = () => {
     const next = toValue(values)
     samples.value = pushStreamSample(samples.value, {
       t: Date.now(),
+      packetsLost: loss.sample(next.packetSource ?? null, next.packetsLost),
       capture: latencyMs(next.capture),
       encode: latencyMs(next.encode),
       transport: next.transport == null ? null : latencyMs(next.transport),

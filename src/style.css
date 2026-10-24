@@ -5930,3 +5930,9 @@ body {
 
 /* Fullscreen is a viewport of its own; keep the remote picture above the taskbar. */
 .console-workspace:fullscreen { padding-bottom: var(--onekvm-taskbar-height, 0px); box-sizing: border-box; }
+
+.latency-packet-loss-background { fill: color-mix(in srgb, var(--destructive) 24%, transparent); }
+.latency-swatch-loss::after { background: var(--destructive); }
+.latency-loss-legend { display: flex; align-items: center; gap: 4px; color: var(--muted-foreground); font-size: 10px; }
+
+.latency-loss-key { flex: 0 0 12px; width: 12px; height: 8px; border-radius: 2px; background: color-mix(in srgb, var(--destructive) 24%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--destructive) 38%, transparent); }

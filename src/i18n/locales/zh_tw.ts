@@ -115,20 +115,11 @@ const zh_tw = {
       totpMethod: '驗證器',
       backupCode: '恢復代碼',
       recoveryCode: '恢復代碼',
-      hardwareConfirm: '請在機身按下 BOOT 鍵確認。OLED 會顯示提示，按一下即可，不用長按。',
+      hardwareConfirm: '請按裝置上的 BOOT 鍵確認，無需長按。',
+      pluginConfirm: '請依照所選驗證外掛的提示完成確認。',
       cloudConfirm: '請在 OneKVM Cloud 寄給已認領帳號的郵件中批准這次登入。請求五分鐘內有效。',
       verify: '驗證',
       cancelVerify: '取消驗證',
-      tips: {
-        reset1: '長按裝置上的 BOOT 按鍵 10 秒鐘來重設帳號。',
-        reset2: '詳細操作方法可參閱本文件：',
-        reset3: '網頁預設帳號：',
-        reset4: 'SSH 預設帳號：',
-        change1: '請注意，此操作將同時更新下列密碼：',
-        change2: '網頁登入密碼',
-        change3: 'root user密碼 (SSH登入密碼)',
-        change4: '如果您忘記密碼，需要長按裝置上的 BOOT 按鍵來重設密碼。'
-      }
     },
     wifi: {
       title: 'Wi-Fi',
@@ -274,7 +265,7 @@ const zh_tw = {
       resetHdmiUnavailable: '目前裝置狀態無法重置 HDMI，請稍後重試。',
       noSignal: '無信號',
       unsupportedResolution: '不支援的解析度',
-      unsupportedResolutionHint: '請將主機輸出改為 Cube 支援的模式，例如 2880×1620、2560×1440、1920×1080 或 1280×720。',
+      unsupportedResolutionHint: '請將被控裝置的 HDMI 輸出調整為目前機型支援的解析度和更新率。',
       checkConnection: '請檢查 HDMI 連接',
       connectionLostTitle: '連線已中斷',
       connectionLostDetail: '瀏覽器目前無法連線 OneKVM，請檢查網路連線，或等待服務重新啟動。',
@@ -422,10 +413,10 @@ const zh_tw = {
       disconnect: '中斷',
       empty: '還沒有正在轉發的手把。',
       enableFirst: '請先在進階設定 → USB 中開啟 USB 手把。',
-      webhidUnsupported: '目前瀏覽器不支援 WebHID。USB 手把透傳需要 Chrome 或 Edge。',
+      webhidUnsupported: '目前瀏覽器不支援 WebHID。標準手把可嘗試自動轉發；連接 WebHID 手把請使用 Chrome 或 Edge。',
       requestFailed: '開啟手把失敗。',
-      enabledHint: 'USB 手把已啟用。用 WebHID 連接本機手把後，按鍵會注入到受控主機。',
-      disabledHint: 'USB 手把未開啟。請到進階設定 → USB 啟用 WebHID 手把支援。受控主機會重新列舉 USB。',
+      enabledHint: 'USB 手把已啟用。連接本機手把後，即可將操作轉發給被控裝置。',
+      disabledHint: 'USB 手把尚未開啟。請到進階設定 → USB 啟用手把。被控裝置會重新辨識 USB。',
       fallbackHint: '目前瀏覽器沒有 WebHID。頁面保持焦點時會轉發標準 Gamepad API 裝置。',
     },
     image: {
@@ -436,21 +427,6 @@ const zh_tw = {
       mountFailed: '掛載失敗',
       mountDesc: '在某些系統中，需要在遠端主機中彈出虛擬硬碟後再掛載鏡像。',
       refresh: '更新鏡像列表',
-      tips: {
-        title: '如何上傳',
-        usb1: '將裝置通過 USB 連接到你的電腦；',
-        usb2: '確保已經掛載了虛擬硬碟（設定 - 虛擬硬碟）；',
-        usb3: '在電腦上打開虛擬硬碟，將鏡像檔案拷貝到虛擬硬碟的根目錄下。',
-        scp1: '確保裝置和你的電腦在同一個區域網路內；',
-        scp2: '在電腦上打開終端軟體，使用 SCP 命令將鏡像檔案上傳到裝置的 /data 目錄。',
-        scp3: '示例：scp your-image-path root@your-nanokvm-ip:/data',
-        tfCard: 'TF 卡',
-        tf1: '該方式適用於 Linux 系統',
-        tf2: '將 TF 卡從裝置中取出（FULL 版本需要先拆開外殼）；',
-        tf3: '將 TF 卡插入讀卡器並連接到你的電腦；',
-        tf4: '從電腦上拷貝鏡像檔案到 TF 卡的 /data 目錄下；',
-        tf5: '將 TF 卡重新插入裝置。'
-      }
     },
     script: {
       title: '腳本',
@@ -1183,7 +1159,7 @@ const zh_tw = {
           browserTimeSynced: '已從瀏覽器同步時間',
           timeSaved: '區域和時間已更新',
           bootSlots: 'A/B 啟動分割區',
-          updateUnavailable: '目前啟動模式不支援系統升級。此測試系統沒有 A/B 升級服務。',
+          updateUnavailable: '系統升級服務暫時無法使用，請稍後再試。',
           slot: '分割區',
           booted: '目前執行',
           nextBoot: '下次啟動',
@@ -1276,7 +1252,6 @@ const zh_tw = {
         deviceKey: '設備碼',
         community: '社區',
         hostname: '主機名',
-        hostnameUpdated: '主機名修改成功，重啟後生效',
         ipType: {
           Wired: '有線',
           Wireless: '無線',
@@ -1341,7 +1316,6 @@ const zh_tw = {
         },
         ssh: {
           description: '啟用 SSH 遠端存取',
-          tip: '啟用前請務必設定強密碼（帳號 - 修改密碼）'
         },
         tls: {
           description: '啟用 HTTPS 協議',
@@ -1426,7 +1400,6 @@ const zh_tw = {
           usernameMinLength: '用戶名至少需要3個字符',
           usernameMaxLength: '用戶名最多32個字符',
           passwordRequired: '密碼不能為空',
-          passwordMinLength: '密碼至少需要6個字符',
           roleRequired: '角色不能為空'
         },
         confirm: {
@@ -1462,38 +1435,6 @@ const zh_tw = {
           currentPasswordRequired: '當前密碼不能為空',
           newPasswordRequired: '新密碼不能為空',
           confirmPasswordRequired: '確認密碼不能為空',
-          passwordMinLength: '密碼至少需要6個字符'
-        }
-      },
-      system: {
-        upgrade: {
-          title: '系統升級',
-          currentVersion: '目前版本',
-          appVersion: '應用程式',
-          sysVersion: '系統',
-          uploadPackage: '上傳升級包',
-          uploadHint: '點擊或拖拽檔案來上傳',
-          uploadTip: '僅支援 .nkbin 檔案',
-          invalidFormat: '檔案格式不正確，僅允許 .nkbin 檔案',
-          fileTooLarge: '檔案太大（最大 200MB）',
-          uploadSuccess: '升級包上傳成功',
-          uploadFailed: '上傳失敗',
-          packageInfo: '升級包資訊',
-          readyToUpgrade: '準備升級',
-          version: '版本',
-          description: '說明',
-          files: '檔案',
-          execute: '執行升級',
-          cancel: '取消',
-          confirmTitle: '確認升級',
-          confirmContent: '確定要繼續升級嗎？系統將需要重新啟動。',
-          rebootRequired: '需要重新啟動',
-          rebootNow: '立即重啟',
-          rebootLater: '稍後重啟',
-          rebooting: '系統正在重新啟動...',
-          rebootingTitle: '系統重新啟動中',
-          rebootingContent: '系統正在重新啟動，請稍等片刻後重新整理頁面。',
-          cleanupSuccess: '清理完成'
         }
       },
       account: {
@@ -1524,7 +1465,7 @@ const zh_tw = {
         okBtn: '是',
         cancelBtn: '否',
         mfa: '雙因素認證',
-        mfaHelp: '密碼即可登入。驗證器、恢復碼、機身 BOOT 鍵確認和 OneKVM Cloud 批准都可以按需開啟。',
+        mfaHelp: '啟用雙因素驗證後，登入時還需完成第二步驗證。可用方式取決於裝置及已啟用的驗證外掛。',
         enableTotp: '啟用驗證器',
         authenticator: '驗證器',
         disableTotp: '關閉驗證器',
@@ -1544,7 +1485,7 @@ const zh_tw = {
         pluginEnabled: '已開啟硬體確認',
         pluginDisabled: '已關閉硬體確認',
         pluginEnrolling: '等待 BOOT',
-        pluginEnrollHint: '請在機身按下 BOOT 鍵確認。OLED 會顯示提示，按一下即可，不必長按。',
+        pluginEnrollHint: '請按裝置上的 BOOT 鍵確認，無需長按。',
         pluginFactors: '裝置確認',
         pluginFactorsHelp: '密碼之後可用外掛作為第二因素。BOOT 確認留在裝置上；OneKVM Cloud 會請已認領的雲端帳號批准本機登入。',
         cloudConfirmHint: '請在 OneKVM Cloud 寄給已認領帳號的郵件中批准這次請求。',
@@ -1554,10 +1495,9 @@ const zh_tw = {
         pluginConfirmHint: '請用所選外掛確認這次請求。',
         pluginWaiting: '等待確認',
         passwordRequired: '請先填寫目前密碼以確認此操作',
-        currentPasswordHint: '儲存帳號或關閉驗證器時需要目前密碼。',
+        currentPasswordHint: '修改帳號、關閉驗證方式或重新產生恢復碼時，需要目前密碼。',
         passwordMismatch: '兩次密碼不一致',
         hardware: '機身確認',
-        hardwareHelp: '用機身 BOOT 鍵作為第二因素。OLED 會提示，按一下即可。',
         copySecret: '複製',
         secretCopied: '金鑰已複製',
         cancelTotp: '取消',

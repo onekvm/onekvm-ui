@@ -2436,7 +2436,7 @@ watch(paneSection, (value) => {
 
               <section v-else-if="paneSection === 'update'" class="advanced-settings-section">
                 <n-alert v-if="systemUpdateUnavailable" type="info" :bordered="false">
-                  {{ t('settings.advancedSettings.systemPage.updateUnavailable', 'System updates are unavailable in this boot mode. This development system has no A/B update service.') }}
+                  {{ t('settings.advancedSettings.systemPage.updateUnavailable', 'System update service is temporarily unavailable. Please try again later.') }}
                 </n-alert>
                 <template v-if="systemUpdate">
                   <section class="system-settings-group">

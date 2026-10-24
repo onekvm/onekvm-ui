@@ -679,7 +679,9 @@ onUnmounted(() => {
           <p v-else-if="selected?.type === 'plugin'" class="auth-mfa-help">
             {{ selected.id === 'cloud'
               ? t('auth.cloudConfirm', 'Approve this sign-in from the OneKVM Cloud email sent to the enrolled account. The request expires in five minutes.')
-              : t('auth.hardwareConfirm', 'Press the BOOT button on the device. The OLED will show a prompt; tap once, do not hold.') }}
+              : selected.id === 'nanokvm-boot-confirm'
+                ? t('auth.hardwareConfirm', 'Press the BOOT button on the device to confirm. Do not hold it.')
+                : t('auth.pluginConfirm', 'Follow the selected verification plugin\'s instructions to confirm.') }}
           </p>
         </n-form>
         <n-button type="primary" attr-type="submit" block :loading="busy">

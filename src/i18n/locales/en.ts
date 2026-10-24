@@ -115,21 +115,11 @@ const en = {
       totpMethod: 'Authenticator',
       backupCode: 'Recovery code',
       recoveryCode: 'Recovery code',
-      hardwareConfirm: 'Press the BOOT button on the device. The OLED will show a prompt; tap once, do not hold.',
+      hardwareConfirm: 'Press the BOOT button on the device to confirm. Do not hold it.',
+      pluginConfirm: 'Follow the selected verification plugin\'s instructions to confirm.',
       cloudConfirm: 'Approve this sign-in from the OneKVM Cloud email sent to the enrolled account. The request expires in five minutes.',
       verify: 'Verify',
       cancelVerify: 'Cancel verification',
-      tips: {
-        reset1:
-          'To reset the passwords, press and hold the BOOT button on the device for 10 seconds.',
-        reset2: 'For detailed steps, please consult this document:',
-        reset3: 'Web default account:',
-        reset4: 'SSH default account:',
-        change1: 'Please note that this action will change the following passwords:',
-        change2: 'Web login password',
-        change3: 'System root password (SSH login password)',
-        change4: 'To reset the passwords, press and hold the BOOT button on the device.'
-      }
     },
     wifi: {
       title: 'Wi-Fi',
@@ -275,7 +265,7 @@ const en = {
       resetHdmiUnavailable: 'Cannot reset HDMI with the current device settings. Try again shortly.',
       noSignal: 'No Signal',
       unsupportedResolution: 'Unsupported resolution',
-      unsupportedResolutionHint: 'Set the host output to a Cube-supported mode such as 2880×1620, 2560×1440, 1920×1080, or 1280×720.',
+      unsupportedResolutionHint: 'Set the controlled device\'s HDMI output to a resolution and refresh rate supported by this model.',
       checkConnection: 'Please check HDMI connection',
       connectionLostTitle: 'Connection interrupted',
       connectionLostDetail: 'The browser can no longer reach OneKVM. Check the network connection or wait for the service to restart.',
@@ -423,10 +413,10 @@ const en = {
       disconnect: 'Disconnect',
       empty: 'No controller is forwarding yet.',
       enableFirst: 'Enable the USB gamepad in Advanced settings → USB first.',
-      webhidUnsupported: 'This browser does not support WebHID. Chrome or Edge is required for USB controller passthrough.',
+      webhidUnsupported: 'This browser does not support WebHID. Standard controllers may still be forwarded automatically; use Chrome or Edge to connect a WebHID controller.',
       requestFailed: 'Failed to open the controller.',
-      enabledHint: 'USB gamepad is enabled. Connect a controller with WebHID, then press buttons on the remote host.',
-      disabledHint: 'USB gamepad is off. Open Advanced settings → USB and enable WebHID gamepad support. The controlled host will re-enumerate USB.',
+      enabledHint: 'USB gamepad is enabled. Connect a local controller to forward its input to the controlled device.',
+      disabledHint: 'USB gamepad is off. Enable it in Advanced settings → USB. The controlled device will re-enumerate USB.',
       fallbackHint: 'WebHID is unavailable in this browser. Standard Gamepad API devices are forwarded while this page stays focused.',
     },
     image: {
@@ -438,20 +428,6 @@ const en = {
       mountDesc:
         "In some systems, it's necessary to eject the virtual disk on the remote host before mounting the image.",
       refresh: 'Refresh the image list',
-      tips: {
-        title: 'How to upload',
-        usb1: 'Connect the device to your computer via USB.',
-        usb3: 'Open the virtual disk on your computer and copy the image file to the root directory of the virtual disk.',
-        scp1: 'Make sure the device and your computer are on the same local network.',
-        scp2: 'Open a terminal on your computer and use the SCP command to upload the image file to the /data directory on the device.',
-        scp3: 'Example: scp your-image-path root@your-nanokvm-ip:/data',
-        tfCard: 'TF Card',
-        tf1: 'This method is supported on Linux system',
-        tf2: 'Get TF card from the device (for the FULL version, disassemble the case first).',
-        tf3: 'Insert the TF card into a card reader and connect it to your computer.',
-        tf4: 'Copy the image file to the /data directory on the TF card.',
-        tf5: 'Insert the TF card into the device.'
-      }
     },
     script: {
       title: 'Scripts',
@@ -1184,7 +1160,7 @@ const en = {
           browserTimeSynced: 'Time synchronized from browser',
           timeSaved: 'Region and time updated',
           bootSlots: 'A/B boot slots',
-          updateUnavailable: 'System updates are unavailable in this boot mode. This development system has no A/B update service.',
+          updateUnavailable: 'System update service is temporarily unavailable. Please try again later.',
           slot: 'Slot',
           booted: 'Booted',
           nextBoot: 'Next boot',
@@ -1277,7 +1253,6 @@ const en = {
         deviceKey: 'Device Key',
         community: 'Community',
         hostname: 'Hostname',
-        hostnameUpdated: 'Hostname updated. Reboot to apply.',
         ipType: {
           Wired: 'Wired',
           Wireless: 'Wireless',
@@ -1329,7 +1304,6 @@ const en = {
         },
         ssh: {
           description: 'Enable SSH remote access',
-          tip: 'Set a strong password before enabling (Account - Change Password)'
         },
         tls: {
           description: 'Enable HTTPS protocol',
@@ -1413,7 +1387,6 @@ const en = {
           usernameMinLength: 'Username must be at least 3 characters',
           usernameMaxLength: 'Username must be at most 32 characters',
           passwordRequired: 'Password is required',
-          passwordMinLength: 'Password must be at least 6 characters',
           roleRequired: 'Role is required'
         },
         messages: {
@@ -1435,7 +1408,6 @@ const en = {
           currentPasswordRequired: 'Current password is required',
           newPasswordRequired: 'New password is required',
           confirmPasswordRequired: 'Confirm password is required',
-          passwordMinLength: 'Password must be at least 6 characters'
         },
         confirm: {
           deleteTitle: 'Are you sure you want to delete this user?',
@@ -1451,37 +1423,6 @@ const en = {
         confirmNewPassword: 'Confirm new password',
         adminPasswordChangeNote: 'Admin password change requires privilege verification',
         adminPasswordChangeDesc: 'You will need to enter the sudo password for verification after clicking Next'
-      },
-      system: {
-        upgrade: {
-          title: 'System Upgrade',
-          currentVersion: 'Current Version',
-          appVersion: 'Application',
-          sysVersion: 'System',
-          uploadPackage: 'Upload Upgrade Package',
-          uploadHint: 'Click or drag file to upload',
-          uploadTip: 'Only .nkbin files are supported',
-          invalidFormat: 'Invalid file format, only .nkbin files are allowed',
-          fileTooLarge: 'File is too large (max 200MB)',
-          uploadSuccess: 'Package uploaded successfully',
-          uploadFailed: 'Upload failed',
-          packageInfo: 'Package Information',
-          readyToUpgrade: 'Ready to Upgrade',
-          version: 'Version',
-          description: 'Description',
-          files: 'Files',
-          execute: 'Execute Upgrade',
-          cancel: 'Cancel',
-          confirmTitle: 'Confirm Upgrade',
-          confirmContent: 'Are you sure you want to proceed with the upgrade? The system will need to restart.',
-          rebootRequired: 'Reboot Required',
-          rebootNow: 'Reboot Now',
-          rebootLater: 'Reboot Later',
-          rebooting: 'System is rebooting...',
-          rebootingTitle: 'System Rebooting',
-          rebootingContent: 'The system is rebooting. Please wait a moment and then refresh the page.',
-          cleanupSuccess: 'Cleanup completed'
-        }
       },
       account: {
         title: 'Account',
@@ -1511,7 +1452,7 @@ const en = {
         okBtn: 'Yes',
         cancelBtn: 'No',
         mfa: 'Two-factor authentication',
-        mfaHelp: 'A password is enough to sign in. An authenticator, recovery codes, BOOT-button confirmation, and OneKVM Cloud approval can be turned on when you need them.',
+        mfaHelp: 'When two-factor authentication is enabled, sign-in requires a second verification step. Available methods depend on the device and enabled verification plugins.',
         enableTotp: 'Enable authenticator',
         authenticator: 'Authenticator',
         disableTotp: 'Disable authenticator',
@@ -1531,7 +1472,7 @@ const en = {
         pluginEnabled: 'Hardware confirmation enabled',
         pluginDisabled: 'Hardware confirmation disabled',
         pluginEnrolling: 'Waiting for BOOT',
-        pluginEnrollHint: 'Press the BOOT button on the device. The OLED will show a prompt; tap once, do not hold.',
+        pluginEnrollHint: 'Press the BOOT button on the device to confirm. Do not hold it.',
         pluginFactors: 'Device confirmation',
         pluginFactorsHelp: 'Use a plugin as a second factor after the password. BOOT confirmation stays on the device; OneKVM Cloud asks the enrolled cloud account to approve local sign-in.',
         cloudConfirmHint: 'Approve the request in the OneKVM Cloud email sent to the enrolled account.',
@@ -1541,10 +1482,9 @@ const en = {
         pluginConfirmHint: 'Confirm this request with the selected plugin.',
         pluginWaiting: 'Waiting for confirmation',
         passwordRequired: 'Enter your current password to confirm this change',
-        currentPasswordHint: 'Needed to save the account or turn off the authenticator.',
+        currentPasswordHint: 'Your current password is required to update the account, disable a verification method, or generate new recovery codes.',
         passwordMismatch: 'The passwords do not match',
         hardware: 'Hardware confirmation',
-        hardwareHelp: 'Use the BOOT button on the device as a second factor. The OLED will prompt; tap once.',
         copySecret: 'Copy',
         secretCopied: 'Secret copied',
         cancelTotp: 'Cancel',

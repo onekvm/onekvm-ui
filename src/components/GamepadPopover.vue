@@ -119,7 +119,7 @@ async function requestHIDDevice() {
     return
   }
   if (!hidSupported || !navigator.hid) {
-    message.warning(t('gamepad.webhidUnsupported', 'This browser does not support WebHID. Chrome or Edge is required for USB controller passthrough.'))
+    message.warning(t('gamepad.webhidUnsupported', 'This browser does not support WebHID. Standard controllers may still be forwarded automatically; use Chrome or Edge to connect a WebHID controller.'))
     return
   }
   requesting.value = true
@@ -238,8 +238,8 @@ onBeforeUnmount(() => {
       <HidHostAlert :hid="hid" />
       <p class="gamepad-hint">
         {{ gadgetEnabled
-          ? t('gamepad.enabledHint', 'USB gamepad is enabled. Connect a controller with WebHID, then press buttons on the remote host.')
-          : t('gamepad.disabledHint', 'USB gamepad is off. Open Advanced settings → USB and enable WebHID gamepad support. The controlled host will re-enumerate USB.') }}
+          ? t('gamepad.enabledHint', 'USB gamepad is enabled. Connect a local controller to forward its input to the controlled device.')
+          : t('gamepad.disabledHint', 'USB gamepad is off. Enable it in Advanced settings → USB. The controlled device will re-enumerate USB.') }}
       </p>
       <p v-if="gadgetEnabled && !hidSupported" class="gamepad-hint">
         {{ t('gamepad.fallbackHint', 'WebHID is unavailable in this browser. Standard Gamepad API devices are forwarded while this page stays focused.') }}

@@ -115,20 +115,11 @@ const zh = {
       totpMethod: '验证器',
       backupCode: '恢复代码',
       recoveryCode: '恢复代码',
-      hardwareConfirm: '请在机身按下 BOOT 键确认。OLED 会显示提示，按一下即可，不用长按。',
+      hardwareConfirm: '请按设备上的 BOOT 键确认，无需长按。',
+      pluginConfirm: '请按所选验证插件的提示完成确认。',
       cloudConfirm: '请在 OneKVM Cloud 发给已认领帐号的邮件里批准这次登录。请求五分钟内有效。',
       verify: '验证',
       cancelVerify: '取消验证',
-      tips: {
-        reset1: '长按设备上的 BOOT 按键 10 秒钟来重置帐号。',
-        reset2: '详细操作步骤可参考此文档：',
-        reset3: '网页默认帐号：',
-        reset4: 'SSH 默认帐号：',
-        change1: '请注意，此操作将同时更新以下密码：',
-        change2: '网页的登录密码',
-        change3: '系统 root 用户的密码（SSH 登录密码）',
-        change4: '如果您忘记了密码，需要长按设备上的 BOOT 按键来重置密码。'
-      }
     },
     wifi: {
       title: 'Wi-Fi',
@@ -270,7 +261,7 @@ const zh = {
       frameDetect: '帧差检测',
       noSignal: '无信号',
       unsupportedResolution: '不支持的分辨率',
-      unsupportedResolutionHint: '请将主机输出改为 Cube 支持的模式，例如 2880×1620、2560×1440、1920×1080 或 1280×720。',
+      unsupportedResolutionHint: '请将被控设备的 HDMI 输出调整为当前机型支持的分辨率和刷新率。',
       checkConnection: '请检查 HDMI 连接',
       connectionLostTitle: '连接已中断',
       connectionLostDetail: '浏览器当前无法连接 OneKVM，请检查网络连接，或等待服务重新启动。',
@@ -422,10 +413,10 @@ const zh = {
       disconnect: '断开',
       empty: '还没有正在转发的手柄。',
       enableFirst: '请先在高级设置 → USB 中打开 USB 手柄。',
-      webhidUnsupported: '当前浏览器不支持 WebHID。USB 手柄透传需要 Chrome 或 Edge。',
+      webhidUnsupported: '当前浏览器不支持 WebHID。标准手柄可尝试自动转发；连接 WebHID 手柄请使用 Chrome 或 Edge。',
       requestFailed: '打开手柄失败。',
-      enabledHint: 'USB 手柄已启用。用 WebHID 连接本地手柄后，按键会注入到被控主机。',
-      disabledHint: 'USB 手柄未打开。请到高级设置 → USB 启用 WebHID 手柄支持。被控主机会重新枚举 USB。',
+      enabledHint: 'USB 手柄已启用。连接本地手柄后，即可将操作转发给被控设备。',
+      disabledHint: 'USB 手柄未打开。请到高级设置 → USB 启用手柄。被控设备会重新识别 USB。',
       fallbackHint: '当前浏览器没有 WebHID。页面保持焦点时会转发标准 Gamepad API 设备。',
     },
     image: {
@@ -436,21 +427,6 @@ const zh = {
       mountFailed: '挂载失败',
       mountDesc: '在某些系统中，需要在远程主机中弹出虚拟硬盘后再挂载镜像。',
       refresh: '刷新镜像列表',
-      tips: {
-        title: '如何上传',
-        usb1: '将设备通过 USB 连接到你的电脑；',
-        usb2: '确保已经挂载了虚拟硬盘（设置 - 虚拟硬盘）；',
-        usb3: '在电脑上打开虚拟硬盘，将镜像文件拷贝到虚拟硬盘的根目录下。',
-        scp1: '确保设备和你的电脑在同一个局域网内；',
-        scp2: '在电脑上打开终端软件，使用 SCP 命令将镜像文件上传到设备的 /data 目录。',
-        scp3: '示例：scp your-image-path root@your-nanokvm-ip:/data',
-        tfCard: 'TF 卡',
-        tf1: '该方式适用于 Linux 系统',
-        tf2: '将 TF 卡从设备中取出（FULL 版本需要先拆开外壳）；',
-        tf3: '将 TF 卡插入读卡器并连接到你的电脑；',
-        tf4: '从电脑上拷贝镜像文件到 TF 卡的 /data 目录下；',
-        tf5: '将 TF 卡重新插入设备。'
-      }
     },
     script: {
       title: '脚本',
@@ -1183,7 +1159,7 @@ const zh = {
           browserTimeSynced: '已从浏览器同步时间',
           timeSaved: '区域和时间已更新',
           bootSlots: 'A/B 启动分区',
-          updateUnavailable: '当前启动模式不支持系统升级。此调试系统没有 A/B 升级服务。',
+          updateUnavailable: '系统升级服务暂不可用，请稍后重试。',
           slot: '分区',
           booted: '当前运行',
           nextBoot: '下次启动',
@@ -1276,7 +1252,6 @@ const zh = {
         deviceKey: '设备码',
         community: '社区',
         hostname: '主机名',
-        hostnameUpdated: '主机名修改成功，重启后生效',
         ipType: {
           Wired: '有线',
           Wireless: '无线',
@@ -1328,7 +1303,6 @@ const zh = {
         },
         ssh: {
           description: '启用 SSH 远程访问',
-          tip: '启用前请务必设置强密码（帐号 - 修改密码）'
         },
         tls: {
           description: '启用 HTTPS 协议',
@@ -1412,7 +1386,6 @@ const zh = {
           usernameMinLength: '用户名至少需要3个字符',
           usernameMaxLength: '用户名最多32个字符',
           passwordRequired: '密码不能为空',
-          passwordMinLength: '密码至少需要6个字符',
           roleRequired: '角色不能为空'
         },
         confirm: {
@@ -1448,38 +1421,6 @@ const zh = {
           currentPasswordRequired: '当前密码不能为空',
           newPasswordRequired: '新密码不能为空',
           confirmPasswordRequired: '确认密码不能为空',
-          passwordMinLength: '密码至少需要6个字符'
-        }
-      },
-      system: {
-        upgrade: {
-          title: '系统升级',
-          currentVersion: '当前版本',
-          appVersion: '应用程序',
-          sysVersion: '系统',
-          uploadPackage: '上传升级包',
-          uploadHint: '点击或拖拽文件到此处上传',
-          uploadTip: '仅支持 .nkbin 格式文件',
-          invalidFormat: '文件格式无效，仅支持 .nkbin 文件',
-          fileTooLarge: '文件过大（最大 200MB）',
-          uploadSuccess: '升级包上传成功',
-          uploadFailed: '上传失败',
-          packageInfo: '升级包信息',
-          readyToUpgrade: '准备升级',
-          version: '版本',
-          description: '描述',
-          files: '文件',
-          execute: '执行升级',
-          cancel: '取消',
-          confirmTitle: '确认升级',
-          confirmContent: '确定要执行升级吗？系统将需要重启。',
-          rebootRequired: '需要重启',
-          rebootNow: '立即重启',
-          rebootLater: '稍后重启',
-          rebooting: '系统正在重启...',
-          rebootingTitle: '系统重启中',
-          rebootingContent: '系统正在重启，请稍等片刻后刷新页面。',
-          cleanupSuccess: '清理完成'
         }
       },
       account: {
@@ -1510,7 +1451,7 @@ const zh = {
         okBtn: '是',
         cancelBtn: '否',
         mfa: '双因素认证',
-        mfaHelp: '密码即可登录。验证器、恢复码、机身 BOOT 键确认和 OneKVM Cloud 批准都可以按需开启。',
+        mfaHelp: '启用双因素认证后，登录时还需完成第二步验证。可用方式取决于设备及已启用的验证插件。',
         enableTotp: '启用验证器',
         authenticator: '验证器',
         disableTotp: '关闭验证器',
@@ -1530,7 +1471,7 @@ const zh = {
         pluginEnabled: '已开启硬件确认',
         pluginDisabled: '已关闭硬件确认',
         pluginEnrolling: '等待 BOOT',
-        pluginEnrollHint: '请在机身按下 BOOT 键确认。OLED 会显示提示，按一下即可，不用长按。',
+        pluginEnrollHint: '请按设备上的 BOOT 键确认，无需长按。',
         pluginFactors: '设备确认',
         pluginFactorsHelp: '密码之后可用插件作为第二因素。BOOT 确认留在设备上；OneKVM Cloud 会请已认领的云帐号批准本地登录。',
         cloudConfirmHint: '请在 OneKVM Cloud 发给已认领帐号的邮件里批准这次请求。',
@@ -1540,10 +1481,9 @@ const zh = {
         pluginConfirmHint: '请用所选插件确认这次请求。',
         pluginWaiting: '等待确认',
         passwordRequired: '请先填写当前密码以确认此操作',
-        currentPasswordHint: '保存帐号或关闭验证器时需要当前密码。',
+        currentPasswordHint: '修改帐号、关闭验证方式或重新生成恢复码时，需要当前密码。',
         passwordMismatch: '两次密码不一致',
         hardware: '机身确认',
-        hardwareHelp: '用机身 BOOT 键作为第二因素。OLED 会提示，按一下即可。',
         copySecret: '复制',
         secretCopied: '密钥已复制',
         cancelTotp: '取消',

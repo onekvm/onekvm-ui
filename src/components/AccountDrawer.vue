@@ -230,7 +230,7 @@ function pluginEnrollHint(id: string) {
     return t('settings.account.cloudConfirmHint', 'Approve the request in the OneKVM Cloud email sent to the enrolled account.')
   }
   if (isBootAuthPlugin(id)) {
-    return t('settings.account.pluginEnrollHint', 'Press the BOOT button on the device. The OLED will show a prompt; tap once, do not hold.')
+    return t('settings.account.pluginEnrollHint', 'Press the BOOT button on the device to confirm. Do not hold it.')
   }
   return t('settings.account.pluginConfirmHint', 'Confirm this request with the selected plugin.')
 }
@@ -314,7 +314,7 @@ watch(totpUrl, async (url) => {
           <header class="account-section-header">
             <strong>{{ t('settings.account.webAccount', 'Web account') }}</strong>
           </header>
-          <p class="account-section-help">{{ t('settings.account.currentPasswordHint', 'Needed to save the account or turn off the authenticator.') }}</p>
+          <p class="account-section-help">{{ t('settings.account.currentPasswordHint', 'Your current password is required to update the account, disable a verification method, or generate new recovery codes.') }}</p>
           <n-form label-placement="top" :show-feedback="false" class="account-form">
             <n-form-item :label="t('settings.account.currentPassword', 'Current password')">
               <div id="account-current-password" class="account-password-field">
@@ -351,7 +351,7 @@ watch(totpUrl, async (url) => {
               {{ totpEnabled ? t('settings.account.enabled', 'Enabled') : t('settings.account.notConfigured', 'Not configured') }}
             </n-tag>
           </header>
-          <p class="account-section-help">{{ t('settings.account.mfaHelp', 'A password is enough to sign in. An authenticator, recovery codes, and BOOT-button confirmation can be turned on when you need them.') }}</p>
+          <p class="account-section-help">{{ t('settings.account.mfaHelp', 'When two-factor authentication is enabled, sign-in requires a second verification step. Available methods depend on the device and enabled verification plugins.') }}</p>
           <div v-if="!totpEnabled && !totpSecret" class="account-section-actions">
             <n-button :loading="totpBusy" @click="beginTotp">{{ t('settings.account.enableTotp', 'Enable authenticator') }}</n-button>
           </div>

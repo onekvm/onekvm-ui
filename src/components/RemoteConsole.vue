@@ -588,7 +588,7 @@ watch(
     >
       <strong>{{ t('screen.unsupportedResolution', 'Unsupported resolution') }}</strong>
       <span v-if="unsupportedSize">{{ unsupportedSize }}</span>
-      <p>{{ t('screen.unsupportedResolutionHint', 'Set the host output to a Cube-supported mode such as 1920×1080 or 1280×720.') }}</p>
+      <p>{{ t('screen.unsupportedResolutionHint', 'Set the controlled device\'s HDMI output to a resolution and refresh rate supported by this model.') }}</p>
     </div>
 
     <Transition name="console-loading">

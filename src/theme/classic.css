@@ -291,9 +291,30 @@ html[data-onekvm-skin="classic"] .n-dropdown-menu:is(.host-theme-menu, .host-men
 }
 html[data-onekvm-skin="classic"] .host-window-titlebar {
   height: auto;
-  min-height: 20px;
+  min-height: 24px;
   line-height: 1;
   text-shadow: none;
+}
+/* Match the caption controls in built-in windows. The toolbox system-menu
+   button otherwise adds six pixels to its titlebar. */
+html[data-onekvm-skin="classic"] .host-window-titlebar .tool-window-system-menu {
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  min-height: 18px;
+  padding: 0;
+}
+/* Keep the resize corner from covering the compact system-menu button. */
+html[data-onekvm-skin="classic"] .tool-window .tool-resize-nw {
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+html[data-onekvm-skin="classic"] .host-window-titlebar .console-floating-title-icon {
+  align-items: center;
+  justify-content: center;
+}
+html[data-onekvm-skin="classic"] .host-window-titlebar .console-floating-title-icon :is(.tool-icon, .n-button__icon, svg, img) {
+  width: 16px;
+  height: 16px;
 }
 html[data-onekvm-skin="classic"] .host-window-titlebar :is(strong, .console-floating-title) {
   color: inherit;
@@ -594,6 +615,7 @@ html[data-onekvm-skin="classic"] :is(.advanced-settings-sidebar nav, .advanced-s
 }
 @media (pointer: coarse), (max-width: 760px), (max-height: 500px) and (max-width: 1100px) {
   html[data-onekvm-skin="classic"] .host-window-actions > button[aria-label],
+  html[data-onekvm-skin="classic"] .host-window-titlebar .tool-window-system-menu,
   html[data-onekvm-skin="classic"] .host-window-titlebar > button,
   html[data-onekvm-skin="classic"] .host-dialog > .n-card-header button,
   html[data-onekvm-skin="classic"] .control-sheet-close {

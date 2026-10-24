@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 
 import { consolePointerCursor, storedHideLocalCursor } from '../src/lib/console-pointer.ts'
 
-assert.equal(storedHideLocalCursor(null), true)
+assert.equal(storedHideLocalCursor(null), false)
 assert.equal(storedHideLocalCursor('true'), true)
 assert.equal(storedHideLocalCursor('false'), false)
 

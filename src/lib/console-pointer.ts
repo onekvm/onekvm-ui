@@ -1,5 +1,5 @@
 export function storedHideLocalCursor(stored: string | null) {
-  return stored !== 'false'
+  return stored === 'true'
 }
 
 export function consolePointerCursor(

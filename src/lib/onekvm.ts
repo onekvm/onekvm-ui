@@ -1,3 +1,4 @@
+import { BANDWIDTH_CHANNEL, StartupBandwidthProbe } from '@/lib/startup-bandwidth'
 import { readWebRTCConnectionStats, type WebRTCConnectionStats } from '@/lib/webrtc-connection-stats'
 import { VIDEO_TIMING_CHANNEL, WebRTCVideoTiming } from '@/lib/webrtc-video-timing'
 import { isCloudHosted } from '@/api/service-url'
@@ -147,6 +148,7 @@ class OneKVMTransport {
   private bitrateListeners = new Set<BitrateListener>()
   private browserLatencyListeners = new Set<BrowserLatencyListener>()
   private webRTCConnectionStatsListeners = new Set<WebRTCConnectionStatsListener>()
+  private bandwidthProbe: StartupBandwidthProbe | null = null
   private webRTCConnectionStats: WebRTCConnectionStats | null = null
   private audioStatsListeners = new Set<AudioStatsListener>()
   private keyboardLEDListeners = new Set<KeyboardLEDListener>()
@@ -771,6 +773,18 @@ class OneKVMTransport {
       }
     }
 
+    const bandwidth = peer.createDataChannel(BANDWIDTH_CHANNEL)
+    bandwidth.binaryType = 'arraybuffer'
+    const probe = new StartupBandwidthProbe(data => {
+      if (this.peer === peer && bandwidth.readyState === 'open') bandwidth.send(data)
+    })
+    this.bandwidthProbe = probe
+    bandwidth.onopen = () => {
+      if (this.peer === peer) bandwidth.send('start')
+    }
+    bandwidth.onmessage = event => {
+      if (this.peer === peer && event.data instanceof ArrayBuffer) probe.receive(event.data)
+    }
     this.videoTiming = new WebRTCVideoTiming(peer.createDataChannel(VIDEO_TIMING_CHANNEL, {
       ordered: false, maxRetransmits: 0,
     }))
@@ -1268,6 +1282,7 @@ class OneKVMTransport {
     this.adaptiveJitterBuffer.reset()
     this.emitVideoBitrate(0)
     this.emitBrowserLatency(emptyBrowserVideoLatency())
+    this.bandwidthProbe = null
     this.emitWebRTCConnectionStats(null)
     const audioClosing = this.disposeWebRTCAudio()
     this.audioOpening = null
@@ -1315,7 +1330,7 @@ class OneKVMTransport {
     const sample = async () => {
       const reports = await peer.getStats().catch(() => null)
       if (!reports || this.peer !== peer) return
-      this.emitWebRTCConnectionStats(readWebRTCConnectionStats(reports, peer))
+      this.emitWebRTCConnectionStats({ ...readWebRTCConnectionStats(reports, peer), autoBitrateKbps: this.bandwidthProbe?.capKbps ?? null })
       applyJitterBufferTargets(peer.getReceivers(), this.adaptiveJitterBuffer.sample(reports))
       const { bitrateKbps, bitrateSampled, latency } = this.playbackStats.sample(reports)
       if (bitrateSampled) this.emitVideoBitrate(bitrateKbps)

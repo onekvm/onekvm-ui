@@ -16,6 +16,8 @@ export type WebRTCConnectionStats = {
   remote: WebRTCCandidate | null
   rttMs: number | null
   jitterMs: number | null
+  autoBitrateKbps?: number | null
+  inboundId?: string | null
   packetsLost: number | null
 }
 
@@ -85,6 +87,7 @@ export function readWebRTCConnectionStats(
     remote: candidate(remoteId ? stats.get(remoteId) : undefined),
     rttMs: milliseconds(pair?.currentRoundTripTime),
     jitterMs: milliseconds(video?.jitter),
+    inboundId: video?.id ?? null,
     packetsLost: numberValue(video?.packetsLost),
   }
 }

@@ -1,4 +1,5 @@
 import JMuxer from 'jmuxer'
+import { StartupBandwidthProbe } from '@/lib/startup-bandwidth'
 
 import { normalizeWebSocketVideoCodec, supportsWebSocketVideo, type WebSocketVideoCodec } from '@/lib/websocket-video-support'
 
@@ -75,6 +76,9 @@ export class WebSocketVideo {
       const socket = new WebSocket(this.url, 'onekvm.video.v1')
       socket.binaryType = 'arraybuffer'
       this.socket = socket
+      const probe = new StartupBandwidthProbe(data => {
+        if (this.socket === socket && socket.readyState === WebSocket.OPEN) socket.send(data)
+      })
 
       socket.onopen = () => {
         if (this.socket !== socket || this.closed) {
@@ -83,12 +87,13 @@ export class WebSocketVideo {
         }
         this.opened = true
         this.log('socket opened')
+        socket.send('bandwidth_probe')
         this.requestKeyframe()
         resolve()
       }
       socket.onmessage = (event) => {
         if (this.socket === socket && event.data instanceof ArrayBuffer) {
-          this.handleFrame(event.data)
+          if (!probe.receive(event.data)) this.handleFrame(event.data)
         }
       }
       socket.onerror = () => {

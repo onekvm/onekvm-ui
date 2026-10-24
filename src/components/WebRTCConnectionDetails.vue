@@ -25,6 +25,7 @@ const rows = computed(() => {
     ['remote', candidateDetails('remote')],
     ['rtt', ms(stats?.rttMs)],
     ['jitter', ms(stats?.jitterMs)],
+    ...(stats?.autoBitrateKbps ? [['autoBitrateCap', `${(stats.autoBitrateKbps / 1000).toFixed(2)} Mbps`]] : []),
     ['packetsLost', stats?.packetsLost?.toString() ?? '—'],
   ]
 })

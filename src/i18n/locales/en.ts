@@ -2008,6 +2008,7 @@ const en = {
         apReconnectHint: 'Saving restarts the access point and disconnects its clients.',
         apNewAddressHint: 'Reconnect and open the new AP address: {address}',
         apPassword: 'Hotspot password', band: 'Band', channel: 'Channel', autoChannel: 'Auto', currentChannel: 'Current channel: {channel}', running: 'Running', apOff: 'Hotspot off',
+        radioCapability: 'Hardware maximum', radioCapabilityHint: 'Maximum wireless standard reported by this device radio; nearby hotspots may advertise a different standard.', hotspotCapabilityTooltip: 'Hotspot capability: up to {generation}',
         expiresIn: 'Turns off in {seconds}s', stationEnabled: 'Enable Wi-Fi', stationEnabledHint: 'Connect to nearby networks and get an IP address.',
         available: 'Available networks', scan: 'Scan', scanning: 'Searching for nearby networks…', noNetworks: 'No networks found. Try scanning again.', noOtherNetworks: 'No other networks nearby.', scanHint: 'Scan and choose a network.',
         open: 'Open', connected: 'Connected', notConnected: 'Not connected', connect: 'Connect', networkPassword: 'Network password', connecting: 'Connecting to Wi-Fi…',

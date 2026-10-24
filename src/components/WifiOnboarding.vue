@@ -63,8 +63,17 @@ const canConnect = computed(() =>
 const displayNetworks = computed(() => networks.value.map((network) => ({
   ...network,
   bandLabel: (network.bands || []).map((band) => band.band.replace(' GHz', 'G')).join('/'),
-  generations: [...new Set((network.bands || []).map((band) => band.generation).filter((value): value is string => !!value))],
+  generation: maximumGeneration([...new Set((network.bands || []).map((band) => band.generation).filter((value): value is string => !!value))]),
 })))
+
+function generationRank(value: string): number {
+  const number = Number(value.match(/Wi-Fi (\d+)/)?.[1] || 0)
+  return number + (value.includes('6E') ? 0.1 : 0)
+}
+
+function maximumGeneration(generations: string[]): string {
+  return generations.reduce((highest, generation) => generationRank(generation) > generationRank(highest) ? generation : highest, '')
+}
 
 const connectedHit = computed(() => {
   const ssid = status.value?.connected ? status.value.station_ssid : ''
@@ -321,6 +330,11 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
             <span class="wifi-network-badges">
               <span v-if="status.station_address" class="wifi-network-badge">{{ status.station_address }}</span>
               <span class="wifi-network-badge">{{ t('network.wifi.connected', '已连接') }}</span>
+              <n-tooltip v-if="status.radio_generation && connectedHit?.generation" trigger="hover">
+                <template #trigger><span class="wifi-network-badge">{{ status.radio_generation }}</span></template>
+                {{ t('network.wifi.hotspotCapabilityTooltip', '热点最高标准：{generation}').replace('{generation}', connectedHit.generation) }}
+              </n-tooltip>
+              <span v-else-if="status.radio_generation" class="wifi-network-badge">{{ status.radio_generation }}</span>
             </span>
           </span>
         </div>
@@ -368,7 +382,11 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
               <span class="wifi-network-badges">
                 <span v-if="status.saved_networks?.some(saved => saved.ssid === network.ssid)" class="wifi-network-badge">{{ t('network.wifi.saved', 'Saved') }}</span>
                 <span v-if="network.bandLabel" class="wifi-network-badge">{{ network.bandLabel }}</span>
-                <span v-for="generation in network.generations" :key="generation" class="wifi-network-badge">{{ generation }}</span>
+                <n-tooltip v-if="status.radio_generation && network.generation" trigger="hover">
+                  <template #trigger><span class="wifi-network-badge">{{ status.radio_generation }}</span></template>
+                  {{ t('network.wifi.hotspotCapabilityTooltip', '热点最高标准：{generation}').replace('{generation}', network.generation) }}
+                </n-tooltip>
+                <span v-else-if="status.radio_generation" class="wifi-network-badge">{{ status.radio_generation }}</span>
                 <span class="wifi-network-badge">{{ securityBadge(network) }}</span>
               </span>
             </span>

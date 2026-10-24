@@ -118,6 +118,7 @@ export interface WifiStatus {
   ap_operating_channel: number | null
   ap_channels?: number[]
   radio_bands?: ('2.4' | '5' | '6')[]
+  radio_generation?: string | null
   ap_expires_in: number | null
   connecting: boolean
   connected: boolean

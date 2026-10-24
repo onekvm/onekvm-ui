@@ -521,6 +521,7 @@ onMounted(() => {
 	unsubscribeStatus = statusEvents.subscribe(
 		(next) => {
 			status.value = { ...next, hid: keyboardLockOverlay.applyStatus(next.hid) }
+			onekvm.setDeviceSpeakerEnabled(Boolean(next.audio.enabled))
 			serverUnavailable.value = false
 		},
 		() => {

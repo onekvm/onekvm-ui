@@ -123,8 +123,10 @@ class OneKVMTransport {
   private micDestination: MediaStreamAudioDestinationNode | null = null
   private speakerVolume = readStoredVolume(SPEAKER_VOLUME_KEY)
   private speakerPlaybackEnabled = readStoredBoolean(SPEAKER_ENABLED_KEY, true)
+  private deviceSpeakerEnabled = false
   private microphoneVolume = readStoredVolume(MICROPHONE_VOLUME_KEY)
   private wantMicrophone = false
+  private microphoneOpening: Promise<boolean> | null = null
   private heldMicrophone = false
   private video: HTMLVideoElement | null = null
   private audio: HTMLAudioElement | null = null
@@ -259,7 +261,46 @@ class OneKVMTransport {
     localStorage.setItem(SPEAKER_ENABLED_KEY, String(enabled))
     if (this.audio) this.audio.muted = !enabled
     this.websocketAudio?.setSpeaker(enabled, this.speakerVolume)
+    void this.reconcileAudio()
     if (enabled) this.unlockAudio()
+  }
+
+  setDeviceSpeakerEnabled(enabled: boolean) {
+    if (enabled === this.deviceSpeakerEnabled) return
+    this.deviceSpeakerEnabled = enabled
+    void this.reconcileAudio()
+  }
+
+  private audioWanted() {
+    return (this.deviceSpeakerEnabled && this.speakerPlaybackEnabled) || this.wantMicrophone
+  }
+
+  private async reconcileAudio() {
+    if (!this.audioWanted()) {
+      ++this.audioGeneration
+      this.audioOpening = null
+      this.disposeLocalAudio()
+      const websocketClosing = this.disposeWebSocketAudio(true)
+      const webRTCClosing = this.disposeWebRTCAudio()
+      this.audioClosing = Promise.all([this.audioClosing, websocketClosing, webRTCClosing]).then(() => undefined)
+      this.setState({ audioError: '' })
+      return this.audioClosing
+    }
+    if (this.audioOpening) return this.audioOpening
+    if (this.webRTCAudio || this.websocketAudio || (!this.peer && !this.websocketVideo)) return
+    const generation = this.connectionGeneration
+    const audioGeneration = this.audioGeneration
+    const opening = this.audioClosing.then(async () => {
+      if (!this.isCurrentAudio(generation, audioGeneration) || !this.audioWanted()) return
+      if (this.usesWebSocketAudio()) await this.openWebSocketAudio(generation, audioGeneration)
+      else await this.openWebRTCAudio(generation, audioGeneration)
+    })
+    this.audioOpening = opening
+    try {
+      await opening
+    } finally {
+      if (this.audioOpening === opening) this.audioOpening = null
+    }
   }
 
   setSpeakerGain(value: number) {
@@ -495,6 +536,7 @@ class OneKVMTransport {
     // PATCH, so every new session must read the current pipeline directly.
     const status = await api.getStatus()
     if (generation !== this.connectionGeneration) return
+    this.deviceSpeakerEnabled = Boolean(status.audio.enabled)
     this.audioPCM = status.audio.quality === 'pcm'
     const automatic = status.video.codec.toLowerCase() === 'auto'
     const [hevcWebRTC, hevcWebSocket] = automatic
@@ -592,7 +634,7 @@ class OneKVMTransport {
     const webRTCClosing = this.disposeWebRTCAudio()
     this.audioClosing = Promise.all([this.audioClosing, websocketClosing, webRTCClosing]).then(() => undefined)
     this.audioOpening = this.audioClosing.then(async () => {
-      if (!this.isCurrentAudio(generation, audioGeneration)) return
+      if (!this.isCurrentAudio(generation, audioGeneration) || !this.audioWanted()) return
       this.setState({ audioError: '' })
       if (this.usesWebSocketAudio()) await this.openWebSocketAudio(generation, audioGeneration)
       else await this.openWebRTCAudio(generation, audioGeneration)
@@ -604,8 +646,20 @@ class OneKVMTransport {
     return generation === this.connectionGeneration && audioGeneration === this.audioGeneration
   }
 
-  async setMicrophone(enabled: boolean) {
+  setMicrophone(enabled: boolean): Promise<boolean> {
     this.wantMicrophone = enabled
+    if (!enabled) return this.updateMicrophone(false)
+    if (this.microphoneOpening) return this.microphoneOpening
+    const opening = this.updateMicrophone(true).finally(async () => {
+      if (this.microphoneOpening === opening) this.microphoneOpening = null
+      if (!this.audioWanted()) await this.reconcileAudio()
+    })
+    this.microphoneOpening = opening
+    return opening
+  }
+
+  private async updateMicrophone(enabled: boolean) {
+    if (enabled) await this.reconcileAudio()
     let opening = this.audioOpening
     while (opening) {
       await opening
@@ -620,6 +674,7 @@ class OneKVMTransport {
       this.disposeLocalAudio()
       const id = this.webRTCAudio?.sessionID()
       if (id) await api.setWebRTCMicrophone(id, false).catch(() => undefined)
+      await this.reconcileAudio()
       return true
     }
     if (this.state.connection !== 'connected' && this.state.connection !== 'connecting') {
@@ -778,10 +833,7 @@ class OneKVMTransport {
     if (this.peer !== peer) return
     this.startVideoStats(peer)
     this.audioStereo = stereo
-    this.audioOpening = this.usesWebSocketAudio()
-      ? this.openWebSocketAudio(generation)
-      : this.openWebRTCAudio(generation)
-    void this.audioOpening
+    void this.reconcileAudio()
     window.clearTimeout(this.peerConnectTimer)
     this.peerConnectTimer = window.setTimeout(() => {
       if (this.peer === peer && peer.connectionState !== 'connected') {
@@ -791,7 +843,7 @@ class OneKVMTransport {
   }
 
   private async openWebRTCAudio(generation: number, audioGeneration = this.audioGeneration) {
-    const canOpen = () => this.isCurrentAudio(generation, audioGeneration) && !this.usesWebSocketAudio() && Boolean(this.peer)
+    const canOpen = () => this.isCurrentAudio(generation, audioGeneration) && this.audioWanted() && !this.usesWebSocketAudio() && Boolean(this.peer)
     if (!canOpen()) return
     let player: WebRTCAudio | null = null
     try {
@@ -886,8 +938,7 @@ class OneKVMTransport {
     await Promise.all([player.connect(), this.openHIDWebSocket()])
     if (this.websocketVideo !== player) return
     this.setState({ connection: 'connected', controlReady: true, error: '', fallbackPrompt: '' })
-    this.audioOpening = this.openWebSocketAudio(generation)
-    void this.audioOpening
+    void this.reconcileAudio()
   }
 
   private usesWebSocketAudio() {
@@ -896,6 +947,7 @@ class OneKVMTransport {
 
   private canOpenWebSocketAudio(generation: number, audioGeneration: number) {
     return this.isCurrentAudio(generation, audioGeneration) && this.usesWebSocketAudio()
+      && this.audioWanted()
       && (this.state.videoMode === 'websocket' ? Boolean(this.websocketVideo) : Boolean(this.peer))
   }
 
@@ -921,7 +973,11 @@ class OneKVMTransport {
       player.setSpeaker(this.speakerPlaybackEnabled, this.speakerVolume)
       this.setState({ audioError: '' })
       this.unlockAudio()
-      if (this.wantMicrophone) await this.setWebSocketMicrophone(true).catch(() => undefined)
+      if (this.wantMicrophone) queueMicrotask(() => {
+        if (this.websocketAudio === player && this.canOpenWebSocketAudio(generation, audioGeneration) && this.wantMicrophone) {
+          void this.setMicrophone(true).catch(() => undefined)
+        }
+      })
     } catch {
       if (!this.canOpenWebSocketAudio(generation, audioGeneration) || (player && this.websocketAudio !== player)) return
       this.disposeWebSocketAudio()
@@ -945,6 +1001,7 @@ class OneKVMTransport {
       this.heldMicrophone = false
       this.disposeLocalAudio()
       await player?.setMicrophone(false).catch(() => undefined)
+      await this.reconcileAudio()
       return true
     }
     if (!player?.sessionID()) {

@@ -152,7 +152,7 @@ try {
 
   const { onekvm } = await server.ssrLoadModule('/src/lib/onekvm.ts')
   cleanup = () => onekvm.close()
-  api.getStatus = async () => ({ video: { codec: 'h264' }, audio: { enabled: true, channels: 'stereo' } })
+  api.getStatus = async () => ({ video: { codec: 'h264' }, audio: { enabled: false, channels: 'stereo' } })
   api.getConfigSchema = async () => ({ capabilities: { audio: true } })
   api.getWebRTCIce = async () => ({ ice_servers: [] })
   const closed: string[] = []
@@ -175,6 +175,9 @@ try {
   onekvm.attachVideo(video)
   onekvm.attachAudio(audio)
   await onekvm.connect()
+  await nextTurn()
+  assert.deepEqual(offers.map(offer => offer.media), ['video'], 'Disabled device audio must not create an idle PeerConnection')
+  onekvm.setDeviceSpeakerEnabled(true)
   await until(() => Boolean(onekvm.audioSessionID()))
   assert.deepEqual(offers.map(offer => offer.media), ['video', 'audio'])
   const videoPeer = peers.find(peer => peer.control)!
@@ -326,6 +329,57 @@ try {
   const finalSocket = sockets.at(-1)!
   await onekvm.close()
   assert.equal(finalSocket.readyState, 3, 'Closing WebRTC video also releases its PCM audio connection')
+  assert.equal(timeouts.size, 0)
+  assert.equal(intervals.size, 0)
+  pendingAudio = null
+  await onekvm.setMicrophone(false)
+  api.getStatus = async () => ({ video: { codec: 'h264' }, audio: { enabled: false, channels: 'stereo', quality: 'medium' } })
+  onekvm.setSpeakerEnabled(true)
+  const idleOffers = offers.length
+  await onekvm.connect()
+  await nextTurn()
+  assert.deepEqual(offers.slice(idleOffers).map(offer => offer.media), ['video'])
+  const lazyVideo = peers.at(-1)!
+  const lazyVideoID = onekvm.sessionID()
+  const beforeLazyClaims = microphoneClaims.filter(claim => claim.enabled).length
+  await onekvm.setMicrophone(true)
+  await nextTurn()
+  assert.equal(microphoneClaims.filter(claim => claim.enabled).length, beforeLazyClaims + 1,
+    'Lazy connection readiness and the user request share one microphone activation')
+  assert.ok(onekvm.audioSessionID(), 'Microphone can create audio when the device speaker is disabled')
+  assert.equal(onekvm.microphoneGranted(), true)
+  onekvm.setSpeakerEnabled(false)
+  await nextTurn()
+  assert.ok(onekvm.audioSessionID(), 'Muting the speaker must preserve an active microphone')
+  await onekvm.setMicrophone(false)
+  await until(() => !onekvm.audioSessionID())
+  assert.equal(lazyVideo.connectionState, 'connected')
+  assert.equal(onekvm.sessionID(), lazyVideoID)
+  onekvm.setDeviceSpeakerEnabled(true)
+  onekvm.setSpeakerEnabled(true)
+  await until(() => Boolean(onekvm.audioSessionID()))
+  const beforeMute = onekvm.audioSessionID()
+  onekvm.setSpeakerEnabled(false)
+  await until(() => !onekvm.audioSessionID() && closed.includes(beforeMute))
+  let resolveUnmute!: (answer: { session_id: string; sdp: string }) => void
+  pendingAudio = { promise: new Promise(yes => { resolveUnmute = yes }), resolve: answer => resolveUnmute(answer) }
+  const beforeUnmute = offers.length
+  onekvm.setSpeakerEnabled(true)
+  await until(() => offers.length > beforeUnmute)
+  const lateID = offers.at(-1)!.id
+  onekvm.setSpeakerEnabled(false)
+  pendingAudio.resolve({ session_id: lateID, sdp: 'opus/48000/2' })
+  await until(() => closed.includes(lateID))
+  assert.equal(onekvm.audioSessionID(), '')
+  assert.equal(onekvm.sessionID(), lazyVideoID, 'Mute and microphone changes preserve the video connection')
+  pendingAudio = null
+  const capture = navigator.mediaDevices.getUserMedia
+  navigator.mediaDevices.getUserMedia = async () => { throw new Error('capture denied') }
+  await assert.rejects(onekvm.setMicrophone(true), /capture denied/)
+  await until(() => !onekvm.audioSessionID())
+  assert.equal(onekvm.sessionID(), lazyVideoID, 'Denied microphone access releases idle audio only')
+  navigator.mediaDevices.getUserMedia = capture
+  await onekvm.close()
   assert.equal(timeouts.size, 0)
   assert.equal(intervals.size, 0)
   console.log('webrtc-audio-recovery tests passed')

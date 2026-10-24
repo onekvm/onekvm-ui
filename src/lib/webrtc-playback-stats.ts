@@ -121,6 +121,25 @@ export function readInboundAudio(
   return readInboundMedia(reports, 'audio')
 }
 
+/**
+ * Return the most recent inbound RTP audio level when the browser exposes it.
+ * A zero level is useful for distinguishing a normal source transition (for
+ * example, changing videos in a playlist) from a receiver that is buffering
+ * audible audio.
+ */
+export function readInboundAudioLevel(
+  reports: RTCStatsReport | Iterable<RTCStats>,
+): number | null {
+  let level: number | null = null
+  forEachRtcStat(reports, (report) => {
+    if (level !== null || report.type !== 'inbound-rtp') return
+    if ((report as RTCInboundRtpStreamStats).kind !== 'audio') return
+    const value = (report as StatsBag).audioLevel
+    if (typeof value === 'number' && Number.isFinite(value)) level = Math.max(0, value)
+  })
+  return level
+}
+
 function sampleMediaDelta(
   snapshot: PlaybackStatsSnapshot | null,
   previous: PlaybackStatsSnapshot | null,

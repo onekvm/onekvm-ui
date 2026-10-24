@@ -1,7 +1,12 @@
 import { api, type IceServer } from '@/api/client'
 import { AdaptiveJitterBuffer, applyJitterBufferTargets } from '@/lib/adaptive-jitter-buffer'
 import { applyOpusStereoPreference, preferLowDelayOpus } from '@/lib/webrtc-opus-sdp'
-import { PlaybackStatsSampler, readInboundAudio, type BrowserAudioStats } from '@/lib/webrtc-playback-stats'
+import {
+  PlaybackStatsSampler,
+  readInboundAudio,
+  readInboundAudioLevel,
+  type BrowserAudioStats,
+} from '@/lib/webrtc-playback-stats'
 
 export type AudioRecoveryReason = 'latency' | 'connection'
 
@@ -50,6 +55,10 @@ export class WebRTCAudio {
   private stats = new PlaybackStatsSampler()
   private jitter = new AdaptiveJitterBuffer()
   private emittedCount = 0
+  // Playlist transitions can emit silent RTP while the browser's jitter
+  // metric is settling. Require a few audible samples before latency-based
+  // receiver replacement is allowed.
+  private audibleSamples = 0
   private sender: RTCRtpSender | null = null
 
   constructor(
@@ -111,7 +120,16 @@ export class WebRTCAudio {
       const fresh = count > this.emittedCount
       const initialized = this.emittedCount > 0
       this.emittedCount = count
-      if (this.recovery.sample(audio.jitterBufferUs, performance.now(), initialized && fresh && this.callbacks.playing())) {
+      const audioLevel = readInboundAudioLevel(reports)
+      if (audioLevel === null) this.audibleSamples = 3
+      else if (audioLevel > 0.001) this.audibleSamples = Math.min(3, this.audibleSamples + 1)
+      else this.audibleSamples = 0
+      const audible = audioLevel === null || this.audibleSamples >= 3
+      if (this.recovery.sample(
+        audio.jitterBufferUs,
+        performance.now(),
+        initialized && fresh && audible && this.callbacks.playing(),
+      )) {
         this.recover('latency')
       }
     }

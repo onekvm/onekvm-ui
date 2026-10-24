@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   PlaybackStatsSampler,
   iceRttSeconds,
+  readInboundAudioLevel,
   samplePlaybackStats,
 } from '../src/lib/webrtc-playback-stats.ts'
 
@@ -133,6 +134,9 @@ function audioInbound(overrides: Record<string, unknown> = {}): RTCStats {
 }
 
 const audioSampler = new PlaybackStatsSampler()
+assert.equal(readInboundAudioLevel([audioInbound()]), null)
+assert.equal(readInboundAudioLevel([audioInbound({ audioLevel: 0 })]), 0)
+assert.equal(readInboundAudioLevel([audioInbound({ audioLevel: 0.25 })]), 0.25)
 audioSampler.sample([audioInbound(), nominatedPair])
 const audioNext = audioSampler.sample([
   audioInbound({

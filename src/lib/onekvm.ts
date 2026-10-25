@@ -1,3 +1,4 @@
+import { BITRATE_CHANNEL, BrowserBitrate } from '@/lib/browser-bitrate'
 import { WebRTCTrickleICE } from '@/lib/webrtc-ice'
 import { readWebRTCConnectionStats, type WebRTCConnectionStats } from '@/lib/webrtc-connection-stats'
 import { VIDEO_TIMING_CHANNEL, WebRTCVideoTiming } from '@/lib/webrtc-video-timing'
@@ -149,6 +150,7 @@ class OneKVMTransport {
   private browserLatencyListeners = new Set<BrowserLatencyListener>()
   private webRTCConnectionStatsListeners = new Set<WebRTCConnectionStatsListener>()
   private autoBitrateKbps: number | null = null
+  private browserBitrate: BrowserBitrate | null = null
   private trickleICE: WebRTCTrickleICE | null = null
   private webRTCConnectionStats: WebRTCConnectionStats | null = null
   private audioStatsListeners = new Set<AudioStatsListener>()
@@ -777,13 +779,22 @@ class OneKVMTransport {
       }
     }
 
-    const congestion = peer.createDataChannel('onekvm.congestion.v1', { ordered: false, maxRetransmits: 0 })
-    congestion.binaryType = 'arraybuffer'
-    congestion.onmessage = event => {
-      if (this.peer !== peer || !(event.data instanceof ArrayBuffer) || event.data.byteLength !== 8) return
-      const view = new DataView(event.data)
-      if (view.getUint32(0) === 0x4f4b4252) this.autoBitrateKbps = view.getUint32(4) || null
+    const bitrateChannel = peer.createDataChannel(BITRATE_CHANNEL, { ordered: true, maxRetransmits: 0 })
+    bitrateChannel.binaryType = 'arraybuffer'
+    const browserBitrate = new BrowserBitrate(bitrateChannel)
+    this.browserBitrate = browserBitrate
+    bitrateChannel.onopen = () => { if (this.peer === peer) browserBitrate.start() }
+    bitrateChannel.onmessage = event => {
+      if (this.peer !== peer) return
+      browserBitrate.status(event.data)
+      this.autoBitrateKbps = browserBitrate.cap
     }
+    bitrateChannel.onclose = () => {
+      if (this.peer !== peer) return
+      this.browserBitrate = null
+      this.autoBitrateKbps = null
+    }
+
     this.videoTiming = new WebRTCVideoTiming(peer.createDataChannel(VIDEO_TIMING_CHANNEL, {
       ordered: false, maxRetransmits: 0,
     }))
@@ -1283,6 +1294,7 @@ class OneKVMTransport {
     this.emitVideoBitrate(0)
     this.emitBrowserLatency(emptyBrowserVideoLatency())
     this.autoBitrateKbps = null
+    this.browserBitrate = null
     this.trickleICE?.destroy()
     this.trickleICE = null
     this.emitWebRTCConnectionStats(null)
@@ -1329,10 +1341,17 @@ class OneKVMTransport {
     this.playbackStats.reset()
     const initialTargets = this.adaptiveJitterBuffer.reset()
     applyJitterBufferTargets(peer.getReceivers(), initialTargets)
+    let sampling = false
     const sample = async () => {
+      if (sampling || this.peer !== peer) return
+      sampling = true
       const reports = await peer.getStats().catch(() => null)
+      sampling = false
       if (!reports || this.peer !== peer) return
-      this.emitWebRTCConnectionStats({ ...readWebRTCConnectionStats(reports, peer), autoBitrateKbps: this.autoBitrateKbps })
+      const connection = readWebRTCConnectionStats(reports, peer)
+      const route = connection.remote ? JSON.stringify([connection.local, connection.remote]) : null
+      this.browserBitrate?.sample(reports, connection.rttMs, route, document.visibilityState === 'visible')
+      this.emitWebRTCConnectionStats({ ...connection, autoBitrateKbps: this.autoBitrateKbps })
       applyJitterBufferTargets(peer.getReceivers(), this.adaptiveJitterBuffer.sample(reports))
       const { bitrateKbps, bitrateSampled, latency } = this.playbackStats.sample(reports)
       if (bitrateSampled) this.emitVideoBitrate(bitrateKbps)

@@ -174,6 +174,7 @@ try {
   const audio = { srcObject: null, paused: true, getAttribute() { return '' }, removeAttribute() {}, play: async () => { audio.paused = false } }
   onekvm.attachVideo(video)
   onekvm.attachAudio(audio)
+  onekvm.setSpeakerEnabled(true)
   await onekvm.connect()
   await nextTurn()
   assert.deepEqual(offers.map(offer => offer.media), ['video'], 'Disabled device audio must not create an idle PeerConnection')

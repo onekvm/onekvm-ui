@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PerformanceBitrateMetric from './PerformanceBitrateMetric.vue'
 import type { WebRTCConnectionStats } from '@/lib/webrtc-connection-stats'
 import { computed } from 'vue'
 
@@ -16,6 +17,7 @@ const props = defineProps<{
   canvasHeight: number
   videoFps: number
   videoBitrate: number
+  bitrateHint: string
   streamSamples: readonly StreamSample[]
   latencySamples: readonly LatencySample[]
   targetFps: number
@@ -172,10 +174,7 @@ const audioLatencyTotal = computed(() => formatLatencyUs(sumLatencyUs(
           <span class="performance-metric-label"><span class="stream-chart-swatch stream-chart-swatch-fps" aria-hidden="true" />{{ t('screen.currentFps', 'Current FPS') }}</span>
           <strong>{{ videoFps }} FPS</strong>
         </div>
-        <div>
-          <span class="performance-metric-label"><span class="stream-chart-swatch stream-chart-swatch-bitrate" aria-hidden="true" />{{ t('screen.bitrate', 'Bitrate') }}</span>
-          <strong>{{ videoBitrate }} kbps</strong>
-        </div>
+        <PerformanceBitrateMetric :value="`${videoBitrate} kbps`" :hint="bitrateHint" />
       </div>
       <div class="display-status-chart">
         <VideoStreamChart :samples="streamSamples" :target-fps="targetFps" />

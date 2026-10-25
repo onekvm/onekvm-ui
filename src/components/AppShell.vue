@@ -708,6 +708,7 @@ onBeforeUnmount(() => {
           :canvas-height="canvasHeight"
           :video-fps="videoFps"
           :video-bitrate="videoBitrate"
+          :bitrate-limit-kbps="status?.video.bitrate_limit_kbps"
           :target-fps="status?.video.fps ?? 0"
           :codec="status ? effectiveVideoCodec(status.video).toUpperCase() : ''"
           :bit-depth="state.videoMode !== 'mjpeg' || status?.video.actual_codec === 'mjpeg' ? status?.video.bit_depth : null"

@@ -33,6 +33,7 @@ const props = defineProps<{
   canvasHeight: number
   videoFps: number
   videoBitrate: number
+  bitrateLimitKbps?: number | null
   targetFps: number
   codec: string
   bitDepth?: number | null
@@ -63,6 +64,20 @@ const props = defineProps<{
   audioEncodeLatencyUs?: number
   audioJitterBufferUs?: number
 }>()
+
+const bitrateHint = computed(() => {
+  if (!/^h26[45]$/i.test(props.codec) || props.bitrateLimitKbps === undefined) {
+    return `${t('screen.bitrateLimit')}: —`
+  }
+  const configured = props.bitrateLimitKbps
+  const limit = configured != null && configured > 0 ? `${configured} kbps` : t('screen.auto')
+  const lines = [`${t('screen.bitrateLimit')}: ${limit}`]
+  const adaptive = props.webrtcConnection?.autoBitrateKbps
+  if ((configured == null || configured <= 0) && props.transport === 'webrtc' && adaptive && adaptive > 0) {
+    lines.push(`${t('screen.adaptiveBitrateLimit')}: ${adaptive} kbps`)
+  }
+  return lines.join('\n')
+})
 
 const emit = defineEmits<{
   close: []
@@ -317,6 +332,7 @@ watch(compact, (value) => {
       ref="floatingBar"
       :video-fps="videoFps"
       :video-bitrate="videoBitrate"
+      :bitrate-hint="bitrateHint"
       :input-width="inputWidth"
       :input-height="inputHeight"
       :codec="codec"
@@ -357,6 +373,7 @@ watch(compact, (value) => {
         :canvas-height="canvasHeight"
         :video-fps="videoFps"
         :video-bitrate="videoBitrate"
+      :bitrate-hint="bitrateHint"
         :stream-samples="samples"
         :latency-samples="latencySamples"
         :target-fps="targetFps"
@@ -396,6 +413,7 @@ watch(compact, (value) => {
       ref="dockedBar"
       :video-fps="videoFps"
       :video-bitrate="videoBitrate"
+      :bitrate-hint="bitrateHint"
       :input-width="inputWidth"
       :input-height="inputHeight"
       :codec="codec"

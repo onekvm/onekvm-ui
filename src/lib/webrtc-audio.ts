@@ -1,4 +1,5 @@
 import { api, type IceServer } from '@/api/client'
+import { WebRTCTrickleICE } from '@/lib/webrtc-ice'
 import { AdaptiveJitterBuffer, applyJitterBufferTargets } from '@/lib/adaptive-jitter-buffer'
 import { applyOpusStereoPreference, preferLowDelayOpus } from '@/lib/webrtc-opus-sdp'
 import {
@@ -46,6 +47,7 @@ interface AudioCallbacks {
 export class WebRTCAudio {
   private peer: RTCPeerConnection | null = null
   private id = ''
+  private trickle: WebRTCTrickleICE | null = null
   private closed = false
   private recovering = false
   private statsTimer = 0
@@ -69,10 +71,11 @@ export class WebRTCAudio {
   sessionID() { return this.id }
   audioSender() { return this.sender }
 
-  async connect(iceServers: IceServer[], stereo: boolean) {
+  async connect(iceServers: IceServer[], stereo: boolean, supportsTrickle = false) {
     if (this.closed) return
     const peer = new RTCPeerConnection(iceServers.length ? { iceServers } : undefined)
     this.peer = peer
+    this.trickle = supportsTrickle ? new WebRTCTrickleICE(peer, api.exchangeWebRTCCandidates) : null
     this.sender = peer.addTransceiver('audio', { direction: 'sendrecv' }).sender
     peer.ontrack = ({ track }) => {
       if (this.closed || this.peer !== peer || track.kind !== 'audio') return
@@ -99,9 +102,9 @@ export class WebRTCAudio {
     if (this.closed) return
     if (offer.sdp) offer.sdp = preferLowDelayOpus(applyOpusStereoPreference(offer.sdp, stereo))
     await peer.setLocalDescription(offer)
-    await this.waitForCandidates(peer)
+    if (!this.trickle) await this.waitForCandidates(peer)
     if (this.closed) return
-    const answer = await api.createWebRTCSession(peer.localDescription?.sdp || '', false, 'audio')
+    const answer = await api.createWebRTCSession(peer.localDescription?.sdp || '', false, 'audio', undefined, supportsTrickle)
     if (this.closed) {
       await api.closeWebRTCSession(answer.session_id, true).catch(() => undefined)
       return
@@ -110,6 +113,7 @@ export class WebRTCAudio {
     this.connectTimer = window.setTimeout(() => this.recover('connection'), 10_000)
     await peer.setRemoteDescription({ type: 'answer', sdp: preferLowDelayOpus(answer.sdp) })
     if (this.closed) return
+    void this.trickle?.start(answer).catch(() => this.recover('connection'))
     const sample = async () => {
       const reports = await peer.getStats().catch(() => null)
       if (!reports || this.closed || this.peer !== peer || this.recovering) return
@@ -165,6 +169,8 @@ export class WebRTCAudio {
     window.clearTimeout(this.connectTimer)
     window.clearTimeout(this.disconnectTimer)
     this.cancelGathering?.()
+    this.trickle?.destroy()
+    this.trickle = null
     this.peer?.close()
     this.peer = null
     this.sender = null

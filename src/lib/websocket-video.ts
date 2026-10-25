@@ -1,5 +1,4 @@
 import JMuxer from 'jmuxer'
-import { StartupBandwidthProbe } from '@/lib/startup-bandwidth'
 
 import { normalizeWebSocketVideoCodec, supportsWebSocketVideo, type WebSocketVideoCodec } from '@/lib/websocket-video-support'
 
@@ -35,6 +34,7 @@ export class WebSocketVideo {
   private opened = false
   private waitingForKeyframe = true
   private lastSequence: bigint | null = null
+  private lastAckAt = -Infinity
   private sampleStartedAt = 0
   private sampleBytes = 0
   private durationRemainderUs = 0
@@ -76,10 +76,6 @@ export class WebSocketVideo {
       const socket = new WebSocket(this.url, 'onekvm.video.v1')
       socket.binaryType = 'arraybuffer'
       this.socket = socket
-      const probe = new StartupBandwidthProbe(data => {
-        if (this.socket === socket && socket.readyState === WebSocket.OPEN) socket.send(data)
-      })
-
       socket.onopen = () => {
         if (this.socket !== socket || this.closed) {
           socket.close()
@@ -87,13 +83,13 @@ export class WebSocketVideo {
         }
         this.opened = true
         this.log('socket opened')
-        socket.send('bandwidth_probe')
+        socket.send('media_feedback_v1')
         this.requestKeyframe()
         resolve()
       }
       socket.onmessage = (event) => {
         if (this.socket === socket && event.data instanceof ArrayBuffer) {
-          if (!probe.receive(event.data)) this.handleFrame(event.data)
+          this.handleFrame(event.data)
         }
       }
       socket.onerror = () => {
@@ -175,6 +171,14 @@ export class WebSocketVideo {
     const payloadLength = view.getUint32(32)
     if (!frameCodec || payloadLength !== buffer.byteLength - HEADER_SIZE) {
       return
+    }
+    const now = performance.now()
+    if (now - this.lastAckAt >= 200 && this.socket?.readyState === WebSocket.OPEN) {
+      const ack = new ArrayBuffer(12)
+      new Uint8Array(ack).set([0x4f, 0x4b, 0x56, 0x41])
+      new DataView(ack).setBigUint64(4, sequence)
+      this.socket.send(ack)
+      this.lastAckAt = now
     }
     // Auto can resolve to H.264 on an older backend or when another viewer
     // already owns the shared encoder. Use the actual first keyframe.

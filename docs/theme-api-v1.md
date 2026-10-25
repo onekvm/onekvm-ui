@@ -57,6 +57,17 @@ Desktop classic titlebars share a 24-pixel minimum height, 16-pixel icons, and
 Shared host windows expose `host-window-frame`,
 `host-window-titlebar`, and `host-window-actions` hooks for consistent chrome.
 
+Clicking the toolbar logo five times toggles its session-only jelly effect.
+The same switch sets `data-onekvm-jelly` on `<html>` so teleported
+`host-window-frame` windows share the same keyframes and bottom-center pivot as
+the logo: 1.05×0.95 at rest, 1.6×0.45 squashed, and 0.92×1.18 stretched.
+Logo and window animations use one document-timeline start time, including newly
+opened or restored windows. Motion continues during interaction to preserve
+their shared phase. Window motion animates the individual CSS `scale` property,
+preserving logical bounds and leaving minimize/restore transforms available. Reduced
+motion disables it; re-enabling motion rejoins the same phase. Leaving the
+console removes the shared state and animation listener.
+
 When the KVM input surface has native focus, all `host-window-frame` windows
 render at 50% opacity. Focusing a window restores full opacity. The shared CSS
 focus rule also covers teleported windows and respects reduced motion; window

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PerformanceBitrateMetric from './PerformanceBitrateMetric.vue'
 import { Square, X } from '@/icons'
 import { useTemplateRef } from 'vue'
 import { t } from '@/i18n/runtime'
@@ -8,6 +9,7 @@ import { formatLatencyUs } from '@/lib/video-stream-chart'
 defineProps<{
   videoFps: number
   videoBitrate: number
+  bitrateHint: string
   inputWidth: number
   inputHeight: number
   codec: string
@@ -53,7 +55,7 @@ defineExpose({ element })
     <span class="performance-compact-sep" />
     <span class="performance-compact-metric performance-compact-resolution"><span>{{ t('screen.performanceCompact.resolution', 'Res.') }}</span><strong>{{ formatCompactResolution(inputWidth, inputHeight) }}</strong></span>
     <span class="performance-compact-sep" />
-    <span class="performance-compact-metric"><span>{{ t('screen.performanceCompact.bitrate', 'Rate') }}</span><strong>{{ formatCompactBitrate(videoBitrate) }}</strong></span>
+    <PerformanceBitrateMetric compact :value="formatCompactBitrate(videoBitrate)" :hint="bitrateHint" />
     <span class="performance-compact-sep" />
     <span class="performance-compact-metric performance-compact-codec"><span>{{ t('screen.codec', 'Codec') }}</span><strong>{{ codec || '—' }}</strong></span>
     <div v-if="!docked" class="performance-window-actions host-window-actions" @pointerdown.stop @keydown.stop>

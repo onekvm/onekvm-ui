@@ -37,6 +37,7 @@ import { type MouseMode } from '@/composables/useMouse'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { usePerformanceDock } from '@/composables/usePerformanceDock'
 import { useToolbarPinMotion } from '@/composables/useToolbarPinMotion'
+import { useJellyAnimation } from '@/composables/useJellyAnimation'
 import type { VideoFit, VideoRotation } from '@/lib/video-fit'
 import { effectiveVideoCodec } from '@/lib/video-transport'
 import { currentLanguage, languageOptions, setLanguage, t } from '@/i18n/runtime'
@@ -196,6 +197,7 @@ const performanceDock = usePerformanceDock()
 const performanceTarget = shallowRef<HTMLElement | null>(null)
 const trayEl = shallowRef<HTMLElement | null>(null)
 const brandLogoJelly = ref(false)
+useJellyAnimation(brandLogoJelly)
 const BRAND_LOGO_CLICK_GAP_MS = 800
 let brandLogoClicks = 0
 let brandLogoLastClick = 0

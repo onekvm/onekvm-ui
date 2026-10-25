@@ -345,6 +345,7 @@ export interface InputConfig {
 }
 
 export interface USBConfig {
+  remote_wakeup?: boolean
 	vendor_id: string
 	product_id: string
 	manufacturer: string
@@ -537,6 +538,7 @@ export interface OneKVMStatus {
 		codec: string
 		actual_codec?: string
 		fps: number
+    bitrate_limit_kbps?: number | null
 		actual_fps?: number
 		resolution: number
 		input_width?: number
@@ -722,7 +724,7 @@ export interface SystemOnlineUpdate {
 }
 
 export interface SystemOnlineUpdateProgress {
-  phase: 'idle' | 'downloading' | 'checking' | 'awaiting_packages' | 'installing' | 'error'
+  phase: 'idle' | 'uploading' | 'downloading' | 'checking' | 'awaiting_packages' | 'installing' | 'complete' | 'error'
   bytes: number
   total_bytes: number
   error: string
@@ -781,6 +783,8 @@ export interface WebRTCAnswer {
   session_id: string
   microphone?: boolean
   is_primary?: boolean
+  trickle?: boolean
+  ice_token?: string
 }
 
 export interface AuthStatus {
@@ -1886,7 +1890,7 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ ntp: false, time_usec: Date.now() * 1000 }),
     }),
-  getSystemUpdate: () => request<SystemUpdateStatus>('/api/system/update'),
+  getSystemUpdate: (signal?: AbortSignal) => request<SystemUpdateStatus>('/api/system/update', { signal }),
   getSystemUpdatePreflight: () => request<SystemUpdatePreflight>('/api/system/update/preflight'),
   addSystemUpdatePackage: (id: string, file: File) => request<SystemUpdatePreflight>('/api/system/update/preflight/packages', {
     method: 'POST', body: file, headers: { 'Content-Type': 'application/octet-stream', 'X-OneKVM-Update-ID': id },
@@ -1899,7 +1903,7 @@ export const api = {
   }),
   getSystemOnlineUpdate: () => request<SystemOnlineUpdate>('/api/system/update/online'),
   startSystemOnlineUpdate: () => request<{ status: string }>('/api/system/update/online', { method: 'POST' }),
-  getSystemOnlineUpdateProgress: () => request<SystemOnlineUpdateProgress>('/api/system/update/online/progress'),
+  getSystemOnlineUpdateProgress: (signal?: AbortSignal) => request<SystemOnlineUpdateProgress>('/api/system/update/online/progress', { signal }),
   getSystemUpdateFiles: () => request<{ files: SystemUpdateLocalFile[] }>('/api/system/update/files'),
   startSystemUpdateSource: (source: SystemUpdateSource) =>
     request<{ status: string }>('/api/system/update/source', { method: 'POST', body: JSON.stringify(source) }),
@@ -1962,11 +1966,15 @@ export const api = {
       method: 'DELETE',
       body: JSON.stringify({ delete_data: Boolean(options?.deleteData) }),
     }),
-  getWebRTCIce: () => request<{ ice_servers: IceServer[] }>('/api/webrtc/ice', { cache: 'no-store' }),
-  createWebRTCSession: (sdp: string, microphone = false, media: 'audio_video' | 'video' | 'audio' = 'audio_video', videoCodec?: string) =>
+  getWebRTCIce: () => request<{ ice_servers: IceServer[]; trickle?: boolean }>('/api/webrtc/ice', { cache: 'no-store' }),
+  createWebRTCSession: (sdp: string, microphone = false, media: 'audio_video' | 'video' | 'audio' = 'audio_video', videoCodec?: string, trickle = false) =>
     request<WebRTCAnswer>('/api/webrtc/offer', {
       method: 'POST',
-      body: JSON.stringify({ type: 'offer', sdp, microphone, media, video_codec: videoCodec }),
+      body: JSON.stringify({ type: 'offer', sdp, microphone, media, video_codec: videoCodec, trickle }),
+    }),
+  exchangeWebRTCCandidates: (sessionId: string, iceToken: string, cursor: number, candidates: RTCIceCandidateInit[], signal: AbortSignal) =>
+    request<{ candidates: RTCIceCandidateInit[]; cursor: number; complete: boolean }>('/api/webrtc/candidates', {
+      method: 'POST', body: JSON.stringify({ session_id: sessionId, ice_token: iceToken, cursor, candidates }), signal,
     }),
   closeWebRTCSession: (sessionId: string, keepalive = false) =>
     request<{ status: string }>('/api/webrtc/close', {

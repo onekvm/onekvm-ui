@@ -62,9 +62,7 @@ import {
   type StoragePartitionStatus,
   type SystemTimeStatus,
   type SystemUpdateSlot,
-  type SystemUpdateStatus,
   type SystemOnlineUpdate,
-  type SystemOnlineUpdateProgress,
   type SystemUpdateSource,
 } from '@/api/client'
 import { hasPermission } from '@/build'
@@ -91,6 +89,7 @@ import {
 } from '@/lib/settings-nav'
 import { uiProduct } from '@/product'
 import { useStorageStatus } from '@/composables/useStorageStatus'
+import { useSystemUpdateMonitor } from '@/composables/useSystemUpdateMonitor'
 import { statusEvents } from '@/lib/status-events'
 
 import ExtensionLayoutPage from './ExtensionLayoutPage.vue'
@@ -269,12 +268,8 @@ const systemActionSawOffline = ref(false)
 const error = ref('')
 const systemDetailsError = ref('')
 const systemTime = ref<SystemTimeStatus | null>(null)
-const systemUpdate = ref<SystemUpdateStatus | null>(null)
-const systemUpdateUnavailable = ref(false)
 const onlineUpdate = ref<SystemOnlineUpdate | null>(null)
 const updateMethod = shallowRef<UpdateMethod>('github')
-const updateStarted = shallowRef(false)
-const onlineUpdateProgress = ref<SystemOnlineUpdateProgress | null>(null)
 const onlineUpdateError = ref('')
 const onlineUpdateLoading = ref(false)
 const onlineDownloadPercent = computed(() => {
@@ -292,7 +287,6 @@ const slotSwitching = ref('')
 const updateFile = ref<File | null>(null)
 const updateFileInput = ref<HTMLInputElement | null>(null)
 const updateFileDragging = ref(false)
-const updateInstalling = ref(false)
 const clockTick = ref(Date.now())
 const pluginsExpanded = ref(true)
 const sidebarNav = ref<HTMLElement | null>(null)
@@ -302,9 +296,6 @@ let pluginFrameObserver: ResizeObserver | null = null
 let pluginFrameMutationObserver: MutationObserver | null = null
 let pluginFrameAnimationFrame: number | null = null
 let clockTimer: number | null = null
-let updatePollTimer: number | null = null
-let onlineUpdateTimer: number | null = null
-let updatePollSawOperation = false
 let systemActionRun = 0
 let networkApplyPollInFlight = false
 let networkApplyLastPoll = 0
@@ -440,7 +431,6 @@ const systemActionDescription = computed(() => {
   if (systemActionStage.value === 'waiting') return t('settings.rebootDevice.waiting', 'Waiting for the device to restart...')
   return t('settings.rebootDevice.processing', 'Sending the restart command. Do not disconnect power.')
 })
-let updatePollIdleCount = 0
 
 const dropdownIcon = (component: typeof CircleUserRound) => () => h(NIcon, null, { default: () => h(component) })
 const { themeChoices, selectedThemeChoice, selectThemeChoice, themeMenuProps } = useThemeMenu()
@@ -544,6 +534,15 @@ const deviceUptime = computed(() => {
 })
 const mobileDetail = computed(() => mobileSettings.value && !isSettingsIndex(section.value))
 const { status: storageStatus } = useStorageStatus(computed(() => paneSection.value === 'system' && (!mobileSettings.value || mobileDetail.value)))
+const updateMonitor = useSystemUpdateMonitor(computed(() => paneSection.value === 'update'), (error) => {
+  if (error) message.error(error)
+  else message.success(t('settings.advancedSettings.systemPage.updateComplete', 'System update installed'))
+})
+const {
+  status: systemUpdate, progress: onlineUpdateProgress, busy: updateInstalling,
+  started: updateStarted, unavailable: systemUpdateUnavailable, error: updateStatusError,
+} = updateMonitor
+
 const activeExtensionParent = computed(() => {
   const sidebarParent = sections.value.find((item) => item.key === paneSection.value)?.parent
   if (sidebarParent) return sidebarParent
@@ -755,6 +754,9 @@ function connectionLabel(connected: boolean, available = true) {
 
 function updateOperationLabel(operation: string) {
   if (operation === 'idle') {
+    if (onlineUpdateProgress.value?.phase === 'uploading') return t('settings.advancedSettings.systemPage.updateUploading', 'Uploading update bundle…')
+    if (onlineUpdateProgress.value?.phase === 'error') return t('settings.advancedSettings.systemPage.updateFailed', 'System update failed')
+    if (onlineUpdateProgress.value?.phase === 'complete') return t('settings.advancedSettings.systemPage.updateComplete', 'System update installed')
     if (onlineUpdateProgress.value?.phase === 'checking') return t('settings.advancedSettings.systemPage.updateChecking', 'Checking kernel versions and plugin dependencies…')
     if (onlineUpdateProgress.value?.phase === 'awaiting_packages') return t('settings.advancedSettings.systemPage.updateAwaitingPackages', 'Upload the missing packages to continue')
     if (onlineUpdateProgress.value?.phase === 'downloading') return t('settings.advancedSettings.systemPage.updateDownloading', '正在下载升级包')
@@ -787,16 +789,11 @@ async function loadSystemDetails() {
       selectedNTPServers.value = [...value.ntp_servers]
       selectedDeviceLanguage.value = value.language
     } else {
-      systemUpdate.value = await api.getSystemUpdate()
+      await updateMonitor.refresh()
       void loadOnlineUpdate()
     }
   } catch (reason) {
-    if (section.value === 'update' && reason instanceof APIError && reason.status === 503) {
-      systemUpdate.value = null
-      systemUpdateUnavailable.value = true
-    } else {
-      systemDetailsError.value = reason instanceof Error ? reason.message : String(reason)
-    }
+    systemDetailsError.value = reason instanceof Error ? reason.message : String(reason)
   } finally {
     systemDetailsLoading.value = false
   }
@@ -886,11 +883,6 @@ function dropUpdateFile(event: DragEvent) {
   if (file) setUpdateFile(file)
 }
 
-function stopUpdatePolling() {
-  if (updatePollTimer !== null) window.clearTimeout(updatePollTimer)
-  updatePollTimer = null
-}
-
 async function loadOnlineUpdate() {
   onlineUpdateLoading.value = true
   onlineUpdateError.value = ''
@@ -902,39 +894,6 @@ async function loadOnlineUpdate() {
   } finally {
     onlineUpdateLoading.value = false
   }
-}
-
-function stopOnlineUpdatePolling() {
-  if (onlineUpdateTimer !== null) window.clearTimeout(onlineUpdateTimer)
-  onlineUpdateTimer = null
-}
-
-async function pollOnlineUpdate() {
-  stopOnlineUpdatePolling()
-  try {
-    const progress = await api.getSystemOnlineUpdateProgress()
-    onlineUpdateProgress.value = progress
-    if (progress.phase === 'awaiting_packages') {
-      updateInstalling.value = false
-      return
-    }
-    if (progress.phase === 'error') {
-      updateInstalling.value = false
-      onlineUpdateError.value = progress.error
-      return
-    }
-    if (progress.phase === 'installing') {
-      updatePollSawOperation = false
-      updatePollIdleCount = 0
-      await pollSystemUpdate()
-      return
-    }
-  } catch (reason) {
-    updateInstalling.value = false
-    onlineUpdateError.value = reason instanceof Error ? reason.message : String(reason)
-    return
-  }
-  onlineUpdateTimer = window.setTimeout(pollOnlineUpdate, 1000)
 }
 
 function confirmOnlineUpdate() {
@@ -951,10 +910,11 @@ function confirmOnlineUpdate() {
       try {
         await api.startSystemOnlineUpdate()
         updateStarted.value = true
-        await pollOnlineUpdate()
+        await updateMonitor.follow()
       } catch (reason) {
         updateInstalling.value = false
         onlineUpdateError.value = reason instanceof Error ? reason.message : String(reason)
+        await updateMonitor.refresh()
         return false
       }
     },
@@ -975,47 +935,21 @@ function confirmSourceUpdate(source: SystemUpdateSource) {
       try {
         await api.startSystemUpdateSource(source)
         updateStarted.value = true
-        await pollOnlineUpdate()
+        await updateMonitor.follow()
       } catch (reason) {
         updateInstalling.value = false
         onlineUpdateError.value = reason instanceof Error ? reason.message : String(reason)
+        await updateMonitor.refresh()
         return false
       }
     },
   })
 }
 
-async function pollSystemUpdate() {
-  stopUpdatePolling()
-  try {
-    const status = await api.getSystemUpdate()
-    systemUpdate.value = status
-    if (status.operation !== 'idle') {
-      updatePollSawOperation = true
-      updatePollIdleCount = 0
-    } else {
-      updatePollIdleCount += 1
-    }
-    if ((updatePollSawOperation && status.operation === 'idle') || updatePollIdleCount >= 3) {
-      updateInstalling.value = false
-      if (status.last_error) message.error(status.last_error)
-      else message.success(t('settings.advancedSettings.systemPage.updateComplete', 'System update installed'))
-      return
-    }
-  } catch (reason) {
-    updateInstalling.value = false
-    message.error(reason instanceof Error ? reason.message : String(reason))
-    return
-  }
-  updatePollTimer = window.setTimeout(pollSystemUpdate, 1000)
-}
-
 async function installPreparedUpdate() {
   updateInstalling.value = true
   updateStarted.value = true
-  updatePollSawOperation = false
-  updatePollIdleCount = 0
-  await pollSystemUpdate()
+  await updateMonitor.follow()
 }
 
 function cancelPreparedUpdate() {
@@ -1034,15 +968,14 @@ function confirmSystemUpdate() {
     onPositiveClick: async () => {
       if (!updateFile.value) return
       updateInstalling.value = true
-      updatePollSawOperation = false
-      updatePollIdleCount = 0
       try {
         await api.installSystemUpdate(updateFile.value)
         updateStarted.value = true
-        await pollOnlineUpdate()
+        await updateMonitor.follow()
       } catch (reason) {
         updateInstalling.value = false
         message.error(reason instanceof Error ? reason.message : String(reason))
+        await updateMonitor.refresh()
         return false
       }
     },
@@ -1711,8 +1644,6 @@ onBeforeUnmount(() => {
   settingsResizeObserver?.disconnect()
   systemActionRun += 1
   stopPluginFrameObserver()
-  stopUpdatePolling()
-  stopOnlineUpdatePolling()
   if (clockTimer !== null) window.clearInterval(clockTimer)
 })
 
@@ -1754,10 +1685,6 @@ watch(activeExtensionURL, () => {
 })
 watch(paneSection, (value) => {
   if (value === 'time' || value === 'update') void loadSystemDetails()
-  else {
-    stopUpdatePolling()
-    stopOnlineUpdatePolling()
-  }
 }, { immediate: true })
 </script>
 
@@ -2451,8 +2378,9 @@ watch(paneSection, (value) => {
                   :switching-slot="slotSwitching"
                   @select-slot="confirmSlotSwitch"
                 />
-                <n-alert v-if="systemUpdateUnavailable" type="info" :bordered="false">
-                  {{ t('settings.advancedSettings.systemPage.updateUnavailable', 'System update service is temporarily unavailable. Please try again later.') }}
+                <n-alert v-if="systemUpdateUnavailable || updateStatusError" type="warning" :bordered="false">
+                  {{ t('settings.advancedSettings.systemPage.updateReconnecting', 'Update status is temporarily unavailable. Reconnecting…') }}
+                  <n-button text @click="updateMonitor.refresh()">{{ t('common.retry', 'Retry') }}</n-button>
                 </n-alert>
                 <template v-if="systemUpdate">
                   <section class="system-settings-group">
@@ -2555,22 +2483,23 @@ watch(paneSection, (value) => {
 
                   <section v-if="updateStarted || systemUpdate.operation !== 'idle'" class="system-settings-group">
                     <h2>{{ t('settings.advancedSettings.systemPage.updateStatus', '升级状态') }}</h2>
+                    <p v-if="updateInstalling">{{ t('settings.advancedSettings.systemPage.updateBackground', 'After upload, the update continues in the background. You can return to this page to view its progress.') }}</p>
                     <div class="system-update-panel">
                       <n-progress
-                        v-if="onlineUpdateProgress?.phase === 'downloading'"
+                        v-if="onlineUpdateProgress?.phase === 'downloading' || onlineUpdateProgress?.phase === 'uploading'"
                         type="line"
                         :percentage="onlineDownloadPercent"
                         :show-indicator="onlineUpdateProgress.total_bytes > 0"
                         :processing="onlineUpdateProgress.total_bytes === 0"
                       />
-                      <span v-if="onlineUpdateProgress?.phase === 'downloading'" class="system-update-transfer">
+                      <span v-if="onlineUpdateProgress?.phase === 'downloading' || onlineUpdateProgress?.phase === 'uploading'" class="system-update-transfer">
                         {{ formatBytes(onlineUpdateProgress.bytes) }}<template v-if="onlineUpdateProgress.total_bytes"> / {{ formatBytes(onlineUpdateProgress.total_bytes) }}</template>
                       </span>
                       <div class="system-update-status">
                         <Download :size="19" />
                         <div>
                           <strong>{{ updateOperationLabel(systemUpdate.operation) }}</strong>
-                          <span>{{ systemUpdate.compatible }}</span>
+                          <span>{{ systemUpdate.operation !== 'idle' ? systemUpdate.progress.message || systemUpdate.compatible : systemUpdate.compatible }}</span>
                         </div>
                         <span v-if="systemUpdate.operation !== 'idle'">{{ systemUpdate.progress.percentage }}%</span>
                       </div>
@@ -2581,7 +2510,7 @@ watch(paneSection, (value) => {
                         :show-indicator="false"
                         status="success"
                       />
-                      <span v-if="systemUpdate.last_error" class="system-update-error">{{ systemUpdate.last_error }}</span>
+                      <span v-if="onlineUpdateProgress?.error || systemUpdate.last_error" class="system-update-error">{{ onlineUpdateProgress?.error || systemUpdate.last_error }}</span>
 
                     </div>
                   </section>

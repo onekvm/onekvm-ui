@@ -136,6 +136,10 @@ const keyboardLeds = computed({
   get: () => !usb.value.keyboard_no_out,
   set: (value: boolean) => { usb.value.keyboard_no_out = !value },
 })
+const remoteWakeup = computed({
+  get: () => usb.value.remote_wakeup ?? true,
+  set: (value: boolean) => { usb.value.remote_wakeup = value },
+})
 </script>
 
 <template>
@@ -182,6 +186,15 @@ const keyboardLeds = computed({
         <p>{{ t('settings.advancedSettings.usbPage.functionsHint', 'Choose what the controlled device can use. Keyboard and mouse stay on. Turn something off and that device will not see it.') }}</p>
       </header>
       <ul class="usb-function-list">
+        <li>
+          <div>
+            <strong>{{ t('settings.advancedSettings.usbPage.remoteWakeup', 'USB remote wakeup') }}</strong>
+            <small>{{ t('settings.advancedSettings.usbPage.remoteWakeupHint', 'Wake the controlled device with a key press or mouse click. Requires USB wake support and permission in its BIOS and operating system. Changing this setting briefly reconnects USB.') }}</small>
+          </div>
+          <div class="usb-function-controls">
+            <n-switch v-model:value="remoteWakeup" :disabled="props.disabled" :aria-label="t('settings.advancedSettings.usbPage.remoteWakeup', 'USB remote wakeup')" />
+          </div>
+        </li>
         <li>
           <div>
             <strong>{{ t('settings.advancedSettings.usbPage.keyboard', 'USB keyboard') }}</strong>

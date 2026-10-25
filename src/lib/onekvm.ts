@@ -1,4 +1,4 @@
-import { BANDWIDTH_CHANNEL, StartupBandwidthProbe } from '@/lib/startup-bandwidth'
+import { WebRTCTrickleICE } from '@/lib/webrtc-ice'
 import { readWebRTCConnectionStats, type WebRTCConnectionStats } from '@/lib/webrtc-connection-stats'
 import { VIDEO_TIMING_CHANNEL, WebRTCVideoTiming } from '@/lib/webrtc-video-timing'
 import { isCloudHosted } from '@/api/service-url'
@@ -148,7 +148,8 @@ class OneKVMTransport {
   private bitrateListeners = new Set<BitrateListener>()
   private browserLatencyListeners = new Set<BrowserLatencyListener>()
   private webRTCConnectionStatsListeners = new Set<WebRTCConnectionStatsListener>()
-  private bandwidthProbe: StartupBandwidthProbe | null = null
+  private autoBitrateKbps: number | null = null
+  private trickleICE: WebRTCTrickleICE | null = null
   private webRTCConnectionStats: WebRTCConnectionStats | null = null
   private audioStatsListeners = new Set<AudioStatsListener>()
   private keyboardLEDListeners = new Set<KeyboardLEDListener>()
@@ -738,11 +739,14 @@ class OneKVMTransport {
 
   private async startWebRTC(generation: number, codec: string, _speaker: boolean, _microphone: boolean, stereo = false, autoCodec?: string) {
 
-    const iceServers = (await api.getWebRTCIce().catch(() => ({ ice_servers: [] }))).ice_servers || []
+    const ice = await api.getWebRTCIce().catch(() => ({ ice_servers: [], trickle: false }))
+    const iceServers = ice.ice_servers || []
     if (generation !== this.connectionGeneration) return
     const peer = new RTCPeerConnection(iceServers.length ? { iceServers } : undefined)
     const stream = new MediaStream()
     this.peer = peer
+    const trickle = ice.trickle ? new WebRTCTrickleICE(peer, api.exchangeWebRTCCandidates) : null
+    this.trickleICE = trickle
     this.stream = stream
 
     peer.ontrack = (event) => {
@@ -773,17 +777,12 @@ class OneKVMTransport {
       }
     }
 
-    const bandwidth = peer.createDataChannel(BANDWIDTH_CHANNEL)
-    bandwidth.binaryType = 'arraybuffer'
-    const probe = new StartupBandwidthProbe(data => {
-      if (this.peer === peer && bandwidth.readyState === 'open') bandwidth.send(data)
-    })
-    this.bandwidthProbe = probe
-    bandwidth.onopen = () => {
-      if (this.peer === peer) bandwidth.send('start')
-    }
-    bandwidth.onmessage = event => {
-      if (this.peer === peer && event.data instanceof ArrayBuffer) probe.receive(event.data)
+    const congestion = peer.createDataChannel('onekvm.congestion.v1', { ordered: false, maxRetransmits: 0 })
+    congestion.binaryType = 'arraybuffer'
+    congestion.onmessage = event => {
+      if (this.peer !== peer || !(event.data instanceof ArrayBuffer) || event.data.byteLength !== 8) return
+      const view = new DataView(event.data)
+      if (view.getUint32(0) === 0x4f4b4252) this.autoBitrateKbps = view.getUint32(4) || null
     }
     this.videoTiming = new WebRTCVideoTiming(peer.createDataChannel(VIDEO_TIMING_CHANNEL, {
       ordered: false, maxRetransmits: 0,
@@ -825,16 +824,16 @@ class OneKVMTransport {
       offer.sdp = preferLowDelayOpus(sdp)
     }
     await peer.setLocalDescription(offer)
-    await this.waitForCandidates(peer)
+    if (!trickle) await this.waitForCandidates(peer)
     if (this.peer !== peer) return
 
-    const answer = await api.createWebRTCSession(peer.localDescription?.sdp || '', false, 'video', autoCodec)
+    const answer = await api.createWebRTCSession(peer.localDescription?.sdp || '', false, 'video', autoCodec, Boolean(trickle))
     if (this.peer !== peer) {
       await api.closeWebRTCSession(answer.session_id, true).catch(() => undefined)
       return
     }
     this.sessionId = answer.session_id
-    if (isCloudHosted()) await this.openHIDWebSocket()
+    if (isCloudHosted()) void this.openHIDWebSocket().catch(() => undefined)
     if (this.peer !== peer) return
     this.setState({
       webRTCSessionId: answer.session_id,
@@ -845,6 +844,7 @@ class OneKVMTransport {
       sdp: preferLowDelayOpus(answer.sdp),
     })
     if (this.peer !== peer) return
+    void trickle?.start(answer).catch(error => { if (this.peer === peer) this.failWebRTC(String(error)) })
     this.startVideoStats(peer)
     this.audioStereo = stereo
     void this.reconcileAudio()
@@ -863,7 +863,7 @@ class OneKVMTransport {
     try {
       const schema = await api.getConfigSchema()
       if (!schema.capabilities?.audio || !canOpen()) return
-      const { ice_servers: iceServers } = await api.getWebRTCIce().catch(() => ({ ice_servers: [] }))
+      const { ice_servers: iceServers, trickle } = await api.getWebRTCIce().catch(() => ({ ice_servers: [], trickle: false }))
       if (!canOpen()) return
       player = new WebRTCAudio({
         track: (track) => {
@@ -884,7 +884,7 @@ class OneKVMTransport {
         },
       }, this.audioRecovery)
       this.webRTCAudio = player
-      await player.connect(iceServers || [], this.audioStereo)
+      await player.connect(iceServers || [], this.audioStereo, trickle)
       if (this.webRTCAudio !== player || !canOpen()) return
       // The pending open must resolve before setMicrophone waits for it.
       if (this.wantMicrophone) queueMicrotask(() => {
@@ -1282,7 +1282,9 @@ class OneKVMTransport {
     this.adaptiveJitterBuffer.reset()
     this.emitVideoBitrate(0)
     this.emitBrowserLatency(emptyBrowserVideoLatency())
-    this.bandwidthProbe = null
+    this.autoBitrateKbps = null
+    this.trickleICE?.destroy()
+    this.trickleICE = null
     this.emitWebRTCConnectionStats(null)
     const audioClosing = this.disposeWebRTCAudio()
     this.audioOpening = null
@@ -1330,7 +1332,7 @@ class OneKVMTransport {
     const sample = async () => {
       const reports = await peer.getStats().catch(() => null)
       if (!reports || this.peer !== peer) return
-      this.emitWebRTCConnectionStats({ ...readWebRTCConnectionStats(reports, peer), autoBitrateKbps: this.bandwidthProbe?.capKbps ?? null })
+      this.emitWebRTCConnectionStats({ ...readWebRTCConnectionStats(reports, peer), autoBitrateKbps: this.autoBitrateKbps })
       applyJitterBufferTargets(peer.getReceivers(), this.adaptiveJitterBuffer.sample(reports))
       const { bitrateKbps, bitrateSampled, latency } = this.playbackStats.sample(reports)
       if (bitrateSampled) this.emitVideoBitrate(bitrateKbps)

@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, shallowRef, watch } from 'vue'
 
 import type { OneKVMConfig, OneKVMStatus, USBConfig } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { USB_GAMEPAD_UI_ENABLED } from '@/lib/ui-features'
-import { usbEndpointCosts as endpointCosts, usbEndpointUse, usbFunctionsFit, type USBFunctionOverrides } from '@/lib/usb-capacity'
 
-import AudioSettingsForm from './AudioSettingsForm.vue'
+import { usbEndpointCosts as endpointCosts, usbEndpointUse, usbFunctionsFit, type USBFunctionOverrides } from '@/lib/usb-capacity'
 import USBCapacityBadge from './USBCapacityBadge.vue'
+import USBAudioDeviceSettings from './USBAudioDeviceSettings.vue'
 
 const props = defineProps<{
   disabled?: boolean
@@ -16,6 +16,7 @@ const props = defineProps<{
 const emit = defineEmits<{ validity: [valid: boolean] }>()
 const usb = defineModel<USBConfig>({ required: true })
 const audio = defineModel<OneKVMConfig['audio']>('audio', { required: true })
+const audioValid = shallowRef(true)
 
 const idValid = (value: string) => /^(?:0x)?[0-9a-f]{4}$/i.test(value.trim())
 const usbStringValid = (value: string, allowEmpty = false) =>
@@ -25,13 +26,11 @@ const scsiStringValid = (value: string, maximum: number) =>
 if (usb.value.gamepad == null) usb.value.gamepad = false
 if (usb.value.mass_storage == null) usb.value.mass_storage = true
 if (usb.value.mtp == null) usb.value.mtp = true
-if (audio.value.microphone == null) audio.value.microphone = false
 if (!usb.value.keyboard_name) usb.value.keyboard_name = 'Keyboard'
 if (!usb.value.mouse_name) usb.value.mouse_name = 'Mouse'
 if (usb.value.keyboard_interval == null) usb.value.keyboard_interval = 0
 if (usb.value.mouse_interval == null) usb.value.mouse_interval = 0
 
-const audioValid = ref(true)
 
 const gadget = computed(() => props.gadget)
 const hasBudget = computed(() => Boolean(gadget.value && (gadget.value.in_limit > 0 || gadget.value.out_limit > 0)))
@@ -53,8 +52,6 @@ function wouldFit(options: USBFunctionOverrides) {
   return usbFunctionsFit(usb.value, audio.value, gadget.value, options)
 }
 
-const audioBlocked = computed(() => !audio.value.enabled && !wouldFit({ audio: true }))
-const microphoneBlocked = computed(() => !audio.value.microphone && !wouldFit({ microphone: true }))
 const gamepadBlocked = computed(() => !usb.value.gamepad && !wouldFit({ gamepad: true }))
 const storageBlocked = computed(() => usb.value.mass_storage === false && !wouldFit({ storage: true }))
 const mtpBlocked = computed(() => usb.value.mtp === false && !wouldFit({ mtp: true }))
@@ -70,10 +67,6 @@ const massStorageOn = computed({
 const mtpOn = computed({
   get: () => usb.value.mtp !== false,
   set: (value: boolean) => { usb.value.mtp = value },
-})
-const microphoneOn = computed({
-  get: () => Boolean(audio.value.microphone),
-  set: (value: boolean) => { audio.value.microphone = value },
 })
 const showMassStorage = computed(() => gadget.value?.mass_storage !== false)
 const showMTP = computed(() => Boolean(gadget.value?.mtp_available))
@@ -92,15 +85,10 @@ const valid = computed(() =>
     scsiStringValid(usb.value.iso_product, 16) &&
     scsiStringValid(usb.value.drive_product, 16)
   )) &&
-  audioValid.value &&
-  !overBudget.value,
+  audioValid.value && !overBudget.value,
 )
 
 watch(valid, (value) => emit('validity', value), { immediate: true })
-watch(() => [audio.value.enabled, audio.value.microphone] as const, ([speaker, microphone]) => {
-  if (!speaker && !microphone) audioValid.value = true
-})
-
 const keyboardLeds = computed({
   get: () => !usb.value.keyboard_no_out,
   set: (value: boolean) => { usb.value.keyboard_no_out = !value },
@@ -211,40 +199,6 @@ const remoteWakeup = computed({
             <n-switch v-model:value="keyboardLeds" :disabled="props.disabled" />
           </div>
         </li>
-        <li>
-          <div>
-            <strong>{{ t('settings.advancedSettings.audioPage.title', 'USB audio') }}</strong>
-            <small>{{ t('settings.advancedSettings.audioPage.hint', 'The controlled device will see OneKVM as a speaker. The console Audio button appears after you turn this on.') }}</small>
-          </div>
-          <div class="usb-function-controls">
-            <USBCapacityBadge :endpoints="endpointCosts.audio" />
-            <n-tooltip :disabled="!audioBlocked" placement="left">
-              <template #trigger>
-                <span class="usb-function-switch">
-                  <n-switch v-model:value="audio.enabled" :disabled="props.disabled || audioBlocked" />
-                </span>
-              </template>
-              {{ t('settings.advancedSettings.usbPage.audioBlocked', 'Not enough USB capacity. Turn off the microphone, virtual storage, or file transfer first.') }}
-            </n-tooltip>
-          </div>
-        </li>
-        <li>
-          <div>
-            <strong>{{ t('settings.advancedSettings.usbPage.microphone', 'USB microphone') }}</strong>
-            <small>{{ t('settings.advancedSettings.usbPage.microphoneHint', 'Forwards this browser’s microphone to the controlled device. Turn it off and that device will not see a microphone.') }}</small>
-          </div>
-          <div class="usb-function-controls">
-            <USBCapacityBadge :endpoints="endpointCosts.microphone" />
-            <n-tooltip :disabled="!microphoneBlocked" placement="left">
-              <template #trigger>
-                <span class="usb-function-switch">
-                  <n-switch v-model:value="microphoneOn" :disabled="props.disabled || microphoneBlocked" />
-                </span>
-              </template>
-              {{ t('settings.advancedSettings.usbPage.microphoneBlocked', 'Not enough USB capacity. Turn off the speaker, virtual storage, or file transfer first.') }}
-            </n-tooltip>
-          </div>
-        </li>
         <li v-if="USB_GAMEPAD_UI_ENABLED">
           <div>
             <strong>{{ t('settings.advancedSettings.usbPage.gamepad', 'Gamepad') }}</strong>
@@ -299,11 +253,11 @@ const remoteWakeup = computed({
       </ul>
     </section>
 
-    <AudioSettingsForm
-      v-if="audio.enabled || audio.microphone"
+    <USBAudioDeviceSettings
       v-model="audio"
-      :show-enable="false"
-      :disabled="props.disabled || audioBlocked || microphoneBlocked"
+      :usb="usb"
+      :gadget="props.gadget"
+      :disabled="props.disabled"
       @validity="audioValid = $event"
     />
 

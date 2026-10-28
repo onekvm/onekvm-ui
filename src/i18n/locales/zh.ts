@@ -645,7 +645,7 @@ const zh = {
         files: '文件',
 			keyboard: '键盘',
 		usb: 'USB',
-        audio: 'USB 音频',
+        audio: '音频',
         time: '区域和时间',
         update: '系统升级',
         personalizationPage: {
@@ -759,10 +759,13 @@ const zh = {
           duration: '已连接',
         },
         audioPage: {
-          restartHint: '启用 USB 音频、调整声道或修改设备名称后，被控设备会重新识别 USB 设备，键盘和鼠标会短暂断开。',
-          title: 'USB 音频',
-          hint: '被控设备会将 OneKVM 识别为 USB 声卡。下方格式用于向浏览器传输音频；USB 音频固定为 48 kHz、16-bit PCM。',
-          enable: '启用 USB 音频',
+          usbTitle: 'USB 音频设备',
+          usbHint: '选择 USB 输入后，被控设备会将 OneKVM 识别为扬声器。麦克风回传独立于音频输入来源。',
+
+          restartHint: '更改 USB 音频功能、声道或 USB 设备名称，会让键盘和鼠标短暂重连。',
+          title: '音频',
+          hint: '所有输入共用这套设置。切换输入来源时，传输格式、音质和声道保持不变。',
+          enable: 'USB 扬声器',
           quality: '音质',
           qualityPCM: '原始音质（48 kHz / 16-bit，无损）',
           qualityLow: '低 (48 kbps)',
@@ -2511,6 +2514,11 @@ const zh = {
       expand: '展开'
     },
     usbAudio: {
+      source: '输入来源',
+      sourceUSB: 'USB 音频',
+      sourceHDMI: 'HDMI 音频',
+      hdmiUnsupported: '当前设备不支持 HDMI 音频，仅可使用 USB 音频。',
+
       title: '音频',
       format: '传输格式',
       formatOpus: 'Opus（节省带宽）',

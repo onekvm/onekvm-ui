@@ -645,7 +645,7 @@ const zh_tw = {
         files: '檔案',
 			keyboard: '鍵盤',
 		usb: 'USB',
-        audio: 'USB 音訊',
+        audio: '音訊',
         time: '區域和時間',
         update: '系統升級',
         personalizationPage: {
@@ -759,10 +759,13 @@ const zh_tw = {
           duration: '已連線',
         },
         audioPage: {
-          restartHint: '啟用 USB 音訊、調整聲道或修改裝置名稱後，受控裝置會重新辨識 USB 裝置，鍵盤和滑鼠會短暫中斷。',
-          title: 'USB 音訊',
-          hint: '受控裝置會將 OneKVM 識別為 USB 音效卡。下方格式用於向瀏覽器傳輸音訊；USB 音訊固定為 48 kHz、16-bit PCM。',
-          enable: '啟用 USB 音訊',
+          usbTitle: 'USB 音訊裝置',
+          usbHint: '選擇 USB 輸入後，受控裝置會將 OneKVM 識別為喇叭。麥克風回傳獨立於音訊輸入來源。',
+
+          restartHint: '變更 USB 音訊功能、聲道或 USB 裝置名稱，會讓鍵盤和滑鼠短暫重新連線。',
+          title: '音訊',
+          hint: '所有輸入共用這套設定。切換輸入來源時，傳輸格式、音質和聲道保持不變。',
+          enable: 'USB 揚聲器',
           quality: '音質',
           qualityPCM: '原始音質（48 kHz / 16-bit，無損）',
           qualityLow: '低 (48 kbps)',
@@ -2516,6 +2519,11 @@ const zh_tw = {
       expand: '展開'
     },
     usbAudio: {
+      source: '輸入來源',
+      sourceUSB: 'USB 音訊',
+      sourceHDMI: 'HDMI 音訊',
+      hdmiUnsupported: '目前裝置不支援 HDMI 音訊，僅可使用 USB 音訊。',
+
       title: '音訊',
       format: '傳輸格式',
       formatOpus: 'Opus（節省頻寬）',

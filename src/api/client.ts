@@ -310,8 +310,10 @@ export interface OneKVMConfig {
   }
   audio: {
     enabled: boolean
+    source?: 'usb' | 'hdmi'
     microphone?: boolean
     device: string
+    microphone_device?: string
     quality?: 'low' | 'medium' | 'high' | 'pcm'
     channels?: 'mono' | 'stereo'
     product_name?: string
@@ -576,6 +578,8 @@ export interface OneKVMStatus {
   }
   audio: {
     enabled: boolean
+    source?: 'usb' | 'hdmi'
+    sources?: ('usb' | 'hdmi')[]
     microphone?: boolean
     microphone_available?: boolean
     microphone_session?: string
@@ -781,6 +785,7 @@ export interface SystemUpdateLocalFile {
 }
 
 export interface ConfigSchema {
+  audio_sources?: ('usb' | 'hdmi')[]
   schema_version?: number
   json_schema?: Record<string, unknown>
   machine: string
@@ -1746,6 +1751,10 @@ export const api = {
     }),
   getConfigSchema: (webRTCSessionId = '') => request<ConfigSchema>('/api/config/schema', {
     headers: webRTCSessionId ? { 'X-OneKVM-WebRTC-Session': webRTCSessionId } : undefined,
+  }),
+  getAudioConfig: () => request<OneKVMConfig['audio']>('/api/config/audio', { cache: 'no-store' }),
+  patchAudioConfig: (patch: Partial<OneKVMConfig['audio']>) => request<ConfigSaveResponse>('/api/config/audio', {
+    method: 'PATCH', body: JSON.stringify(patch),
   }),
   saveConfig: (config: OneKVMConfig, webRTCSessionId = '') =>
 		request<ConfigSaveResponse>('/api/config', {

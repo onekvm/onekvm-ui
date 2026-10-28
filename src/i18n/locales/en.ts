@@ -646,7 +646,7 @@ const en = {
         files: 'Files',
 			keyboard: 'Keyboard',
 		usb: 'USB',
-        audio: 'USB audio',
+        audio: 'Audio',
         time: 'Region and time',
         update: 'System update',
         personalizationPage: {
@@ -760,10 +760,13 @@ const en = {
           duration: 'Connected for',
         },
         audioPage: {
-          restartHint: 'Enabling USB audio or changing its channels or device name makes the controlled device rediscover this USB gadget. The keyboard and mouse disconnect briefly.',
-          title: 'USB audio',
-          hint: 'The controlled device recognizes OneKVM as a USB sound card. The format below controls audio transmission to the browser; USB audio uses 48 kHz, 16-bit PCM.',
-          enable: 'Enable USB audio',
+          usbTitle: 'USB audio device',
+          usbHint: 'USB input makes OneKVM a speaker on the controlled device. Microphone forwarding is independent of the selected input.',
+
+          restartHint: 'Changing USB audio functions, channels or the USB device name briefly reconnects the keyboard and mouse.',
+          title: 'Audio',
+          hint: 'All inputs share these settings. Switching the input keeps the format, quality and channels.',
+          enable: 'USB speaker',
           quality: 'Quality',
           qualityPCM: 'Original (48 kHz / 16-bit, lossless)',
           qualityLow: 'Low (48 kbps)',
@@ -2512,6 +2515,11 @@ const en = {
       expand: 'Expand Menu'
     },
     usbAudio: {
+      source: 'Input source',
+      sourceUSB: 'USB audio',
+      sourceHDMI: 'HDMI audio',
+      hdmiUnsupported: 'This device does not support HDMI audio. Only USB audio is available.',
+
       title: 'Audio',
       format: 'Transmission format',
       formatOpus: 'Opus (save bandwidth)',

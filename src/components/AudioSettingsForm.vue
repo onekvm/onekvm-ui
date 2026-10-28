@@ -1,11 +1,21 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, shallowRef, watch } from 'vue'
 
 import type { OneKVMConfig } from '@/api/client'
 import { useAudioSettings, type AudioFormat, type AudioQuality } from '@/composables/useAudioSettings'
+import { useAudioInputs } from '@/composables/useAudioInputs'
+import type { AudioInputSource } from '@/lib/audio-settings'
+import { usbFunctionsFit, type USBGadget } from '@/lib/usb-capacity'
 import { t } from '@/i18n/runtime'
+import USBAudioDeviceSettings from './USBAudioDeviceSettings.vue'
+import AudioInputSelect from './AudioInputSelect.vue'
 
-const props = defineProps<{ disabled?: boolean; showEnable?: boolean }>()
+const props = defineProps<{
+  disabled?: boolean
+  usb: OneKVMConfig['usb']
+  gadget?: USBGadget
+  sources?: readonly AudioInputSource[]
+}>()
 const emit = defineEmits<{ validity: [valid: boolean] }>()
 const audio = defineModel<OneKVMConfig['audio']>({ required: true })
 
@@ -14,15 +24,8 @@ watch(() => audio.value, (value) => {
   if (!value.quality) value.quality = 'medium'
   if (value.channels !== 'mono' && value.channels !== 'stereo') value.channels = 'stereo'
   if (!value.product_name) value.product_name = 'OneKVM Audio'
+  if (!value.source) value.source = 'usb'
 }, { immediate: true })
-
-const enabled = computed({
-  get: () => Boolean(audio.value.enabled),
-  set: (value: boolean) => { audio.value.enabled = value },
-})
-
-const usbStringValid = (value: string) =>
-  value.length > 0 && new TextEncoder().encode(value).length <= 126 && !/[\u0000-\u001f\u007f]/.test(value)
 
 const channels = computed({
   get: () => audio.value.channels || 'stereo',
@@ -37,13 +40,18 @@ function updateFormat(value: AudioFormat) {
 function updateQuality(value: AudioQuality) {
   if (format.value === 'opus' && value !== 'pcm') audio.value.quality = value
 }
-const productName = computed({
-  get: () => audio.value.product_name || 'OneKVM Audio',
-  set: (value: string) => { audio.value.product_name = value },
+const source = computed({
+  get: () => audio.value.source || 'usb',
+  set: (value: AudioInputSource) => { audio.value.source = value },
 })
-
-const valid = computed(() => usbStringValid(productName.value))
-watch(valid, (value) => emit('validity', value), { immediate: true })
+const { sourceOptions: availableSources, sourceSelectionDisabled } = useAudioInputs(() => props.sources, () => source.value)
+const sourceOptions = computed(() => availableSources.value.map(option => ({
+  ...option,
+  disabled: option.disabled || (option.value === 'usb' && audio.value.enabled && source.value !== 'usb'
+    && !usbFunctionsFit(props.usb, audio.value, props.gadget, { audio: true })),
+})))
+const usbAudioValid = shallowRef(true)
+watch(usbAudioValid, (value) => emit('validity', value), { immediate: true })
 
 const channelOptions = computed(() => [
   { label: t('settings.advancedSettings.audioPage.mono', 'Mono'), value: 'mono' },
@@ -53,18 +61,14 @@ const channelOptions = computed(() => [
 
 <template>
   <div class="audio-settings">
-    <n-alert v-if="props.showEnable !== false" type="info" :bordered="false">
-      {{ t('settings.advancedSettings.audioPage.restartHint', 'Enabling USB audio or changing its channels or device name makes the controlled device rediscover this USB gadget. The keyboard and mouse disconnect briefly.') }}
-    </n-alert>
-
     <section class="audio-settings-card">
       <header>
-        <h2>{{ t('settings.advancedSettings.audioPage.title', 'USB audio') }}</h2>
-        <p>{{ t('settings.advancedSettings.audioPage.hint', 'The controlled device recognizes OneKVM as a USB sound card. The format below controls audio transmission to the browser; USB audio uses 48 kHz, 16-bit PCM.') }}</p>
+        <h2>{{ t('settings.advancedSettings.audioPage.title', 'Audio') }}</h2>
+        <p>{{ t('settings.advancedSettings.audioPage.hint', 'All inputs share these settings. Switching the input keeps the format, quality and channels.') }}</p>
       </header>
       <n-form label-placement="top" :show-feedback="false" class="audio-settings-grid">
-        <n-form-item v-if="props.showEnable !== false" :label="t('settings.advancedSettings.audioPage.enable', 'Enable USB audio')">
-          <n-switch v-model:value="enabled" :disabled="props.disabled" />
+        <n-form-item :label="t('usbAudio.source', 'Input source')">
+          <AudioInputSelect v-model="source" :options="sourceOptions" :disabled="props.disabled" :unavailable="sourceSelectionDisabled" />
         </n-form-item>
         <n-form-item :label="t('usbAudio.format', 'Transmission format')">
           <div class="audio-quality-field">
@@ -78,19 +82,16 @@ const channelOptions = computed(() => [
         <n-form-item :label="t('settings.advancedSettings.audioPage.channels', 'Channels')">
           <n-select v-model:value="channels" :options="channelOptions" :disabled="props.disabled" />
         </n-form-item>
-        <n-form-item :label="t('settings.advancedSettings.audioPage.productName', 'Name shown to the controlled device')">
-          <div class="audio-quality-field">
-            <n-input
-              v-model:value="productName"
-              :disabled="props.disabled"
-              maxlength="126"
-              :status="usbStringValid(productName) ? undefined : 'error'"
-            />
-            <p>{{ t('settings.advancedSettings.audioPage.productNameHint', 'A name for the USB audio device in the controlled device’s sound settings. The operating system determines how it is displayed.') }}</p>
-          </div>
-        </n-form-item>
       </n-form>
     </section>
+
+    <USBAudioDeviceSettings
+      v-model="audio"
+      :usb="props.usb"
+      :gadget="props.gadget"
+      :disabled="props.disabled"
+      @validity="usbAudioValid = $event"
+    />
   </div>
 </template>
 

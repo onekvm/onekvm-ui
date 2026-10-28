@@ -39,6 +39,7 @@ import {
   Trash2,
   Upload,
 	Usb,
+  Volume2,
   Wifi,
 } from '@/icons'
 import { NIcon, useMessage, type DropdownOption } from 'naive-ui'
@@ -70,6 +71,7 @@ import { useAuth } from '@/composables/useAuth'
 import { currentLanguage, languageOptions, setLanguage, t } from '@/i18n/runtime'
 import { normalizeConsoleSubtitleParts } from '@/lib/console-title'
 import { normalizeToolbarIcons } from '@/lib/toolbar-icons'
+import { audioConfigPatch, normalizeAudioConfig, type AudioConfig } from '@/lib/audio-settings'
 import { machineDisplayName } from '@/lib/machine'
 import { PLUGIN_MARKETPLACE_ID } from '@/lib/cloud-services'
 import { loadMarketplaceInstallPackage } from '@/lib/marketplace-install-client'
@@ -103,6 +105,7 @@ import AccountDrawer from './AccountDrawer.vue'
 import DNSSettingsForm from './DNSSettingsForm.vue'
 import ActiveRoutesPanel from './ActiveRoutesPanel.vue'
 import DisplaySettingsForm from './DisplaySettingsForm.vue'
+import AudioSettingsForm from './AudioSettingsForm.vue'
 import PersonalizationSettingsForm from './PersonalizationSettingsForm.vue'
 import { setMessagePlacement } from '@/composables/useMessagePlacement'
 import HostnameSettingsForm from './HostnameSettingsForm.vue'
@@ -170,8 +173,7 @@ function sectionFromRoute(route: string): Section {
     }
   }
   if (uiProduct.settingsSections?.some((item) => item.key === normalized)) return normalized
-  if (normalized === 'audio') return 'usb'
-  return ['display', 'personalization', 'network', 'firewall', 'keyboard', 'usb', 'cloud', 'plugins', 'services', 'security', 'logs', 'resources', 'sessions', 'system', 'files', 'users', 'time', 'update'].includes(normalized) ? normalized : 'system'
+  return ['display', 'audio', 'personalization', 'network', 'firewall', 'keyboard', 'usb', 'cloud', 'plugins', 'services', 'security', 'logs', 'resources', 'sessions', 'system', 'files', 'users', 'time', 'update'].includes(normalized) ? normalized : 'system'
 }
 
 function routeFromSection(value: Section) {
@@ -235,6 +237,8 @@ const loading = ref(true)
 const saving = ref(false)
 const keyboardShortcutsValid = ref(true)
 const usbSettingsValid = ref(true)
+const audioSettingsValid = shallowRef(true)
+const savedAudio = shallowRef<AudioConfig | null>(null)
 const personalizationValid = ref(true)
 const keyboardLayoutOptions = computed(() => [
 	{ value: 'us', label: t('keyboard.layouts.us', 'English (US)') },
@@ -500,6 +504,9 @@ const sections = computed<SidebarSection[]>(() => {
       ? [{ key: 'files', label: t('settings.advancedSettings.files', 'Files'), icon: FolderOpen }]
       : []),
     { key: 'display', label: t('settings.advancedSettings.display', 'Display'), icon: MonitorUp },
+    ...(schema.value?.capabilities.audio !== false
+      ? [{ key: 'audio', label: t('settings.advancedSettings.audio', 'Audio'), icon: Volume2 }]
+      : []),
 		{ key: 'keyboard', label: t('settings.advancedSettings.keyboard', 'Keyboard'), icon: Keyboard },
 		{ key: 'usb', label: t('settings.advancedSettings.usb', 'USB'), icon: Usb },
     { key: 'network', label: t('settings.advancedSettings.network', 'Network'), icon: Network },
@@ -1030,6 +1037,8 @@ async function load() {
     loadedConfig.video.h26x.max_qp ??= 0
     networkEditorsValid.value = true
     config.value = loadedConfig
+    config.value.audio = normalizeAudioConfig(loadedConfig.audio)
+    savedAudio.value = { ...config.value.audio }
     schema.value = loadedSchema
     savedNetworkSnapshot.value = networkConfigSnapshot(loadedConfig.network)
   } catch (reason) {
@@ -1322,6 +1331,13 @@ async function revealActiveSidebarItem() {
   })
 }
 
+async function usbSaveConfig() {
+  const current = await api.getConfig()
+  const patch = savedAudio.value && config.value
+    ? audioConfigPatch(savedAudio.value, config.value.audio) : {}
+  return { ...current, usb: config.value!.usb, audio: { ...current.audio, ...patch } }
+}
+
 async function save() {
   if (!config.value) return
   config.value.personalization.device_name = config.value.personalization.device_name.trim()
@@ -1338,6 +1354,8 @@ async function save() {
     // defaults and a stale network draft do not belong in a video save.
     const nextConfig = paneSection.value === 'display'
       ? { ...await api.getConfig(), video: config.value.video }
+      : paneSection.value === 'usb'
+        ? await usbSaveConfig()
       : config.value
 		const response = await api.saveConfig(nextConfig, props.videoSessionId)
 		if (response.network_apply?.pending) {
@@ -1346,6 +1364,11 @@ async function save() {
 			message.success(t('settings.success', 'Settings saved'))
 		}
 		savedNetworkSnapshot.value = networkConfigSnapshot(nextConfig.network)
+    if (paneSection.value === 'usb') {
+      const audio = normalizeAudioConfig(await api.getAudioConfig())
+      config.value.audio = audio
+      savedAudio.value = { ...audio }
+    }
 	} catch (reason) {
 		if (section.value === 'network' && !(reason instanceof APIError)) {
 			const status = pendingNetworkStatus()
@@ -1375,6 +1398,23 @@ async function savePersonalization() {
     config.value.personalization = await api.savePersonalizationConfig(personalization)
     setMessagePlacement(config.value.personalization.message_placement)
     await nextTick()
+    message.success(t('settings.success', 'Settings saved'))
+  } catch (reason) {
+    message.error(reason instanceof Error ? reason.message : String(reason))
+  } finally {
+    saving.value = false
+  }
+}
+
+async function saveAudio() {
+  if (!config.value || !savedAudio.value || !audioSettingsValid.value) return
+  saving.value = true
+  try {
+    const patch = audioConfigPatch(savedAudio.value, config.value.audio)
+    if (Object.keys(patch).length) await api.patchAudioConfig(patch)
+    const audio = normalizeAudioConfig(await api.getAudioConfig())
+    config.value.audio = audio
+    savedAudio.value = { ...audio }
     message.success(t('settings.success', 'Settings saved'))
   } catch (reason) {
     message.error(reason instanceof Error ? reason.message : String(reason))
@@ -1693,6 +1733,27 @@ watch(activeExtensionURL, () => {
 watch(paneSection, (value) => {
   if (value === 'time' || value === 'update') void loadSystemDetails()
 }, { immediate: true })
+
+watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.status?.audio.quality,
+  props.status?.audio.channels, props.status?.audio.microphone_available] as const, () => {
+  if (!config.value || !savedAudio.value || !props.status || saving.value) return
+  const incoming = props.status.audio
+  const latest: Partial<AudioConfig> = {
+    enabled: incoming.enabled, source: incoming.source || 'usb', microphone: Boolean(incoming.microphone_available),
+  }
+  if (['low', 'medium', 'high', 'pcm'].includes(incoming.quality || '')) latest.quality = incoming.quality as AudioConfig['quality']
+  if (incoming.channels === 'mono' || incoming.channels === 'stereo') latest.channels = incoming.channels
+  const base = { ...savedAudio.value }
+  const draft = { ...config.value.audio }
+  for (const key of Object.keys(latest) as (keyof AudioConfig)[]) {
+    if (draft[key] === base[key]) {
+      Object.assign(draft, { [key]: latest[key] })
+      Object.assign(base, { [key]: latest[key] })
+    }
+  }
+  config.value.audio = draft
+  savedAudio.value = base
+})
 </script>
 
 <template>
@@ -1876,6 +1937,24 @@ watch(paneSection, (value) => {
                     :disabled="!keyboardShortcutsValid"
                     @click="saveKeyboardShortcuts"
                   >
+                    <template #icon><Save /></template>
+                    {{ t('common.save', 'Save') }}
+                  </n-button>
+                </footer>
+              </section>
+
+              <section v-else-if="paneSection === 'audio' && config" class="advanced-settings-section">
+                <AudioSettingsForm
+                  v-model="config.audio"
+                  :usb="config.usb"
+                  :gadget="status?.hid?.gadget"
+                  :sources="status?.audio.sources ?? schema?.audio_sources"
+                  :disabled="saving || schema?.capabilities.audio === false"
+                  @validity="audioSettingsValid = $event"
+                />
+                <footer class="advanced-settings-actions">
+                  <n-button :disabled="saving" @click="load">{{ t('common.refresh', 'Reload') }}</n-button>
+                  <n-button type="primary" :loading="saving" :disabled="!audioSettingsValid || schema?.capabilities.audio === false" @click="saveAudio">
                     <template #icon><Save /></template>
                     {{ t('common.save', 'Save') }}
                   </n-button>

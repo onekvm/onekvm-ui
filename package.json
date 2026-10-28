@@ -19,6 +19,7 @@
     "test:network-dns": "node --experimental-strip-types tests/network-dns.test.ts",
     "test:network-config": "node --experimental-strip-types tests/network-config.test.ts && node --experimental-strip-types tests/network-environment.test.ts",
     "test:settings-nav": "node --experimental-strip-types tests/settings-nav.test.ts",
+    "test:audio-settings": "node --experimental-strip-types tests/audio-settings.test.ts",
     "test:firewall": "node --experimental-strip-types tests/firewall-draft.test.ts",
     "test:console-title": "node --experimental-strip-types tests/console-title.test.ts",
     "test:toolbar-icons": "node --experimental-strip-types tests/toolbar-icons.test.ts",

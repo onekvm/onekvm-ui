@@ -4,12 +4,15 @@ import { useMessage } from 'naive-ui'
 
 import { api, type ConfigSchema, type OneKVMStatus } from '@/api/client'
 import { useAudioSettings, type AudioFormat, type AudioQuality } from '@/composables/useAudioSettings'
+import { useAudioInputs } from '@/composables/useAudioInputs'
+import type { AudioInputSource } from '@/lib/audio-settings'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { t } from '@/i18n/runtime'
 import { microphoneAccessErrorKind } from '@/lib/microphone-access'
 import { onekvm } from '@/lib/onekvm'
 import { DISMISS_CONTROL_OVERLAY_EVENT } from '@/lib/overlay-target'
 import ControlOverlay from './ControlOverlay.vue'
+import AudioInputSelect from './AudioInputSelect.vue'
 
 const props = defineProps<{
   status: OneKVMStatus | null
@@ -26,14 +29,18 @@ const message = useMessage()
 const overlayTo = useOverlayMount()
 const popoverOpen = shallowRef(false)
 const formatMenuOpen = shallowRef(false)
+const sourceMenuOpen = shallowRef(false)
 const qualityMenuOpen = shallowRef(false)
-const saving = shallowRef<'microphone' | 'format' | 'quality' | null>(null)
+const saving = shallowRef<'microphone' | 'format' | 'quality' | 'source' | null>(null)
 const schema = shallowRef<ConfigSchema | null>(null)
 const speakerVolume = shallowRef(Math.round(onekvm.speakerGain() * 100))
 const microphoneVolume = shallowRef(Math.round(onekvm.microphoneGain() * 100))
 const speakerOn = shallowRef(onekvm.speakerEnabled())
 const microphoneOverride = shallowRef<boolean | null>(null)
 const qualityOverride = shallowRef<AudioQuality | null>(null)
+const sourceOverride = shallowRef<AudioInputSource | null>(null)
+const source = computed(() => sourceOverride.value ?? props.status?.audio.source ?? 'usb')
+const { sourceOptions, sourceSelectionDisabled } = useAudioInputs(() => props.status?.audio.sources ?? schema.value?.audio_sources, () => source.value)
 const { format: audioFormat, quality: audioQuality, formatOptions, qualityOptions, formatHint, qualityForFormat } = useAudioSettings(() => qualityOverride.value ?? props.status?.audio.quality)
 const audioError = shallowRef('')
 const unsubscribe = onekvm.subscribe(state => { audioError.value = state.audioError })
@@ -42,7 +49,7 @@ onBeforeUnmount(unsubscribe)
 const speakerAvailable = computed(() => Boolean(props.status?.audio.enabled))
 const microphoneAvailable = computed(() => Boolean(props.status?.audio.microphone_available))
 const audioAvailable = computed(() => schema.value?.capabilities?.audio === true
-  && (speakerAvailable.value || microphoneAvailable.value))
+  && (Boolean(props.status?.audio.sources?.length) || speakerAvailable.value || microphoneAvailable.value))
 const microphoneOn = computed(() => microphoneOverride.value
   ?? Boolean(props.status?.audio.microphone && onekvm.microphoneGranted()))
 const microphoneBusy = computed(() => {
@@ -60,6 +67,9 @@ watch(() => props.status?.audio.quality, (quality) => {
   if (qualityOverride.value === quality) qualityOverride.value = null
   if (qualityOverride.value === null) void onekvm.setAudioQuality(quality)
 }, { immediate: true })
+watch(() => props.status?.audio.source, (value) => {
+  if (value === sourceOverride.value) sourceOverride.value = null
+})
 
 watch(() => ({
   speaker: speakerAvailable.value && speakerOn.value,
@@ -87,13 +97,14 @@ async function loadSchema() {
 }
 
 function updateShow(open: boolean) {
-  if (!open && (formatMenuOpen.value || qualityMenuOpen.value)) return
+  if (!open && (formatMenuOpen.value || qualityMenuOpen.value || sourceMenuOpen.value)) return
   popoverOpen.value = open
   emit('update:show', open)
 }
 
 function forceClose() {
   formatMenuOpen.value = false
+  sourceMenuOpen.value = false
   qualityMenuOpen.value = false
   updateShow(false)
 }
@@ -120,6 +131,20 @@ function requestSpeaker(value: boolean) {
 async function requestFormat(value: AudioFormat) {
   if (value === audioFormat.value || saving.value !== null) return
   await applyQuality(qualityForFormat(value), 'format')
+}
+
+async function requestSource(value: AudioInputSource) {
+  if (sourceSelectionDisabled.value || value === source.value || saving.value !== null) return
+  saving.value = 'source'
+  try {
+    await api.patchAudioConfig({ source: value })
+    sourceOverride.value = props.status?.audio.source === value ? null : value
+  } catch (error) {
+    sourceOverride.value = null
+    message.error(error instanceof Error ? error.message : String(error))
+  } finally {
+    saving.value = null
+  }
 }
 
 async function requestQuality(value: AudioQuality) {
@@ -196,6 +221,22 @@ async function applyMicrophone(value: boolean) {
         <strong>{{ t('usbAudio.title', 'Audio') }}</strong>
       </header>
       <div class="display-status-values">
+        <div class="usb-audio-format">
+          <span>{{ t('usbAudio.source', 'Input source') }}</span>
+          <AudioInputSelect
+            :model-value="source"
+            :options="sourceOptions"
+            :unavailable="sourceSelectionDisabled"
+            :size="sheet ? 'medium' : 'tiny'"
+            :menu-size="sheet ? 'medium' : 'tiny'"
+            :loading="saving === 'source'"
+            :disabled="saving !== null || !status"
+            :to="overlayTo"
+            :menu-props="{ class: 'display-fit-select-menu' }"
+            @update:model-value="requestSource"
+            @update:show="sourceMenuOpen = $event"
+          />
+        </div>
         <div class="usb-audio-format">
           <span>{{ t('usbAudio.format', 'Transmission format') }}</span>
           <n-select

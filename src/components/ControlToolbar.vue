@@ -102,7 +102,7 @@ import GamepadPopover from './GamepadPopover.vue'
 import MouseSettingsPopover from './MouseSettingsPopover.vue'
 import PowerControlPopover from './PowerControlPopover.vue'
 import HddActivityIndicator from './HddActivityIndicator.vue'
-import USBAudioPopover from './USBAudioPopover.vue'
+import AudioPopover from './AudioPopover.vue'
 import MediaTransferIndicator from './MediaTransferIndicator.vue'
 import type { MediaTransferState } from '@/lib/media-transfer'
 import ControlOverlay from './ControlOverlay.vue'
@@ -1053,7 +1053,7 @@ const actionStartExtensions = toolbarItemsFor('actions-start')
 const actionEndExtensions = toolbarItemsFor('actions-end')
 const toolbarIcons = computed(() => props.status?.identity?.toolbar_icons)
 const audioControlAvailable = computed(() => Boolean(
-  props.status?.audio.enabled || props.status?.audio.microphone_available,
+  props.status?.audio.sources?.length || props.status?.audio.enabled || props.status?.audio.microphone_available,
 ))
 function toolbarIconShown(id: ToolbarIconId) {
   return !toolbarIconHidden(toolbarIcons.value, id)
@@ -1783,7 +1783,7 @@ onBeforeUnmount(() => {
         :order="toolbarIconStyle('audio').order"
         @activate="onCollectedIconClick('audio')"
       >
-      <USBAudioPopover
+      <AudioPopover
         :status="status"
         :placement="menuPlacement"
         :sheet="toolbarLauncher"
@@ -1806,7 +1806,7 @@ onBeforeUnmount(() => {
           </template>
           {{ t('usbAudio.title', 'Audio') }}: {{ audioStateLabel }}
         </n-tooltip>
-      </USBAudioPopover>
+      </AudioPopover>
       </ToolbarIconSlot>
 
       <ToolbarIconSlot

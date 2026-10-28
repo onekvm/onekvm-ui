@@ -521,7 +521,7 @@ const zh_tw = {
         installation: {
           notInstalled: "未安裝",
           incomplete: "元件缺失",
-          description: "防火牆為選用功能，預設不安裝。安裝工具和對應的核心模組後，即可管理存取規則；啟用防護後規則才會生效。",
+          description: "安裝防火牆工具和對應的核心模組後，即可管理存取規則；啟用防護後規則才會生效。",
           repairHint: "缺少防火牆工具或與目前核心相符的模組，請先安裝所需元件。",
           marketplaceMissing: "線上安裝需要啟用外掛市集。也可以前往外掛頁面上傳套件。",
           marketplaceOutdated: "請先更新外掛市集，再線上安裝防火牆。也可以前往外掛頁面上傳套件。",

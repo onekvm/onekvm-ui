@@ -522,7 +522,7 @@ const en = {
         installation: {
           notInstalled: "Not installed",
           incomplete: "Components missing",
-          description: "The firewall is optional and is not installed by default. Install its tools and matching kernel modules to manage access rules. Protection stays off until you enable it.",
+          description: "Install the firewall tools and matching kernel modules to manage access rules. Protection stays off until you enable it.",
           repairHint: "The firewall tools or matching kernel modules are missing. Install the required components before managing rules.",
           marketplaceMissing: "Online installation requires an enabled Plugin Marketplace. You can also upload a package from the Plugins page.",
           marketplaceOutdated: "Update Plugin Marketplace to install the firewall online. You can also upload a package from the Plugins page.",

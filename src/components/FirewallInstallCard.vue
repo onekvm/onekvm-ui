@@ -63,7 +63,7 @@ async function afterInstall() {
     </header>
     <p>{{ installed
       ? t(key + 'repairHint', 'The firewall tools or matching kernel modules are missing. Install the required components before managing rules.')
-      : t(key + 'description', 'The firewall is optional and is not installed by default. Install its tools and matching kernel modules to manage access rules. Protection stays off until you enable it.') }}</p>
+      : t(key + 'description', 'Install the firewall tools and matching kernel modules to manage access rules. Protection stays off until you enable it.') }}</p>
     <n-alert v-if="error" type="error" :bordered="false">{{ error }}</n-alert>
     <n-alert v-if="!loading && !canInstall" type="warning" :bordered="false" :show-icon="false">
       {{ marketplace?.enabled

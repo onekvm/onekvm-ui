@@ -521,7 +521,7 @@ const zh = {
         installation: {
           notInstalled: "未安装",
           incomplete: "组件缺失",
-          description: "防火墙为可选功能，默认不安装。安装工具和对应的内核模块后，即可管理访问规则；启用防护后规则才会生效。",
+          description: "安装防火墙工具和对应的内核模块后，即可管理访问规则；启用防护后规则才会生效。",
           repairHint: "缺少防火墙工具或与当前内核匹配的模块，请先安装所需组件。",
           marketplaceMissing: "在线安装需要启用插件市场。也可以前往插件页面上传软件包。",
           marketplaceOutdated: "请先更新插件市场，再在线安装防火墙。也可以前往插件页面上传软件包。",

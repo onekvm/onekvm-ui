@@ -329,6 +329,27 @@ export interface OneKVMConfig {
 
 export type ConsoleTitleSource = 'device_name' | 'hostname' | 'custom'
 export type ConsoleSubtitlePart = 'hostname' | 'device_model' | 'custom'
+export type ToolbarIconId =
+  | 'display'
+  | 'mouse'
+  | 'keyboard'
+  | 'gamepad'
+  | 'power'
+  | 'audio'
+  | 'virtual_media'
+  | 'performance'
+  | 'fullscreen'
+  | 'toolbox'
+  | 'settings'
+  | 'language'
+  | 'account'
+
+export interface ToolbarIconPreference {
+  id: ToolbarIconId
+  hidden: boolean
+}
+
+export type MessagePlacement = 'top-left' | 'top' | 'top-right' | 'bottom-left' | 'bottom' | 'bottom-right'
 
 export interface PersonalizationConfig {
   device_name: string
@@ -337,6 +358,8 @@ export interface PersonalizationConfig {
   console_subtitle_parts: ConsoleSubtitlePart[]
   custom_console_subtitle: string
   dim_windows_on_kvm_focus: boolean
+  message_placement?: MessagePlacement
+  toolbar_icons?: ToolbarIconPreference[]
 }
 
 export interface InputConfig {
@@ -1755,7 +1778,7 @@ export const api = {
         })
       } catch (error) {
         if (signal?.aborted || (error instanceof APIError && error.status < 500)) throw error
-        // Bridge reads stop Core briefly. The independent job keeps running.
+        // Keep the independent job resumable across transient connection errors.
         await new Promise<void>((resolve) => window.setTimeout(resolve, 1500))
         continue
       }

@@ -69,6 +69,7 @@ import { hasPermission } from '@/build'
 import { useAuth } from '@/composables/useAuth'
 import { currentLanguage, languageOptions, setLanguage, t } from '@/i18n/runtime'
 import { normalizeConsoleSubtitleParts } from '@/lib/console-title'
+import { normalizeToolbarIcons } from '@/lib/toolbar-icons'
 import { machineDisplayName } from '@/lib/machine'
 import { PLUGIN_MARKETPLACE_ID } from '@/lib/cloud-services'
 import { loadMarketplaceInstallPackage } from '@/lib/marketplace-install-client'
@@ -103,6 +104,7 @@ import DNSSettingsForm from './DNSSettingsForm.vue'
 import ActiveRoutesPanel from './ActiveRoutesPanel.vue'
 import DisplaySettingsForm from './DisplaySettingsForm.vue'
 import PersonalizationSettingsForm from './PersonalizationSettingsForm.vue'
+import { setMessagePlacement } from '@/composables/useMessagePlacement'
 import HostnameSettingsForm from './HostnameSettingsForm.vue'
 import DiscoverySettingsForm from './DiscoverySettingsForm.vue'
 import MarketplaceInstallDialog from './MarketplaceInstallDialog.vue'
@@ -1017,6 +1019,7 @@ async function load() {
     loadedConfig.personalization.console_subtitle_parts = normalizeConsoleSubtitleParts(legacyPersonalization)
     loadedConfig.personalization.custom_console_subtitle ??= ''
     loadedConfig.personalization.dim_windows_on_kvm_focus ??= true
+    loadedConfig.personalization.toolbar_icons = normalizeToolbarIcons(loadedConfig.personalization.toolbar_icons)
     delete legacyPersonalization.show_device_model
     loadedConfig.video.mjpeg ??= { frame_detect: false }
     loadedConfig.video.h26x ??= { gop: 0 }
@@ -1325,6 +1328,7 @@ async function save() {
   config.value.personalization.custom_console_title = config.value.personalization.custom_console_title.trim()
   config.value.personalization.console_subtitle_parts = normalizeConsoleSubtitleParts(config.value.personalization)
   config.value.personalization.custom_console_subtitle = config.value.personalization.custom_console_subtitle.trim()
+  config.value.personalization.toolbar_icons = normalizeToolbarIcons(config.value.personalization.toolbar_icons)
   delete (config.value.personalization as typeof config.value.personalization & {
     show_device_model?: boolean
   }).show_device_model
@@ -1364,10 +1368,13 @@ async function savePersonalization() {
   personalization.custom_console_title = personalization.custom_console_title.trim()
   personalization.console_subtitle_parts = normalizeConsoleSubtitleParts(personalization)
   personalization.custom_console_subtitle = personalization.custom_console_subtitle.trim()
+  personalization.toolbar_icons = normalizeToolbarIcons(personalization.toolbar_icons)
   delete (personalization as typeof personalization & { show_device_model?: boolean }).show_device_model
   saving.value = true
   try {
     config.value.personalization = await api.savePersonalizationConfig(personalization)
+    setMessagePlacement(config.value.personalization.message_placement)
+    await nextTick()
     message.success(t('settings.success', 'Settings saved'))
   } catch (reason) {
     message.error(reason instanceof Error ? reason.message : String(reason))

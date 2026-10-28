@@ -31,7 +31,7 @@ import {
 } from '@/icons'
 import { NIcon, useMessage, type DialogReactive, type DropdownOption } from 'naive-ui'
 
-import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type OneKVMStatus } from '@/api/client'
+import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type OneKVMStatus, type ToolbarIconId } from '@/api/client'
 import type { BrowserISOProgress } from '@/lib/browser-iso'
 import { type MouseMode } from '@/composables/useMouse'
 import { useOverlayMount } from '@/composables/useOverlayMount'
@@ -43,12 +43,15 @@ import { effectiveVideoCodec } from '@/lib/video-transport'
 import { currentLanguage, languageOptions, setLanguage, t } from '@/i18n/runtime'
 import ToolboxMenu from './toolbox/ToolboxMenu.vue'
 import PinnedTools from './toolbox/PinnedTools.vue'
+import ToolbarCollectionMenu from './ToolbarCollectionMenu.vue'
+import ToolbarIconSlot from './ToolbarIconSlot.vue'
 import { useToolboxContext } from '@/composables/useToolbox'
 import { toolbarItemsFor } from '@/extensions/pluginUi'
 import { hidIndicatorState } from '@/lib/hid-status'
 import { USB_GAMEPAD_UI_ENABLED } from '@/lib/ui-features'
 import { dismissControlOverlays } from '@/lib/overlay-target'
 import { resolveConsoleSubtitle } from '@/lib/console-title'
+import { normalizeToolbarIcons, toolbarIconCssOrder, toolbarIconHidden } from '@/lib/toolbar-icons'
 import { machineDisplayName } from '@/lib/machine'
 import { onekvm, type InputActivity, type TransportState } from '@/lib/onekvm'
 import { sendShortcut, shortcutChordLabel } from '@/lib/keyboard-shortcuts'
@@ -189,6 +192,8 @@ function updateHddIndicatorPreference(show: boolean) {
 const openMenu = ref<MenuName | null>(null)
 const toolbox = useToolboxContext()
 const pinnedOverflowOpen = ref(false)
+const collectionMenuOpen = shallowRef(false)
+const collectedIconsTarget = shallowRef<HTMLElement | null>(null)
 const mouseLed = ref<HTMLElement | null>(null)
 const keyboardLed = ref<HTMLElement | null>(null)
 const gamepadLed = ref<HTMLElement | null>(null)
@@ -384,7 +389,7 @@ function persistLauncherPos() {
 
 const keyboardTextModal = ref(false)
 function emitToolbarOverlay() {
-  emit('overlay', openMenu.value !== null || launcherMenuOpen.value || toolbox.menuOpen || pinnedOverflowOpen.value || keyboardTextModal.value)
+  emit('overlay', openMenu.value !== null || launcherMenuOpen.value || toolbox.menuOpen || collectionMenuOpen.value || pinnedOverflowOpen.value || keyboardTextModal.value)
 }
 function onKeyboardTextModal(open: boolean) {
   keyboardTextModal.value = open
@@ -437,7 +442,7 @@ function onLauncherClick(event: MouseEvent) {
 function isLauncherOverlayTarget(target: EventTarget | null) {
   if (!(target instanceof Element)) return false
   return Boolean(target.closest(
-    '.toolbar, .toolbar-tray, .toolbar-launcher-mask, .control-popover, .control-sheet-mask, .trackpad-overlay, .keyboard-panel, .n-popover, .n-dropdown-menu, .n-modal, .n-dialog, .n-drawer, .n-base-select-menu, .folder-create-popover',
+    '.toolbar, .toolbar-tray, .toolbar-launcher-mask, .control-popover, .control-sheet-mask, .trackpad-overlay, .keyboard-panel, .n-popover, .n-dropdown-menu, .n-modal, .n-modal-container, .n-dialog, .n-drawer, .n-base-select-menu, .folder-create-popover',
   ))
 }
 
@@ -453,7 +458,7 @@ function onLauncherWindowPointerDown(event: PointerEvent) {
 }
 
 function onLauncherWindowKeydown(event: KeyboardEvent) {
-  if (event.key !== 'Escape' || !launcherMenuOpen.value || openMenu.value) return
+  if (event.key !== 'Escape' || !launcherMenuOpen.value || openMenu.value || collectionMenuOpen.value || toolbox.menuOpen || pinnedOverflowOpen.value) return
   setLauncherMenuOpen(false)
 }
 
@@ -474,6 +479,7 @@ function syncToolbarLauncher() {
   toolbarLauncher.value = next
   if (!next && props.trackpad) emit('update:trackpad', false)
   launcherMenuOpen.value = false
+  collectionMenuOpen.value = false
   openMenu.value = null
   stopToolbarMorph()
   toolbarDragging.value = false
@@ -541,7 +547,7 @@ function armToolbarHide() {
   if (
     openMenu.value
     || toolbox.menuOpen
-    || pinnedOverflowOpen.value
+    || collectionMenuOpen.value || pinnedOverflowOpen.value
     || launcherMenuOpen.value
     || pointerOnToolbarChrome.value
     || performanceDock.dragging.value
@@ -559,7 +565,7 @@ function armToolbarHide() {
       !hideEdge.value
       || openMenu.value
       || toolbox.menuOpen
-      || pinnedOverflowOpen.value
+      || collectionMenuOpen.value || pinnedOverflowOpen.value
       || launcherMenuOpen.value
       || pointerOnToolbarChrome.value
       || performanceDock.dragging.value
@@ -1045,6 +1051,54 @@ const inputState = computed<DeviceState>(() => hidIndicatorState(props.status?.h
 const deviceControlExtensions = toolbarItemsFor('device-controls')
 const actionStartExtensions = toolbarItemsFor('actions-start')
 const actionEndExtensions = toolbarItemsFor('actions-end')
+const toolbarIcons = computed(() => props.status?.identity?.toolbar_icons)
+const audioControlAvailable = computed(() => Boolean(
+  props.status?.audio.enabled || props.status?.audio.microphone_available,
+))
+function toolbarIconShown(id: ToolbarIconId) {
+  return !toolbarIconHidden(toolbarIcons.value, id)
+}
+function toolbarIconStyle(id: ToolbarIconId) {
+  return { order: toolbarIconCssOrder(toolbarIcons.value, id) }
+}
+const collectedIcons = computed(() => normalizeToolbarIcons(toolbarIcons.value).filter(icon => {
+  if (!icon.hidden) return false
+  if (icon.id === 'gamepad') return USB_GAMEPAD_UI_ENABLED && Boolean(props.status?.hid?.gamepad)
+  if (icon.id === 'audio') return audioControlAvailable.value
+  if (icon.id === 'toolbox') return toolbox.allowed
+  return true
+}))
+function onCollectedIconClick(id: ToolbarIconId) {
+  if (toolbarIconShown(id)) return
+  if (id === 'performance' || id === 'fullscreen' || id === 'virtual_media') {
+    collectionMenuOpen.value = false
+  }
+}
+watch(() => collectedIcons.value.length, count => {
+  if (!count) collectionMenuOpen.value = false
+})
+const deviceClusterShown = computed(() => {
+  const builtin = (['display', 'mouse', 'keyboard', 'power', 'virtual_media'] as const).some(toolbarIconShown)
+    || (USB_GAMEPAD_UI_ENABLED && Boolean(props.status?.hid?.gamepad) && toolbarIconShown('gamepad'))
+    || (audioControlAvailable.value && toolbarIconShown('audio'))
+    || (hddIndicatorVisible.value && toolbarIconShown('power'))
+  return builtin
+    || deviceControlExtensions.value.length > 0
+    || (props.mediaTransfer.uploading && props.mediaTransfer.minimized)
+    || (performanceDock.docked.value && performanceDock.visible.value)
+    || performanceDock.dragging.value
+})
+const actionClusterShown = computed(() => (
+  collectedIcons.value.length > 0
+  || (props.canSettings && toolbarIconShown('settings'))
+  || toolbarIconShown('performance')
+  || toolbarIconShown('fullscreen')
+  || toolbarIconShown('language')
+  || toolbarIconShown('account')
+  || (toolbox.allowed && toolbarIconShown('toolbox'))
+  || actionStartExtensions.value.length > 0
+  || actionEndExtensions.value.length > 0
+))
 const extensionHostProps = computed(() => ({
   compact: toolbarCompact.value,
   placement: menuPlacement.value,
@@ -1326,7 +1380,11 @@ function selectPower(key: string | number) {
 }
 
 function updateMenu(name: MenuName, visible: boolean) {
-  if (visible) openMenu.value = name
+  if (visible) {
+    openMenu.value = name
+    // Mobile controls use independent sheets, so their collection can close.
+    if (toolbarLauncher.value && !toolbarIconShown(name)) collectionMenuOpen.value = false
+  }
   else if (openMenu.value === name) openMenu.value = null
   emitToolbarOverlay()
 }
@@ -1339,6 +1397,7 @@ function onTrackpadToggle(open: boolean) {
 }
 
 function dismissOverlays() {
+  collectionMenuOpen.value = false
   if (openMenu.value !== null) openMenu.value = null
   setLauncherMenuOpen(false)
   dismissControlOverlays()
@@ -1366,7 +1425,7 @@ function pulseInputLed(activity: InputActivity) {
 }
 
 watch(
-  [openMenu, () => toolbox.menuOpen, pinnedOverflowOpen, toolbarDragging, toolbarMorphing, toolbarLiftPending],
+  [openMenu, () => toolbox.menuOpen, collectionMenuOpen, pinnedOverflowOpen, toolbarDragging, toolbarMorphing, toolbarLiftPending],
   () => {
     refreshHideEdge()
     armToolbarHide()
@@ -1503,13 +1562,20 @@ onBeforeUnmount(() => {
       <div v-if="toolbarLauncher" class="toolbar-list-title">
         {{ t('deviceStatus.title', 'Device status') }}
       </div>
-      <div class="device-controls" :aria-label="t('deviceStatus.title', 'Device status')">
+      <div class="device-controls" :class="{ 'is-iconless': !deviceClusterShown }" :aria-label="t('deviceStatus.title', 'Device status')">
       <div
         ref="performanceTarget"
         v-show="!toolbarLauncher && ((performanceDock.docked.value && performanceDock.visible.value) || performanceDock.dragging.value)"
         class="toolbar-performance-slot"
+        :style="{ order: -1 }"
         :class="{ 'is-drop-preview': performanceDock.preview.value, 'is-drop-target': performanceDock.dragging.value && !performanceDock.docked.value }"
       ><span v-if="performanceDock.dragging.value && !performanceDock.docked.value" class="toolbar-performance-drop-label">{{ t('screen.performanceDock', 'Drop into toolbar') }}</span></div>
+      <ToolbarIconSlot
+        :collected="!toolbarIconShown('display')"
+        :target="collectedIconsTarget"
+        :order="toolbarIconStyle('display').order"
+        @activate="onCollectedIconClick('display')"
+      >
       <DisplaySettingsPopover
         :state="state"
         :pip-active="pipActive"
@@ -1528,9 +1594,9 @@ onBeforeUnmount(() => {
         @update:video-rotation="emit('update:videoRotation', $event)"
         @picture-in-picture="emit('picture-in-picture')"
       >
-        <n-tooltip :disabled="toolbarLauncher || openMenu === 'display'">
+        <n-tooltip :disabled="!toolbarIconShown('display') || toolbarLauncher || openMenu === 'display'">
           <template #trigger>
-            <n-button
+            <n-button :role="toolbarIconShown('display') ? undefined : 'menuitem'"
               quaternary
               size="small"
               class="device-indicator screen-device-indicator"
@@ -1545,7 +1611,14 @@ onBeforeUnmount(() => {
           {{ deviceStateLabel(t('screen.title', 'Screen'), screenState) }}
         </n-tooltip>
       </DisplaySettingsPopover>
+      </ToolbarIconSlot>
 
+      <ToolbarIconSlot
+        :collected="!toolbarIconShown('mouse')"
+        :target="collectedIconsTarget"
+        :order="toolbarIconStyle('mouse').order"
+        @activate="onCollectedIconClick('mouse')"
+      >
       <MouseSettingsPopover
         :mouse-mode="mouseMode"
         :scroll-interval="scrollInterval"
@@ -1562,9 +1635,9 @@ onBeforeUnmount(() => {
         @update:hide-local-cursor="emit('update:hideLocalCursor', $event)"
         @update:trackpad="onTrackpadToggle"
       >
-        <n-tooltip :disabled="toolbarLauncher || openMenu === 'mouse'">
+        <n-tooltip :disabled="!toolbarIconShown('mouse') || toolbarLauncher || openMenu === 'mouse'">
           <template #trigger>
-            <n-button
+            <n-button :role="toolbarIconShown('mouse') ? undefined : 'menuitem'"
               quaternary
               size="small"
               class="device-indicator"
@@ -1580,7 +1653,14 @@ onBeforeUnmount(() => {
           {{ deviceStateLabel(t('mouse.title', 'Mouse'), inputState) }}
         </n-tooltip>
       </MouseSettingsPopover>
+      </ToolbarIconSlot>
 
+      <ToolbarIconSlot
+        :collected="!toolbarIconShown('keyboard')"
+        :target="collectedIconsTarget"
+        :order="toolbarIconStyle('keyboard').order"
+        @activate="onCollectedIconClick('keyboard')"
+      >
       <KeyboardControlPopover
         :options="keyboardOptions"
         :input-suspended="pipActive"
@@ -1595,9 +1675,9 @@ onBeforeUnmount(() => {
         @update:show="updateMenu('keyboard', $event)"
         @text-modal="onKeyboardTextModal"
       >
-        <n-tooltip :disabled="toolbarLauncher || openMenu === 'keyboard'">
+        <n-tooltip :disabled="!toolbarIconShown('keyboard') || toolbarLauncher || openMenu === 'keyboard'">
           <template #trigger>
-            <n-button
+            <n-button :role="toolbarIconShown('keyboard') ? undefined : 'menuitem'"
               quaternary
               size="small"
               class="device-indicator"
@@ -1613,17 +1693,23 @@ onBeforeUnmount(() => {
           {{ deviceStateLabel(t('keyboard.title', 'Keyboard'), inputState) }}
         </n-tooltip>
       </KeyboardControlPopover>
+      </ToolbarIconSlot>
 
+      <ToolbarIconSlot v-if="USB_GAMEPAD_UI_ENABLED && status?.hid?.gamepad"
+        :collected="!toolbarIconShown('gamepad')"
+        :target="collectedIconsTarget"
+        :order="toolbarIconStyle('gamepad').order"
+        @activate="onCollectedIconClick('gamepad')"
+      >
       <GamepadPopover
-        v-if="USB_GAMEPAD_UI_ENABLED && status?.hid?.gamepad"
         :hid="status?.hid"
         :placement="menuPlacement"
         :sheet="toolbarLauncher"
         @update:show="updateMenu('gamepad', $event)"
       >
-        <n-tooltip :disabled="toolbarLauncher || openMenu === 'gamepad'">
+        <n-tooltip :disabled="!toolbarIconShown('gamepad') || toolbarLauncher || openMenu === 'gamepad'">
           <template #trigger>
-            <n-button
+            <n-button :role="toolbarIconShown('gamepad') ? undefined : 'menuitem'"
               quaternary
               size="small"
               class="device-indicator"
@@ -1638,7 +1724,14 @@ onBeforeUnmount(() => {
           {{ deviceStateLabel(t('gamepad.title', 'Gamepad'), gamepadState) }}
         </n-tooltip>
       </GamepadPopover>
+      </ToolbarIconSlot>
 
+      <ToolbarIconSlot
+        :collected="!toolbarIconShown('power')"
+        :target="collectedIconsTarget"
+        :order="toolbarIconStyle('power').order"
+        @activate="onCollectedIconClick('power')"
+      >
       <PowerControlPopover
         :available="Boolean(status?.atx?.available)"
         :can-power="canPower && Boolean(status?.atx?.available)"
@@ -1652,9 +1745,9 @@ onBeforeUnmount(() => {
         @update:show="updateMenu('power', $event)"
         @update:show-hdd-indicator="updateHddIndicatorPreference"
       >
-        <n-tooltip :disabled="toolbarLauncher || openMenu === 'power'">
+        <n-tooltip :disabled="!toolbarIconShown('power') || toolbarLauncher || openMenu === 'power'">
           <template #trigger>
-            <n-button
+            <n-button :role="toolbarIconShown('power') ? undefined : 'menuitem'"
               quaternary
               size="small"
               class="device-indicator power-device-indicator"
@@ -1670,25 +1763,36 @@ onBeforeUnmount(() => {
           {{ t('power.title', 'Power') }}: {{ powerStateLabel }}
         </n-tooltip>
       </PowerControlPopover>
+      </ToolbarIconSlot>
 
+      <div
+        v-if="hddIndicatorVisible && toolbarIconShown('power')"
+        class="toolbar-icon-slot"
+        :style="{ order: toolbarIconStyle('power').order + 1 }"
+      >
       <HddActivityIndicator
-        v-if="hddIndicatorVisible"
         :available="Boolean(status?.atx?.available)"
         :led="status?.atx?.hdd_led"
         :expanded="toolbarLauncher"
       />
+      </div>
 
+      <ToolbarIconSlot v-if="audioControlAvailable"
+        :collected="!toolbarIconShown('audio')"
+        :target="collectedIconsTarget"
+        :order="toolbarIconStyle('audio').order"
+        @activate="onCollectedIconClick('audio')"
+      >
       <USBAudioPopover
-        v-if="status?.audio.enabled || status?.audio.microphone_available"
         :status="status"
         :placement="menuPlacement"
         :sheet="toolbarLauncher"
         @update:show="updateMenu('audio', $event)"
         @session="audioSession = $event"
       >
-        <n-tooltip :disabled="toolbarLauncher || openMenu === 'audio'">
+        <n-tooltip :disabled="!toolbarIconShown('audio') || toolbarLauncher || openMenu === 'audio'">
           <template #trigger>
-            <n-button
+            <n-button :role="toolbarIconShown('audio') ? undefined : 'menuitem'"
               quaternary
               size="small"
               class="device-indicator"
@@ -1703,10 +1807,17 @@ onBeforeUnmount(() => {
           {{ t('usbAudio.title', 'Audio') }}: {{ audioStateLabel }}
         </n-tooltip>
       </USBAudioPopover>
+      </ToolbarIconSlot>
 
-      <n-tooltip :disabled="toolbarLauncher">
+      <ToolbarIconSlot
+        :collected="!toolbarIconShown('virtual_media')"
+        :target="collectedIconsTarget"
+        :order="toolbarIconStyle('virtual_media').order"
+        @activate="onCollectedIconClick('virtual_media')"
+      >
+      <n-tooltip :disabled="!toolbarIconShown('virtual_media') || toolbarLauncher">
         <template #trigger>
-          <n-button
+          <n-button :role="toolbarIconShown('virtual_media') ? undefined : 'menuitem'"
             quaternary
             size="small"
             class="device-indicator"
@@ -1725,19 +1836,28 @@ onBeforeUnmount(() => {
           <br />{{ t('virtualMedia.readSpeed', 'Read speed:') }} {{ formatMediaReadSpeed(browserIsoProgress.bytesPerSecond) }}
         </template>
       </n-tooltip>
+      </ToolbarIconSlot>
 
-      <component
+      <div
         v-for="item in deviceControlExtensions"
         :key="`${item.extensionId}:${item.slot}:${item.order}`"
-        :is="item.component"
-        v-bind="extensionHostProps"
-      />
+        class="toolbar-icon-slot"
+        style="order: 1000"
+      >
+        <component :is="item.component" v-bind="extensionHostProps" />
+      </div>
 
-      <MediaTransferIndicator
-        :state="mediaTransfer"
-        :tooltip-disabled="toolbarLauncher"
-        @restore="emit('restore-media-transfer')"
-      />
+      <div
+        v-show="mediaTransfer.uploading && mediaTransfer.minimized"
+        class="toolbar-icon-slot"
+        style="order: 3000"
+      >
+        <MediaTransferIndicator
+          :state="mediaTransfer"
+          :tooltip-disabled="toolbarLauncher"
+          @restore="emit('restore-media-transfer')"
+        />
+      </div>
     </div>
 
     <PinnedTools :mobile="toolbarLauncher" :vertical="toolbarVertical" :placement="menuPlacement" @overlay="pinnedOverflowOpen = $event" />
@@ -1745,17 +1865,25 @@ onBeforeUnmount(() => {
     <div v-if="toolbarLauncher" class="toolbar-list-title">
       {{ t('keyboard.actions', 'Actions') }}
     </div>
-    <div class="toolbar-actions">
-      <component
+    <div class="toolbar-actions" :class="{ 'is-iconless': !actionClusterShown }">
+      <div
         v-for="item in actionStartExtensions"
         :key="`${item.extensionId}:${item.slot}:${item.order}`"
-        :is="item.component"
-        v-bind="extensionHostProps"
-      />
+        class="toolbar-icon-slot"
+        style="order: 0"
+      >
+        <component :is="item.component" v-bind="extensionHostProps" />
+      </div>
 
-      <n-tooltip :disabled="toolbarLauncher">
+      <ToolbarIconSlot
+        :collected="!toolbarIconShown('performance')"
+        :target="collectedIconsTarget"
+        :order="toolbarIconStyle('performance').order"
+        @activate="onCollectedIconClick('performance')"
+      >
+      <n-tooltip :disabled="!toolbarIconShown('performance') || toolbarLauncher">
         <template #trigger>
-          <n-button
+          <n-button :role="toolbarIconShown('performance') ? undefined : 'menuitem'"
             quaternary
             size="small"
             :aria-pressed="performanceOpen"
@@ -1765,32 +1893,60 @@ onBeforeUnmount(() => {
             @click="emit('update:performanceOpen', !performanceOpen, $event)"
           >
             <template #icon><Activity /></template>
-            <span v-if="toolbarLauncher" class="toolbar-action-label">{{ t('toolbar.performance', 'Stats') }}</span>
+            <span v-if="toolbarLauncher || !toolbarIconShown('performance')" class="toolbar-action-label">{{ t('toolbar.performance', 'Stats') }}</span>
           </n-button>
         </template>
         {{ performanceOpen
           ? t('screen.hidePerformance', 'Hide performance overlay')
           : t('screen.showPerformance', 'Show performance overlay') }}
       </n-tooltip>
+      </ToolbarIconSlot>
 
-      <n-tooltip :disabled="toolbarLauncher">
+      <ToolbarIconSlot
+        :collected="!toolbarIconShown('fullscreen')"
+        :target="collectedIconsTarget"
+        :order="toolbarIconStyle('fullscreen').order"
+        @activate="onCollectedIconClick('fullscreen')"
+      >
+      <n-tooltip :disabled="!toolbarIconShown('fullscreen') || toolbarLauncher">
         <template #trigger>
-          <n-button
+          <n-button :role="toolbarIconShown('fullscreen') ? undefined : 'menuitem'"
             quaternary
             size="small"
             :aria-label="t('fullscreen.toggle', 'Toggle fullscreen')"
             @click="emit('fullscreen')"
           >
             <template #icon><Minimize v-if="fullscreen" /><Maximize v-else /></template>
-            <span v-if="toolbarLauncher" class="toolbar-action-label">{{ t('toolbar.fullscreen', 'Full screen') }}</span>
+            <span v-if="toolbarLauncher || !toolbarIconShown('fullscreen')" class="toolbar-action-label">{{ t('toolbar.fullscreen', 'Full screen') }}</span>
           </n-button>
         </template>
         {{ t('fullscreen.toggle', 'Toggle fullscreen') }}
       </n-tooltip>
+      </ToolbarIconSlot>
 
-      <ToolboxMenu :mobile="toolbarLauncher" :placement="menuPlacement" />
+      <ToolbarIconSlot v-if="toolbox.allowed"
+        :collected="!toolbarIconShown('toolbox')"
+        :target="collectedIconsTarget"
+        :order="toolbarIconStyle('toolbox').order"
+        @activate="onCollectedIconClick('toolbox')"
+      >
+      <ToolboxMenu :menu-item="!toolbarIconShown('toolbox')" :mobile="toolbarLauncher || !toolbarIconShown('toolbox')" :placement="menuPlacement" />
+      </ToolbarIconSlot>
 
-      <n-tooltip v-if="canSettings" :disabled="toolbarLauncher">
+      <div v-if="collectedIcons.length" class="toolbar-icon-slot" style="order: 21">
+        <ToolbarCollectionMenu
+          :show="collectionMenuOpen"
+          :count="collectedIcons.length"
+          :mobile="toolbarLauncher"
+          :child-open="openMenu !== null || toolbox.menuOpen || keyboardTextModal"
+          :placement="menuPlacement"
+          @update:show="collectionMenuOpen = $event"
+          @target="collectedIconsTarget = $event"
+        />
+      </div>
+
+      <div v-if="canSettings" class="toolbar-icon-slot" :style="toolbarIconStyle('settings')">
+      <n-tooltip :disabled="toolbarLauncher">
         <template #trigger>
           <n-button quaternary size="small" :aria-label="t('settings.title')" @click="emit('settings')">
             <template #icon><Settings /></template>
@@ -1799,28 +1955,39 @@ onBeforeUnmount(() => {
         </template>
         {{ t('settings.title') }}
       </n-tooltip>
+      </div>
 
-      <component
+      <div
         v-for="item in actionEndExtensions"
         :key="`${item.extensionId}:${item.slot}:${item.order}`"
-        :is="item.component"
-        v-bind="extensionHostProps"
-      />
+        class="toolbar-icon-slot"
+        style="order: 2000"
+      >
+        <component :is="item.component" v-bind="extensionHostProps" />
+      </div>
 
+      <ToolbarIconSlot
+        :collected="!toolbarIconShown('language')"
+        :target="collectedIconsTarget"
+        :order="toolbarIconStyle('language').order"
+        @activate="onCollectedIconClick('language')"
+      >
       <n-dropdown
         v-if="!toolbarLauncher"
         trigger="click"
         :show="openMenu === 'language'"
+        :to="overlayTo"
         :placement="menuPlacement"
         :options="languageMenuOptions"
         :menu-props="() => ({ class: 'host-menu' })"
         @select="setLanguage(String($event))"
         @update:show="updateMenu('language', $event)"
       >
-        <n-tooltip :disabled="openMenu === 'language'">
+        <n-tooltip :disabled="openMenu === 'language' || !toolbarIconShown('language')">
           <template #trigger>
-            <n-button quaternary size="small" :aria-label="t('settings.appearance.language')">
+            <n-button :role="toolbarIconShown('language') ? undefined : 'menuitem'" quaternary size="small" :aria-label="t('settings.appearance.language')">
               <template #icon><Languages /></template>
+              <span v-if="!toolbarIconShown('language')" class="toolbar-action-label">{{ t('settings.appearance.language') }}</span>
             </n-button>
           </template>
           {{ t('settings.appearance.language') }}
@@ -1832,7 +1999,7 @@ onBeforeUnmount(() => {
         sheet
         @update:show="updateMenu('language', $event)"
       >
-        <n-button quaternary size="small" :aria-label="t('settings.appearance.language')">
+        <n-button :role="toolbarIconShown('language') ? undefined : 'menuitem'" quaternary size="small" :aria-label="t('settings.appearance.language')">
           <template #icon><Languages /></template>
           <span class="toolbar-action-label">{{ t('settings.appearance.language') }}</span>
         </n-button>
@@ -1855,28 +2022,37 @@ onBeforeUnmount(() => {
           </div>
         </template>
       </ControlOverlay>
+      </ToolbarIconSlot>
 
-      <div class="toolbar-account">
+      <ToolbarIconSlot :class="{ 'toolbar-account': toolbarIconShown('account') }"
+        :collected="!toolbarIconShown('account')"
+        :target="collectedIconsTarget"
+        :order="toolbarIconStyle('account').order"
+        @activate="onCollectedIconClick('account')"
+      >
         <n-dropdown
           v-if="!toolbarLauncher"
+          :style="toolbarIconStyle('account')"
           trigger="click"
           :show="openMenu === 'account'"
+          :to="overlayTo"
           :placement="menuPlacement"
           :options="accountOptions"
           :menu-props="themeMenuProps"
           @select="selectAccount"
           @update:show="updateMenu('account', $event)"
         >
-          <n-tooltip :disabled="openMenu === 'account'">
+          <n-tooltip :disabled="openMenu === 'account' || !toolbarIconShown('account')">
             <template #trigger>
-              <n-button
+              <n-button :role="toolbarIconShown('account') ? undefined : 'menuitem'"
                 quaternary
                 size="small"
                 class="account-button"
                 :aria-label="t('settings.account.title', 'Account')"
               >
                 <template #icon><CircleUserRound /></template>
-                <span v-if="!toolbarVertical" class="button-label account-name">{{ username }}</span>
+                <span v-if="!toolbarIconShown('account')" class="toolbar-action-label">{{ t('settings.account.title', 'Account') }}</span>
+                <span v-if="!toolbarVertical && toolbarIconShown('account')" class="button-label account-name">{{ username }}</span>
               </n-button>
             </template>
             {{ t('settings.account.title', 'Account') }}
@@ -1884,11 +2060,12 @@ onBeforeUnmount(() => {
         </n-dropdown>
         <ControlOverlay
           v-else
+          :style="toolbarIconStyle('account')"
           :show="openMenu === 'account'"
           sheet
           @update:show="updateMenu('account', $event)"
         >
-          <n-button
+          <n-button :role="toolbarIconShown('account') ? undefined : 'menuitem'"
             quaternary
             size="small"
             class="account-button"
@@ -1925,7 +2102,7 @@ onBeforeUnmount(() => {
             </div>
           </template>
         </ControlOverlay>
-      </div>
+      </ToolbarIconSlot>
     </div>
     </div>
     </Transition>

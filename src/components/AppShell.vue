@@ -12,6 +12,7 @@ import { useWindowTaskbarInset } from '@/composables/useWindowTaskbar'
 import { useToolbox } from '@/composables/useToolbox'
 import { providePerformanceDock } from '@/composables/usePerformanceDock'
 import { useAuth } from '@/composables/useAuth'
+import { setMessagePlacement } from '@/composables/useMessagePlacement'
 import { useDeviceInputSettings } from '@/composables/useDeviceInputSettings'
 import { useKeyboardLockOverlay } from '@/composables/useKeyboardLockOverlay'
 import { hasPermission } from '@/build'
@@ -155,6 +156,7 @@ const {
 const trackpadOpen = ref(false)
 const hideLocalCursor = ref(storedHideLocalCursor(localStorage.getItem(HIDE_LOCAL_CURSOR_KEY)))
 const status = ref<OneKVMStatus | null>(null)
+watch(() => status.value?.identity?.message_placement, setMessagePlacement, { immediate: true })
 const msdStatus = ref<MSDStatus | null>(null)
 const browserISOProgress = shallowRef<BrowserISOProgress | null>(null)
 const serverUnavailable = ref(false)

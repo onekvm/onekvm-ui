@@ -1,8 +1,25 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
-import { Activity, GripVertical, Keyboard, Monitor, MousePointer2, Settings } from '@/icons'
+import {
+  Activity,
+  ChevronDown,
+  ChevronUp,
+  CircleUserRound,
+  Disc3,
+  Gamepad2,
+  GripVertical,
+  Keyboard,
+  Languages,
+  Maximize,
+  Monitor,
+  MousePointer2,
+  Power,
+  Settings,
+  Toolbox,
+  Volume2,
+} from '@/icons'
 
-import type { ConsoleSubtitlePart, ConsoleTitleSource, PersonalizationConfig } from '@/api/client'
+import type { ConsoleSubtitlePart, ConsoleTitleSource, PersonalizationConfig, ToolbarIconId } from '@/api/client'
 import { serviceURL } from '@/api/service-url'
 import { t } from '@/i18n/runtime'
 import {
@@ -12,6 +29,17 @@ import {
   resolveConsoleTitle,
   validPersonalizationText,
 } from '@/lib/console-title'
+import { USB_GAMEPAD_UI_ENABLED } from '@/lib/ui-features'
+import { useToolbarIconDrag } from '@/composables/useToolbarIconDrag'
+import MessagePlacementPicker from './MessagePlacementPicker.vue'
+import {
+  defaultToolbarIcons,
+  isDeviceToolbarIcon,
+  normalizeToolbarIcons,
+  reorderToolbarIcon,
+  setToolbarIconHidden,
+  toolbarIconsEqual,
+} from '@/lib/toolbar-icons'
 import ConsoleBrandCopy from './ConsoleBrandCopy.vue'
 
 const props = defineProps<{
@@ -99,6 +127,84 @@ function updateSubtitleParts(values: Array<string | number>) {
       .filter(value => selected.has(value)) as ConsoleSubtitlePart[],
   })
 }
+
+const iconGlyph = {
+  display: Monitor,
+  mouse: MousePointer2,
+  keyboard: Keyboard,
+  gamepad: Gamepad2,
+  power: Power,
+  audio: Volume2,
+  virtual_media: Disc3,
+  performance: Activity,
+  fullscreen: Maximize,
+  toolbox: Toolbox,
+  settings: Settings,
+  language: Languages,
+  account: CircleUserRound,
+}
+
+const toolbarIcons = computed(() => normalizeToolbarIcons(props.modelValue.toolbar_icons))
+const iconsCustomized = computed(() => !toolbarIconsEqual(toolbarIcons.value, defaultToolbarIcons()))
+const { dragId, previewIcons, startIconDrag, moveIconDrag, endIconDrag, cancelIconDrag } = useToolbarIconDrag(
+  () => toolbarIcons.value,
+  () => props.disabled,
+  toolbar_icons => update({ toolbar_icons }),
+)
+const iconGroups = computed(() => [
+  {
+    id: 'device',
+    title: t('settings.advancedSettings.personalizationPage.deviceIcons', 'Device status'),
+    icons: previewIcons.value.filter(icon => isDeviceToolbarIcon(icon.id) && (icon.id !== 'gamepad' || USB_GAMEPAD_UI_ENABLED)),
+  },
+  {
+    id: 'action',
+    title: t('settings.advancedSettings.personalizationPage.actionIcons', 'Actions'),
+    icons: previewIcons.value.filter(icon => !isDeviceToolbarIcon(icon.id)),
+  },
+])
+const previewDeviceIcons = computed(() => toolbarIcons.value.filter(icon => isDeviceToolbarIcon(icon.id) && !icon.hidden && (icon.id !== 'gamepad' || USB_GAMEPAD_UI_ENABLED)))
+const previewActionIcons = computed(() => toolbarIcons.value.filter(icon => !isDeviceToolbarIcon(icon.id) && !icon.hidden))
+
+function iconLabel(id: ToolbarIconId) {
+  const labels: Record<ToolbarIconId, string> = {
+    display: t('screen.title', 'Screen'),
+    mouse: t('mouse.title', 'Mouse'),
+    keyboard: t('keyboard.title', 'Keyboard'),
+    gamepad: t('gamepad.title', 'Gamepad'),
+    power: t('power.title', 'Power'),
+    audio: t('usbAudio.title', 'Audio'),
+    virtual_media: t('virtualMedia.title', 'Virtual Media'),
+    performance: t('toolbar.performance', 'Stats'),
+    fullscreen: t('toolbar.fullscreen', 'Full screen'),
+    toolbox: t('toolbox.title', 'Toolbox'),
+    settings: t('settings.title', 'Settings'),
+    language: t('settings.appearance.language', 'Language'),
+    account: t('settings.account.title', 'Account'),
+  }
+  return labels[id]
+}
+
+function iconNeighbor(id: ToolbarIconId, direction: -1 | 1) {
+  const group = iconGroups.value.find(item => item.icons.some(icon => icon.id === id))
+  const index = group?.icons.findIndex(icon => icon.id === id) ?? -1
+  return index < 0 ? undefined : group?.icons[index + direction]
+}
+
+function moveIcon(id: ToolbarIconId, direction: -1 | 1) {
+  const target = iconNeighbor(id, direction)
+  if (!target || props.disabled) return
+  update({ toolbar_icons: reorderToolbarIcon(toolbarIcons.value, id, target.id) })
+}
+
+function showIcon(id: ToolbarIconId, shown: boolean) {
+  update({ toolbar_icons: setToolbarIconHidden(toolbarIcons.value, id, !shown) })
+}
+
+function resetIcons() {
+  update({ toolbar_icons: defaultToolbarIcons() })
+}
+
 </script>
 
 <template>
@@ -120,6 +226,82 @@ function updateSubtitleParts(values: Array<string | number>) {
           @update:value="update({ dim_windows_on_kvm_focus: $event })"
         />
       </div>
+    </section>
+
+    <section class="personalization-section">
+      <header>
+        <h2>{{ t('settings.advancedSettings.personalizationPage.toastMessages') }}</h2>
+        <p id="message-placement-hint">{{ t('settings.advancedSettings.personalizationPage.messagePlacementHint') }}</p>
+      </header>
+      <MessagePlacementPicker
+        :model-value="modelValue.message_placement ?? 'bottom-right'"
+        :disabled="disabled"
+        @update:model-value="update({ message_placement: $event })"
+      />
+    </section>
+
+    <section class="personalization-section">
+      <header class="personalization-icon-heading">
+        <div>
+          <h2>{{ t('settings.advancedSettings.personalizationPage.toolbarIcons', 'Toolbar icons') }}</h2>
+          <p>{{ t('settings.advancedSettings.personalizationPage.toolbarIconsHint', 'Drag to reorder the default icons. Turn one off to move it into the collection menu, where it remains available. Settings stays visible.') }}</p>
+        </div>
+        <n-button size="small" quaternary :disabled="disabled || !iconsCustomized" @click="resetIcons">
+          {{ t('settings.advancedSettings.personalizationPage.resetIcons', 'Reset') }}
+        </n-button>
+      </header>
+      <div class="personalization-icon-groups">
+        <div v-for="group in iconGroups" :key="group.id" class="personalization-icon-group">
+          <h3>{{ group.title }}</h3>
+          <TransitionGroup
+            name="personalization-icon-sort"
+            tag="div"
+            class="personalization-icon-list"
+            role="list"
+            @pointermove="moveIconDrag"
+            @pointerup="endIconDrag"
+            @pointercancel="cancelIconDrag"
+            @lostpointercapture="cancelIconDrag"
+          >
+            <div
+              v-for="(icon, index) in group.icons"
+              :key="icon.id"
+              class="personalization-icon-row"
+              :class="{ 'is-hidden': icon.hidden, 'is-dragging': dragId === icon.id }"
+              role="listitem"
+              :data-toolbar-icon="icon.id"
+              :data-icon-group="group.id"
+            >
+              <button
+                type="button"
+                class="personalization-icon-drag"
+                :disabled="disabled"
+                :aria-label="t('settings.firewall.drag', 'Drag to reorder')"
+                @pointerdown="startIconDrag($event, icon.id)"
+              >
+                <GripVertical :size="16" />
+              </button>
+              <span class="personalization-icon-glyph" aria-hidden="true"><component :is="iconGlyph[icon.id]" :size="18" /></span>
+              <strong>{{ iconLabel(icon.id) }}</strong>
+              <span class="personalization-icon-moves">
+                <button type="button" class="personalization-icon-move" :disabled="disabled || index === 0" :aria-label="t('settings.advancedSettings.personalizationPage.moveUp', 'Move up')" @click="moveIcon(icon.id, -1)">
+                  <ChevronUp :size="16" />
+                </button>
+                <button type="button" class="personalization-icon-move" :disabled="disabled || index === group.icons.length - 1" :aria-label="t('settings.advancedSettings.personalizationPage.moveDown', 'Move down')" @click="moveIcon(icon.id, 1)">
+                  <ChevronDown :size="16" />
+                </button>
+              </span>
+              <n-switch
+                :value="!icon.hidden"
+                :disabled="disabled || icon.id === 'settings'"
+                :aria-label="t('settings.advancedSettings.personalizationPage.showIcon', 'Show {name}').replace('{name}', iconLabel(icon.id))"
+                @update:value="showIcon(icon.id, $event)"
+              />
+            </div>
+          </TransitionGroup>
+        </div>
+      </div>
+      <p class="personalization-subtitle-hidden">{{ t('settings.advancedSettings.personalizationPage.settingsPinned', 'Settings stays visible so this page can be opened again.') }}</p>
     </section>
 
     <section class="personalization-section">
@@ -262,23 +444,24 @@ function updateSubtitleParts(values: Array<string | number>) {
         <span class="toolbar-spacer personalization-preview-spacer" aria-hidden="true">
           <span class="toolbar-handle"><GripVertical :size="14" /></span>
         </span>
-        <div class="device-controls personalization-preview-devices" aria-hidden="true">
-          <n-button quaternary size="small" class="device-indicator" data-state="ready" tabindex="-1">
-            <template #icon><Monitor /></template>
-            <span class="device-led" />
-          </n-button>
-          <n-button quaternary size="small" class="device-indicator personalization-preview-optional" data-state="ready" tabindex="-1">
-            <template #icon><MousePointer2 /></template>
-            <span class="device-led" />
-          </n-button>
-          <n-button quaternary size="small" class="device-indicator personalization-preview-optional" data-state="ready" tabindex="-1">
-            <template #icon><Keyboard /></template>
+        <div class="device-controls personalization-preview-devices" :class="{ 'is-iconless': previewDeviceIcons.length === 0 }" aria-hidden="true">
+          <n-button
+            v-for="icon in previewDeviceIcons"
+            :key="icon.id"
+            quaternary
+            size="small"
+            class="device-indicator"
+            data-state="ready"
+            tabindex="-1"
+          >
+            <template #icon><component :is="iconGlyph[icon.id]" /></template>
             <span class="device-led" />
           </n-button>
         </div>
         <div class="toolbar-actions personalization-preview-actions" aria-hidden="true">
-          <n-button quaternary size="small" tabindex="-1"><template #icon><Activity /></template></n-button>
-          <n-button quaternary size="small" tabindex="-1"><template #icon><Settings /></template></n-button>
+          <n-button v-for="icon in previewActionIcons" :key="icon.id" quaternary size="small" tabindex="-1">
+            <template #icon><component :is="iconGlyph[icon.id]" /></template>
+          </n-button>
         </div>
       </div>
       <small>{{ t('settings.advancedSettings.personalizationPage.browserTab', 'Browser tab') }} · {{ previewTitle }} - OneKVM</small>
@@ -312,6 +495,27 @@ function updateSubtitleParts(values: Array<string | number>) {
 .personalization-source small { margin-top: 4px; color: var(--muted-foreground); font-size: 11px; line-height: 1.45; }
 .personalization-custom-form { padding-top: 14px; }
 .personalization-subtitle-hidden { margin: -2px 0 0; color: var(--muted-foreground); font-size: 11px; line-height: 1.45; }
+.personalization-icon-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.personalization-icon-heading .n-button { flex: 0 0 auto; }
+.personalization-icon-groups { display: grid; gap: 16px; }
+.personalization-icon-group { display: grid; gap: 8px; }
+.personalization-icon-group h3 { margin: 0; color: var(--muted-foreground); font-size: 11px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; }
+.personalization-icon-list { position: relative; display: grid; gap: 6px; }
+.personalization-icon-row { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto; align-items: center; gap: 8px; min-height: 44px; padding: 4px 10px 4px 4px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+.personalization-icon-row.is-hidden { background: var(--onekvm-surface-inset); }
+.personalization-icon-row.is-hidden strong { color: var(--muted-foreground); }
+.personalization-icon-row.is-dragging { opacity: .3; border-color: var(--primary); }
+.personalization-icon-row.is-drag-ghost { border-color: var(--primary); box-shadow: var(--onekvm-shadow-popover); }
+.personalization-icon-sort-move { transition: transform 180ms var(--win11-ease-out); }
+.personalization-icon-row strong { overflow: hidden; color: var(--foreground); font-size: 13px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+.personalization-icon-glyph { display: grid; width: 28px; height: 28px; place-items: center; color: var(--foreground); }
+.personalization-icon-drag, .personalization-icon-move { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--muted-foreground); }
+.personalization-icon-drag { cursor: grab; touch-action: none; }
+.personalization-icon-drag:active { cursor: grabbing; }
+.personalization-icon-drag:disabled, .personalization-icon-move:disabled { cursor: default; opacity: 0.4; }
+.personalization-icon-move:not(:disabled):hover, .personalization-icon-drag:not(:disabled):hover { background: var(--secondary); color: var(--foreground); }
+.personalization-icon-moves { display: flex; }
+.personalization-icon-row :deep(.n-switch) { justify-self: end; }
 .personalization-preview { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--onekvm-surface-inset); }
 .personalization-preview-label { color: var(--muted-foreground); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
 .personalization-preview-toolbar { z-index: auto; width: 100%; height: var(--onekvm-toolbar-bar); overflow: hidden; border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px); pointer-events: none; }
@@ -325,11 +529,12 @@ function updateSubtitleParts(values: Array<string | number>) {
 @media (max-width: 720px) {
   .personalization-source-list { grid-template-columns: 1fr; }
   .personalization-source { min-height: 0; }
+  .personalization-icon-heading { flex-direction: column; }
+  .personalization-icon-drag, .personalization-icon-move { width: 44px; height: 44px; }
   .personalization-preview-toolbar { padding-inline: 7px; }
   .personalization-preview-toolbar :deep(.brand-copy) { display: grid; max-width: min(180px, 42vw); }
-  .personalization-preview-optional { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .personalization-source { transition: none; }
+  .personalization-source, .personalization-icon-sort-move { transition: none; }
 }
 </style>

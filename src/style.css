@@ -561,7 +561,15 @@ select { font: inherit; }
 }
 
 .toolbar-tray.is-centered .toolbar-account {
-  display: contents;
+  /* A generated box keeps the account row in the action grid. display:contents
+     would promote the sheet trigger, and that trigger cannot receive the order. */
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 .toolbar-tray.is-centered .control-sheet-trigger,
@@ -984,6 +992,36 @@ html[data-onekvm-jelly] .host-window-frame {
   align-items: center;
 }
 
+.toolbar-icon-slot {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.device-controls.is-iconless,
+.toolbar-actions.is-iconless,
+.toolbar.is-vertical .device-controls.is-iconless,
+.toolbar.is-vertical .toolbar-actions.is-iconless,
+.toolbar-tray.is-centered .device-controls.is-iconless,
+.toolbar-tray.is-centered .toolbar-actions.is-iconless {
+  display: none;
+}
+
+.toolbar.is-vertical .toolbar-icon-slot,
+.toolbar-tray.is-centered .toolbar-icon-slot {
+  width: 100%;
+}
+
+.toolbar.is-vertical .toolbar-icon-slot {
+  justify-content: center;
+}
+
+.toolbar-tray.is-centered .toolbar-icon-slot > :first-child {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+
 .device-controls,
 .toolbar-actions { height: 30px; }
 
@@ -991,6 +1029,20 @@ html[data-onekvm-jelly] .host-window-frame {
   margin-left: 4px;
   padding-left: 7px;
   border-left: 1px solid var(--border);
+}
+
+/* The first visible group has no preceding group to separate it from. */
+.device-controls.is-iconless + :is(.toolbar-actions, .toolbar-pinned-tools) {
+  margin-left: 0;
+  padding-left: 0;
+  border-left: 0;
+}
+.toolbar.is-vertical .device-controls.is-iconless + :is(.toolbar-actions, .toolbar-pinned-tools) {
+  padding-top: 0;
+  border-top: 0;
+}
+.toolbar.is-vertical .device-controls.is-iconless + .toolbar-actions::before {
+  display: none;
 }
 
 .toolbar-account {

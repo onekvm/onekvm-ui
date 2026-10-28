@@ -136,7 +136,7 @@ async function startCollect(resumeId = '') {
         ? reason.message
         : String(reason)
     errorMessage.value = reason instanceof APIError && reason.status === 401
-      ? t('settings.diagnostics.signInAgain', 'Capture is restoring. Sign in again to resume this diagnostics job.')
+      ? t('settings.diagnostics.signInAgain', 'Your session expired. Sign in again to resume this diagnostics job.')
       : text
     stage.value = 'error'
     appendLine(text)
@@ -198,7 +198,7 @@ onBeforeUnmount(() => {
   >
     <template v-if="stage === 'idle'">
       <p class="diagnostics-purpose">
-        {{ t('settings.diagnostics.purpose', 'Collect system logs, network state, hardware information, and supported bridge firmware in a ZIP file. Reading firmware briefly stops capture services. Sign in again afterward to download the result.') }}
+        {{ t('settings.diagnostics.purpose', 'Collect system logs, network state, and hardware information in a ZIP file. OneKVM and video keep running while progress logs stream live.') }}
       </p>
       <div class="diagnostics-actions">
         <n-button type="primary" @click="startCollect()">

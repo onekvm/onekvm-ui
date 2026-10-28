@@ -9,7 +9,7 @@ import { t } from '@/i18n/runtime'
 import ToolIcon from './ToolIcon.vue'
 import PinnedToolList from './PinnedToolList.vue'
 
-defineProps<{ mobile?: boolean; placement?: 'top-end' | 'bottom-end' | 'bottom-start' | 'right-start' | 'left-start' }>()
+defineProps<{ menuItem?: boolean; mobile?: boolean; placement?: 'top-end' | 'bottom-end' | 'bottom-start' | 'right-start' | 'left-start' }>()
 const toolbox = useToolboxContext()
 const mountTo = useOverlayMount()
 const pinned = (id: string) => toolbox.pins.some(pin => pin.toolId === id)
@@ -86,7 +86,7 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
   <n-dropdown v-if="toolbox.allowed" trigger="click" :show="toolbox.menuOpen" :options="options" :theme-overrides="{ optionHeightMedium: '52px' }" :placement="placement || 'bottom-end'" :to="mountTo" scrollable :menu-props="menuProps" @update:show="toolbox.menuOpen = $event" @select="toolbox.open(String($event))">
     <n-tooltip :disabled="mobile || toolbox.menuOpen" :to="mountTo" style="pointer-events: none">
       <template #trigger>
-        <n-button quaternary size="small" :aria-label="t('toolbox.title')" :aria-expanded="toolbox.menuOpen" aria-haspopup="menu" data-toolbox-local data-toolbox-trigger @keydown="triggerKeydown">
+        <n-button quaternary size="small" :role="menuItem ? 'menuitem' : undefined" :aria-label="t('toolbox.title')" :aria-expanded="toolbox.menuOpen" aria-haspopup="menu" data-toolbox-local data-toolbox-trigger @keydown="triggerKeydown">
           <template #icon><Toolbox /></template>
           <span v-if="mobile" class="toolbar-action-label">{{ t('toolbox.title') }}</span>
         </n-button>

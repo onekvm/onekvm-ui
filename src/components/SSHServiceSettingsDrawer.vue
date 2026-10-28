@@ -45,6 +45,7 @@ async function save() {
       authorized_keys: splitAuthorizedKeyList(form.authorizedKeys),
     }))
     message.success(t('settings.success', 'Settings saved'))
+    show.value = false
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : String(reason)
   } finally {

@@ -21,6 +21,7 @@
     "test:settings-nav": "node --experimental-strip-types tests/settings-nav.test.ts",
     "test:firewall": "node --experimental-strip-types tests/firewall-draft.test.ts",
     "test:console-title": "node --experimental-strip-types tests/console-title.test.ts",
+    "test:toolbar-icons": "node --experimental-strip-types tests/toolbar-icons.test.ts",
     "test:toolbar-dock": "node --experimental-strip-types tests/toolbar-dock.test.ts && node --experimental-strip-types tests/toolbar-pin-capacity.test.ts",
     "test:toolbar-extensions": "node --experimental-strip-types tests/toolbar-extensions.test.ts",
     "test:extension-shell": "node --experimental-strip-types tests/extension-shell.test.ts",

@@ -771,6 +771,9 @@ const zh_tw = {
           productNameHint: '提供給被控端聲音設定的 USB 音訊裝置名稱，具體顯示方式由被控端系統決定。',
         },
         usbPage: {
+          networkSharing: 'USB 網路共享',
+          networkSharingHint: '透過 USB 將 OneKVM 的網際網路連線分享給受控裝置。支援 Linux 和 macOS，受控裝置需設為自動取得 IP。',
+          networkSharingBlocked: 'USB 容量不足，請先關閉不用的 USB 功能。',
           remoteWakeup: 'USB 遠端喚醒',
           remoteWakeupHint: '透過按鍵或滑鼠點擊喚醒受控裝置，需主機板支援，並在 BIOS 和作業系統中允許 USB 喚醒。變更此設定會讓 USB 短暫重新連線。',
           restartHint: '開關功能或改名字都會馬上重新設定 USB，鍵盤滑鼠會短暫中斷一下。',

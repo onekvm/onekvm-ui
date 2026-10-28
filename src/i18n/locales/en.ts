@@ -772,6 +772,9 @@ const en = {
           productNameHint: 'A name for the USB audio device in the controlled device’s sound settings. The operating system determines how it is displayed.',
         },
         usbPage: {
+          networkSharing: 'USB network sharing',
+          networkSharingHint: 'Share OneKVM’s internet connection with the controlled device over USB. Supports Linux and macOS with automatic IP configuration.',
+          networkSharingBlocked: 'Not enough USB capacity. Turn off unused USB functions first.',
           remoteWakeup: 'USB remote wakeup',
           remoteWakeupHint: 'Wake the controlled device with a key press or mouse click. Requires USB wake support and permission in its BIOS and operating system. Changing this setting briefly reconnects USB.',
           restartHint: 'Turning functions on or off, or changing the names below, reconfigures USB immediately. The keyboard and mouse disconnect briefly.',

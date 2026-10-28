@@ -1234,6 +1234,10 @@ const en = {
           slotSwitched: 'Next boot slot updated',
           updateChecking: "Checking kernel versions and plugin dependencies…",
           updateAwaitingPackages: "Upload the missing packages to continue",
+          allowUntrustedFirmware: "Allow untrusted firmware for this update",
+          untrustedFirmwareHint: "Accept a signer outside the built-in trust store for this update only. Firmware format, signature integrity, data integrity and model checks still apply. Only install firmware from a source you trust.",
+          untrustedFirmwareConfirm: "Install firmware from an untrusted signer to the inactive slot? Firmware format, signature integrity, data integrity and model checks will still be required.",
+          updateErrors: {"details": "Technical details", "payloadCorrupted": "Update file data verification failed. Download the firmware again, compare its SHA-256 with the published checksum, then upload it again.", "signatureInvalid": "Update signature verification failed. Use firmware signed for this device and check the device date and time.", "kernelMetadataMissing": "The upgrade plan is missing target kernel compatibility metadata. Cancel this update and upload the latest complete firmware again. If this persists, export diagnostics. This cannot be fixed by uploading a plugin package.", "extractFailed": "Could not verify or extract the update file. Check available storage and upload a complete firmware file again."},
           pluginUpdate: {
             title: "Pre-update check",
             currentKernel: "Current kernel version",

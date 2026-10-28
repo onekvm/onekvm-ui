@@ -760,6 +760,7 @@ export interface SystemOnlineUpdateProgress {
 }
 
 export interface SystemUpdatePreflight {
+  allow_untrusted?: boolean
   id?: string
   phase: 'idle' | 'prepared' | 'armed' | 'installing' | 'complete' | 'failed'
   error?: string
@@ -1943,18 +1944,18 @@ export const api = {
   startSystemOnlineUpdate: () => request<{ status: string }>('/api/system/update/online', { method: 'POST' }),
   getSystemOnlineUpdateProgress: (signal?: AbortSignal) => request<SystemOnlineUpdateProgress>('/api/system/update/online/progress', { signal }),
   getSystemUpdateFiles: () => request<{ files: SystemUpdateLocalFile[] }>('/api/system/update/files'),
-  startSystemUpdateSource: (source: SystemUpdateSource) =>
-    request<{ status: string }>('/api/system/update/source', { method: 'POST', body: JSON.stringify(source) }),
+  startSystemUpdateSource: (source: SystemUpdateSource, allowUntrusted = false) =>
+    request<{ status: string }>('/api/system/update/source', { method: 'POST', body: JSON.stringify(source), headers: { 'X-OneKVM-Allow-Untrusted': String(allowUntrusted) } }),
   setSystemUpdateSlot: (slot: string, allowBad = false) =>
     request<SystemUpdateStatus>('/api/system/update/slot', {
       method: 'POST',
       body: JSON.stringify({ slot, allow_bad: allowBad }),
     }),
-  installSystemUpdate: (file: File) =>
+  installSystemUpdate: (file: File, allowUntrusted = false) =>
     request<{ status: string }>('/api/system/update/bundle', {
       method: 'POST',
       body: file,
-      headers: { 'Content-Type': 'application/vnd.onekvm.firmware-update' },
+      headers: { 'Content-Type': 'application/vnd.onekvm.firmware-update', 'X-OneKVM-Allow-Untrusted': String(allowUntrusted) },
     }),
   getExtensions: () => request<ExtensionSummary[]>('/api/extensions'),
   getConsoleExtensions: () => consoleExtensions.get(serviceBaseUrl(), () => request<ConsoleExtension[]>('/api/extensions/console', { cache: 'no-store' })),

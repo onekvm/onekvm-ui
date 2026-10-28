@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { systemUpdateErrorText } from '@/lib/system-update-error'
+import SystemUpdateError from './SystemUpdateError.vue'
 import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch, type Component } from 'vue'
 import {
@@ -276,6 +278,7 @@ const systemDetailsError = ref('')
 const systemTime = ref<SystemTimeStatus | null>(null)
 const onlineUpdate = ref<SystemOnlineUpdate | null>(null)
 const updateMethod = shallowRef<UpdateMethod>('github')
+const allowUntrustedFirmware = shallowRef(false)
 const onlineUpdateError = ref('')
 const onlineUpdateLoading = ref(false)
 const onlineDownloadPercent = computed(() => {
@@ -544,7 +547,7 @@ const deviceUptime = computed(() => {
 const mobileDetail = computed(() => mobileSettings.value && !isSettingsIndex(section.value))
 const { status: storageStatus } = useStorageStatus(computed(() => paneSection.value === 'system' && (!mobileSettings.value || mobileDetail.value)))
 const updateMonitor = useSystemUpdateMonitor(computed(() => paneSection.value === 'update'), (error) => {
-  if (error) message.error(error)
+  if (error) message.error(systemUpdateErrorText(error, t))
   else message.success(t('settings.advancedSettings.systemPage.updateComplete', 'System update installed'))
 })
 const {
@@ -934,7 +937,7 @@ function confirmSourceUpdate(source: SystemUpdateSource) {
   if (updateInstalling.value || systemUpdate.value?.operation !== 'idle') return
   dialog.warning({
     title: t('settings.advancedSettings.systemPage.installUpdate', '安装系统升级'),
-    content: t('settings.advancedSettings.systemPage.installUpdateConfirm', '将所选来源的已签名升级包安装到非活动分区？'),
+    content: allowUntrustedFirmware.value ? t('settings.advancedSettings.systemPage.untrustedFirmwareConfirm', 'Install firmware from an untrusted signer to the inactive slot? Firmware format, signature integrity, data integrity and model checks will still be required.') : t('settings.advancedSettings.systemPage.installUpdateConfirm', '将所选来源的已签名升级包安装到非活动分区？'),
     positiveText: t('settings.advancedSettings.systemPage.install', '安装'),
     negativeText: t('common.cancel', '取消'),
     onPositiveClick: async () => {
@@ -942,7 +945,7 @@ function confirmSourceUpdate(source: SystemUpdateSource) {
       onlineUpdateError.value = ''
       onlineUpdateProgress.value = null
       try {
-        await api.startSystemUpdateSource(source)
+        await api.startSystemUpdateSource(source, allowUntrustedFirmware.value)
         updateStarted.value = true
         await updateMonitor.follow()
       } catch (reason) {
@@ -971,14 +974,14 @@ function confirmSystemUpdate() {
   if (!updateFile.value) return
   dialog.warning({
     title: t('settings.advancedSettings.systemPage.installUpdate', 'Install system update'),
-    content: t('settings.advancedSettings.systemPage.installUpdateConfirm', 'Install the selected signed update bundle to the inactive slot?'),
+    content: allowUntrustedFirmware.value ? t('settings.advancedSettings.systemPage.untrustedFirmwareConfirm', 'Install firmware from an untrusted signer to the inactive slot? Firmware format, signature integrity, data integrity and model checks will still be required.') : t('settings.advancedSettings.systemPage.installUpdateConfirm', 'Install the selected signed update bundle to the inactive slot?'),
     positiveText: t('settings.advancedSettings.systemPage.install', 'Install'),
     negativeText: t('common.cancel', 'Cancel'),
     onPositiveClick: async () => {
       if (!updateFile.value) return
       updateInstalling.value = true
       try {
-        await api.installSystemUpdate(updateFile.value)
+        await api.installSystemUpdate(updateFile.value, allowUntrustedFirmware.value)
         updateStarted.value = true
         await updateMonitor.follow()
       } catch (reason) {
@@ -2473,12 +2476,13 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                     <h2>{{ t('settings.advancedSettings.systemPage.systemUpdate', 'System update') }}</h2>
                     <div class="system-update-panel">
                       <SystemUpdateSourceSelector
+                        v-model:allow-untrusted="allowUntrustedFirmware"
                         v-model="updateMethod"
                         :disabled="updateInstalling || systemUpdate.operation !== 'idle'"
                         @install="confirmSourceUpdate"
                       >
                       <template #error>
-                        <n-alert v-if="onlineUpdateError" type="error" :bordered="false">{{ onlineUpdateError }}</n-alert>
+                        <n-alert v-if="onlineUpdateError" type="error" :bordered="false"><SystemUpdateError :error="onlineUpdateError" /></n-alert>
                       </template>
                       <template #github>
                       <div v-if="onlineUpdateLoading || onlineUpdate" class="system-update-source-info">
@@ -2596,7 +2600,7 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                         :show-indicator="false"
                         status="success"
                       />
-                      <span v-if="onlineUpdateProgress?.error || systemUpdate.last_error" class="system-update-error">{{ onlineUpdateProgress?.error || systemUpdate.last_error }}</span>
+                      <SystemUpdateError v-if="onlineUpdateProgress?.error || systemUpdate.last_error" class="system-update-error" :error="onlineUpdateProgress?.error || systemUpdate.last_error" />
 
                     </div>
                   </section>

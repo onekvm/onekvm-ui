@@ -1233,6 +1233,10 @@ const zh_tw = {
           slotSwitched: '下次啟動分割區已更新',
           updateChecking: "正在檢查核心版本與外掛相依套件…",
           updateAwaitingPackages: "請補齊升級所需的軟體套件",
+          allowUntrustedFirmware: "本次升級允許不可信韌體",
+          untrustedFirmwareHint: "僅本次接受內置信任庫以外的簽章憑證。仍校驗 fwup 格式、簽章有效性、資料完整性及機型。請確認韌體來源可靠。",
+          untrustedFirmwareConfirm: "將非內置信任憑證簽署的韌體安裝到非活動分區？仍須通過 fwup 格式、簽章有效性、資料完整性及機型校驗。",
+          updateErrors: {"details": "技術詳情", "payloadCorrupted": "升級檔案資料校驗失敗，檔案可能損壞或傳輸不完整。請重新下載韌體，比對發布的 SHA-256 校驗值後再次上傳。", "signatureInvalid": "升級檔案簽章校驗失敗。請使用適用於此裝置的可信韌體，並檢查裝置日期和時間。", "kernelMetadataMissing": "升級計畫缺少目標核心相容資訊。請取消本次升級，重新上傳最新完整韌體；若仍失敗，請匯出診斷。此問題無法透過上傳外掛套件解決。", "extractFailed": "無法校驗或解壓縮升級檔案。請檢查可用儲存空間，並重新上傳完整韌體；若仍失敗，請查看技術詳情或匯出診斷。"},
           pluginUpdate: {
             title: "升級前檢查",
             currentKernel: "目前核心版本",

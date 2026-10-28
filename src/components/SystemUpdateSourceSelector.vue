@@ -9,6 +9,7 @@ export type UpdateMethod = 'github' | 'http' | 'tftp' | 'nfs' | 'local' | 'uploa
 
 defineProps<{ disabled: boolean }>()
 const emit = defineEmits<{ install: [source: SystemUpdateSource] }>()
+const allowUntrusted = defineModel<boolean>('allowUntrusted', { default: false })
 const method = defineModel<UpdateMethod>({ required: true })
 defineSlots<{ github(): unknown; upload(): unknown; error(): unknown }>()
 
@@ -69,6 +70,10 @@ function install() {
     </div>
     <div class="update-source-detail">
       <slot name="error" />
+      <div v-if="method !== 'github'" class="update-source-trust">
+        <n-checkbox v-model:checked="allowUntrusted" :disabled="disabled">{{ t('settings.advancedSettings.systemPage.allowUntrustedFirmware', 'Allow untrusted firmware for this update') }}</n-checkbox>
+        <p>{{ t('settings.advancedSettings.systemPage.untrustedFirmwareHint', 'Accept a signer outside the built-in trust store for this update only. Firmware format, signature integrity, data integrity and model checks still apply. Only install firmware from a source you trust.') }}</p>
+      </div>
       <Transition name="update-source" mode="out-in">
       <div :key="method" class="update-source-pane">
       <slot v-if="method === 'github'" name="github" />
@@ -136,6 +141,8 @@ function install() {
 .update-source-enter-from { opacity: 0; transform: translateY(6px); }
 .update-source-leave-to { opacity: 0; transform: translateY(-4px); }
 .update-source-form { display: grid; grid-template-columns: minmax(100px, 150px) minmax(0, 1fr); gap: 12px; align-items: center; }
+.update-source-trust { display: grid; gap: 8px; }
+.update-source-trust p { margin: 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
 .update-source-form label { color: var(--muted-foreground); font-size: 12px; }
 .update-local-picker { min-width: 0; }
 .update-source-actions { display: flex; justify-content: flex-start; }

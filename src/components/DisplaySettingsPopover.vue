@@ -179,7 +179,7 @@ const qualityBudgetSelection = computed<QualityBudgetSelection>({
 })
 const qualityBudgetLabel = computed(() => video.value?.codec === 'mjpeg'
   ? t('settings.advancedSettings.displayPage.jpegQuality', 'JPEG quality')
-  : t('screen.bitrateBudget', 'Bitrate budget ceiling'))
+  : t('screen.bitrateBudget', 'Bitrate ceiling'))
 const qualityBudgetHelpTitle = computed(() => video.value?.codec === 'mjpeg'
   ? t('screen.jpegQualityHelpTitle', 'About JPEG quality')
   : t('screen.bitrateHelpTitle', 'About the bitrate ceiling'))
@@ -626,7 +626,7 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
         <div v-if="video && video.codec !== 'mjpeg'">
           <span class="display-setting-label">
             {{ t('settings.advancedSettings.displayPage.qpPreset', 'Picture preset') }}
-            <DisplaySettingHelp :active="popoverOpen" :label="t('screen.qpPresetHelpTitle', 'About picture presets')" :text="qpPresetHelp" />
+            <DisplaySettingHelp :active="popoverOpen" :label="t('screen.qpPresetHelpTitle', 'Picture preset')" :text="qpPresetHelp" />
           </span>
           <n-select
             v-bind="selectProps"

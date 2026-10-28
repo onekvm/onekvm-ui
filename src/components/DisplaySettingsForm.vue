@@ -106,7 +106,7 @@ const qpPresetMode = ref<QpPresetMode>(
 )
 const qualityBudgetLabel = computed(() => video.value.codec === 'mjpeg'
   ? t('settings.advancedSettings.displayPage.jpegQuality', 'JPEG quality')
-  : t('screen.bitrateBudget', 'Bitrate budget ceiling'))
+  : t('screen.bitrateBudget', 'Bitrate ceiling'))
 const qualityBudgetHint = computed(() => video.value.codec === 'mjpeg'
   ? t('settings.advancedSettings.displayPage.jpegQualityHint', 'Controls JPEG compression quality; higher values retain more detail and use more bandwidth.')
   : t('screen.bitrateHelp'))
@@ -230,7 +230,7 @@ function setBitrateBudget(value: number) {
             </div>
             <span v-if="video.codec === 'mjpeg'" class="display-setting-field-hint">{{ qualityDescription }}</span>
             <span v-else class="display-setting-field-hint">
-              {{ t('settings.advancedSettings.displayPage.bitrateShortHint', 'A soft ceiling; complex scenes may briefly exceed it.') }}
+              {{ t('settings.advancedSettings.displayPage.bitrateShortHint', 'Busy pictures may briefly go over this ceiling.') }}
               <template v-if="videoBitrateRange">{{ videoBitrateRange.minimum / 1000 }}–{{ videoBitrateRange.maximum / 1000 }} Mbps</template>
               <template v-else>{{ t('settings.advancedSettings.displayPage.customBitrateUnavailable', 'This device does not report a configurable bitrate range.') }}</template>
             </span>
@@ -259,7 +259,7 @@ function setBitrateBudget(value: number) {
         <n-form-item :label="t('settings.advancedSettings.displayPage.maxQp', 'Maximum QP')">
           <n-input-number v-model:value="video.h26x.max_qp" :min="0" :max="51" :disabled="disabled" />
         </n-form-item>
-        <span class="display-setting-field-hint display-settings-wide">{{ t('settings.advancedSettings.displayPage.qpAutoHint', 'Use 0 to let the device backend choose automatically. Lower QP improves quality and increases bitrate.') }}</span>
+        <span class="display-setting-field-hint display-settings-wide">{{ t('settings.advancedSettings.displayPage.qpAutoHint', 'Use 0 for automatic. A smaller number makes the picture clearer and uses more bandwidth.') }}</span>
       </div>
       <n-collapse class="display-advanced-fields">
         <n-collapse-item name="advanced" :title="t('settings.advancedSettings.displayPage.advancedParameters', 'Advanced parameters')">

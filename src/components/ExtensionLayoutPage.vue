@@ -104,7 +104,7 @@ function property(name: string) {
 
 function settingTitle(name: string) {
   if (hasIndependentVideoSettings.value && name === 'bitrate_kbps') {
-    return t('screen.bitrateBudget', 'Bitrate budget ceiling')
+    return t('screen.bitrateBudget', 'Bitrate ceiling')
   }
   if (hasIndependentVideoSettings.value && name === 'quality_factor') {
     return t('settings.advancedSettings.displayPage.jpegQuality', 'JPEG quality')

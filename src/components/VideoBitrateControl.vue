@@ -62,7 +62,7 @@ watch(() => props.value, value => { if (!value) custom.value = false })
       :max="range.maximum"
       :step="range.step"
       :disabled="disabled"
-      :aria-label="t('screen.bitrateBudget', 'Bitrate budget ceiling')"
+      :aria-label="t('screen.bitrateBudget', 'Bitrate ceiling')"
       @update:value="updateCustom"
     />
   </div>

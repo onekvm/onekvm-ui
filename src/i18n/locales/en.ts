@@ -893,7 +893,7 @@ const en = {
           edidCustomFiles: 'Custom files',
           edidFactory: 'Factory preset',
           edidApply: 'Apply EDID',
-          edidHotplug: 'EDID updated. Re-detect the display on the controlled host.',
+          edidHotplug: 'Applied.',
           edidRebootTitle: 'Restart required',
           edidReboot: 'Restart the device to advertise the new EDID to the host.',
           edidPowerCycle: 'Power-cycle the device to advertise the new EDID.',

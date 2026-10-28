@@ -892,7 +892,7 @@ const zh = {
           edidCustomFiles: '自定义文件',
           edidFactory: '出厂预设',
           edidApply: '应用 EDID',
-          edidHotplug: 'EDID 已更新。请在被控主机上重新检测显示器。',
+          edidHotplug: '已应用。',
           edidRebootTitle: '需要重启',
           edidReboot: '需要重启设备后，新的 EDID 才会对被控主机生效。',
           edidPowerCycle: '需要给设备断电再上电，新的 EDID 才会对外生效。',

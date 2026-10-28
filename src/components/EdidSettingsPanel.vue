@@ -85,7 +85,7 @@ async function confirmApply(required: EDIDApplyRequired) {
     })
     return
   }
-  message.success(t('settings.advancedSettings.displayPage.edidHotplug', 'EDID updated. Re-detect the display on the controlled host.'))
+  message.success(t('settings.advancedSettings.displayPage.edidHotplug', 'Applied.'))
 }
 
 onMounted(() => {

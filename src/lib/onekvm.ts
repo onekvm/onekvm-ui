@@ -855,7 +855,11 @@ class OneKVMTransport {
       sdp: preferLowDelayOpus(answer.sdp),
     })
     if (this.peer !== peer) return
-    void trickle?.start(answer).catch(error => { if (this.peer === peer) this.failWebRTC(String(error)) })
+    void trickle?.start(answer).catch(error => {
+      // Late signaling errors do not invalidate an established media path.
+      // Its connection events and disconnect timeout still detect real loss.
+      if (this.peer === peer && peer.connectionState !== 'connected') this.failWebRTC(String(error))
+    })
     this.startVideoStats(peer)
     this.audioStereo = stereo
     void this.reconcileAudio()

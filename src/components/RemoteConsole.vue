@@ -4,6 +4,8 @@ import { WifiOff } from '@/icons'
 
 import { useMouse, type MouseMode } from '@/composables/useMouse'
 import { consolePointerCursor } from '@/lib/console-pointer'
+import { consoleConnectionProblem } from '@/lib/console-connection'
+import { statusEvents } from '@/lib/status-events'
 import { useViewportZoom } from '@/composables/useViewportZoom'
 import { useZoomBadge } from '@/composables/useZoomBadge'
 import { useVideoDisplayMotion } from '@/composables/useVideoDisplayMotion'
@@ -77,7 +79,7 @@ const mjpegReload = ref(0)
 let detachVideo: (() => void) | undefined
 const detachFrameProvider = registerConsoleFrameProvider(async () => {
   const source = isMJPEG.value ? canvas.value : video.value
-  if (!source || !hasFrame.value || mediaError.value || transportFailed.value || props.serverUnavailable ||
+  if (!source || !hasFrame.value || mediaError.value || transportFailed.value || connectionProblem.value ||
       props.signalConnected !== true || props.hdmiError) throw new Error('CONSOLE_FRAME_UNAVAILABLE')
   return encodeConsoleFrame(source)
 }, () => stage.value)
@@ -115,9 +117,12 @@ const transportFailed = computed(
   () => ['failed', 'disconnected'].includes(props.state.connection),
 )
 const connectionProblem = computed(
-  () => !props.state.fallbackPrompt && (
-    props.serverUnavailable || transportFailed.value || (mediaError.value && props.signalConnected !== false)
-  ),
+  () => consoleConnectionProblem({
+    state: props.state,
+    serverUnavailable: props.serverUnavailable,
+    mediaError: mediaError.value,
+    signalConnected: props.signalConnected,
+  }),
 )
 
 const {
@@ -281,6 +286,7 @@ async function reconnect() {
   mediaError.value = false
   mjpegReload.value += 1
   try {
+    statusEvents.reconnect()
     await onekvm.reconnect()
   } catch {
     // The transport publishes the localized modal state; keep it open.

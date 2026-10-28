@@ -80,6 +80,7 @@ export function applyStatusPatch(status: OneKVMStatus, operations: StatusPatchOp
 
 class StatusEvents {
   private source: EventSource | null = null
+  private retryTimer: ReturnType<typeof setTimeout> | undefined
   private current: OneKVMStatus | null = null
   private receivedAt = 0
   private readonly listeners = new Map<StatusListener, ErrorListener | undefined>()
@@ -109,38 +110,69 @@ class StatusEvents {
       : null
   }
 
+  reconnect() {
+    clearTimeout(this.retryTimer)
+    this.retryTimer = undefined
+    const source = this.source
+    this.source = null
+    source?.close()
+    this.current = null
+    if (this.listeners.size || this.waiters.size) this.start()
+  }
+
   private start() {
-    if (this.source) return
+    if (this.source || this.retryTimer !== undefined) return
     const source = new EventSource(api.getStatusEventsURL(), {
       withCredentials: import.meta.env.VITE_WITH_CREDENTIALS !== 'false',
     })
     this.source = source
     source.addEventListener('status', (event) => {
       if (this.source !== source) return
+      let status: OneKVMStatus
       try {
-        const status = JSON.parse((event as MessageEvent<string>).data) as OneKVMStatus
-        this.publish(status)
+        status = JSON.parse((event as MessageEvent<string>).data) as OneKVMStatus
+        if (!status || typeof status !== 'object' || Array.isArray(status)) throw new Error('Invalid status snapshot')
       } catch {
-        this.reportError(new Error('Invalid status event'))
+        this.recover(source, new Error('Invalid status event'))
+        return
       }
+      this.publish(status)
     })
     source.addEventListener('status.patch', (event) => {
       if (this.source !== source) return
       if (!this.current) {
-        this.reportError(new Error('Status patch received without a snapshot'))
+        this.recover(source, new Error('Status patch received without a snapshot'))
         return
       }
+      let status: OneKVMStatus
       try {
         const operations = JSON.parse((event as MessageEvent<string>).data) as StatusPatchOperation[]
         if (!Array.isArray(operations)) throw new Error('Status patch is not an array')
-        this.publish(applyStatusPatch(this.current, operations))
+        status = applyStatusPatch(this.current, operations)
       } catch {
-        this.reportError(new Error('Invalid status patch'))
+        this.recover(source, new Error('Invalid status patch'))
+        return
       }
+      this.publish(status)
     })
     source.onerror = () => {
-      if (this.source === source) this.reportError(new Error('Status event stream disconnected'))
+      this.recover(source, new Error('Status event stream disconnected'))
     }
+  }
+
+  private recover(source: EventSource, error: Error) {
+    if (this.source !== source) return
+    this.source = null
+    source.close()
+    // Patches are relative to this stream's previous snapshot. After an
+    // error, open a new stream to obtain a full snapshot before applying more.
+    if (this.listeners.size) {
+      this.retryTimer = setTimeout(() => {
+        this.retryTimer = undefined
+        this.start()
+      }, 1000)
+    }
+    this.reportError(error)
   }
 
   private publish(status: OneKVMStatus) {
@@ -160,8 +192,11 @@ class StatusEvents {
 
   private closeIfUnused() {
     if (this.listeners.size || this.waiters.size) return
-    this.source?.close()
+    clearTimeout(this.retryTimer)
+    this.retryTimer = undefined
+    const source = this.source
     this.source = null
+    source?.close()
     this.current = null
   }
 }

@@ -59,7 +59,7 @@
     "test:video-transport": "node --experimental-strip-types tests/video-transport.test.ts",
     "test:websocket-video": "node --experimental-strip-types tests/websocket-video.test.ts",
     "test:websocket-audio": "node --experimental-strip-types tests/websocket-audio.test.ts && node --experimental-strip-types tests/websocket-audio-connection.test.ts && node --experimental-strip-types tests/websocket-lz4.test.ts",
-    "test:transport-reconnect": "node --experimental-strip-types tests/transport-reconnect.test.ts",
+    "test:transport-reconnect": "node --experimental-strip-types tests/transport-reconnect.test.ts && node --experimental-strip-types tests/console-connection.test.ts && node --experimental-strip-types tests/status-events.test.ts",
     "test:webrtc-opus-sdp": "node --experimental-strip-types tests/webrtc-opus-sdp.test.ts",
     "test:webrtc-video-timing": "node --experimental-strip-types tests/webrtc-video-timing.test.ts",
     "test:webrtc-playback-stats": "node --experimental-strip-types tests/webrtc-playback-stats.test.ts && node --experimental-strip-types tests/webrtc-connection-stats.test.ts",

@@ -63,6 +63,8 @@ class FakePeer {
   preferred: { mimeType: string }[] = []
   control: ReturnType<FakePeer['createDataChannel']> | null = null
   constructor() { peers.push(this) }
+  addEventListener() {}
+  removeEventListener() {}
   createDataChannel() {
     const channel = {
       binaryType: '', readyState: 'connecting',
@@ -130,6 +132,7 @@ let cleanup: (() => Promise<void>) | undefined
 try {
   const { api } = await server.ssrLoadModule('/src/api/client.ts')
   const { statusEvents } = await server.ssrLoadModule('/src/lib/status-events.ts')
+  const { WebRTCTrickleICE } = await server.ssrLoadModule('/src/lib/webrtc-ice.ts')
   const { onekvm } = await server.ssrLoadModule('/src/lib/onekvm.ts')
   cleanup = () => onekvm.close()
   let codec = 'h264'
@@ -294,6 +297,35 @@ try {
   assert.equal(state?.connection, 'connected', 'A backend without HEVC must still negotiate H.264 from the same offer')
   assert.equal(offers.at(-1)?.codec, 'h264')
 
+  // Candidate exchange can fail after the media path is already connected.
+  api.getWebRTCIce = async () => ({ ice_servers: [], trickle: true })
+  let iceFailure = deferred<void>()
+  WebRTCTrickleICE.prototype.start = () => iceFailure.promise
+  await onekvm.reconnect()
+  const connectedPeer = peers.at(-1)!
+  assert.equal(connectedPeer.connectionState, 'connected')
+  iceFailure.reject(new Error('Late candidate exchange failed'))
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(state?.connection, 'connected', 'A signaling failure must not mark an already connected media path as failed')
+  assert.equal(state?.controlReady, true)
+  connectedPeer.connectionState = 'failed'
+  connectedPeer.onconnectionstatechange?.()
+  assert.equal(state?.connection, 'failed', 'A real peer failure must still be reported after the signaling error')
+
+  iceFailure = deferred<void>()
+  const originalRemoteDescription = FakePeer.prototype.setRemoteDescription
+  FakePeer.prototype.setRemoteDescription = async () => {}
+  try {
+    await onekvm.reconnect()
+    assert.equal(peers.at(-1)?.connectionState, 'connecting')
+    iceFailure.reject(new Error('Candidate exchange failed before connection'))
+    await until(() => state?.connection === 'failed')
+    assert.equal(state?.controlReady, false, 'Signaling failure before connectivity must still be reported')
+  } finally {
+    FakePeer.prototype.setRemoteDescription = originalRemoteDescription
+  }
+
+  api.getWebRTCIce = async () => ({ ice_servers: [] })
   await onekvm.close()
   const pendingStatus = deferred<ReturnType<typeof snapshot>>()
   api.getStatus = () => pendingStatus.promise

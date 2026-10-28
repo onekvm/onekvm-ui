@@ -159,6 +159,9 @@ For transport, network, update, or recovery changes, also exercise the feature
 against a device because browser-only type checks cannot validate Core protocol
 compatibility or reconnect behavior.
 
+Console interruption and status-stream recovery rules are documented in
+[控制台连接状态](docs/console-connection.md).
+
 ## License
 
 This project is licensed under the GNU General Public License v3.0. See

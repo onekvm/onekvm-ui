@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { Disc3, Folder, HardDrive, House, LoaderCircle, RefreshCw, Server, Unplug } from '@/icons'
+import { Disc3, Folder, HardDrive, House, Link, LoaderCircle, RefreshCw, Server, Unplug } from '@/icons'
 import { api, type MSDMedia, type MSDSource, type MSDSourceListing } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { useOverlayMount } from '@/composables/useOverlayMount'
+import { mediaSourceTabsTheme } from '@/lib/media-source-tabs'
 
 const props = defineProps<{
   kind: MSDMedia['kind']
@@ -13,8 +14,10 @@ const props = defineProps<{
   mountedId: string
   mountingId: string | null
   blocked: boolean
+  connected: boolean
+  connecting: boolean
 }>()
-const emit = defineEmits<{ mount: [media: MSDMedia]; eject: []; refresh: [] }>()
+const emit = defineEmits<{ mount: [media: MSDMedia]; eject: []; refresh: []; connect: [] }>()
 const overlayTo = useOverlayMount()
 const tooltipStyle = { maxWidth: 'min(600px, calc(100vw - 32px))', overflowWrap: 'anywhere' }
 const selectedKey = ref('')
@@ -31,9 +34,9 @@ const sizeLabel = (size: number) => size >= 1024 ** 3
   ? `${(size / 1024 ** 3).toFixed(1)} GiB`
   : `${(size / 1024 ** 2).toFixed(1)} MiB`
 
-function choose(source: MSDSource) {
+function choose(key: string) {
   path.value = ''
-  selectedKey.value = sourceKey(source)
+  selectedKey.value = key
 }
 
 watch(() => props.sources, sources => {
@@ -73,12 +76,18 @@ onBeforeUnmount(() => controller?.abort())
       <strong><Server :size="16" />{{ t('virtualMedia.networkShares') }}</strong>
       <n-button quaternary circle size="small" :loading="loading || refreshing" :aria-label="t('common.refresh', 'Refresh')" @click="emit('refresh')"><template #icon><RefreshCw /></template></n-button>
     </header>
-    <div class="source-options">
-      <n-button v-for="source in sources" :key="sourceKey(source)" size="small" :aria-pressed="selectedKey === sourceKey(source)" :type="selectedKey === sourceKey(source) ? 'primary' : 'default'" @click="choose(source)">
-        <template #icon><Server /></template>{{ source.name }}
-      </n-button>
-    </div>
+    <n-tabs :value="selectedKey" type="line" size="small" :bar-width="24" :theme-overrides="mediaSourceTabsTheme" class="source-tabs host-tabs" :aria-label="t('virtualMedia.networkShares')" @update:value="choose">
+      <n-tab v-for="source in sources" :key="sourceKey(source)" :name="sourceKey(source)">
+        <span class="source-tab"><Server :size="16" />{{ source.name }}</span>
+      </n-tab>
+    </n-tabs>
     <small class="source-hint">{{ t('virtualMedia.networkReadOnly') }}</small>
+    <n-alert v-if="!connected" type="info" :bordered="false" class="source-connect">
+      <div class="source-connect-content">
+        <span>{{ t('virtualMedia.pleaseConnect', 'Connect virtual media before exposing it to the host.') }}</span>
+        <n-button size="small" type="primary" :loading="connecting" @click="emit('connect')"><template #icon><Link /></template>{{ connecting ? t('virtualMedia.connecting', 'Connecting') : t('virtualMedia.connect', 'Connect') }}</n-button>
+      </div>
+    </n-alert>
     <div v-if="networkMounted" class="network-mounted">
       <span>{{ t('virtualMedia.networkMounted') }}</span>
       <n-button size="small" @click="emit('eject')"><template #icon><Unplug /></template>{{ t('virtualMedia.unmount', 'Eject') }}</n-button>
@@ -122,9 +131,11 @@ onBeforeUnmount(() => controller?.abort())
 .network-media { display: grid; gap: 10px; padding: 12px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 8px; min-width: 0; }
 .network-media header, .network-media header strong, .network-mounted { display: flex; align-items: center; gap: 8px; }
 .network-media header, .network-mounted { justify-content: space-between; }
-.source-options, .source-path { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
-.source-options :deep(.n-button) { max-width: 100%; }
-.source-options :deep(.n-button__content) { overflow: hidden; text-overflow: ellipsis; display: block; }
+.source-tabs { min-width: 0; }
+.source-tab { display: inline-flex; align-items: center; gap: 6px; }
+.source-tab svg { flex-shrink: 0; }
+.source-connect-content { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.source-path { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .source-path :deep(.n-button__content) { overflow-wrap: anywhere; white-space: normal; text-align: left; }
 .source-hint, .source-file small { color: var(--muted-foreground); font-size: 12px; }
 .source-status { display: flex; align-items: center; gap: 8px; padding: 12px 0; }

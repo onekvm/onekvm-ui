@@ -2,7 +2,7 @@
 import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import { ArrowLeft, Check, CircleCheck, CirclePlus, ClipboardPaste, Copy, Database, Disc3, Download, File, Folder, FolderOpen, FolderPlus, FolderSync, HardDrive, House, Info, Laptop, LayoutGrid, Link, LoaderCircle, Pencil, Scissors, Server, Trash2, Unlink, Unplug, Upload, X } from '@/icons'
-import { useMessage, type TabsProps } from 'naive-ui'
+import { useMessage } from 'naive-ui'
 
 import { api, APIError, type MSDDownloadTask, type MSDFileEntry, type MSDMedia, type MSDSource, type MSDStatus } from '@/api/client'
 import { useMSDDownload } from '@/composables/useMSDDownload'
@@ -11,6 +11,7 @@ import { useOverlayMount } from '@/composables/useOverlayMount'
 import { t } from '@/i18n/runtime'
 import { BrowserISO, type BrowserISOProgress } from '@/lib/browser-iso'
 import type { MediaTransferState } from '@/lib/media-transfer'
+import { mediaSourceTabsTheme } from '@/lib/media-source-tabs'
 import { nextUploadSpeed, uploadPercentage, uploadRemainingSeconds } from '@/lib/upload-speed'
 
 import XpTransferDialog from './XpTransferDialog.vue'
@@ -76,15 +77,6 @@ const featureNavName = computed(() => featureNavDirection.value === 'back'
   : 'virtual-media-forward')
 const isoSource = ref<IsoSource>('device')
 const driveSource = ref<DriveSource>('device')
-const mediaSourceTabsTheme: TabsProps['themeOverrides'] = {
-  tabFontSizeSmall: '13px',
-  tabGapSmallLine: '16px',
-  tabPaddingSmallLine: '10px 8px',
-  tabFontWeight: '500',
-  tabFontWeightActive: '600',
-  tabTextColorLine: 'var(--muted-foreground)',
-  panePaddingSmall: '16px 0 0',
-}
 const driveCreateOpen = ref(false)
 const folderCreateOpen = ref(false)
 const popoverOpen = ref(false)
@@ -1342,6 +1334,7 @@ onBeforeUnmount(() => {
                       </template>
                       <p class="iso-source-hint"><Info :size="14" />{{ t('virtualMedia.networkSourceHint') }}</p>
                       <NetworkMediaBrowser kind="iso" :sources="networkSources" :revision="sourceRevision" :refreshing="loading"
+                        :connected="hostConnected" :connecting="connecting" @connect="connectVirtualMedia"
                         :mounted-id="status?.iso_mounted || ''" :mounting-id="mountingID" :blocked="hostMountBlocked"
                         @mount="mount" @eject="eject('iso')" @refresh="refresh(true)" />
                     </n-tab-pane>
@@ -1513,6 +1506,7 @@ onBeforeUnmount(() => {
                         <span class="media-source-tab"><Server :size="16" />{{ t('virtualMedia.networkShares') }}</span>
                       </template>
                       <NetworkMediaBrowser kind="drive" :sources="networkSources" :revision="sourceRevision" :refreshing="loading"
+                        :connected="hostConnected" :connecting="connecting" @connect="connectVirtualMedia"
                         :mounted-id="status?.drive_mounted || ''" :mounting-id="mountingID" :blocked="hostMountBlocked"
                         @mount="mount" @eject="eject('drive')" @refresh="refresh(true)" />
                     </n-tab-pane>

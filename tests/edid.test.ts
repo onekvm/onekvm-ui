@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 
 import {
   edidCurrentSummary,
+  edidWriteMode,
   edidAspectRatio,
   filterEdidOption,
   edidRequiresRestart,
@@ -102,3 +103,9 @@ assert.equal(
 assert.equal(edidCurrentSummary({ supported: true }, 'unknown'), 'unknown')
 
 console.log('edid tests passed')
+
+assert.equal(edidWriteMode({ supported: true, write_modes: { permanent: true, temporary: true } }, 'temporary'), 'temporary')
+assert.equal(edidWriteMode({ supported: true, write_modes: { permanent: true, temporary: false } }, 'temporary'), 'temporary')
+assert.equal(edidWriteMode(null, 'temporary'), 'temporary')
+assert.equal(edidWriteMode({ supported: true }, 'permanent'), undefined)
+assert.equal(edidWriteMode({ supported: true, write_modes: { permanent: true, temporary: false } }, 'permanent'), 'permanent')

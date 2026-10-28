@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useAsyncDialog } from '@/composables/useAsyncDialog'
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
-import { Cable, Monitor, PictureInPicture2, RotateCcw, SlidersHorizontal, Waypoints } from '@/icons'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
+import { Cable, Monitor, Pencil, PictureInPicture2, RotateCcw, SlidersHorizontal, Waypoints } from '@/icons'
 import { useMessage, type SelectOption } from 'naive-ui'
 
 import { api, APIError, type ConfigSchema, type EDIDStatus, type OneKVMConfig } from '@/api/client'
@@ -9,11 +9,8 @@ import { useOverlayMount } from '@/composables/useOverlayMount'
 import { useVideoCodecSupport } from '@/composables/useVideoCodecSupport'
 import { t } from '@/i18n/runtime'
 import {
-  edidCurrentSummary,
+  edidWriteMode,
   edidRequiresRestart,
-  edidSelectOptions,
-  filterEdidOption,
-  parseEdidSelection,
   supportsHdmiReset,
 } from '@/lib/edid'
 import { DISMISS_CONTROL_OVERLAY_EVENT } from '@/lib/overlay-target'
@@ -36,6 +33,7 @@ import ControlPopoverHeading from './ControlPopoverHeading.vue'
 import DisplaySettingHelp from './DisplaySettingHelp.vue'
 import DisplaySettingsGroup from './DisplaySettingsGroup.vue'
 import EdidIdentitySummary from './EdidIdentitySummary.vue'
+import EdidApplyModal from './EdidApplyModal.vue'
 import VideoBitrateControl from './VideoBitrateControl.vue'
 
 const props = defineProps<{
@@ -72,7 +70,8 @@ const fps = ref(props.targetFps)
 const video = ref<OneKVMConfig['video'] | null>(null)
 const schema = ref<ConfigSchema | null>(null)
 const edid = ref<EDIDStatus | null>(null)
-const edidSelection = ref('')
+const edidModalOpen = shallowRef(false)
+const triggerRef = useTemplateRef<HTMLElement>('trigger')
 const edidBusy = ref(false)
 const resettingHdmi = shallowRef(false)
 const codecTransport = computed(() => switchingProtocol.value || (props.state.videoMode === 'mjpeg'
@@ -124,27 +123,27 @@ const fpsOptions = computed(() => [
   })),
 ])
 const videoDisabled = computed(() => !props.canChangeVideo || saving.value || edidBusy.value || !!switchingProtocol.value)
-const edidOptions = computed(() => edidSelectOptions(edid.value, {
-  factory: t('settings.advancedSettings.displayPage.edidFactory', 'Factory preset'),
-  presets: t('settings.advancedSettings.displayPage.edidMachinePresets', 'Machine presets'),
-  common: t('settings.advancedSettings.displayPage.edidCommonPresets', 'Common'),
-  custom: t('settings.advancedSettings.displayPage.edidCustomFiles', 'Custom files'),
-}))
 const edidDisabled = computed(() => saving.value || edidBusy.value || !!switchingProtocol.value || !edid.value?.writable)
 const canResetHdmi = computed(() => supportsHdmiReset(edid.value))
-const edidPlaceholder = computed(() => edidCurrentSummary(
-  edid.value,
-  t('settings.advancedSettings.displayPage.edidSelect', 'Choose a machine preset or a custom file'),
-))
-const edidRestartHint = computed(() => {
-  if (edid.value?.apply_policy === 'power_cycle') {
-    return t('screen.edidPowerCycleHint', 'This board cannot hotplug HDMI. Applying EDID requires a power cycle.')
+
+function openEdidModal() {
+  if (edidDisabled.value) return
+  forceClose()
+  edidModalOpen.value = true
+}
+
+async function focusTrigger() {
+  await nextTick()
+  const activeDialog = document.activeElement?.closest('[role="dialog"], [role="alertdialog"]')
+  if (activeDialog && !activeDialog.classList.contains('edid-apply-modal')) return
+  const trigger = triggerRef.value?.querySelector<HTMLElement>('button')
+  if (trigger?.getClientRects().length && !trigger.closest('[inert]')) {
+    trigger.focus({ preventScroll: true })
+  } else {
+    const root = overlayTo.value instanceof HTMLElement ? overlayTo.value : document
+    root.querySelector<HTMLElement>('.toolbar-launcher')?.focus({ preventScroll: true })
   }
-  if (edidRequiresRestart(edid.value?.apply_policy) || edid.value?.hotplug === false) {
-    return t('screen.edidRebootHint', 'This board cannot hotplug HDMI. Applying EDID requires a restart.')
-  }
-  return ''
-})
+}
 
 function qualityTierLabel(value: number) {
   const tier = qualityTier(value)
@@ -278,19 +277,24 @@ async function loadVideo() {
     resolution.value = loadedConfig.video.resolution
     fps.value = loadedConfig.video.fps
     edid.value = loadedEdid?.supported ? loadedEdid : null
-    if (!edid.value) edidSelection.value = ''
   } catch (reason) {
     message.error(reason instanceof Error ? reason.message : String(reason))
   }
 }
 
 async function confirmEdidApply(required: string) {
-  if (required === 'reboot' || required === 'power_cycle') {
+  if (required === 'power_cycle') {
+    dialog.warning({
+      title: t('settings.advancedSettings.displayPage.edidPowerCycleTitle', 'Power cycle required'),
+      content: t('settings.advancedSettings.displayPage.edidPowerCycle', 'EDID saved. Disconnect and reconnect the device power to apply it. Restarting the system is insufficient.'),
+      positiveText: t('common.confirm', 'OK'),
+    })
+    return
+  }
+  if (required === 'reboot') {
     dialog.warning({
       title: t('settings.advancedSettings.displayPage.edidRebootTitle', 'Restart required'),
-      content: required === 'power_cycle'
-        ? t('settings.advancedSettings.displayPage.edidPowerCycle', 'Power-cycle the device to advertise the new EDID.')
-        : t('settings.advancedSettings.displayPage.edidReboot', 'Restart the device to advertise the new EDID to the host.'),
+      content: t('settings.advancedSettings.displayPage.edidReboot', 'Restart the device to advertise the new EDID to the host.'),
       positiveText: t('settings.advancedSettings.displayPage.edidRebootNow', 'Restart now'),
       negativeText: t('common.later', 'Later'),
       onPositiveClick: () => api.rebootSystem().catch((error: unknown) => {
@@ -303,23 +307,17 @@ async function confirmEdidApply(required: string) {
   message.success(t('settings.advancedSettings.displayPage.edidHotplug', 'Applied.'))
 }
 
-async function updateEdid(value: string | number | null) {
-  if (typeof value !== 'string' || value === edidSelection.value) return
-  const ref = parseEdidSelection(value)
-  if (!ref || !edid.value?.writable || edidDisabled.value) return
-  const previous = edidSelection.value
-  edidSelection.value = value
-  edidBusy.value = true
-  try {
-    const result = await api.applyVideoEDID({ library: ref })
-    await confirmEdidApply(result.apply_required)
-    edid.value = await api.getVideoEDID()
-  } catch (reason) {
-    edidSelection.value = previous
-    message.error(reason instanceof APIError ? reason.message : String(reason))
-  } finally {
-    edidBusy.value = false
-  }
+function confirmResetHdmi() {
+  if (!canResetHdmi.value || edidDisabled.value) return
+  forceClose()
+  dialog.warning({
+    title: t('screen.resetHdmi', 'Reset HDMI'),
+    content: t('screen.resetHdmiConfirm', 'The HDMI input signal will be detected again, which may briefly interrupt video. Continue?'),
+    positiveText: t('screen.resetHdmi', 'Reset HDMI'),
+    negativeText: t('common.cancel', 'Cancel'),
+    onPositiveClick: resetHdmi,
+    onAfterLeave: focusTrigger,
+  })
 }
 
 async function resetHdmi() {
@@ -334,7 +332,7 @@ async function resetHdmi() {
     if (!supportsHdmiReset(current) || !current.data_hex) {
       throw new Error(t('screen.resetHdmiUnavailable', 'Cannot reset HDMI with the current device settings.'))
     }
-    const result = await api.applyVideoEDID({ data_hex: current.data_hex })
+    const result = await api.applyVideoEDID({ data_hex: current.data_hex, mode: edidWriteMode(current, current.write_modes?.temporary ? 'temporary' : 'permanent') })
     if (edidRequiresRestart(result.apply_required)) {
       await confirmEdidApply(result.apply_required)
     } else {
@@ -343,6 +341,7 @@ async function resetHdmi() {
     edid.value = await api.getVideoEDID()
   } catch (reason) {
     message.error(reason instanceof Error ? reason.message : String(reason))
+    return false
   } finally {
     resettingHdmi.value = false
     edidBusy.value = false
@@ -482,6 +481,7 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
 </script>
 
 <template>
+  <span ref="trigger" class="display-settings-trigger">
   <ControlOverlay
     :show="popoverOpen"
     :sheet="sheet"
@@ -654,38 +654,22 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
         collapsible
       >
         <EdidIdentitySummary :status="edid" compact />
-        <div class="display-edid-field">
-          <span class="display-setting-label">
-            {{ t('screen.edid', 'EDID') }}
-            <DisplaySettingHelp
-              :active="popoverOpen"
-              :label="t('screen.edidHelpTitle', 'What is EDID?')"
-              :text="t('screen.edidHelp', 'EDID tells the remote computer which resolutions, refresh rates, and audio formats the display supports. The computer uses it to choose its HDMI output. Changing EDID can help with resolution and compatibility issues.')"
-            />
-          </span>
-          <n-select
-            v-bind="selectProps"
-            :consistent-menu-width="true"
-            :value="edidSelection || null"
-            :options="edidOptions"
-            filterable
-            :filter="filterEdidOption"
-            :menu-props="{ class: 'edid-preset-menu' }"
-            :virtual-scroll="false"
-            :placeholder="edidPlaceholder"
-            :disabled="edidDisabled"
-            @update:value="updateEdid"
-            @update:show="menuOpen = $event"
-          />
-        </div>
-        <p v-if="edidRestartHint" class="display-edid-hint">{{ edidRestartHint }}</p>
+        <n-button
+          class="display-edid-open"
+          :size="sheet ? 'medium' : 'small'"
+          :disabled="edidDisabled"
+          @click="openEdidModal"
+        >
+          <template #icon><Pencil :size="14" aria-hidden="true" /></template>
+          {{ t('screen.changeEdid', 'Change EDID') }}
+        </n-button>
         <n-button
           v-if="canResetHdmi"
           class="display-hdmi-reset"
           :size="sheet ? 'medium' : 'small'"
           :disabled="edidDisabled"
           :loading="resettingHdmi"
-          @click="resetHdmi"
+          @click="confirmResetHdmi"
         >
           <template #icon><RotateCcw :size="14" aria-hidden="true" /></template>
           {{ t('screen.resetHdmi', 'Reset HDMI') }}
@@ -715,18 +699,19 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
     </div>
     </template>
   </ControlOverlay>
+  </span>
+  <EdidApplyModal
+    v-model:show="edidModalOpen"
+    :status="edid"
+    :disabled="saving || resettingHdmi || !!switchingProtocol"
+    @update:busy="edidBusy = $event"
+    @applied="confirmEdidApply"
+    @after-leave="focusTrigger"
+  />
 </template>
 
 <style scoped>
-.display-status-popover .display-edid-field {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-}
-.display-status-popover .display-edid-field :deep(.n-select) {
-  width: 100%;
-  min-width: 0;
-}
+.display-settings-trigger { display: inline-flex; }
 
 .display-hdmi-reset {
   justify-self: stretch;

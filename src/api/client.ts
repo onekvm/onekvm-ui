@@ -1518,7 +1518,11 @@ export type DiagnosticsEvent =
   | { type: 'done'; id: string; name: string }
   | { type: 'error'; message: string }
 
+export type EDIDWriteMode = 'permanent' | 'temporary'
+
 export interface EDIDStatus {
+  temporary?: boolean
+  write_modes?: Record<EDIDWriteMode, boolean>
   supported: boolean
   writable?: boolean
   persistent?: boolean
@@ -1639,7 +1643,7 @@ export const api = {
       headers: webRTCSessionId ? { 'X-OneKVM-WebRTC-Session': webRTCSessionId } : undefined,
     }),
   getVideoEDID: () => request<EDIDStatus>('/api/video/edid', { cache: 'no-store' }),
-  applyVideoEDID: (body: { data_hex?: string; library?: { extension: string; directory: string; id: string }; preset?: string; custom?: string }) =>
+  applyVideoEDID: (body: { mode?: EDIDWriteMode; data_hex?: string; library?: { extension: string; directory: string; id: string }; preset?: string; custom?: string }) =>
     request<{ status: string; apply_required: EDIDApplyRequired }>('/api/video/edid', {
       method: 'PUT',
       body: JSON.stringify(body),

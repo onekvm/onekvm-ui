@@ -137,3 +137,10 @@ export function supportsHdmiReset(status: EDIDStatus | null) {
     && status.hotplug === true
     && !edidRequiresRestart(status.apply_policy)
 }
+
+// Legacy-only backends retain their existing write action. Temporary requests
+// must always remain explicit, even if capabilities disappear between reads.
+export function edidWriteMode(status: EDIDStatus | null | undefined, mode: 'permanent' | 'temporary') {
+  if (mode === 'temporary') return mode
+  return status?.write_modes?.permanent ? mode : undefined
+}

@@ -3,10 +3,11 @@ import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { computed, onMounted, ref } from 'vue'
 import { useMessage } from 'naive-ui'
 
-import { api, APIError, type EDIDApplyRequired, type EDIDStatus } from '@/api/client'
+import { api, APIError, type EDIDApplyRequired, type EDIDStatus, type EDIDWriteMode } from '@/api/client'
 import { t } from '@/i18n/runtime'
-import { edidSelectOptions, filterEdidOption, parseEdidSelection } from '@/lib/edid'
+import { edidSelectOptions, filterEdidOption, parseEdidSelection, edidWriteMode } from '@/lib/edid'
 import SettingsPanel from './SettingsPanel.vue'
+import EdidWriteModeSelect from './EdidWriteModeSelect.vue'
 import EdidIdentitySummary from './EdidIdentitySummary.vue'
 
 defineProps<{ disabled?: boolean }>()
@@ -16,6 +17,7 @@ const dialog = useAsyncDialog()
 const status = ref<EDIDStatus | null>(null)
 const busy = ref(false)
 const selection = ref('')
+const writeMode = ref<EDIDWriteMode>('permanent')
 
 const options = computed(() => edidSelectOptions(status.value, {
   factory: t('settings.advancedSettings.displayPage.edidFactory', 'Factory preset'),
@@ -24,7 +26,7 @@ const options = computed(() => edidSelectOptions(status.value, {
   custom: t('settings.advancedSettings.displayPage.edidCustomFiles', 'Custom files'),
 }))
 
-const applyPolicy = computed(() => status.value?.apply_policy || 'none')
+const applyPolicy = computed(() => writeMode.value === 'temporary' ? 'hotplug' : status.value?.apply_policy || 'none')
 const applyPolicyText = computed(() => {
   switch (applyPolicy.value) {
     case 'hotplug':
@@ -59,7 +61,7 @@ async function applySelection() {
   const { extension, directory, id } = ref
   busy.value = true
   try {
-    const result = await api.applyVideoEDID({ library: { extension, directory, id } })
+    const result = await api.applyVideoEDID({ library: { extension, directory, id }, mode: edidWriteMode(status.value, writeMode.value) })
     await confirmApply(result.apply_required)
     await reload()
   } catch (error) {
@@ -70,12 +72,18 @@ async function applySelection() {
 }
 
 async function confirmApply(required: EDIDApplyRequired) {
-  if (required === 'reboot' || required === 'power_cycle') {
+  if (required === 'power_cycle') {
+    dialog.warning({
+      title: t('settings.advancedSettings.displayPage.edidPowerCycleTitle', 'Power cycle required'),
+      content: t('settings.advancedSettings.displayPage.edidPowerCycle', 'EDID saved. Disconnect and reconnect the device power to apply it. Restarting the system is insufficient.'),
+      positiveText: t('common.confirm', 'OK'),
+    })
+    return
+  }
+  if (required === 'reboot') {
     dialog.warning({
       title: t('settings.advancedSettings.displayPage.edidRebootTitle', 'Restart required'),
-      content: required === 'power_cycle'
-        ? t('settings.advancedSettings.displayPage.edidPowerCycle', 'Power-cycle the device to advertise the new EDID.')
-        : t('settings.advancedSettings.displayPage.edidReboot', 'Restart the device to advertise the new EDID to the host.'),
+      content: t('settings.advancedSettings.displayPage.edidReboot', 'Restart the device to advertise the new EDID to the host.'),
       positiveText: t('settings.advancedSettings.displayPage.edidRebootNow', 'Restart now'),
       negativeText: t('common.later', 'Later'),
       onPositiveClick: () => api.rebootSystem().catch((error: unknown) => {
@@ -105,6 +113,7 @@ onMounted(() => {
   >
     <EdidIdentitySummary :status="status" />
     <p v-if="!status.summary" class="display-setting-field-hint">{{ t('settings.advancedSettings.displayPage.edidReadUnavailable', 'Current EDID could not be read. Presets and custom files are still available.') }}</p>
+    <EdidWriteModeSelect v-model:value="writeMode" :status="status" :disabled="disabled || busy" />
     <n-select
       v-model:value="selection"
       class="edid-preset-select"

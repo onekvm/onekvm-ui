@@ -42,6 +42,7 @@ const props = defineProps<{
   rightControlAsMeta: boolean
   trackpad?: boolean
   usbConnected?: boolean
+  connectionAnimation?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -516,7 +517,7 @@ watch(
     :style="stageStyle"
     @pointerdown="onekvm.unlockAudio()"
   >
-    <ConnectionTrace :usb-connected="Boolean(usbConnected)" :video-connected="playing" />
+    <ConnectionTrace v-if="connectionAnimation !== false" :usb-connected="Boolean(usbConnected)" :video-connected="playing" />
     <audio ref="remoteAudio" class="console-remote-audio" autoplay playsinline />
     <div class="console-viewport" :style="viewportStyle">
     <div class="console-picture" :style="pictureStyle">

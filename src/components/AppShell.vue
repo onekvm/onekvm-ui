@@ -694,6 +694,7 @@ onBeforeUnmount(() => {
           :right-control-as-meta="rightControlAsMeta"
           :trackpad="trackpadOpen"
           :usb-connected="Boolean(status?.hid.connected)"
+          :connection-animation="Boolean(status) && status?.identity?.connection_animation !== false"
           @metadata="setMetadata"
           @canvas-size="setCanvasSize"
           @fps="videoFps = $event"

@@ -15,6 +15,7 @@ const identity = {
   console_subtitle_parts: ['device_model'] as const,
   custom_console_subtitle: 'Primary rack',
   dim_windows_on_kvm_focus: true,
+  connection_animation: true,
 } satisfies PersonalizationConfig
 
 assert.equal(resolveConsoleTitle(identity, 'onekvm-107'), 'Lab KVM')

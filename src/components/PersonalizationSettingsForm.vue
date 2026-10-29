@@ -163,12 +163,21 @@ function resetIcons() {
   <div class="personalization-settings">
     <section class="personalization-section">
       <header>
-        <h2>{{ t('settings.advancedSettings.personalizationPage.windowBehavior', 'Window behavior') }}</h2>
+        <h2>{{ t('settings.advancedSettings.personalizationPage.windowBehavior', 'Interface effects') }}</h2>
       </header>
+      <div class="personalization-switch-row">
+        <label id="connection-animation-label">{{ t('settings.advancedSettings.personalizationPage.connectionAnimation', 'Bottom-left connection animation') }}</label>
+        <n-switch
+          :value="modelValue.connection_animation ?? true"
+          :disabled="disabled"
+          aria-labelledby="connection-animation-label"
+          @update:value="update({ connection_animation: $event })"
+        />
+      </div>
       <div class="personalization-switch-row">
         <div>
           <label id="dim-windows-label">{{ t('settings.advancedSettings.personalizationPage.dimWindowsOnKvmFocus', 'Translucent windows when KVM has focus') }}</label>
-          <p id="dim-windows-hint">{{ t('settings.advancedSettings.personalizationPage.dimWindowsOnKvmFocusHint', 'Set all windows to 50% opacity while controlling KVM. Focusing a window restores its opacity.') }}</p>
+          <p id="dim-windows-hint">{{ t('settings.advancedSettings.personalizationPage.dimWindowsOnKvmFocusHint', 'Set windows to 50% opacity while controlling KVM, except Performance and Virtual keyboard. Focusing a window restores its opacity.') }}</p>
         </div>
         <n-switch
           :value="modelValue.dim_windows_on_kvm_focus ?? true"

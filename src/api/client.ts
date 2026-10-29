@@ -374,6 +374,7 @@ export interface PersonalizationConfig {
   console_subtitle_parts: ConsoleSubtitlePart[]
   custom_console_subtitle: string
   dim_windows_on_kvm_focus: boolean
+  connection_animation: boolean
   message_placement?: MessagePlacement
   toolbar_icons?: ToolbarIconPreference[]
   toolbar_folders?: ToolbarFolder[]

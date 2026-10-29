@@ -5377,6 +5377,7 @@ html[data-onekvm-jelly] .host-window-frame {
 /* Native focus also covers windows teleported outside the console workspace. */
 body:has(.app-shell[data-dim-windows-on-kvm-focus="true"]):has(.console-hid-layer:focus) { --onekvm-window-opacity: 0.5; }
 :where(.host-window-frame) { opacity: var(--onekvm-window-opacity, 1); transition: opacity 140ms ease; }
+:where(.host-window-frame:is(.video-performance-overlay, .keyboard-panel)) { --onekvm-window-opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
   :where(.host-window-frame) { transition: none; }
 }

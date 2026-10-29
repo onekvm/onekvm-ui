@@ -1022,6 +1022,7 @@ async function load() {
       console_subtitle_parts: ['device_model'],
       custom_console_subtitle: '',
       dim_windows_on_kvm_focus: true,
+      connection_animation: true,
     }
     const legacyPersonalization = loadedConfig.personalization as typeof loadedConfig.personalization & {
       show_device_model?: boolean
@@ -1029,6 +1030,7 @@ async function load() {
     loadedConfig.personalization.console_subtitle_parts = normalizeConsoleSubtitleParts(legacyPersonalization)
     loadedConfig.personalization.custom_console_subtitle ??= ''
     loadedConfig.personalization.dim_windows_on_kvm_focus ??= true
+    loadedConfig.personalization.connection_animation ??= true
     loadedConfig.personalization.toolbar_icons = normalizeToolbarIcons(loadedConfig.personalization.toolbar_icons)
     delete legacyPersonalization.show_device_model
     loadedConfig.video.mjpeg ??= { frame_detect: false }

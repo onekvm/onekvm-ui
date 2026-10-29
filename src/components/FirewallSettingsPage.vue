@@ -13,6 +13,7 @@ import {
   draftFromStatus,
   draftsEqual,
   duplicateAllow,
+  duplicateServicePort,
   enableProtection,
   expandDraft,
   isAnywhere,
@@ -20,6 +21,7 @@ import {
   protocolPort,
   reorderVisible,
   saveFirewallRule,
+  saveServicePort,
   servicePortRules,
   serviceEnabled,
   setService,
@@ -80,7 +82,7 @@ const actionOptions = computed(() => [
   { value: 'allow', label: t('settings.firewall.allow', 'Allow') },
   { value: 'deny', label: t('settings.firewall.deny', 'Block') },
   { value: 'reject', label: t('settings.firewall.reject', 'Reject') },
-  { value: 'limit', label: t('settings.firewall.limit', 'Limit rate') },
+  { value: 'limit', label: t('settings.firewall.limit', 'Limit connection rate') },
 ])
 const directionOptions = computed(() => [
   { value: 'in', label: t('settings.firewall.in', 'incoming') },
@@ -206,10 +208,10 @@ function openRuleModal(simple: boolean) {
   ruleModal.value = true
 }
 
-function editRule(rule: FirewallRuleDraft) {
+function editRule(rule: FirewallRuleDraft, simple = false) {
   if (busy.value) return
   editingRuleId.value = rule.id
-  ruleModalSimple.value = false
+  ruleModalSimple.value = simple
   ruleAction.value = rule.action
   ruleDirection.value = rule.direction
   ruleProtocol.value = rule.protocol || 'any'
@@ -220,19 +222,19 @@ function editRule(rule: FirewallRuleDraft) {
   ruleModal.value = true
 }
 
-function addSimplePort() {
+function saveSimplePort() {
   const port = rulePort.value.trim()
   if (!validPort(port)) {
     message.warning(t('settings.firewall.portRequired', 'Enter a port, such as 22, 443, or 8000:8010'))
     return false
   }
-  if (duplicateAllow(draft.value?.rules ?? [], { port, protocol: ruleProtocol.value, direction: 'in', source: '' })) {
+  if (duplicateServicePort(draft.value?.rules ?? [], { port, protocol: ruleProtocol.value }, editingRuleId.value)) {
     message.warning(t('settings.firewall.duplicate', 'That port is already allowed'))
     return false
   }
   updateDraft((current) => ({
     ...current,
-    rules: saveFirewallRule(current.rules, { action: 'allow', direction: 'in', protocol: ruleProtocol.value, port, source: '', comment: ruleComment.value.trim() }, null),
+    rules: saveServicePort(current.rules, { protocol: ruleProtocol.value, port, comment: ruleComment.value.trim() }, editingRuleId.value),
   }))
   return true
 }
@@ -271,7 +273,7 @@ function saveAdvancedRule() {
 
 function submitRule() {
   if (busy.value) return
-  const added = ruleModalSimple.value ? addSimplePort() : saveAdvancedRule()
+  const added = ruleModalSimple.value ? saveSimplePort() : saveAdvancedRule()
   if (added) ruleModal.value = false
 }
 
@@ -519,6 +521,9 @@ onUnmounted(() => {
                 <strong>{{ endpoint(rule) }}</strong>
                 <small v-if="ruleDetail(rule)">{{ ruleDetail(rule) }}</small>
               </div>
+              <n-button quaternary circle :disabled="busy" :aria-label="`${t('settings.firewall.editPort', 'Edit port')}: ${endpoint(rule)}`" @click="editRule(rule, true)">
+                <template #icon><Pencil :size="15" /></template>
+              </n-button>
               <n-button quaternary circle :disabled="busy" :aria-label="t('settings.firewall.remove', 'Remove')" @click="removeRule(rule.id)">
                 <template #icon><Trash2 :size="15" /></template>
               </n-button>
@@ -624,7 +629,7 @@ onUnmounted(() => {
       :to="overlayTo"
       :z-index="4600"
       :style="{ width: 'min(480px, calc(100vw - 32px))' }"
-      :title="editingRuleId !== null ? t('settings.firewall.editRule', 'Edit rule') : ruleModalSimple ? t('settings.firewall.addPort', 'Add port') : t('settings.firewall.addRule', 'Add a rule')"
+      :title="editingRuleId !== null ? ruleModalSimple ? t('settings.firewall.editPort', 'Edit port') : t('settings.firewall.editRule', 'Edit rule') : ruleModalSimple ? t('settings.firewall.addPort', 'Add port') : t('settings.firewall.addRule', 'Add a rule')"
       :mask-closable="!busy"
       :closable="!busy"
       :close-on-esc="!busy"
@@ -633,6 +638,7 @@ onUnmounted(() => {
         <p>{{ editingRuleId !== null ? t('settings.firewall.editRuleHint', 'Changes take effect after you apply.') : ruleModalSimple ? t('settings.firewall.portOnlyHint', 'Enter a protocol and port, such as TCP/5900. An IP address is not needed.') : t('settings.firewall.addRuleHint', 'It is added to the list first. Nothing changes until you apply.') }}</p>
         <template v-if="!ruleModalSimple">
           <label>{{ t('settings.firewall.action', 'What to do') }}<n-select v-model:value="ruleAction" :options="actionOptions" /></label>
+          <p v-if="ruleAction === 'limit'">{{ t('settings.firewall.limitHint', 'Limits new connections, not bandwidth. Excess connections follow the remaining rules.') }}</p>
           <label>{{ t('settings.firewall.direction', 'Direction') }}<n-select v-model:value="ruleDirection" :options="directionOptions" /></label>
         </template>
         <label>{{ t('settings.firewall.protocol', 'Protocol') }}<n-select v-model:value="ruleProtocol" :options="protocolOptions" /></label>
@@ -651,7 +657,7 @@ onUnmounted(() => {
         <p class="firewall-preview"><span>{{ editingRuleId !== null ? t('settings.firewall.updatedRule', 'Updated rule') : t('settings.firewall.preview', 'This will add') }}</span>{{ preview }}</p>
         <div class="firewall-modal-actions">
           <n-button @click="ruleModal = false">{{ t('auth.cancel', 'Cancel') }}</n-button>
-          <n-button attr-type="submit" type="primary" :disabled="busy">{{ editingRuleId !== null ? t('settings.firewall.saveRule', 'Save rule') : t('settings.firewall.addToList', 'Add to list') }}</n-button>
+          <n-button attr-type="submit" type="primary" :disabled="busy">{{ editingRuleId !== null ? ruleModalSimple ? t('settings.firewall.savePort', 'Save port') : t('settings.firewall.saveRule', 'Save rule') : t('settings.firewall.addToList', 'Add to list') }}</n-button>
         </div>
       </form>
     </n-modal>

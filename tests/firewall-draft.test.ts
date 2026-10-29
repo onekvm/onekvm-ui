@@ -6,12 +6,14 @@ import {
   draftFromStatus,
   draftsEqual,
   duplicateAllow,
+  duplicateServicePort,
   enableProtection,
   extraRules,
   managementServices,
   protocolPort,
   reorderVisible,
   saveFirewallRule,
+  saveServicePort,
   serviceEnabled,
   servicePortRules,
   setService,
@@ -135,4 +137,28 @@ const expandedRows = [allow('22', { id: -1 }), allow('443', { id: -2 })]
 const addedRows = saveFirewallRule(expandedRows, editedValues, null)
 assert.deepEqual(addedRows.map(rule => rule.id), [-1, -2, -3])
 assert.deepEqual(saveFirewallRule(addedRows, { ...editedValues, port: '9443' }, -3).map(rule => rule.port), ['22', '443', '9443'])
+// A simple-mode port may represent several source-specific rules. Editing it
+// must update the whole group without widening its access or moving rules.
+const groupedPorts = [
+  allow('5900', { id: 1, source: '10.0.0.0/8', comment: 'VNC' }),
+  allow('5900', { id: 2, source: '192.168.1.10', comment: 'VNC' }),
+  allow('22', { id: 3 }),
+  allow('5900', { id: 4, action: 'deny' }),
+  allow('5900', { id: 5, direction: 'out' }),
+]
+assert.equal(duplicateServicePort(groupedPorts, groupedPorts[0], 1), false)
+assert.equal(duplicateServicePort(groupedPorts, { port: '22', protocol: 'any' }, 1), true)
+assert.equal(duplicateServicePort(groupedPorts, { port: '5900', protocol: 'tcp' }, null), true)
+assert.equal(duplicateServicePort(groupedPorts, { port: '22', protocol: 'udp' }, 1), false)
+const portValues = { port: '5901', protocol: 'udp', comment: 'Updated VNC' }
+const editedPorts = saveServicePort(groupedPorts, portValues, 1)
+assert.deepEqual(editedPorts.slice(0, 2), groupedPorts.slice(0, 2).map(rule => ({ ...rule, ...portValues })))
+assert.deepEqual(editedPorts.slice(2), groupedPorts.slice(2))
+assert.deepEqual(editedPorts.map(rule => rule.id), [1, 2, 3, 4, 5])
+assert.deepEqual(applyPayload(draft(editedPorts)).rules?.slice(0, 2).map(rule => rule.source), ['10.0.0.0/8', '192.168.1.10'])
+assert.equal(groupedPorts[0].port, '5900')
+assert.deepEqual(saveServicePort(groupedPorts, portValues, 99), groupedPorts)
+const editedCollapsed = { ...collapsed, rules: saveServicePort(collapsed.rules, portValues, collapsed.rules[0].id) }
+assert.deepEqual(applyPayload(editedCollapsed).rules?.slice(0, 2).map(rule => `${rule.port}@${rule.source}`), ['5901@10.0.0.0/8', '5901@192.168.1.10'])
+assert.deepEqual(saveServicePort([], portValues, null), [{ ...portValues, action: 'allow', direction: 'in', source: '', id: -1 }])
 console.log('firewall draft tests passed')

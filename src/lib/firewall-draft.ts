@@ -50,6 +50,23 @@ export function saveFirewallRule(rules: FirewallRuleDraft[], values: Omit<Firewa
   return [...rules, { ...values, id: nextId }]
 }
 
+function servicePortGroupIds(rules: FirewallRuleDraft[], id: number | null) {
+  const original = whitelistRules(rules).find(rule => rule.id === id)
+  return new Set(original ? whitelistRules(rules).filter(rule => portKey(rule) === portKey(original)).map(rule => rule.id) : [])
+}
+
+export function duplicateServicePort(rules: FirewallRuleDraft[], candidate: Pick<FirewallRuleDraft, 'port' | 'protocol'>, id: number | null) {
+  const excluded = servicePortGroupIds(rules, id)
+  return whitelistRules(rules).some(rule => !excluded.has(rule.id) && rule.port === candidate.port
+    && (rule.protocol === candidate.protocol || rule.protocol === 'any' || candidate.protocol === 'any'))
+}
+
+export function saveServicePort(rules: FirewallRuleDraft[], values: Pick<FirewallRuleDraft, 'protocol' | 'port' | 'comment'>, id: number | null) {
+  if (id === null) return saveFirewallRule(rules, { ...values, action: 'allow', direction: 'in', source: '' }, null)
+  const group = servicePortGroupIds(rules, id)
+  return rules.map(rule => group.has(rule.id) ? { ...rule, ...values } : rule)
+}
+
 export function whitelistRules(rules: FirewallRuleDraft[]) {
   return rules.filter((rule) => rule.action === 'allow' && rule.direction === 'in')
 }

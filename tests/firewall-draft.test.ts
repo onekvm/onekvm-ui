@@ -12,6 +12,8 @@ import {
   managementServices,
   protocolPort,
   reorderVisible,
+  reorderDirectionRules,
+  rulesForDirection,
   saveFirewallRule,
   saveServicePort,
   serviceEnabled,
@@ -161,4 +163,22 @@ assert.deepEqual(saveServicePort(groupedPorts, portValues, 99), groupedPorts)
 const editedCollapsed = { ...collapsed, rules: saveServicePort(collapsed.rules, portValues, collapsed.rules[0].id) }
 assert.deepEqual(applyPayload(editedCollapsed).rules?.slice(0, 2).map(rule => `${rule.port}@${rule.source}`), ['5901@10.0.0.0/8', '5901@192.168.1.10'])
 assert.deepEqual(saveServicePort([], portValues, null), [{ ...portValues, action: 'allow', direction: 'in', source: '', id: -1 }])
+// Direction lists are independent, even when the persisted rules interleave.
+const directional = [
+  allow('22', { id: 1 }),
+  allow('53', { id: 2, direction: 'out', protocol: 'udp' }),
+  allow('443', { id: 3 }),
+  allow('123', { id: 4, direction: 'out', protocol: 'udp' }),
+]
+assert.deepEqual(rulesForDirection(directional, 'in').map(rule => rule.id), [1, 3])
+assert.deepEqual(rulesForDirection(directional, 'out').map(rule => rule.id), [2, 4])
+assert.deepEqual(reorderDirectionRules(directional, 3, 1).map(rule => rule.id), [3, 2, 1, 4])
+assert.deepEqual(reorderDirectionRules(directional, 4, 2).map(rule => rule.id), [1, 4, 3, 2])
+assert.equal(reorderDirectionRules(directional, 1, 2), directional)
+assert.equal(reorderDirectionRules(directional, 1, 99), directional)
+assert.deepEqual(directional.map(rule => rule.id), [1, 2, 3, 4])
+const movedDirection = saveFirewallRule(directional, { ...directional[0], direction: 'out' }, 1)
+assert.deepEqual(rulesForDirection(movedDirection, 'in').map(rule => rule.id), [3])
+assert.deepEqual(rulesForDirection(movedDirection, 'out').map(rule => rule.id), [1, 2, 4])
+assert.deepEqual(applyPayload(draft(reorderDirectionRules(directional, 4, 2))).rules?.map(rule => `${rule.direction}/${rule.port}`), ['in/22', 'out/123', 'in/443', 'out/53'])
 console.log('firewall draft tests passed')

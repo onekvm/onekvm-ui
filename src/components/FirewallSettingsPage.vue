@@ -5,6 +5,7 @@ import { NButtonGroup, useMessage } from 'naive-ui'
 
 import { api, type ExtensionSummary, type FirewallStatus } from '@/api/client'
 import FirewallInstallCard from './FirewallInstallCard.vue'
+import FirewallRuleSection from './FirewallRuleSection.vue'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { t } from '@/i18n/runtime'
 import {
@@ -20,12 +21,15 @@ import {
   managementServices,
   protocolPort,
   reorderVisible,
+  reorderDirectionRules,
+  rulesForDirection,
   saveFirewallRule,
   saveServicePort,
   servicePortRules,
   serviceEnabled,
   setService,
   type FirewallDraft,
+  type FirewallDirection,
   type FirewallRuleDraft,
   type ServiceDef,
 } from '@/lib/firewall-draft'
@@ -71,6 +75,10 @@ const pending = computed(() => Boolean(status.value?.confirmation?.pending))
 const seconds = computed(() => pending.value ? Math.max(0, Math.ceil((expiresAt.value - now.value) / 1000)) : 0)
 const busy = computed(() => saving.value || pending.value)
 const servicePortsList = computed(() => draft.value ? servicePortRules(draft.value.rules) : [])
+const directionSections = computed(() => ([
+  { direction: 'in', policyKey: 'defaultIncoming' },
+  { direction: 'out', policyKey: 'defaultOutgoing' },
+] as const).map(section => ({ ...section, rules: rulesForDirection(draft.value?.rules ?? [], section.direction) })))
 const summary = computed(() => {
   if (!draft.value) return ''
   if (!draft.value.enabled) return t('settings.firewall.openHint', 'The firewall is off, so every incoming connection is accepted. The choices below take effect after you turn it on.')
@@ -111,16 +119,11 @@ function sentence(rule: FirewallRuleDraft) {
     .replace('{source}', isAnywhere(rule.source) ? t('settings.firewall.anywhere', 'Anywhere') : rule.source)
 }
 
-function ruleDetail(rule: FirewallRuleDraft, advanced = false) {
+function ruleDetail(rule: FirewallRuleDraft) {
   const parts: string[] = []
-  if (advanced) parts.push(t(rule.direction === 'out' ? 'settings.firewall.out' : 'settings.firewall.in', rule.direction))
   if (!isAnywhere(rule.source)) parts.push(rule.source)
   if (rule.comment) parts.push(rule.comment)
   return parts.join(' · ')
-}
-
-function actionType(action: string) {
-  return ({ allow: 'success', deny: 'error', reject: 'warning', limit: 'info' } as const)[action as 'allow' | 'deny' | 'reject' | 'limit'] ?? 'default'
 }
 
 function serviceById(id: ServiceDef['id']) {
@@ -194,12 +197,12 @@ function validPort(port: string) {
   return /^[0-9]{1,5}(?::[0-9]{1,5})?$/.test(port.trim())
 }
 
-function openRuleModal(simple: boolean) {
+function openRuleModal(simple: boolean, direction: FirewallDirection = 'in') {
   if (busy.value) return
   editingRuleId.value = null
   ruleModalSimple.value = simple
   ruleAction.value = 'allow'
-  ruleDirection.value = 'in'
+  ruleDirection.value = direction
   ruleProtocol.value = 'tcp'
   rulePort.value = ''
   ruleSourceMode.value = 'any'
@@ -321,6 +324,10 @@ function visibleRuleIds() {
 
 function reorder(fromId: number, toId: number) {
   updateDraft((current) => ({ ...current, rules: reorderVisible(current.rules, visibleRuleIds(), fromId, toId) }))
+}
+
+function reorderAdvanced(fromId: number, toId: number) {
+  updateDraft(current => ({ ...current, rules: reorderDirectionRules(current.rules, fromId, toId) }))
 }
 
 function startDrag(event: PointerEvent, id: number) {
@@ -555,41 +562,24 @@ onUnmounted(() => {
           </ul>
         </section>
 
-        <section v-if="mode === 'advanced'" class="firewall-card">
-          <header class="firewall-card-heading">
-            <div>
-              <h2>{{ t('settings.firewall.rules', 'Rules') }}</h2>
-              <p>{{ t('settings.firewall.orderHint', 'Rules higher in the list match first. Drag the handle to change the order. Nothing changes until you apply.') }}</p>
-            </div>
-            <n-button :disabled="busy" @click="openRuleModal(false)">
-              <template #icon><Plus :size="15" /></template>
-              {{ t('settings.firewall.addRule', 'Add a rule') }}
-            </n-button>
-          </header>
-          <p v-if="!draft.rules.length" class="firewall-empty">{{ t('settings.firewall.noRules', 'No rules yet.') }}</p>
-          <TransitionGroup v-else tag="ul" name="firewall-rule" class="firewall-list">
-            <li v-for="rule in draft.rules" :key="rule.id" class="firewall-rule" :class="{ 'is-dragging': dragId === rule.id, 'is-over': overId === rule.id && dragId !== rule.id }" :data-rule-id="rule.id">
-              <button type="button" class="firewall-drag" :disabled="busy" :aria-label="t('settings.firewall.drag', 'Drag to reorder')" @pointerdown="startDrag($event, rule.id)" @pointermove="moveDrag" @pointerup="endDrag" @pointercancel="endDrag">
-                <GripVertical :size="16" />
-              </button>
-              <div class="firewall-rule-main">
-                <div class="firewall-rule-title">
-                  <n-tag size="small" :type="actionType(rule.action)" :bordered="false">{{ t(`settings.firewall.${rule.action}`, rule.action) }}</n-tag>
-                  <strong>{{ endpoint(rule) }}</strong>
-                </div>
-                <small>{{ ruleDetail(rule, true) }}</small>
-              </div>
-              <n-button quaternary circle :disabled="busy" :aria-label="`${t('settings.firewall.editRule', 'Edit rule')}: ${endpoint(rule)}`" @click="editRule(rule)">
-                <template #icon><Pencil :size="15" /></template>
-              </n-button>
-              <n-button quaternary circle :disabled="busy" :aria-label="t('settings.firewall.remove', 'Remove')" @click="removeRule(rule.id)">
-                <template #icon><Trash2 :size="15" /></template>
-              </n-button>
-            </li>
-          </TransitionGroup>
-        </section>
+        <template v-if="mode === 'advanced'">
+          <p class="firewall-order-hint">{{ t('settings.firewall.orderHint', 'Rules higher in the list match first. Drag the handle to change the order. Nothing changes until you apply.') }}</p>
+          <FirewallRuleSection
+            v-for="section in directionSections"
+            :key="section.direction"
+            :direction="section.direction"
+            :rules="section.rules"
+            :policy="draft[section.policyKey]"
+            :busy="busy"
+            @add="openRuleModal(false, section.direction)"
+            @edit="editRule($event)"
+            @remove="removeRule"
+            @reorder="reorderAdvanced"
+            @update:policy="(value: string) => updateDraft(current => ({ ...current, [section.policyKey]: value }))"
+          />
+        </template>
 
-        <section class="firewall-card">
+        <section v-if="mode === 'simple'" class="firewall-card">
           <header>
             <h2>{{ t('settings.firewall.defaultsTitle', 'Default rules') }}</h2>
             <p>{{ t('settings.firewall.defaultsHint', 'Connections that match none of the ports above are handled here.') }}</p>
@@ -711,6 +701,7 @@ onUnmounted(() => {
 <style scoped>
 .firewall-page { display: grid; gap: 16px; container-type: inline-size; }
 .firewall-toolbar { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.firewall-order-hint { margin: 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
 .firewall-toolbar p { margin: 0; color: var(--muted-foreground); line-height: 1.5; }
 .firewall-toolbar-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .firewall-stack { display: grid; gap: 16px; }
@@ -727,7 +718,6 @@ onUnmounted(() => {
 .firewall-list strong { font-size: 13px; }
 .firewall-rule-main { flex: 1; min-width: 0; }
 .firewall-rule-main small { overflow-wrap: anywhere; }
-.firewall-rule-title { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
 .firewall-rule { transition: opacity 160ms ease, background-color 160ms ease; }
 .firewall-rule-move { transition: transform 200ms ease, opacity 160ms ease, background-color 160ms ease; }
 .firewall-rule.is-dragging { opacity: 0.45; }

@@ -10,6 +10,20 @@ export interface FirewallRuleDraft {
   comment: string
 }
 
+export type FirewallDirection = 'in' | 'out'
+
+export function rulesForDirection(rules: FirewallRuleDraft[], direction: FirewallDirection) {
+  return rules.filter(rule => rule.direction === direction)
+}
+
+export function reorderDirectionRules(rules: FirewallRuleDraft[], fromId: number, toId: number) {
+  const from = rules.find(rule => rule.id === fromId)
+  const to = rules.find(rule => rule.id === toId)
+  if (!from || !to || from.direction !== to.direction || !['in', 'out'].includes(from.direction)) return rules
+  const ids = rulesForDirection(rules, from.direction as FirewallDirection).map(rule => rule.id)
+  return reorderVisible(rules, ids, fromId, toId)
+}
+
 export interface FirewallDraft {
   enabled: boolean
   defaultIncoming: string

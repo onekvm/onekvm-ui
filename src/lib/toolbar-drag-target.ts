@@ -4,23 +4,26 @@ export interface ToolbarSlotRect {
   top: number
   bottom: number
 }
+export type ToolbarDragLayout = 'horizontal' | 'vertical' | 'grid'
 
 // Gaps and surface padding belong to the nearest slot edge, not to the end
 // of the toolbar. Use the original rectangles so animated icons cannot move
 // the drop target out from under a stationary pointer.
-export function toolbarSlotAt(rects: readonly ToolbarSlotRect[], x: number, y: number, vertical = false): number {
-  const point = vertical ? y : x
+export function toolbarSlotAt(rects: readonly ToolbarSlotRect[], x: number, y: number, layout: ToolbarDragLayout = 'horizontal'): number {
   let nearest = -1
   let distance = Infinity
-  let nearestStart = Infinity
+  let row = Infinity
+  let column = Infinity
   for (const [index, rect] of rects.entries()) {
-    const start = vertical ? rect.top : rect.left
-    const end = vertical ? rect.bottom : rect.right
-    const next = Math.max(start - point, point - end, 0)
-    if (next < distance || (next === distance && start < nearestStart)) {
+    const dx = Math.max(rect.left - x, x - rect.right, 0)
+    const dy = Math.max(rect.top - y, y - rect.bottom, 0)
+    const next = layout === 'grid' ? dx * dx + dy * dy : layout === 'vertical' ? dy : dx
+    const start = layout === 'horizontal' ? rect.left : rect.top
+    if (next < distance || (next === distance && (start < row || (start === row && rect.left < column)))) {
       nearest = index
       distance = next
-      nearestStart = start
+      row = start
+      column = rect.left
     }
   }
   return nearest

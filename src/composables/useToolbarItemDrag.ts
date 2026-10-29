@@ -85,8 +85,9 @@ export function useToolbarItemDrag(options: {
     const hit = document.elementFromPoint(event.clientX, event.clientY)
     const surface = hit?.closest<HTMLElement>('[data-toolbar-surface]')
     const folderList = hit?.closest<HTMLElement>('[data-toolbar-folder-list]')
-    const vertical = Boolean(folderList) || options.vertical()
-    const item = surface ? preview.hit(surface, event.clientX, event.clientY, vertical) : null
+    const direction = surface ? preview.direction(surface, Boolean(folderList) || options.vertical()) : 'horizontal'
+    const vertical = direction === 'vertical'
+    const item = surface ? preview.hit(surface, event.clientX, event.clientY, direction) : null
     clearMarker()
     active.target = null
     let folder = ''

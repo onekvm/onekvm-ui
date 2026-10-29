@@ -6049,7 +6049,12 @@ body:has(.toolbar:is(.has-context-menu, .is-item-dragging)) .n-tooltip { visibil
 .toolbar.is-item-dragging [data-toolbar-item] { cursor: grabbing; }
 .toolbar-tray.is-centered .toolbar-layout { display: flex; flex-direction: column; align-items: stretch; overflow: visible; width: 100%; max-width: none; gap: 0; }
 .toolbar-tray.is-centered .toolbar-layout .toolbar-icon-slot { width: 100%; }
-.toolbar.is-vertical .toolbar-layout { flex-direction: column; flex: 1 1 auto; width: 100%; overflow-x: hidden; overflow-y: auto; }
+.toolbar.is-vertical .toolbar-layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; align-items: center; justify-items: center; flex: 0 1 auto; min-height: 0; width: 100%; overflow-x: hidden; overflow-y: auto; }
 .toolbar.is-vertical .toolbar-layout .toolbar-icon-slot { width: 100%; justify-content: center; }
+.toolbar.is-vertical .toolbar-layout .toolbar-separator,
+.toolbar.is-vertical .toolbar-layout [data-toolbar-item="account"] { grid-column: 1 / -1; }
+.toolbar.is-vertical .toolbar-layout .toolbar-separator::before { width: 100%; }
+.toolbar.is-vertical .toolbar-layout .toolbar-account { padding-top: 0; }
+.toolbar.is-vertical .toolbar-layout.has-text-labels { grid-template-columns: minmax(0, 1fr); }
 .toolbar.is-vertical .toolbar-layout.has-text-labels .n-button { width: 100% !important; max-width: 100%; }
 .toolbar.is-vertical .toolbar-layout.has-text-labels:is([data-toolbar-label-position="left"], [data-toolbar-label-position="right"]) .n-button { justify-content: flex-start; height: 36px !important; }

@@ -1,4 +1,5 @@
 import { nextTick, onBeforeUnmount } from 'vue'
+import { toolbarSlotAt } from '@/lib/toolbar-drag-target'
 
 // Keep hit testing in the original slots while sibling icons slide aside.
 // Translating slots avoids changing persisted/Vue state during the gesture.
@@ -13,16 +14,21 @@ export function useToolbarItemPreview() {
     originals.clear()
   }
   function bounds(element: HTMLElement) { return originals.get(element)?.rect ?? element.getBoundingClientRect() }
-  function hit(x: number, y: number) {
-    return [...originals].find(([, { rect }]) => x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom)?.[0]
-  }
-  function preview(source: HTMLElement, surface: HTMLElement | null, before?: string, vertical = false) {
-    if (!surface || source.closest('[data-toolbar-surface]') !== surface) { clear(); return }
+  function slots(surface: HTMLElement) {
     const elements = [...surface.querySelectorAll<HTMLElement>('[data-toolbar-item]')]
       .filter(element => element.closest('[data-toolbar-surface]') === surface && element.getClientRects().length && !element.closest('.toolbar-item-drag-ghost'))
     for (const element of elements) {
       if (!originals.has(element)) originals.set(element, { rect: element.getBoundingClientRect(), translate: element.style.translate })
     }
+    return elements
+  }
+  function hit(surface: HTMLElement, x: number, y: number, vertical: boolean) {
+    const elements = slots(surface)
+    return elements[toolbarSlotAt(elements.map(bounds), x, y, vertical)]
+  }
+  function preview(source: HTMLElement, surface: HTMLElement | null, before?: string, vertical = false) {
+    if (!surface || source.closest('[data-toolbar-surface]') !== surface) { clear(); return }
+    const elements = slots(surface)
     vertical ||= surface.hasAttribute('data-toolbar-folder-list')
     elements.sort((a, b) => vertical ? bounds(a).top - bounds(b).top : bounds(a).left - bounds(b).left)
     const from = elements.indexOf(source)

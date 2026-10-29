@@ -83,8 +83,10 @@ export function useToolbarItemDrag(options: {
     }
     active.ghost.style.transform = `translate(${event.clientX - active.x}px, ${event.clientY - active.y}px)`
     const hit = document.elementFromPoint(event.clientX, event.clientY)
-    const item = preview.hit(event.clientX, event.clientY) ?? hit?.closest<HTMLElement>('[data-toolbar-item]')
+    const surface = hit?.closest<HTMLElement>('[data-toolbar-surface]')
     const folderList = hit?.closest<HTMLElement>('[data-toolbar-folder-list]')
+    const vertical = Boolean(folderList) || options.vertical()
+    const item = surface ? preview.hit(surface, event.clientX, event.clientY, vertical) : null
     clearMarker()
     active.target = null
     let folder = ''
@@ -92,13 +94,13 @@ export function useToolbarItemDrag(options: {
     if (item && item !== active.source) {
       const id = item.dataset.toolbarItem!
       const rect = preview.bounds(item)
-      const vertical = Boolean(folderList) || options.vertical()
       const ratio = vertical ? (event.clientY - rect.top) / rect.height : (event.clientX - rect.left) / rect.width
-      if (id.startsWith('folder:') && isToolbarItem(active.id) && active.id !== 'settings' && ratio > .25 && ratio < .75) {
+      const inside = event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom
+      if (inside && id.startsWith('folder:') && isToolbarItem(active.id) && active.id !== 'settings' && ratio > .25 && ratio < .75) {
         folder = id.slice(7)
         active.target = { folder }
         mode = 'into'
-      } else if (!folderList && isToolbarItem(id) && id !== 'settings' && isToolbarItem(active.id) && active.id !== 'settings' && ratio > .3 && ratio < .7 && options.canCreateFolder()) {
+      } else if (inside && !folderList && isToolbarItem(id) && id !== 'settings' && isToolbarItem(active.id) && active.id !== 'settings' && ratio > .3 && ratio < .7 && options.canCreateFolder()) {
         active.target = { merge: id }
         mode = 'merge'
       } else {
@@ -115,10 +117,6 @@ export function useToolbarItemDrag(options: {
       active.target = { folder: folderList.dataset.toolbarFolderList }
       marker = folderList
       mode = 'into'
-    } else if (!item && hit?.closest('.toolbar-layout')) {
-      active.target = {}
-      marker = hit.closest<HTMLElement>('.toolbar-layout')
-      mode = 'after'
     }
     if (marker) { marker.classList.add('is-toolbar-drop-target'); marker.dataset.toolbarDropMode = mode }
     if (active.target && mode !== 'into' && mode !== 'merge') {

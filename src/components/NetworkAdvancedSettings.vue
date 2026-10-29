@@ -91,7 +91,7 @@ const panelId = useId()
 .network-advanced-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; border-radius: 4px; }
 .network-advanced-arrow { flex-shrink: 0; transition: transform 220ms cubic-bezier(0.23, 1, 0.32, 1); }
 .network-advanced-arrow.is-expanded { transform: rotate(90deg); }
-.network-advanced-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; padding-top: 16px; }
+.network-advanced-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 8px 12px; padding-top: 16px; }
 .network-advanced-mac { grid-column: 1 / -1; }
 .network-advanced-fields :deep(.n-input-number) { width: 100%; }
 @media (max-width: 760px) {

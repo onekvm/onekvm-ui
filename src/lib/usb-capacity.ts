@@ -12,7 +12,7 @@ export type USBGadget = NonNullable<OneKVMStatus['hid']>['gadget']
 export type USBFunctionOverrides = Partial<Record<'audio' | 'microphone' | 'gamepad' | 'keyboardOut' | 'storage' | 'mtp' | 'network', boolean>>
 
 export function usbSpeakerEnabled(audio: { enabled: boolean; source?: 'usb' | 'hdmi' }) {
-  return audio.enabled && (audio.source || 'usb') === 'usb'
+  return audio.enabled
 }
 
 export function usbEndpointUse(usb: USBConfig, audio: OneKVMConfig['audio'], gadget?: USBGadget, overrides: USBFunctionOverrides = {}) {

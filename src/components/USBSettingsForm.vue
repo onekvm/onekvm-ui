@@ -60,9 +60,7 @@ const speakerOn = computed({
   get: () => Boolean(audio.value.enabled),
   set: (value: boolean) => { audio.value = { ...audio.value, enabled: value } },
 })
-const speakerBlocked = computed(() => !audio.value.enabled && (audio.value.source || 'usb') === 'usb'
-  && !wouldFit({ audio: true }))
-const speakerShowsCapacity = computed(() => (audio.value.source || 'usb') === 'usb')
+const speakerBlocked = computed(() => !audio.value.enabled && !wouldFit({ audio: true }))
 const microphoneOn = computed({
   get: () => Boolean(audio.value.microphone),
   set: (value: boolean) => { audio.value = { ...audio.value, microphone: value } },
@@ -217,7 +215,7 @@ const remoteWakeup = computed({
             <small>{{ t('settings.advancedSettings.usbPage.speakerHint', 'The controlled device sees OneKVM as a speaker. If this device also supports HDMI audio, turning this off leaves audio available.') }}</small>
           </div>
           <div class="usb-function-controls">
-            <USBCapacityBadge v-if="speakerShowsCapacity" :endpoints="endpointCosts.audio" />
+            <USBCapacityBadge :endpoints="endpointCosts.audio" />
             <n-tooltip :disabled="!speakerBlocked" placement="left">
               <template #trigger>
                 <span class="usb-function-switch">

@@ -114,7 +114,7 @@ onBeforeUnmount(() => {
     :close-on-esc="false"
     :auto-focus="false"
   >
-    <p>{{ t('settings.uiUpdate.description', 'A newer web interface is installed. Reload before continuing to avoid mixing old and new UI resources.') }}</p>
+    <p>{{ t('settings.uiUpdate.description', 'The web interface was updated. Reload before continuing.') }}</p>
     <template #footer>
       <n-button type="primary" block @click="reloadLatestUI">
         <template #icon><RefreshCw /></template>

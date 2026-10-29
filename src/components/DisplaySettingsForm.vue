@@ -181,7 +181,6 @@ function setBitrateBudget(value: number) {
   <n-form label-placement="top" :show-feedback="false" class="display-settings-form">
     <SettingsPanel
       :title="t('settings.advancedSettings.displayPage.outputGroup', 'Video output')"
-      :description="t('settings.advancedSettings.displayPage.outputGroupHint', 'Format, resolution, and frame rate sent to viewers.')"
     >
       <div class="display-settings-fields display-output-fields">
         <n-form-item :label="t('screen.codec', 'Codec')">
@@ -204,7 +203,6 @@ function setBitrateBudget(value: number) {
 
     <SettingsPanel
       :title="t('settings.advancedSettings.displayPage.encodingGroup', 'Quality and bandwidth')"
-      :description="t('settings.advancedSettings.displayPage.encodingGroupHint', 'Balance picture detail and bandwidth use.')"
     >
       <div class="display-settings-fields">
         <n-form-item>

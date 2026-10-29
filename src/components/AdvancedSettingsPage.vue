@@ -1878,7 +1878,7 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
             <n-spin class="advanced-settings-content" :show="loading || systemDetailsLoading">
               <section v-if="paneSection === 'display' && config" class="advanced-settings-section">
                 <n-alert v-if="!canEditVideo" type="info" :bordered="false">
-                  {{ t('settings.advancedSettings.displaySecondary', 'Video settings are controlled by the primary WebRTC client. This client shares its stream.') }}
+                  {{ t('settings.advancedSettings.displaySecondary', 'Another connection controls the video settings. They cannot be changed here.') }}
                 </n-alert>
                 <DisplaySettingsForm
                   v-model="config.video"

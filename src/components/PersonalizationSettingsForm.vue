@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
+import { NMessageProvider } from 'naive-ui'
 import {
   Activity,
   ChevronDown,
@@ -31,7 +32,9 @@ import {
 } from '@/lib/console-title'
 import { USB_GAMEPAD_UI_ENABLED } from '@/lib/ui-features'
 import { useToolbarIconDrag } from '@/composables/useToolbarIconDrag'
+import { useOverlayMount } from '@/composables/useOverlayMount'
 import MessagePlacementPicker from './MessagePlacementPicker.vue'
+import MessagePlacementTestButton from './MessagePlacementTestButton.vue'
 import {
   defaultToolbarIcons,
   isDeviceToolbarIcon,
@@ -54,21 +57,20 @@ const emit = defineEmits<{
   validity: [valid: boolean]
 }>()
 
+const overlayTo = useOverlayMount()
+
 const sources = computed(() => [
   {
     value: 'device_name' as const,
     label: t('settings.advancedSettings.personalizationPage.deviceNameSource', 'Device name'),
-    description: t('settings.advancedSettings.personalizationPage.deviceNameSourceHint', 'Use the friendly name saved on this device.'),
   },
   {
     value: 'hostname' as const,
     label: t('settings.advancedSettings.personalizationPage.hostnameSource', 'Hostname'),
-    description: t('settings.advancedSettings.personalizationPage.hostnameSourceHint', 'Use the network hostname shown below.'),
   },
   {
     value: 'custom' as const,
     label: t('settings.advancedSettings.personalizationPage.customSource', 'Custom'),
-    description: t('settings.advancedSettings.personalizationPage.customSourceHint', 'Use a separate title only for the console.'),
   },
 ])
 
@@ -76,17 +78,14 @@ const subtitleOptions = computed(() => [
   {
     value: 'hostname' as const,
     label: t('settings.advancedSettings.personalizationPage.subtitleHostname', 'Hostname'),
-    description: t('settings.advancedSettings.personalizationPage.subtitleHostnameHint', 'Show the current network hostname.'),
   },
   {
     value: 'device_model' as const,
     label: t('settings.advancedSettings.personalizationPage.subtitleDeviceModel', 'Device model'),
-    description: t('settings.advancedSettings.personalizationPage.subtitleDeviceModelHint', 'Show the detected device model.'),
   },
   {
     value: 'custom' as const,
     label: t('settings.advancedSettings.personalizationPage.subtitleCustom', 'Custom'),
-    description: t('settings.advancedSettings.personalizationPage.subtitleCustomHint', 'Append your own short description.'),
   },
 ])
 
@@ -229,9 +228,14 @@ function resetIcons() {
     </section>
 
     <section class="personalization-section">
-      <header>
-        <h2>{{ t('settings.advancedSettings.personalizationPage.toastMessages') }}</h2>
-        <p id="message-placement-hint">{{ t('settings.advancedSettings.personalizationPage.messagePlacementHint') }}</p>
+      <header class="personalization-section-heading">
+        <div>
+          <h2>{{ t('settings.advancedSettings.personalizationPage.toastMessages') }}</h2>
+          <p id="message-placement-hint">{{ t('settings.advancedSettings.personalizationPage.messagePlacementHint') }}</p>
+        </div>
+        <NMessageProvider :placement="modelValue.message_placement ?? 'bottom-right'" :to="overlayTo" :max="1">
+          <MessagePlacementTestButton :disabled="disabled" />
+        </NMessageProvider>
       </header>
       <MessagePlacementPicker
         :model-value="modelValue.message_placement ?? 'bottom-right'"
@@ -241,7 +245,7 @@ function resetIcons() {
     </section>
 
     <section class="personalization-section">
-      <header class="personalization-icon-heading">
+      <header class="personalization-section-heading">
         <div>
           <h2>{{ t('settings.advancedSettings.personalizationPage.toolbarIcons', 'Toolbar icons') }}</h2>
           <p>{{ t('settings.advancedSettings.personalizationPage.toolbarIconsHint', 'Drag to reorder the default icons. Turn one off to move it into the collection menu, where it remains available. Settings stays visible.') }}</p>
@@ -301,7 +305,6 @@ function resetIcons() {
           </TransitionGroup>
         </div>
       </div>
-      <p class="personalization-subtitle-hidden">{{ t('settings.advancedSettings.personalizationPage.settingsPinned', 'Settings stays visible so this page can be opened again.') }}</p>
     </section>
 
     <section class="personalization-section">
@@ -351,7 +354,6 @@ function resetIcons() {
           <n-radio :value="source.value" />
           <span>
             <strong>{{ source.label }}</strong>
-            <small>{{ source.description }}</small>
           </span>
         </label>
       </n-radio-group>
@@ -399,7 +401,6 @@ function resetIcons() {
           :class="{ active: subtitleParts.includes(option.value) }"
         >
           <strong>{{ option.label }}</strong>
-          <small>{{ option.description }}</small>
         </n-checkbox>
       </n-checkbox-group>
 
@@ -484,19 +485,17 @@ function resetIcons() {
 .personalization-reference dt { color: var(--muted-foreground); font-size: 12px; }
 .personalization-reference dd { min-width: 0; margin: 0; overflow: hidden; color: var(--foreground); font-family: var(--onekvm-font-mono); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .personalization-source-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.personalization-source { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 10px; min-height: 76px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); cursor: pointer; transition: border-color var(--win11-fast), background-color var(--win11-fast); }
+.personalization-source { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; min-height: 44px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); cursor: pointer; transition: border-color var(--win11-fast), background-color var(--win11-fast); }
 .personalization-source:hover { border-color: var(--border-strong); background: var(--secondary); }
 .personalization-source.active { border-color: color-mix(in srgb, var(--primary) 60%, var(--border)); background: color-mix(in srgb, var(--primary) 8%, var(--card)); }
 .personalization-source:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .personalization-source.n-checkbox--disabled { cursor: not-allowed; }
 .personalization-source :deep(.n-checkbox__label) { min-width: 0; padding: 0; }
-.personalization-source strong, .personalization-source small { display: block; }
-.personalization-source strong { color: var(--foreground); font-size: 13px; line-height: 1.35; }
-.personalization-source small { margin-top: 4px; color: var(--muted-foreground); font-size: 11px; line-height: 1.45; }
+.personalization-source strong { display: block; color: var(--foreground); font-size: 13px; line-height: 1.35; }
 .personalization-custom-form { padding-top: 14px; }
 .personalization-subtitle-hidden { margin: -2px 0 0; color: var(--muted-foreground); font-size: 11px; line-height: 1.45; }
-.personalization-icon-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.personalization-icon-heading .n-button { flex: 0 0 auto; }
+.personalization-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.personalization-section-heading .n-button { flex: 0 0 auto; }
 .personalization-icon-groups { display: grid; gap: 16px; }
 .personalization-icon-group { display: grid; gap: 8px; }
 .personalization-icon-group h3 { margin: 0; color: var(--muted-foreground); font-size: 11px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; }

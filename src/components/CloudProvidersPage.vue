@@ -201,7 +201,6 @@ async function stopService(service: CloudServiceEntry) {
         <header>
           <div>
             <h3>{{ t('settings.cloudProviders.otherTitle', 'Other providers') }}</h3>
-            <p>{{ t('settings.cloudProviders.otherDescription', 'Cloud service plugins available from the Plugin Marketplace and local installations.') }}</p>
           </div>
           <n-tag size="small" :bordered="false">{{ otherServices.length }}</n-tag>
         </header>

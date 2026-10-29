@@ -704,7 +704,7 @@ watch(() => props.active, (active) => {
             <span class="installer-hero-icon"><FileUp :size="31" /></span>
             <div>
               <strong>{{ t('settings.plugins.choosePackageTitle', 'Choose a plugin package') }}</strong>
-              <p>{{ t('settings.plugins.choosePackageDescription', 'Upload a signed OneKVM IPK or IPKS package to inspect it before installation.') }}</p>
+              <p>{{ t('settings.plugins.choosePackageDescription', 'Select a signed OneKVM IPK or IPKS package.') }}</p>
             </div>
           </div>
           <n-alert v-if="installError" type="error" :show-icon="false">{{ installError }}</n-alert>

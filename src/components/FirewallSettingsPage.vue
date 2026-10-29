@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { GripVertical, Plus, Trash2 } from '@/icons'
-import { useMessage } from 'naive-ui'
+import { NButtonGroup, useMessage } from 'naive-ui'
 
 import { api, type ExtensionSummary, type FirewallStatus } from '@/api/client'
 import FirewallInstallCard from './FirewallInstallCard.vue'
@@ -445,8 +445,8 @@ onUnmounted(() => {
       <div class="firewall-toolbar-actions">
         <n-tag :type="draft.enabled ? 'success' : 'default'" round>{{ draft.enabled ? t('settings.firewall.active', 'On') : t('settings.firewall.inactive', 'Off') }}</n-tag>
         <n-button-group>
-          <n-button :type="mode === 'simple' ? 'primary' : 'default'" @click="setMode('simple')">{{ t('settings.firewall.simple', 'Simple') }}</n-button>
-          <n-button :type="mode === 'advanced' ? 'primary' : 'default'" @click="setMode('advanced')">{{ t('settings.firewall.advanced', 'Advanced') }}</n-button>
+          <n-button :type="mode === 'simple' ? 'primary' : 'default'" :aria-pressed="mode === 'simple'" @click="setMode('simple')">{{ t('settings.firewall.simple', 'Simple') }}</n-button>
+          <n-button :type="mode === 'advanced' ? 'primary' : 'default'" :aria-pressed="mode === 'advanced'" @click="setMode('advanced')">{{ t('settings.firewall.advanced', 'Advanced') }}</n-button>
         </n-button-group>
       </div>
     </div>
@@ -492,7 +492,7 @@ onUnmounted(() => {
             </n-button>
           </header>
           <p v-if="!servicePortsList.length" class="firewall-empty">{{ t('settings.firewall.servicePortsEmpty', 'No ports are allowed yet. Turn on Web or SSH above, or add a port.') }}</p>
-          <ul v-else class="firewall-list">
+          <TransitionGroup v-else tag="ul" name="firewall-rule" class="firewall-list">
             <li v-for="rule in servicePortsList" :key="rule.id" class="firewall-rule" :class="{ 'is-dragging': dragId === rule.id, 'is-over': overId === rule.id && dragId !== rule.id }" :data-rule-id="rule.id">
               <button type="button" class="firewall-drag" :disabled="busy" :aria-label="t('settings.firewall.drag', 'Drag to reorder')" @pointerdown="startDrag($event, rule.id)" @pointermove="moveDrag" @pointerup="endDrag" @pointercancel="endDrag">
                 <GripVertical :size="16" />
@@ -505,7 +505,7 @@ onUnmounted(() => {
                 <template #icon><Trash2 :size="15" /></template>
               </n-button>
             </li>
-          </ul>
+          </TransitionGroup>
         </section>
 
         <section v-if="mode === 'simple'" class="firewall-card">
@@ -544,7 +544,7 @@ onUnmounted(() => {
             </n-button>
           </header>
           <p v-if="!draft.rules.length" class="firewall-empty">{{ t('settings.firewall.noRules', 'No rules yet.') }}</p>
-          <ul v-else class="firewall-list">
+          <TransitionGroup v-else tag="ul" name="firewall-rule" class="firewall-list">
             <li v-for="rule in draft.rules" :key="rule.id" class="firewall-rule" :class="{ 'is-dragging': dragId === rule.id, 'is-over': overId === rule.id && dragId !== rule.id }" :data-rule-id="rule.id">
               <button type="button" class="firewall-drag" :disabled="busy" :aria-label="t('settings.firewall.drag', 'Drag to reorder')" @pointerdown="startDrag($event, rule.id)" @pointermove="moveDrag" @pointerup="endDrag" @pointercancel="endDrag">
                 <GripVertical :size="16" />
@@ -557,7 +557,7 @@ onUnmounted(() => {
                 <template #icon><Trash2 :size="15" /></template>
               </n-button>
             </li>
-          </ul>
+          </TransitionGroup>
         </section>
 
         <section class="firewall-card">
@@ -696,6 +696,8 @@ onUnmounted(() => {
 .firewall-list li:first-child { border-top: 0; padding-top: 0; }
 .firewall-list strong { font-size: 13px; }
 .firewall-rule-main { flex: 1; min-width: 0; }
+.firewall-rule { transition: opacity 160ms ease, background-color 160ms ease; }
+.firewall-rule-move { transition: transform 200ms ease, opacity 160ms ease, background-color 160ms ease; }
 .firewall-rule.is-dragging { opacity: 0.45; }
 .firewall-rule.is-over { background: color-mix(in srgb, var(--primary) 12%, transparent); }
 .firewall-drag { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--muted-foreground); cursor: grab; touch-action: none; }
@@ -710,10 +712,14 @@ onUnmounted(() => {
 .firewall-modal label { display: grid; gap: 6px; }
 .firewall-modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .firewall-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (prefers-reduced-motion: reduce) {
+  .firewall-rule, .firewall-rule-move { transition: none; }
+}
 @container (max-width: 640px) {
   .firewall-toolbar, .firewall-switch-row, .firewall-card-heading { align-items: stretch; flex-direction: column; }
   .firewall-defaults { grid-template-columns: 1fr; }
-  .firewall-toolbar-actions, .firewall-toolbar-actions :deep(.n-button-group) { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+  .firewall-toolbar-actions { display: grid; grid-template-columns: auto minmax(0, 1fr); width: 100%; }
+  .firewall-toolbar-actions :deep(.n-button-group) { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
   .firewall-add-port, .firewall-card-heading :deep(.n-button) { width: 100%; }
   .firewall-drag { width: 44px; height: 44px; }
   .firewall-list li { min-height: 48px; }
@@ -722,7 +728,8 @@ onUnmounted(() => {
 @media (max-width: 760px) {
   .firewall-toolbar, .firewall-switch-row, .firewall-card-heading { align-items: stretch; flex-direction: column; }
   .firewall-defaults { grid-template-columns: 1fr; }
-  .firewall-toolbar-actions, .firewall-toolbar-actions :deep(.n-button-group) { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+  .firewall-toolbar-actions { display: grid; grid-template-columns: auto minmax(0, 1fr); width: 100%; }
+  .firewall-toolbar-actions :deep(.n-button-group) { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
   .firewall-add-port, .firewall-card-heading :deep(.n-button) { width: 100%; }
   .firewall-drag { width: 44px; height: 44px; }
   .firewall-list li { min-height: 48px; }

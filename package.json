@@ -42,7 +42,7 @@
     "test:zoom-badge": "node --experimental-strip-types tests/zoom-badge.test.ts",
     "test:virtual-keyboard": "node --experimental-strip-types tests/virtual-keyboard.test.ts",
     "test:keyboard-report": "node --experimental-strip-types tests/keyboard-report-state.test.ts",
-    "test:keyboard-lock": "node --experimental-strip-types tests/keyboard-lock-state.test.ts",
+    "test:keyboard-lock": "node --experimental-strip-types tests/keyboard-lock-state.test.ts && node --experimental-strip-types tests/console-keyboard-lock.test.ts",
     "test:picture-in-picture": "node --experimental-strip-types tests/picture-in-picture.test.ts",
     "test:trackpad": "node --experimental-strip-types tests/trackpad.test.ts",
     "test:mobile-viewport": "node --experimental-strip-types tests/mobile-viewport.test.ts",

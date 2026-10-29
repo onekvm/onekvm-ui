@@ -684,7 +684,7 @@ const en = {
           customSubtitle: 'Custom second-line text',
           customSubtitlePlaceholder: 'Primary rack',
           toolbarIcons: 'Toolbar icons',
-          toolbarIconsHint: 'Drag to reorder the default icons. Turn one off to move it into the collection menu, where it remains available. Settings stays visible.',
+          toolbarIconsHint: 'Drag to reorder icons. Hidden controls remain available in the keyboard or collection menu. Settings stays visible.',
           deviceIcons: 'Device status',
           actionIcons: 'Actions',
           showIcon: 'Show {name}',

@@ -11,10 +11,12 @@ import {
 } from '../src/lib/toolbar-icons.ts'
 
 const defaults = defaultToolbarIcons()
-assert.equal(defaults.length, 13)
+assert.equal(defaults.length, 16)
 assert.equal(defaults[0]?.id, 'display')
 assert.equal(defaults.at(-1)?.id, 'account')
-assert.equal(defaults.every(icon => !icon.hidden), true)
+assert.deepEqual(defaults.filter(icon => icon.hidden).map(icon => icon.id), [
+  'virtual_keyboard', 'keyboard_text', 'ctrl_alt_del',
+])
 
 assert.deepEqual(normalizeToolbarIcons(undefined).map(icon => icon.id), defaults.map(icon => icon.id))
 assert.equal(toolbarIconsEqual(undefined, []), true)
@@ -28,7 +30,8 @@ const mixed = normalizeToolbarIcons([
   { id: 'language', hidden: false },
 ])
 assert.deepEqual(mixed.map(icon => icon.id), [
-  'mouse', 'display', 'keyboard', 'gamepad', 'power', 'audio', 'virtual_media',
+  'mouse', 'display', 'keyboard', 'virtual_keyboard', 'keyboard_text', 'ctrl_alt_del',
+  'gamepad', 'power', 'audio', 'virtual_media',
   'account', 'settings', 'language', 'performance', 'fullscreen', 'toolbox',
 ])
 assert.equal(toolbarIconHidden(mixed, 'mouse'), true)
@@ -44,5 +47,15 @@ assert.deepEqual(reorderToolbarIcon(defaults, 'display', 'fullscreen').map(icon 
 const hiddenPower = setToolbarIconHidden(defaults, 'power', true)
 assert.equal(toolbarIconHidden(hiddenPower, 'power'), true)
 assert.equal(setToolbarIconHidden(defaults, 'settings', true).some(icon => icon.id === 'settings' && icon.hidden), false)
+
+const legacy = defaults.filter(icon => !['virtual_keyboard', 'keyboard_text', 'ctrl_alt_del'].includes(icon.id))
+for (const id of ['virtual_keyboard', 'keyboard_text', 'ctrl_alt_del'] as const) {
+  assert.equal(toolbarIconHidden(legacy, id), true)
+  const enabled = setToolbarIconHidden(legacy, id, false)
+  assert.equal(toolbarIconHidden(enabled, id), false)
+  assert.equal(toolbarIconHidden(normalizeToolbarIcons(JSON.parse(JSON.stringify(enabled))), id), false)
+  assert.equal(toolbarIconHidden(setToolbarIconHidden(enabled, id, true), id), true)
+  assert.equal(toolbarIconHidden(defaultToolbarIcons(), id), true)
+}
 
 console.log('toolbar icon tests passed')

@@ -683,7 +683,7 @@ const zh_tw = {
           customSubtitle: '自訂第二行文字',
           customSubtitlePlaceholder: '主機架',
           toolbarIcons: '工具列圖示',
-          toolbarIconsHint: '拖曳調整預設圖示的順序。關閉後，該圖示會移入收納選單，仍可從選單使用。設定入口保持顯示。',
+          toolbarIconsHint: '拖曳調整圖示順序。關閉的功能仍可從鍵盤選單或收納選單使用，設定始終顯示。',
           deviceIcons: '裝置狀態',
           actionIcons: '操作',
           showIcon: '顯示{name}',

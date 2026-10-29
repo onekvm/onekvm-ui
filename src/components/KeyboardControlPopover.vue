@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Keyboard, Pin, PinOff } from '@/icons'
-import { useMessage, type DropdownOption, type InputInst } from 'naive-ui'
+import type { DropdownOption } from 'naive-ui'
 
-import { api, type KeyboardLayout } from '@/api/client'
-import { onekvm } from '@/lib/onekvm'
+import type { KeyboardLayout } from '@/api/client'
 import { t } from '@/i18n/runtime'
-import { filterKeyboardText } from '@/input/keyboard-text'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import ControlOverlay from './ControlOverlay.vue'
 import ControlPopoverHeading from './ControlPopoverHeading.vue'
@@ -33,18 +31,12 @@ const emit = defineEmits<{
 
 const popoverOpen = ref(false)
 const pinned = ref(false)
-const textModalOpen = ref(false)
-const text = ref('')
-const sendingText = ref(false)
-const textInput = ref<InputInst | null>(null)
 const compactViewport = ref(window.innerWidth <= 520)
 const overlayTo = useOverlayMount()
 const panel = ref<HTMLElement | null>(null)
 const position = ref({ x: 24, y: 58 })
 let dragOffset = { x: 0, y: 0 }
 let dragging = false
-let unsupportedWarningAt = 0
-const message = useMessage()
 
 const remainingOptions = computed(() => props.options.slice(1))
 
@@ -109,44 +101,11 @@ function selectOption(key: string | number) {
   if (props.inputSuspended) return
   if (key === 'send-text') {
     if (!pinned.value) updateShow(false)
-    textModalOpen.value = true
-    void nextTick(() => textInput.value?.focus())
+    emit('text-modal', true)
     return
   }
   emit('select', key)
   if (!pinned.value && key !== 'right-control-as-meta') updateShow(false)
-}
-
-function updateText(value: string) {
-  const filtered = filterKeyboardText(value, props.layout)
-  text.value = filtered.value
-  if (filtered.removed === 0 || Date.now() - unsupportedWarningAt < 1200) return
-  unsupportedWarningAt = Date.now()
-  message.warning(t('keyboard.unsupportedRemoved', 'Characters unavailable on this keyboard layout were removed.'))
-}
-
-function resumeConsole() {
-  onekvm.sendKeyboard([])
-  document.querySelector<HTMLElement>('.console-hid-layer')?.focus({ preventScroll: true })
-}
-
-watch(textModalOpen, (open) => emit('text-modal', open))
-
-async function sendText() {
-  if (props.inputSuspended || !text.value || sendingText.value) return
-  sendingText.value = true
-  try {
-    const sent = text.value
-    const result = await api.sendKeyboardText(sent, props.layout)
-    text.value = ''
-    onekvm.notifyKeyboardText(sent)
-    textModalOpen.value = false
-    message.success(t('keyboard.textSent', 'Sent {count} characters').replace('{count}', String(result.characters)))
-  } catch (error) {
-    message.error(error instanceof Error ? error.message : String(error))
-  } finally {
-    sendingText.value = false
-  }
 }
 
 function startDrag(event: PointerEvent) {
@@ -177,10 +136,6 @@ function handleResize() {
 onMounted(() => {
   handleResize()
   window.addEventListener('resize', handleResize)
-})
-
-watch(() => props.layout, (layout) => {
-  text.value = filterKeyboardText(text.value, layout).value
 })
 
 onBeforeUnmount(() => {
@@ -243,43 +198,6 @@ onBeforeUnmount(() => {
     </div>
     </template>
   </ControlOverlay>
-
-  <n-modal
-    v-model:show="textModalOpen"
-    :to="overlayTo"
-    preset="card"
-    class="keyboard-text-modal"
-    :title="t('keyboard.paste', 'Send text')"
-    :mask-closable="!sendingText"
-    :close-on-esc="!sendingText"
-    @after-leave="resumeConsole"
-  >
-    <div class="keyboard-text-modal-content">
-      <p class="keyboard-text-modal-hint">
-        {{ t('keyboard.tips', 'Only characters available on the selected remote keyboard layout can be sent.') }}
-        <strong>{{ layoutLabel(layout) }}</strong>
-      </p>
-      <n-input
-        ref="textInput"
-        :value="text"
-        type="textarea"
-        :maxlength="1024"
-        show-count
-        :autosize="{ minRows: 5, maxRows: 10 }"
-        :placeholder="t('keyboard.placeholder', 'Text to type on the remote host')"
-        @update:value="updateText"
-        @keydown.ctrl.enter.prevent="sendText"
-      />
-      <div class="keyboard-text-modal-actions">
-        <n-button :disabled="sendingText" @click="textModalOpen = false">
-          {{ t('common.cancel', 'Cancel') }}
-        </n-button>
-        <n-button type="primary" :loading="sendingText" :disabled="inputSuspended || !text" @click="sendText">
-          {{ t('keyboard.submit', 'Send') }}
-        </n-button>
-      </div>
-    </div>
-  </n-modal>
 
   <Teleport :to="overlayTo">
     <Transition name="win11-window">

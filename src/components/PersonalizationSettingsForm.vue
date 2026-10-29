@@ -16,6 +16,7 @@ import {
   MousePointer2,
   Power,
   Settings,
+  TextCursorInput,
   Toolbox,
   Volume2,
 } from '@/icons'
@@ -38,12 +39,14 @@ import MessagePlacementTestButton from './MessagePlacementTestButton.vue'
 import {
   defaultToolbarIcons,
   isDeviceToolbarIcon,
+  isKeyboardActionToolbarIcon,
   normalizeToolbarIcons,
   reorderToolbarIcon,
   setToolbarIconHidden,
   toolbarIconsEqual,
 } from '@/lib/toolbar-icons'
 import ConsoleBrandCopy from './ConsoleBrandCopy.vue'
+import KeyboardChordIcon from './KeyboardChordIcon'
 
 const props = defineProps<{
   modelValue: PersonalizationConfig
@@ -131,6 +134,9 @@ const iconGlyph = {
   display: Monitor,
   mouse: MousePointer2,
   keyboard: Keyboard,
+  virtual_keyboard: Keyboard,
+  keyboard_text: TextCursorInput,
+  ctrl_alt_del: KeyboardChordIcon,
   gamepad: Gamepad2,
   power: Power,
   audio: Volume2,
@@ -170,6 +176,9 @@ function iconLabel(id: ToolbarIconId) {
     display: t('screen.title', 'Screen'),
     mouse: t('mouse.title', 'Mouse'),
     keyboard: t('keyboard.title', 'Keyboard'),
+    virtual_keyboard: t('keyboard.virtualKeyboard', 'Virtual Keyboard'),
+    keyboard_text: t('keyboard.paste', 'Send text'),
+    ctrl_alt_del: t('keyboard.ctrlaltdel', 'Ctrl+Alt+Del'),
     gamepad: t('gamepad.title', 'Gamepad'),
     power: t('power.title', 'Power'),
     audio: t('usbAudio.title', 'Audio'),
@@ -248,7 +257,7 @@ function resetIcons() {
       <header class="personalization-section-heading">
         <div>
           <h2>{{ t('settings.advancedSettings.personalizationPage.toolbarIcons', 'Toolbar icons') }}</h2>
-          <p>{{ t('settings.advancedSettings.personalizationPage.toolbarIconsHint', 'Drag to reorder the default icons. Turn one off to move it into the collection menu, where it remains available. Settings stays visible.') }}</p>
+          <p>{{ t('settings.advancedSettings.personalizationPage.toolbarIconsHint', 'Drag to reorder icons. Hidden controls remain available in the keyboard or collection menu. Settings stays visible.') }}</p>
         </div>
         <n-button size="small" quaternary :disabled="disabled || !iconsCustomized" @click="resetIcons">
           {{ t('settings.advancedSettings.personalizationPage.resetIcons', 'Reset') }}
@@ -456,7 +465,7 @@ function resetIcons() {
             tabindex="-1"
           >
             <template #icon><component :is="iconGlyph[icon.id]" /></template>
-            <span class="device-led" />
+            <span v-if="!isKeyboardActionToolbarIcon(icon.id)" class="device-led" />
           </n-button>
         </div>
         <div class="toolbar-actions personalization-preview-actions" aria-hidden="true">

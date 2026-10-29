@@ -51,7 +51,7 @@ import { hidIndicatorState } from '@/lib/hid-status'
 import { USB_GAMEPAD_UI_ENABLED } from '@/lib/ui-features'
 import { dismissControlOverlays } from '@/lib/overlay-target'
 import { resolveConsoleSubtitle } from '@/lib/console-title'
-import { normalizeToolbarIcons, toolbarIconCssOrder, toolbarIconHidden } from '@/lib/toolbar-icons'
+import { isKeyboardActionToolbarIcon, normalizeToolbarIcons, toolbarIconCssOrder, toolbarIconHidden } from '@/lib/toolbar-icons'
 import { machineDisplayName } from '@/lib/machine'
 import { onekvm, type InputActivity, type TransportState } from '@/lib/onekvm'
 import { sendShortcut, shortcutChordLabel } from '@/lib/keyboard-shortcuts'
@@ -98,6 +98,8 @@ import {
 
 import DisplaySettingsPopover from './DisplaySettingsPopover.vue'
 import KeyboardControlPopover from './KeyboardControlPopover.vue'
+import KeyboardTextModal from './KeyboardTextModal.vue'
+import KeyboardChordIcon from './KeyboardChordIcon'
 import GamepadPopover from './GamepadPopover.vue'
 import MouseSettingsPopover from './MouseSettingsPopover.vue'
 import PowerControlPopover from './PowerControlPopover.vue'
@@ -392,6 +394,7 @@ function emitToolbarOverlay() {
   emit('overlay', openMenu.value !== null || launcherMenuOpen.value || toolbox.menuOpen || collectionMenuOpen.value || pinnedOverflowOpen.value || keyboardTextModal.value)
 }
 function onKeyboardTextModal(open: boolean) {
+  if (open) setLauncherMenuOpen(false)
   keyboardTextModal.value = open
   emitToolbarOverlay()
 }
@@ -1063,6 +1066,7 @@ function toolbarIconStyle(id: ToolbarIconId) {
 }
 const collectedIcons = computed(() => normalizeToolbarIcons(toolbarIcons.value).filter(icon => {
   if (!icon.hidden) return false
+  if (isKeyboardActionToolbarIcon(icon.id)) return false
   if (icon.id === 'gamepad') return USB_GAMEPAD_UI_ENABLED && Boolean(props.status?.hid?.gamepad)
   if (icon.id === 'audio') return audioControlAvailable.value
   if (icon.id === 'toolbox') return toolbox.allowed
@@ -1078,7 +1082,7 @@ watch(() => collectedIcons.value.length, count => {
   if (!count) collectionMenuOpen.value = false
 })
 const deviceClusterShown = computed(() => {
-  const builtin = (['display', 'mouse', 'keyboard', 'power', 'virtual_media'] as const).some(toolbarIconShown)
+  const builtin = (['display', 'mouse', 'keyboard', 'virtual_keyboard', 'keyboard_text', 'ctrl_alt_del', 'power', 'virtual_media'] as const).some(toolbarIconShown)
     || (USB_GAMEPAD_UI_ENABLED && Boolean(props.status?.hid?.gamepad) && toolbarIconShown('gamepad'))
     || (audioControlAvailable.value && toolbarIconShown('audio'))
     || (hddIndicatorVisible.value && toolbarIconShown('power'))
@@ -1216,6 +1220,12 @@ function shortcutOptions(shortcuts: KeyboardShortcut[], scope: 'user' | 'device'
   }))
 }
 
+const keyboardToolbarActions = computed(() => [
+  { id: 'virtual_keyboard' as const, key: 'virtual', label: t('keyboard.virtualKeyboard', 'Virtual Keyboard'), icon: Keyboard },
+  { id: 'keyboard_text' as const, key: 'send-text', label: t('keyboard.paste', 'Send text'), icon: TextCursorInput },
+  { id: 'ctrl_alt_del' as const, key: 'cad', label: t('keyboard.ctrlaltdel', 'Ctrl+Alt+Del'), icon: KeyboardChordIcon },
+].filter(action => toolbarIconShown(action.id)))
+
 const keyboardOptions = computed<DropdownOption[]>(() => [
   {
     type: 'group',
@@ -1297,7 +1307,11 @@ function sendCtrlAltDelete() {
 
 function selectKeyboard(key: string | number) {
   if (props.pipActive) return
-  if (key === 'cad') sendCtrlAltDelete()
+  if (key === 'cad') {
+    setLauncherMenuOpen(false)
+    sendCtrlAltDelete()
+  }
+  if (key === 'send-text') onKeyboardTextModal(true)
   if (key === 'virtual') {
     setLauncherMenuOpen(false)
     emit('keyboard')
@@ -1694,6 +1708,29 @@ onBeforeUnmount(() => {
         </n-tooltip>
       </KeyboardControlPopover>
       </ToolbarIconSlot>
+
+      <div
+        v-for="action in keyboardToolbarActions"
+        :key="action.id"
+        class="toolbar-icon-slot"
+        :style="toolbarIconStyle(action.id)"
+      >
+        <n-tooltip :disabled="toolbarLauncher">
+          <template #trigger>
+            <n-button
+              quaternary
+              size="small"
+              :aria-label="action.label"
+              :disabled="pipActive"
+              @click="selectKeyboard(action.key)"
+            >
+              <template #icon><component :is="action.icon" aria-hidden="true" /></template>
+              <span class="toolbar-action-label">{{ action.label }}</span>
+            </n-button>
+          </template>
+          {{ action.label }}
+        </n-tooltip>
+      </div>
 
       <ToolbarIconSlot v-if="USB_GAMEPAD_UI_ENABLED && status?.hid?.gamepad"
         :collected="!toolbarIconShown('gamepad')"
@@ -2108,6 +2145,12 @@ onBeforeUnmount(() => {
     </Transition>
     </Teleport>
   </header>
+  <KeyboardTextModal
+    :show="keyboardTextModal"
+    :layout="keyboardLayout"
+    :input-suspended="pipActive"
+    @update:show="onKeyboardTextModal"
+  />
   <Teleport :to="overlayTo">
     <div
       v-if="toolbarLauncher && launcherMenuOpen"

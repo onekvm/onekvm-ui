@@ -683,7 +683,7 @@ const zh = {
           customSubtitle: '自定义第二行文本',
           customSubtitlePlaceholder: '主机架',
           toolbarIcons: '工具栏图标',
-          toolbarIconsHint: '拖动调整默认图标的顺序。关闭后，该图标会移入收纳菜单，仍可从菜单中使用。设置入口保持显示。',
+          toolbarIconsHint: '拖动调整图标顺序。关闭的功能仍可从键盘菜单或收纳菜单使用，设置始终显示。',
           deviceIcons: '设备状态',
           actionIcons: '操作',
           showIcon: '显示{name}',

@@ -2096,6 +2096,8 @@ const zh_tw = {
 		addGroupOverlay: '疊加網路',
 		addGroupTunnels: '通道',
 		addGroupVpn: 'VPN',
+		groupEthernet: '乙太網路',
+		groupWifi: 'Wi-Fi',
 		refresh: '重新整理介面',
 		empty: '沒有網路介面',
 		noAddress: '無位址',

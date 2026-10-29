@@ -2092,6 +2092,8 @@ const en = {
 		addGroupOverlay: 'Overlay',
 		addGroupTunnels: 'Tunnels',
 		addGroupVpn: 'VPN',
+		groupEthernet: 'Ethernet',
+		groupWifi: 'Wi-Fi',
 		refresh: 'Refresh interfaces',
 		empty: 'No network interfaces',
 		noAddress: 'No address',

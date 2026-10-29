@@ -2484,7 +2484,16 @@ const zh_tw = {
       toggle: '切換全螢幕'
     },
     toolbar: {
+      lock: '鎖定工具列',
+      unlock: '解鎖工具列',
+      addSeparator: '新增分隔線',
+      removeSeparator: '移除分隔線',
       folders: {
+        searchIcons: '搜尋圖示',
+        noIcons: '沒有符合的圖示',
+        defaultName: '資料夾',
+        dropToCreate: '放開以建立資料夾',
+        dropToAdd: '放開以加入資料夾',
         title: '資料夾',
         create: '建立資料夾',
         edit: '編輯資料夾',

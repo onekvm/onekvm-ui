@@ -8,7 +8,6 @@ import {
   Command,
   Disc3,
   FolderSync,
-  FolderPlus,
   HardDrive,
   GripVertical,
   Gamepad2,
@@ -61,8 +60,9 @@ import { hasPermission } from '@/build'
 import { useAuth } from '@/composables/useAuth'
 import { useToolbarLayout } from '@/composables/useToolbarLayout'
 import { useToolbarItemDrag } from '@/composables/useToolbarItemDrag'
+import { useToolbarContextMenu } from '@/composables/useToolbarContextMenu'
 import { useToolbarFolderOptions } from '@/composables/useToolbarFolderOptions'
-import { MAX_TOOLBAR_FOLDERS, moveToolbarItem, toolbarFolderFor, upsertToolbarFolder } from '@/lib/toolbar-layout'
+import { MAX_TOOLBAR_FOLDERS, groupToolbarItems, moveToolbarItem, toolbarFolderFor, upsertToolbarFolder, visibleToolbarSeparators } from '@/lib/toolbar-layout'
 import type { ToolbarFolder } from '@/api/client'
 import ToolbarFolderDialog from './ToolbarFolderDialog.vue'
 
@@ -211,15 +211,48 @@ const folderOpen = ref('')
 const folderEditorOpen = ref(false)
 const editingFolder = shallowRef<ToolbarFolder | null>(null)
 const folderTargets = shallowRef<Record<string, HTMLElement | null>>({})
+const toolbarContext = useToolbarContextMenu({
+  canArrange: () => canArrangeToolbar.value && !toolbarLayout.saving.value,
+  canCreateFolder: () => toolbarLayout.folders.value.length < MAX_TOOLBAR_FOLDERS,
+  createFolder: () => openFolderEditor(),
+  editFolder: id => openFolderEditor(toolbarLayout.folders.value.find(folder => folder.id === id) ?? null),
+  addSeparator: before => {
+    const id = `separator:${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+    const order = [...toolbarLayout.order.value]
+    const index = before ? order.indexOf(before) : -1
+    order.splice(index < 0 ? order.length : index, 0, id)
+    void toolbarLayout.save(layout => ({ ...layout, toolbar_order: order }))
+  },
+  removeSeparator: id => { void toolbarLayout.save(layout => ({ ...layout, toolbar_order: toolbarLayout.order.value.filter(item => item !== id) })) },
+})
+const toolbarSeparators = computed(() => {
+  const visible = new Set(toolbarLayout.order.value.filter(id => {
+    if (id.startsWith('folder:')) return true
+    if (id === 'settings' && !props.canSettings) return false
+    return !folderForItem(id) && folderItemAvailable(id)
+  }))
+  return visibleToolbarSeparators(toolbarLayout.order.value, visible)
+})
 const itemDrag = useToolbarItemDrag({
-  enabled: () => canArrangeToolbar.value && !toolbarLayout.saving.value,
+  enabled: () => canArrangeToolbar.value && !toolbarLayout.saving.value && !toolbarContext.locked.value,
   order: () => toolbarLayout.order.value,
   folderItems: id => toolbarLayout.folders.value.find(folder => folder.id === id)?.items ?? [],
   vertical: () => toolbarVertical.value || toolbarLauncher.value,
   openFolder: id => setFolderOpen(id, true),
-  commit: (item, target) => { void toolbarLayout.save(layout => moveToolbarItem(layout, item, target, toolbarLayout.order.value)) },
+  canCreateFolder: () => toolbarLayout.folders.value.length < MAX_TOOLBAR_FOLDERS,
+  commit: (item, target) => {
+    const order = toolbarLayout.order.value
+    const folder: ToolbarFolder = { id: `folder-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`, name: t('toolbar.folders.defaultName', 'Folder'), icon: 'Folder', items: [] }
+    void toolbarLayout.save(layout => target.merge
+      ? groupToolbarItems(layout, item, target.merge, folder, order)
+      : moveToolbarItem(layout, item, target, order))
+  },
 })
-watch([folderOpen, folderEditorOpen, itemDrag.dragging], () => emitToolbarOverlay())
+watch([folderOpen, folderEditorOpen, itemDrag.dragging, toolbarContext.show], () => { emitToolbarOverlay(); armToolbarHide() })
+function openToolbarContext(event: MouseEvent) {
+  dismissOverlays()
+  toolbarContext.open(event)
+}
 function folderForItem(id: string) { return toolbarFolderFor(toolbarLayout.folders.value, id) }
 function setFolderTarget(id: string, target: HTMLElement | null) { folderTargets.value = { ...folderTargets.value, [id]: target } }
 function setFolderOpen(id: string, open: boolean) {
@@ -273,7 +306,7 @@ const toolbarDock = ref<ToolbarDockState>(parseToolbarDock(localStorage.getItem(
 const toolbarDragging = ref(false)
 const toolbarMorphing = ref(false)
 const toolbarLiftPending = ref(false)
-useToolbarPinMotion(toolbarEl, trayEl, () => `${performanceDock.docked.value}:${performanceDock.visible.value}:${performanceDock.dragging.value}:${hddIndicatorVisible.value}:${toolbox.pinned.map(({ tool }) => tool.id).join(',')}`, () => !toolbarDragging.value && !toolbarMorphing.value)
+useToolbarPinMotion(toolbarEl, trayEl, () => `${performanceDock.docked.value}:${performanceDock.visible.value}:${performanceDock.dragging.value}:${hddIndicatorVisible.value}:${toolbox.pinned.map(({ tool }) => tool.id).join(',')}`, () => !toolbarDragging.value && !toolbarMorphing.value && !itemDrag.dragging.value)
 const toolbarSnapHint = ref<ToolbarSnapPreview>(null)
 const toolbarSnapHintText = computed(() => {
   if (!toolbarSnapHint.value) return ''
@@ -343,6 +376,7 @@ const launcherTrayClass = computed(() => ({
   'is-centered': true,
 }))
 const toolbarClass = computed(() => ({
+  'has-context-menu': toolbarContext.show.value,
   'has-text-labels': toolbarLayout.showLabels.value,
   'is-item-dragging': itemDrag.dragging.value,
   'is-launcher': toolbarLauncher.value,
@@ -454,7 +488,7 @@ function persistLauncherPos() {
 
 const keyboardTextModal = ref(false)
 function emitToolbarOverlay() {
-  emit('overlay', openMenu.value !== null || launcherMenuOpen.value || toolbox.menuOpen || collectionMenuOpen.value || pinnedOverflowOpen.value || keyboardTextModal.value || Boolean(folderOpen.value) || folderEditorOpen.value || itemDrag.dragging.value)
+  emit('overlay', openMenu.value !== null || launcherMenuOpen.value || toolbox.menuOpen || collectionMenuOpen.value || pinnedOverflowOpen.value || keyboardTextModal.value || Boolean(folderOpen.value) || folderEditorOpen.value || itemDrag.dragging.value || toolbarContext.show.value)
 }
 function onKeyboardTextModal(open: boolean) {
   if (open) { setLauncherMenuOpen(false); folderOpen.value = '' }
@@ -614,7 +648,7 @@ function armToolbarHide() {
   if (
     openMenu.value
     || toolbox.menuOpen
-    || collectionMenuOpen.value || pinnedOverflowOpen.value || folderOpen.value || folderEditorOpen.value || itemDrag.dragging.value
+    || collectionMenuOpen.value || pinnedOverflowOpen.value || folderOpen.value || folderEditorOpen.value || itemDrag.dragging.value || toolbarContext.show.value
     || launcherMenuOpen.value
     || pointerOnToolbarChrome.value
     || performanceDock.dragging.value
@@ -632,7 +666,7 @@ function armToolbarHide() {
       !hideEdge.value
       || openMenu.value
       || toolbox.menuOpen
-      || collectionMenuOpen.value || pinnedOverflowOpen.value || folderOpen.value || folderEditorOpen.value || itemDrag.dragging.value
+      || collectionMenuOpen.value || pinnedOverflowOpen.value || folderOpen.value || folderEditorOpen.value || itemDrag.dragging.value || toolbarContext.show.value
       || launcherMenuOpen.value
       || pointerOnToolbarChrome.value
       || performanceDock.dragging.value
@@ -1051,6 +1085,7 @@ function isToolbarDragChrome(target: EventTarget | null) {
 }
 
 function startToolbarDrag(event: PointerEvent) {
+  if (toolbarContext.locked.value) return
   if (event.button !== 0) return
   if (toolbarPointerId !== null) return
   stopToolbarMorph()
@@ -1569,6 +1604,7 @@ onBeforeUnmount(() => {
     @pointerdown="onToolbarChromePointerDown"
     @pointerenter="onToolbarChromePointerEnter"
     @pointerleave="onToolbarChromePointerLeave"
+    @contextmenu="openToolbarContext"
   >
     <button
       v-if="toolbarLauncher"
@@ -1635,6 +1671,7 @@ onBeforeUnmount(() => {
       v-show="!toolbarLauncher || launcherMenuOpen"
       class="toolbar-tray"
       ref="trayEl"
+      @contextmenu="openToolbarContext"
       :class="toolbarLauncher ? launcherTrayClass : undefined"
       :inert="toolbarLauncher && !launcherMenuOpen"
     >
@@ -1644,6 +1681,7 @@ onBeforeUnmount(() => {
         <span v-if="consoleSubtitle">{{ consoleSubtitle }}</span>
       </div>
       <div class="toolbar-layout" :class="{ 'has-text-labels': toolbarLayout.showLabels.value }" :data-toolbar-label-position="toolbarLayout.layout.value.toolbar_label_position ?? 'right'" data-toolbar-surface>
+      <div v-for="id in toolbarSeparators" :key="id" class="toolbar-separator" role="separator" :aria-orientation="toolbarVertical || toolbarLauncher ? 'horizontal' : 'vertical'" :data-toolbar-item="id" :style="{ order: toolbarItemOrder(id) }" />
       <div class="device-controls" :class="{ 'is-iconless': !deviceClusterShown }" :aria-label="t('deviceStatus.title', 'Device status')">
       <div
         ref="performanceTarget"
@@ -1978,9 +2016,9 @@ onBeforeUnmount(() => {
 
     <PinnedTools :mobile="toolbarLauncher" :vertical="toolbarVertical" :placement="menuPlacement" :layout="toolbarLayout.layout.value" :order="toolbarLayout.order.value" :folder-targets="folderTargets" :show-labels="toolbarLayout.showLabels.value" @overlay="pinnedOverflowOpen = $event" @activate="onPinnedToolActivate" />
 
-    <div v-for="folder in toolbarLayout.folders.value" :key="folder.id" class="toolbar-icon-slot toolbar-folder-slot" :data-toolbar-item="`folder:${folder.id}`" :data-toolbar-folder="folder.id" :style="{ order: toolbarItemOrder(`folder:${folder.id}`) }" @contextmenu.prevent.stop="canArrangeToolbar && openFolderEditor(folder)">
+    <div v-for="folder in toolbarLayout.folders.value" :key="folder.id" class="toolbar-icon-slot toolbar-folder-slot" :data-toolbar-item="`folder:${folder.id}`" :data-toolbar-folder="folder.id" :style="{ order: toolbarItemOrder(`folder:${folder.id}`) }">
       <ToolbarCollectionMenu :title="folder.name" :icon="folder.icon" :folder-id="folder.id" :show="folderOpen === folder.id" :count="folderItemCount(folder)" :mobile="toolbarLauncher" :child-open="openMenu !== null || toolbox.menuOpen || keyboardTextModal" :placement="menuPlacement" @update:show="setFolderOpen(folder.id, $event)" @target="setFolderTarget(folder.id, $event)">
-        <template v-if="canArrangeToolbar" #footer><n-button quaternary block class="toolbar-folder-edit-button" @click="openFolderEditor(folder)">{{ t('toolbar.folders.edit', 'Edit folder') }}</n-button></template>
+        <template v-if="canArrangeToolbar && !toolbarContext.locked.value" #footer><n-button quaternary block class="toolbar-folder-edit-button" @click="openFolderEditor(folder)">{{ t('toolbar.folders.edit', 'Edit folder') }}</n-button></template>
       </ToolbarCollectionMenu>
     </div>
 
@@ -2227,15 +2265,13 @@ onBeforeUnmount(() => {
           </template>
         </ControlOverlay>
       </ToolbarIconSlot>
-      <div v-if="canArrangeToolbar" class="toolbar-icon-slot toolbar-create-folder" style="order: 10000">
-        <n-tooltip :disabled="toolbarLauncher"><template #trigger><n-button quaternary size="small" :disabled="toolbarLayout.saving.value || toolbarLayout.folders.value.length >= MAX_TOOLBAR_FOLDERS" :aria-label="t('toolbar.folders.create', 'Create folder')" @click="openFolderEditor()"><template #icon><FolderPlus /></template><span class="toolbar-action-label">{{ t('toolbar.folders.create', 'Create folder') }}</span></n-button></template>{{ t('toolbar.folders.create', 'Create folder') }}</n-tooltip>
-      </div>
     </div>
     </div>
     </div>
     </Transition>
     </Teleport>
   </header>
+  <n-dropdown trigger="manual" :show="toolbarContext.show.value" :x="toolbarContext.position.value.x" :y="toolbarContext.position.value.y" :options="toolbarContext.menuOptions.value" :to="overlayTo" :menu-props="() => ({ class: 'host-menu' })" @select="toolbarContext.select" @clickoutside="toolbarContext.show.value = false" @update:show="toolbarContext.show.value = $event" />
   <ToolbarFolderDialog :show="folderEditorOpen" :folder="editingFolder" :options="folderOptions" :saving="toolbarLayout.saving.value" @update:show="folderEditorOpen = $event" @save="saveFolder" />
   <KeyboardTextModal
     :show="keyboardTextModal"
@@ -2244,6 +2280,7 @@ onBeforeUnmount(() => {
     @update:show="onKeyboardTextModal"
   />
   <Teleport :to="overlayTo">
+    <div v-if="itemDrag.hint.value" class="toolbar-item-drop-hint" role="status" :style="{ left: `${itemDrag.hint.value.x}px`, top: `${itemDrag.hint.value.y}px` }">{{ itemDrag.hint.value.mode === 'merge' ? t('toolbar.folders.dropToCreate', 'Release to create a folder') : t('toolbar.folders.dropToAdd', 'Release to add to folder') }}</div>
     <div
       v-if="toolbarLauncher && launcherMenuOpen"
       class="toolbar-launcher-mask"

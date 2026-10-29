@@ -2480,7 +2480,16 @@ const en = {
       toggle: 'Toggle Fullscreen'
     },
     toolbar: {
+      lock: 'Lock toolbar',
+      unlock: 'Unlock toolbar',
+      addSeparator: 'Add separator',
+      removeSeparator: 'Remove separator',
       folders: {
+        searchIcons: 'Search icons',
+        noIcons: 'No matching icons',
+        defaultName: 'Folder',
+        dropToCreate: 'Release to create a folder',
+        dropToAdd: 'Release to add to folder',
         title: 'Folders',
         create: 'Create folder',
         edit: 'Edit folder',

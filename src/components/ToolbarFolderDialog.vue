@@ -2,9 +2,8 @@
 import { computed, ref, watch } from 'vue'
 import type { SelectGroupOption } from 'naive-ui'
 import type { ToolbarFolder } from '@/api/client'
-import { Folder, iconComponent } from '@/icons'
 import { t } from '@/i18n/runtime'
-import { TOOLBAR_FOLDER_ICONS } from '@/lib/toolbar-layout'
+import ToolbarFolderIconPicker from './ToolbarFolderIconPicker.vue'
 import { validPersonalizationText } from '@/lib/console-title'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 
@@ -32,11 +31,7 @@ function save() {
         <n-input v-model:value="draft.name" :maxlength="64" :disabled="saving" :input-props="{ 'aria-label': t('toolbar.folders.name', 'Folder name') }" @keydown.enter.prevent="save" />
       </n-form-item>
       <n-form-item :label="t('toolbar.folders.icon', 'Folder icon')">
-        <div class="toolbar-folder-icon-picker" role="group" :aria-label="t('toolbar.folders.icon', 'Folder icon')">
-          <n-button v-for="name in TOOLBAR_FOLDER_ICONS" :key="name" :type="draft.icon === name ? 'primary' : 'default'" :secondary="draft.icon === name" :disabled="saving" :aria-label="t(`toolbar.folders.icons.${name}`, name)" :aria-pressed="draft.icon === name" @click="draft.icon = name">
-            <template #icon><component :is="iconComponent(name) || Folder" aria-hidden="true" /></template>
-          </n-button>
-        </div>
+        <ToolbarFolderIconPicker v-model:value="draft.icon" :disabled="saving" />
       </n-form-item>
       <n-form-item :label="t('toolbar.folders.members', 'Icons in folder')">
         <n-select v-model:value="draft.items" multiple filterable :options="options" :disabled="saving" :to="overlayTo" :aria-label="t('toolbar.folders.members', 'Icons in folder')" :placeholder="t('toolbar.folders.selectIcons', 'Select icons')" />
@@ -51,10 +46,6 @@ function save() {
 </template>
 
 <style scoped>
-.toolbar-folder-icon-picker { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; width: 100%; }
-.toolbar-folder-icon-picker :deep(.n-button) { width: 100%; height: 36px; padding: 0; }
-.toolbar-folder-icon-picker :deep(.n-button__icon) { margin: 0; }
 .toolbar-folder-editor-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 .toolbar-folder-transfer-hint { margin: -6px 0 0; font-size: 12px; line-height: 1.5; color: var(--muted-foreground); }
-@media (max-width: 420px) { .toolbar-folder-icon-picker { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 </style>

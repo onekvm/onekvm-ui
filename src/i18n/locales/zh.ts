@@ -2479,7 +2479,16 @@ const zh = {
       toggle: '切换全屏'
     },
     toolbar: {
+      lock: '锁定工具栏',
+      unlock: '解锁工具栏',
+      addSeparator: '添加分割线',
+      removeSeparator: '移除分割线',
       folders: {
+        searchIcons: '搜索图标',
+        noIcons: '没有匹配的图标',
+        defaultName: '文件夹',
+        dropToCreate: '松开以创建文件夹',
+        dropToAdd: '松开以加入文件夹',
         title: '文件夹',
         create: '创建文件夹',
         edit: '编辑文件夹',

@@ -1,15 +1,20 @@
 import { onBeforeUnmount, onMounted, shallowRef } from 'vue'
+import { isToolbarItem } from '@/lib/toolbar-layout'
+import { useToolbarItemPreview } from './useToolbarItemPreview'
 
-export interface ToolbarDrop { folder?: string; before?: string }
+export interface ToolbarDrop { folder?: string; before?: string; merge?: string }
 export function useToolbarItemDrag(options: {
   enabled: () => boolean
   order: () => string[]
   folderItems: (folder: string) => string[]
   vertical: () => boolean
   openFolder: (folder: string) => void
+  canCreateFolder: () => boolean
   commit: (item: string, target: ToolbarDrop) => void
 }) {
   const dragging = shallowRef(false)
+  const hint = shallowRef<{ mode: 'into' | 'merge'; x: number; y: number } | null>(null)
+  const preview = useToolbarItemPreview()
   let active: { id: string; pointer: number; x: number; y: number; source: HTMLElement; ghost: HTMLElement | null; target: ToolbarDrop | null } | null = null
   let marker: HTMLElement | null = null
   let folderTimer = 0
@@ -31,6 +36,8 @@ export function useToolbarItemDrag(options: {
     active?.source.classList.remove('is-toolbar-item-dragging')
     active = null
     dragging.value = false
+    hint.value = null
+    preview.clear()
     clearMarker()
     clearTimeout(folderTimer)
     hoveredFolder = ''
@@ -76,7 +83,7 @@ export function useToolbarItemDrag(options: {
     }
     active.ghost.style.transform = `translate(${event.clientX - active.x}px, ${event.clientY - active.y}px)`
     const hit = document.elementFromPoint(event.clientX, event.clientY)
-    const item = hit?.closest<HTMLElement>('[data-toolbar-item]')
+    const item = preview.hit(event.clientX, event.clientY) ?? hit?.closest<HTMLElement>('[data-toolbar-item]')
     const folderList = hit?.closest<HTMLElement>('[data-toolbar-folder-list]')
     clearMarker()
     active.target = null
@@ -84,16 +91,19 @@ export function useToolbarItemDrag(options: {
     let mode = 'before'
     if (item && item !== active.source) {
       const id = item.dataset.toolbarItem!
-      const rect = item.getBoundingClientRect()
+      const rect = preview.bounds(item)
       const vertical = Boolean(folderList) || options.vertical()
       const ratio = vertical ? (event.clientY - rect.top) / rect.height : (event.clientX - rect.left) / rect.width
-      if (id.startsWith('folder:') && !active.id.startsWith('folder:') && active.id !== 'settings' && ratio > .2 && ratio < .8) {
+      if (id.startsWith('folder:') && isToolbarItem(active.id) && active.id !== 'settings' && ratio > .25 && ratio < .75) {
         folder = id.slice(7)
         active.target = { folder }
         mode = 'into'
+      } else if (!folderList && isToolbarItem(id) && id !== 'settings' && isToolbarItem(active.id) && active.id !== 'settings' && ratio > .3 && ratio < .7 && options.canCreateFolder()) {
+        active.target = { merge: id }
+        mode = 'merge'
       } else {
         const parent = folderList?.dataset.toolbarFolderList
-        if (!parent || (!active.id.startsWith('folder:') && active.id !== 'settings')) {
+        if (!parent || (isToolbarItem(active.id) && active.id !== 'settings')) {
           const order = parent ? options.folderItems(parent) : options.order()
           const next = ratio > .5 ? order.slice(order.indexOf(id) + 1).find(candidate => candidate !== active!.id) : id
           active.target = { folder: parent, before: next }
@@ -101,7 +111,7 @@ export function useToolbarItemDrag(options: {
         }
       }
       if (active.target) marker = item
-    } else if (!item && folderList && !active.id.startsWith('folder:') && active.id !== 'settings') {
+    } else if (!item && folderList && isToolbarItem(active.id) && active.id !== 'settings') {
       active.target = { folder: folderList.dataset.toolbarFolderList }
       marker = folderList
       mode = 'into'
@@ -111,6 +121,12 @@ export function useToolbarItemDrag(options: {
       mode = 'after'
     }
     if (marker) { marker.classList.add('is-toolbar-drop-target'); marker.dataset.toolbarDropMode = mode }
+    if (active.target && mode !== 'into' && mode !== 'merge') {
+      preview.preview(active.source, marker?.closest<HTMLElement>('[data-toolbar-surface]') ?? null, active.target.before, options.vertical())
+    } else preview.clear()
+    hint.value = active.target && (mode === 'into' || mode === 'merge')
+      ? { mode, x: Math.max(100, Math.min(window.innerWidth - 100, event.clientX)), y: event.clientY < 76 ? event.clientY + 42 : event.clientY - 44 }
+      : null
     if (folder !== hoveredFolder) {
       clearTimeout(folderTimer)
       hoveredFolder = folder
@@ -124,9 +140,13 @@ export function useToolbarItemDrag(options: {
     const item = active.id
     const target = active.target
     const moved = dragging.value
+    const before = moved ? preview.capture() : null
     cancel()
     suppressNextClick()
-    if (moved && target && options.enabled()) options.commit(item, target)
+    if (moved && target && options.enabled()) {
+      options.commit(item, target)
+      if (before) void preview.settle(before)
+    }
   }
   onMounted(() => { window.addEventListener('pointerdown', start, true); window.addEventListener('blur', cancel) })
   onBeforeUnmount(() => {
@@ -135,5 +155,5 @@ export function useToolbarItemDrag(options: {
     window.removeEventListener('pointerup', finishCanceledGesture, true)
     window.removeEventListener('click', suppressClick, true)
   })
-  return { dragging, cancel }
+  return { dragging, hint, cancel }
 }

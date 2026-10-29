@@ -1,10 +1,28 @@
 import assert from 'node:assert/strict'
 import { defaultToolbarIcons } from '../src/lib/toolbar-icons.ts'
-import { moveToolbarItem, normalizeToolbarFolders, removeToolbarFolder, syncToolbarIconOrder, toolbarFolderFor, toolbarLayoutOrder, upsertToolbarFolder, type ToolbarLayout } from '../src/lib/toolbar-layout.ts'
+import { groupToolbarItems, isToolbarSeparator, moveToolbarItem, normalizeToolbarFolders, removeToolbarFolder, syncToolbarIconOrder, toolbarFolderFor, toolbarLayoutOrder, upsertToolbarFolder, visibleToolbarSeparators, type ToolbarLayout } from '../src/lib/toolbar-layout.ts'
 
 const initial: ToolbarLayout = { toolbar_icons: defaultToolbarIcons() }
 assert.deepEqual(normalizeToolbarFolders(undefined), [])
-assert.equal(toolbarLayoutOrder(initial).length, 16)
+assert.equal(toolbarLayoutOrder(initial).length, 18)
+assert.ok(toolbarLayoutOrder(initial).includes('separator:controls'))
+assert.equal(toolbarLayoutOrder(initial).at(-2), 'separator:account')
+assert.deepEqual(visibleToolbarSeparators(toolbarLayoutOrder(initial), new Set(['display', 'fullscreen', 'account'])), ['separator:controls', 'separator:account'])
+assert.deepEqual(visibleToolbarSeparators(toolbarLayoutOrder(initial), new Set(['display', 'account'])), ['separator:controls'])
+assert.deepEqual(visibleToolbarSeparators(toolbarLayoutOrder(initial), new Set(['account'])), [])
+assert.deepEqual(visibleToolbarSeparators(['separator:custom', 'account'], new Set(['account'])), ['separator:custom'])
+const withSeparator = { ...initial, toolbar_order: ['display', 'separator:custom', 'mouse'] }
+assert.deepEqual(toolbarLayoutOrder(withSeparator).slice(0, 3), ['display', 'separator:custom', 'mouse'])
+assert.equal(isToolbarSeparator('separator:../bad'), false)
+const separatorMoved = moveToolbarItem(withSeparator, 'separator:custom', { before: 'display' })
+assert.equal(separatorMoved.toolbar_order![0], 'separator:custom')
+assert.equal(moveToolbarItem(withSeparator, 'separator:custom', { folder: 'input' }), withSeparator)
+const merged = groupToolbarItems(initial, 'mouse', 'display', { id: 'merged', name: 'Folder', icon: 'Rocket', items: [] })
+assert.deepEqual(merged.toolbar_folders![0]!.items, ['display', 'mouse'])
+assert.equal(merged.toolbar_folders![0]!.icon, 'Rocket')
+assert.equal(merged.toolbar_order![0], 'folder:merged')
+assert.equal(groupToolbarItems(initial, 'settings', 'display', { id: 'bad', name: 'Folder', icon: 'Folder', items: [] }), initial)
+assert.equal(normalizeToolbarFolders([{ id: 'custom', name: 'Custom', icon: 'shield-check', items: [] }])[0]!.icon, 'shield-check')
 const input = { id: 'input', name: '输入', icon: 'Keyboard', items: ['virtual_keyboard', 'tool:terminal/main', 'settings'] }
 const first = upsertToolbarFolder(initial, input)
 assert.equal(toolbarFolderFor(first.toolbar_folders!, 'virtual_keyboard')?.id, 'input')
@@ -13,7 +31,7 @@ assert.equal(first.toolbar_folders![0]!.items.includes('settings'), false)
 assert.equal(initial.toolbar_icons!.find(icon => icon.id === 'virtual_keyboard')!.hidden, true)
 assert.equal(first.toolbar_folders![0]!.items.includes('tool:terminal/main'), true)
 
-const second = upsertToolbarFolder(first, { id: 'other', name: 'Other', icon: 'invalid', items: ['virtual_keyboard'] })
+const second = upsertToolbarFolder(first, { id: 'other', name: 'Other', icon: 'invalid!', items: ['virtual_keyboard'] })
 assert.equal(second.toolbar_folders![1]!.icon, 'Folder')
 assert.deepEqual(second.toolbar_folders![0]!.items, ['tool:terminal/main'])
 assert.deepEqual(second.toolbar_folders![1]!.items, ['virtual_keyboard'])

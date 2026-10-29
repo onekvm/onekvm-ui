@@ -1,10 +1,28 @@
 import type { ToolbarFolder, ToolbarIconPreference, ToolbarLabelPosition } from '../api/client.ts'
 import { isDeviceToolbarIcon, isToolbarIconId, normalizeToolbarIcons } from './toolbar-icons.ts'
 
-export const TOOLBAR_FOLDER_ICONS = [
-  'Folder', 'FolderOpen', 'Monitor', 'Keyboard', 'MousePointer2', 'Gamepad2', 'Power', 'Volume2',
-  'Disc3', 'Cloud', 'Network', 'Settings', 'Toolbox', 'Layers', 'Shield', 'Activity',
-] as const
+// Icon sets may register additional names; rendering falls back to Folder when
+// the selected set does not provide a glyph.
+export const validToolbarFolderIcon = (value: unknown): value is string => typeof value === 'string'
+  && value.length <= 64 && /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/i.test(value)
+export const isToolbarSeparator = (value: unknown): value is string => typeof value === 'string' && /^separator:[a-z0-9_-]{1,64}$/.test(value)
+const defaultSeparators = new Set(['separator:controls', 'separator:tools', 'separator:account'])
+export function visibleToolbarSeparators(order: readonly string[], visibleItems: ReadonlySet<string>) {
+  const shown = new Set<string>()
+  let hasItem = false
+  let pending = ''
+  for (const id of order) {
+    if (isToolbarSeparator(id)) {
+      if (!defaultSeparators.has(id)) { shown.add(id); pending = ''; hasItem = false }
+      else if (hasItem && !pending) pending = id
+    } else if (visibleItems.has(id)) {
+      if (pending) shown.add(pending)
+      pending = ''
+      hasItem = true
+    }
+  }
+  return order.filter(id => shown.has(id))
+}
 export const MAX_TOOLBAR_FOLDERS = 32
 export interface ToolbarLayout {
   toolbar_icons?: ToolbarIconPreference[]
@@ -23,7 +41,7 @@ export function normalizeToolbarFolders(value: readonly ToolbarFolder[] | null |
     .slice(0, MAX_TOOLBAR_FOLDERS).map(folder => ({
       id: folder.id,
       name: typeof folder.name === 'string' ? folder.name.trim() : '',
-      icon: (TOOLBAR_FOLDER_ICONS as readonly string[]).includes(folder.icon) ? folder.icon : 'Folder',
+      icon: validToolbarFolderIcon(folder.icon) ? folder.icon : 'Folder',
       items: (Array.isArray(folder.items) ? folder.items : []).slice(0, 256)
         .filter(item => item !== 'settings' && isToolbarItem(item) && !members.has(item) && Boolean(members.add(item))),
     }))
@@ -38,13 +56,17 @@ export function toolbarLayoutOrder(layout: ToolbarLayout, pinnedToolIds: readonl
   const icons = normalizeToolbarIcons(layout.toolbar_icons)
   const defaults = [
     ...icons.filter(icon => isDeviceToolbarIcon(icon.id)).map(icon => icon.id),
+    'separator:controls',
     ...pinnedToolIds.map(id => `tool:${id}`),
     ...folders.map(folder => `folder:${folder.id}`),
-    ...icons.filter(icon => !isDeviceToolbarIcon(icon.id)).map(icon => icon.id),
+    ...(pinnedToolIds.length || folders.length ? ['separator:tools'] : []),
+    ...icons.filter(icon => !isDeviceToolbarIcon(icon.id)).flatMap(icon => icon.id === 'account' ? ['separator:account', icon.id] : [icon.id]),
   ]
-  const valid = (id: unknown): id is string => isToolbarItem(id)
+  const valid = (id: unknown): id is string => isToolbarItem(id) || isToolbarSeparator(id)
     || (typeof id === 'string' && folders.some(folder => `folder:${folder.id}` === id))
-  return [...new Set([...(layout.toolbar_order ?? []).filter(valid), ...defaults])]
+  return [...new Set(layout.toolbar_order?.length
+    ? [...layout.toolbar_order.filter(valid), ...defaults.filter(id => !isToolbarSeparator(id))]
+    : defaults)]
 }
 
 export function upsertToolbarFolder<T extends ToolbarLayout>(layout: T, folder: ToolbarFolder): T {
@@ -66,13 +88,22 @@ export function removeToolbarFolder<T extends ToolbarLayout>(layout: T, id: stri
   return { ...layout, toolbar_folders: normalizeToolbarFolders(layout.toolbar_folders).filter(folder => folder.id !== id), toolbar_order: (layout.toolbar_order ?? []).filter(item => item !== `folder:${id}`) }
 }
 
+export function groupToolbarItems<T extends ToolbarLayout>(layout: T, item: string, other: string, folder: ToolbarFolder, rootOrder = toolbarLayoutOrder(layout)): T {
+  if (item === other || item === 'settings' || other === 'settings' || !isToolbarItem(item) || !isToolbarItem(other)) return layout
+  if (normalizeToolbarFolders(layout.toolbar_folders).length >= MAX_TOOLBAR_FOLDERS) return layout
+  const grouped = upsertToolbarFolder(layout, { ...folder, items: [other, item] })
+  const order = rootOrder.filter(id => id !== item)
+  order.splice(Math.max(0, order.indexOf(other)), 0, `folder:${folder.id}`)
+  return { ...grouped, toolbar_order: order }
+}
+
 export function moveToolbarItem<T extends ToolbarLayout>(
   layout: T, item: string, target: { folder?: string; before?: string }, rootOrder = toolbarLayoutOrder(layout),
 ): T {
   if (item === target.before || (item === 'settings' && target.folder)) return layout
   const folders = normalizeToolbarFolders(layout.toolbar_folders)
-  if (!isToolbarItem(item) && !folders.some(folder => `folder:${folder.id}` === item)) return layout
-  if (target.folder && (item.startsWith('folder:') || !folders.some(folder => folder.id === target.folder))) return layout
+  if (!isToolbarItem(item) && !isToolbarSeparator(item) && !folders.some(folder => `folder:${folder.id}` === item)) return layout
+  if (target.folder && (!isToolbarItem(item) || !folders.some(folder => folder.id === target.folder))) return layout
   for (const folder of folders) folder.items = folder.items.filter(id => id !== item)
   if (target.folder) {
     const folder = folders.find(folder => folder.id === target.folder)!

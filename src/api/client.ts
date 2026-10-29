@@ -1103,6 +1103,11 @@ export interface ExtensionRoute {
   auth: string
 }
 
+export interface USBADBDebugStatus {
+  available: boolean
+  enabled: boolean
+}
+
 export interface ManagedService {
   id: string
   name: string
@@ -1867,6 +1872,10 @@ export const api = {
   getLogs: async (lines = 250) =>
     (await request<LogResponse>(`/api/logs?lines=${encodeURIComponent(lines)}`)).lines,
   getServices: () => request<ManagedService[]>('/api/services'),
+  getUSBADBDebug: () => request<USBADBDebugStatus>('/api/system/usb-adb', { cache: 'no-store' }),
+  setUSBADBDebug: (enabled: boolean) => request<USBADBDebugStatus>('/api/system/usb-adb', {
+    method: 'PUT', body: JSON.stringify({ enabled }),
+  }),
   serviceAction: (id: string, action: 'start' | 'stop' | 'restart' | 'enable' | 'disable') =>
     request<{ status: string }>(`/api/services/${encodeURIComponent(id)}/${action}`, { method: 'POST' }),
 	getOneKVMServiceSettings: () => request<OneKVMServiceSettings>('/api/services/onekvm'),

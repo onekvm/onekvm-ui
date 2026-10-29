@@ -141,6 +141,7 @@ import FileManagerPage from './file-manager/FileManagerPage.vue'
 import SettingsAppList from './SettingsAppList.vue'
 import SystemMemorySpec from './SystemMemorySpec.vue'
 import SystemCertificateFingerprint from './SystemCertificateFingerprint.vue'
+import SystemUSBADBDebug from './SystemUSBADBDebug.vue'
 import SystemSpecBadge from './SystemSpecBadge.vue'
 
 type Section = string
@@ -2353,20 +2354,27 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                         {{ t('settings.factoryReset.action', 'Restore') }}
                       </n-button>
                     </div>
-                    <div v-if="schema?.capabilities?.recovery === true" class="system-recovery-row">
-                      <strong>{{ t('settings.recoveryMode.title', 'Recovery') }}</strong>
-                      <n-button type="warning" secondary :loading="enteringRecovery" :disabled="systemAction !== null" @click="confirmEnterRecovery">
-                        <template #icon><LifeBuoy /></template>
-                        {{ t('settings.recoveryMode.action', 'Enter') }}
-                      </n-button>
-                    </div>
-                    <div class="system-recovery-row">
-                      <strong>{{ t('settings.diagnostics.title', 'Download diagnostic data') }}</strong>
-                      <n-button secondary :disabled="systemAction !== null" @click="diagnosticsOpen = true">
-                        <template #icon><Download /></template>
-                        {{ t('settings.diagnostics.action', 'Download') }}
-                      </n-button>
-                    </div>
+                    <n-collapse class="system-recovery-tools" :default-expanded-names="[]">
+                      <n-collapse-item name="tools" :title="t('settings.advancedSettings.systemPage.recoveryTools', 'Debug and recovery tools')" display-directive="if">
+                        <div class="system-settings-group">
+                          <SystemUSBADBDebug :disabled="systemAction !== null || !canManageSettings" />
+                          <div v-if="schema?.capabilities?.recovery === true" class="system-recovery-row">
+                            <strong>{{ t('settings.recoveryMode.title', 'Recovery') }}</strong>
+                            <n-button type="warning" secondary :loading="enteringRecovery" :disabled="systemAction !== null" @click="confirmEnterRecovery">
+                              <template #icon><LifeBuoy /></template>
+                              {{ t('settings.recoveryMode.action', 'Enter') }}
+                            </n-button>
+                          </div>
+                          <div class="system-recovery-row">
+                            <strong>{{ t('settings.diagnostics.title', 'Download diagnostic data') }}</strong>
+                            <n-button secondary :disabled="systemAction !== null" @click="diagnosticsOpen = true">
+                              <template #icon><Download /></template>
+                              {{ t('settings.diagnostics.action', 'Download') }}
+                            </n-button>
+                          </div>
+                        </div>
+                      </n-collapse-item>
+                    </n-collapse>
                   </section>
                 </template>
               </section>

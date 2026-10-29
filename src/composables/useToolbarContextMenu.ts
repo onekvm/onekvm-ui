@@ -10,6 +10,7 @@ export function useToolbarContextMenu(options: {
   canCreateFolder: () => boolean
   createFolder: () => void
   editFolder: (id: string) => void
+  removeFolder: (id: string) => void
   addSeparator: (before?: string) => void
   removeSeparator: (id: string) => void
 }) {
@@ -24,6 +25,7 @@ export function useToolbarContextMenu(options: {
     { key: 'separator', label: t('toolbar.addSeparator', 'Add separator'), icon: glyph(Minus), disabled: locked.value || !options.canArrange() },
     { key: 'folder', label: t('toolbar.folders.create', 'Create folder'), icon: glyph(FolderPlus), disabled: locked.value || !options.canArrange() || !options.canCreateFolder() },
     ...(item.value.startsWith('folder:') ? [{ key: 'edit', label: t('toolbar.folders.edit', 'Edit folder'), icon: glyph(Pencil), disabled: locked.value || !options.canArrange() }] : []),
+    ...(item.value.startsWith('folder:') ? [{ key: 'remove-folder', label: t('toolbar.folders.remove', 'Delete folder'), icon: glyph(Trash2), disabled: locked.value || !options.canArrange() }] : []),
     ...(isToolbarSeparator(item.value) ? [{ key: 'remove', label: t('toolbar.removeSeparator', 'Remove separator'), icon: glyph(Trash2), disabled: locked.value || !options.canArrange() }] : []),
   ])
   function open(event: MouseEvent) {
@@ -47,6 +49,7 @@ export function useToolbarContextMenu(options: {
     if (key === 'separator') options.addSeparator(item.value || undefined)
     if (key === 'remove' && isToolbarSeparator(item.value)) options.removeSeparator(item.value)
     if (key === 'edit') options.editFolder(item.value.slice(7))
+    if (key === 'remove-folder' && item.value.startsWith('folder:')) options.removeFolder(item.value.slice(7))
   }
   return { locked, show, position, menuOptions, open, select }
 }

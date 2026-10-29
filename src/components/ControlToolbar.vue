@@ -62,7 +62,7 @@ import { useToolbarLayout } from '@/composables/useToolbarLayout'
 import { useToolbarItemDrag } from '@/composables/useToolbarItemDrag'
 import { useToolbarContextMenu } from '@/composables/useToolbarContextMenu'
 import { useToolbarFolderOptions } from '@/composables/useToolbarFolderOptions'
-import { MAX_TOOLBAR_FOLDERS, groupToolbarItems, moveToolbarItem, toolbarFolderFor, upsertToolbarFolder, visibleToolbarSeparators } from '@/lib/toolbar-layout'
+import { MAX_TOOLBAR_FOLDERS, groupToolbarItems, moveToolbarItem, removeToolbarFolder, toolbarFolderFor, upsertToolbarFolder, visibleToolbarSeparators } from '@/lib/toolbar-layout'
 import type { ToolbarFolder } from '@/api/client'
 import ToolbarFolderDialog from './ToolbarFolderDialog.vue'
 
@@ -216,6 +216,10 @@ const toolbarContext = useToolbarContextMenu({
   canCreateFolder: () => toolbarLayout.folders.value.length < MAX_TOOLBAR_FOLDERS,
   createFolder: () => openFolderEditor(),
   editFolder: id => openFolderEditor(toolbarLayout.folders.value.find(folder => folder.id === id) ?? null),
+  removeFolder: id => {
+    setFolderOpen(id, false)
+    void toolbarLayout.save(layout => removeToolbarFolder(layout, id))
+  },
   addSeparator: before => {
     const id = `separator:${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
     const order = [...toolbarLayout.order.value]

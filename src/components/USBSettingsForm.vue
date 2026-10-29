@@ -63,6 +63,11 @@ const speakerOn = computed({
 const speakerBlocked = computed(() => !audio.value.enabled && (audio.value.source || 'usb') === 'usb'
   && !wouldFit({ audio: true }))
 const speakerShowsCapacity = computed(() => (audio.value.source || 'usb') === 'usb')
+const microphoneOn = computed({
+  get: () => Boolean(audio.value.microphone),
+  set: (value: boolean) => { audio.value = { ...audio.value, microphone: value } },
+})
+const microphoneBlocked = computed(() => !audio.value.microphone && !wouldFit({ microphone: true }))
 const networkSharing = computed({
   get: () => Boolean(usb.value.network_sharing),
   set: (value: boolean) => { usb.value.network_sharing = value },
@@ -225,6 +230,28 @@ const remoteWakeup = computed({
                 </span>
               </template>
               {{ t('settings.advancedSettings.usbPage.audioBlocked', 'Not enough USB capacity. Turn off the microphone, virtual storage, or file transfer first.') }}
+            </n-tooltip>
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>{{ t('settings.advancedSettings.usbPage.microphone', 'USB microphone') }}</strong>
+            <small>{{ t('settings.advancedSettings.usbPage.microphoneHint', 'Forwards this browser’s microphone to the controlled device. Turn it off and that device will not see a microphone.') }}</small>
+          </div>
+          <div class="usb-function-controls">
+            <USBCapacityBadge :endpoints="endpointCosts.microphone" />
+            <n-tooltip :disabled="!microphoneBlocked" placement="left">
+              <template #trigger>
+                <span class="usb-function-switch">
+                  <n-switch
+                    v-model:value="microphoneOn"
+                    :disabled="props.disabled || microphoneBlocked"
+                    :aria-disabled="Boolean(props.disabled || microphoneBlocked)"
+                    :aria-label="t('settings.advancedSettings.usbPage.microphone', 'USB microphone')"
+                  />
+                </span>
+              </template>
+              {{ t('settings.advancedSettings.usbPage.microphoneBlocked', 'Not enough USB capacity. Turn off the speaker, virtual storage, or file transfer first.') }}
             </n-tooltip>
           </div>
         </li>

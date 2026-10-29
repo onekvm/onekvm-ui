@@ -565,21 +565,23 @@ watch(() => props.disabled, (disabled, previous) => {
               <ExpandablePanel :show="expanded === networkInterface.name">
                 <div class="settings-list-detail">
                   <dl class="interface-facts">
-                    <div v-if="networkInterface.kind === 'physical'">
-                      <dt>{{ t('network.interfaces.currentMAC', 'Current MAC address') }}</dt>
-                      <dd>{{ networkInterface.mac || '-' }}</dd>
+                    <div class="interface-status">
+                      <div v-if="networkInterface.kind === 'physical'">
+                        <dt>{{ t('network.interfaces.currentMAC', 'Current MAC address') }}</dt>
+                        <dd>{{ networkInterface.mac || '-' }}</dd>
+                      </div>
+                      <div v-if="networkInterface.port_type === 'physical'">
+                        <dt>{{ t('network.interfaces.linkSpeed', 'Link speed') }}</dt>
+                        <dd>{{ networkInterface.link_speed_mbps > 0
+                          ? `${networkInterface.link_speed_mbps} Mbps`
+                          : t('network.interfaces.speedUnavailable', 'Unavailable') }}</dd>
+                      </div>
+                      <div>
+                        <dt>{{ t('network.interfaces.currentMTU', 'Current MTU') }}</dt>
+                        <dd>{{ networkInterface.mtu || '-' }}</dd>
+                      </div>
                     </div>
-                    <div v-if="networkInterface.port_type === 'physical'">
-                      <dt>{{ t('network.interfaces.linkSpeed', 'Link speed') }}</dt>
-                      <dd>{{ networkInterface.link_speed_mbps > 0
-                        ? `${networkInterface.link_speed_mbps} Mbps`
-                        : t('network.interfaces.speedUnavailable', 'Unavailable') }}</dd>
-                    </div>
-                    <div>
-                      <dt>{{ t('network.interfaces.currentMTU', 'Current MTU') }}</dt>
-                      <dd>{{ networkInterface.mtu || '-' }}</dd>
-                    </div>
-                    <div>
+                    <div class="interface-address-fact">
                       <dt>{{ t('network.interfaces.addresses', 'Addresses') }}</dt>
                       <dd class="interface-addresses">
                         <span v-for="address in networkInterface.addresses" :key="address">{{ address }}</span>
@@ -723,9 +725,15 @@ watch(() => props.disabled, (disabled, previous) => {
   gap: 10px;
   margin: 0;
 }
-.interface-facts > div { display: grid; gap: 2px; }
+.interface-status {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 16px;
+}
+.interface-status > div,
+.interface-address-fact { display: grid; gap: 2px; min-width: 0; }
 .interface-facts dt { color: var(--muted-foreground); font-size: 11px; }
-.interface-facts dd { margin: 0; font-size: 13px; }
+.interface-facts dd { margin: 0; overflow-wrap: anywhere; font-size: 13px; }
 .interface-addresses {
   display: grid;
   gap: 2px;
@@ -748,6 +756,7 @@ watch(() => props.disabled, (disabled, previous) => {
   }
   .settings-list-detail { padding: 14px 12px 18px 38px; }
   .settings-list-row :deep(.port-type-tag) { display: none; }
+  .interface-status { grid-template-columns: minmax(0, 1fr); }
 }
 </style>
 
@@ -756,4 +765,5 @@ watch(() => props.disabled, (disabled, previous) => {
   max-height: min(24rem, calc(100vh - 12rem));
 }
 .network-add-warning-option { display: inline-flex; align-items: center; gap: 7px; color: var(--warning); }
+.advanced-settings-page.is-settings-app .interface-status { grid-template-columns: minmax(0, 1fr); }
 </style>

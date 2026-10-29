@@ -590,6 +590,8 @@ const zh = {
         outgoingReject: '设备主动发出的连接会立刻失败。',
         allow: '允许', deny: '拦截', reject: '拒绝', limit: '限速',
         addRule: '添加规则',
+        editRule: '编辑规则', saveRule: '保存规则',
+        editRuleHint: '应用后生效。', updatedRule: '修改后',
         addRuleHint: '先加入列表，点应用后才会生效。',
         action: '动作', direction: '方向',
         source: '来源', anywhere: '任何地址', specificSource: '指定地址',

@@ -590,6 +590,8 @@ const zh_tw = {
         outgoingReject: '裝置主動發出的連線會立刻失敗。',
         allow: '允許', deny: '攔截', reject: '拒絕', limit: '限速',
         addRule: '新增規則',
+        editRule: '編輯規則', saveRule: '儲存規則',
+        editRuleHint: '套用後生效。', updatedRule: '修改後',
         addRuleHint: '先加入清單，點套用後才會生效。',
         action: '動作', direction: '方向',
         source: '來源', anywhere: '任何位址', specificSource: '指定位址',

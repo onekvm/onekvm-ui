@@ -5,11 +5,13 @@ import {
   collapseDraft,
   draftFromStatus,
   draftsEqual,
+  duplicateAllow,
   enableProtection,
   extraRules,
   managementServices,
   protocolPort,
   reorderVisible,
+  saveFirewallRule,
   serviceEnabled,
   servicePortRules,
   setService,
@@ -110,3 +112,27 @@ const mixed = collapseDraft(draft([
 ]))
 assert.deepEqual(mixed.allowSources, [])
 assert.equal(mixed.rules.length, 2)
+
+// Editing replaces the original row in place, including its action, while
+// allowing a note-only edit of an allow rule without treating it as a duplicate.
+const originalRules = [allow('22', { id: 1 }), allow('443', { id: 2 }), allow('53', { id: 3, protocol: 'udp', action: 'deny' })]
+assert.equal(duplicateAllow(originalRules, originalRules[1], 2), false)
+assert.equal(duplicateAllow(originalRules, { ...originalRules[1], port: '22' }, 2), true)
+assert.equal(duplicateAllow(originalRules, { ...originalRules[1], port: '22', protocol: 'any' }, 2), true)
+assert.equal(duplicateAllow(originalRules, { ...originalRules[1], source: '10.0.0.0/24' }, 2), false)
+const editedValues = { action: 'reject', direction: 'out', protocol: 'udp', port: '8443', source: '10.0.0.0/24', comment: 'Edited' }
+const editedRules = saveFirewallRule(originalRules, editedValues, 2)
+assert.deepEqual(editedRules.map(rule => rule.id), [1, 2, 3])
+assert.deepEqual(editedRules[1], { ...editedValues, id: 2 })
+assert.equal(editedRules[0], originalRules[0])
+assert.equal(editedRules[2], originalRules[2])
+assert.equal(originalRules[1].port, '443')
+assert.deepEqual(applyPayload(draft(editedRules)).rules?.[1], editedValues)
+assert.deepEqual(saveFirewallRule(originalRules, editedValues, 99), originalRules)
+// Expanded whitelist rows already use negative IDs; newly added rules must
+// get their own IDs so later edits target only the intended row.
+const expandedRows = [allow('22', { id: -1 }), allow('443', { id: -2 })]
+const addedRows = saveFirewallRule(expandedRows, editedValues, null)
+assert.deepEqual(addedRows.map(rule => rule.id), [-1, -2, -3])
+assert.deepEqual(saveFirewallRule(addedRows, { ...editedValues, port: '9443' }, -3).map(rule => rule.port), ['22', '443', '9443'])
+console.log('firewall draft tests passed')

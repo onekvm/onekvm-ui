@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { GripVertical, Plus, Trash2 } from '@/icons'
+import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
+import { GripVertical, Pencil, Plus, Trash2 } from '@/icons'
 import { NButtonGroup, useMessage } from 'naive-ui'
 
 import { api, type ExtensionSummary, type FirewallStatus } from '@/api/client'
@@ -12,12 +12,14 @@ import {
   collapseDraft,
   draftFromStatus,
   draftsEqual,
+  duplicateAllow,
   enableProtection,
   expandDraft,
   isAnywhere,
   managementServices,
   protocolPort,
   reorderVisible,
+  saveFirewallRule,
   servicePortRules,
   serviceEnabled,
   setService,
@@ -46,6 +48,7 @@ const expiresAt = ref(0)
 const now = ref(Date.now())
 const ruleModal = ref(false)
 const ruleModalSimple = ref(true)
+const editingRuleId = shallowRef<number | null>(null)
 const sourceModal = ref(false)
 const sourceAddress = ref('')
 const dragId = ref<number | null>(null)
@@ -57,7 +60,6 @@ const rulePort = ref('')
 const ruleSourceMode = ref<'any' | 'address'>('any')
 const ruleSource = ref('')
 const ruleComment = ref('')
-let nextId = -1
 let pollTimer: number | null = null
 let clockTimer: number | null = null
 
@@ -107,12 +109,16 @@ function sentence(rule: FirewallRuleDraft) {
     .replace('{source}', isAnywhere(rule.source) ? t('settings.firewall.anywhere', 'Anywhere') : rule.source)
 }
 
-function ruleDetail(rule: FirewallRuleDraft) {
+function ruleDetail(rule: FirewallRuleDraft, advanced = false) {
   const parts: string[] = []
-  if (!(rule.action === 'allow' && rule.direction === 'in')) parts.push(`${t(`settings.firewall.${rule.action}`, rule.action)}${t(rule.direction === 'out' ? 'settings.firewall.out' : 'settings.firewall.in', rule.direction)}`)
+  if (advanced) parts.push(t(rule.direction === 'out' ? 'settings.firewall.out' : 'settings.firewall.in', rule.direction))
   if (!isAnywhere(rule.source)) parts.push(rule.source)
   if (rule.comment) parts.push(rule.comment)
   return parts.join(' · ')
+}
+
+function actionType(action: string) {
+  return ({ allow: 'success', deny: 'error', reject: 'warning', limit: 'info' } as const)[action as 'allow' | 'deny' | 'reject' | 'limit'] ?? 'default'
 }
 
 function serviceById(id: ServiceDef['id']) {
@@ -186,11 +192,9 @@ function validPort(port: string) {
   return /^[0-9]{1,5}(?::[0-9]{1,5})?$/.test(port.trim())
 }
 
-function duplicateAllow(port: string, protocol: string, direction: string, source: string) {
-  return Boolean(draft.value?.rules.some((rule) => rule.action === 'allow' && rule.direction === direction && rule.port === port && (rule.protocol === protocol || rule.protocol === 'any' || protocol === 'any') && isAnywhere(rule.source) === isAnywhere(source) && (isAnywhere(source) || rule.source === source)))
-}
-
 function openRuleModal(simple: boolean) {
+  if (busy.value) return
+  editingRuleId.value = null
   ruleModalSimple.value = simple
   ruleAction.value = 'allow'
   ruleDirection.value = 'in'
@@ -202,24 +206,38 @@ function openRuleModal(simple: boolean) {
   ruleModal.value = true
 }
 
+function editRule(rule: FirewallRuleDraft) {
+  if (busy.value) return
+  editingRuleId.value = rule.id
+  ruleModalSimple.value = false
+  ruleAction.value = rule.action
+  ruleDirection.value = rule.direction
+  ruleProtocol.value = rule.protocol || 'any'
+  rulePort.value = rule.port
+  ruleSourceMode.value = isAnywhere(rule.source) ? 'any' : 'address'
+  ruleSource.value = rule.source
+  ruleComment.value = rule.comment
+  ruleModal.value = true
+}
+
 function addSimplePort() {
   const port = rulePort.value.trim()
   if (!validPort(port)) {
     message.warning(t('settings.firewall.portRequired', 'Enter a port, such as 22, 443, or 8000:8010'))
     return false
   }
-  if (duplicateAllow(port, ruleProtocol.value, 'in', '')) {
+  if (duplicateAllow(draft.value?.rules ?? [], { port, protocol: ruleProtocol.value, direction: 'in', source: '' })) {
     message.warning(t('settings.firewall.duplicate', 'That port is already allowed'))
     return false
   }
   updateDraft((current) => ({
     ...current,
-    rules: [...current.rules, { id: nextId--, action: 'allow', direction: 'in', protocol: ruleProtocol.value, port, source: '', comment: ruleComment.value.trim() }],
+    rules: saveFirewallRule(current.rules, { action: 'allow', direction: 'in', protocol: ruleProtocol.value, port, source: '', comment: ruleComment.value.trim() }, null),
   }))
   return true
 }
 
-function addAdvancedRule() {
+function saveAdvancedRule() {
   const port = rulePort.value.trim()
   const source = ruleSourceMode.value === 'address' ? ruleSource.value.trim() : ''
   if (!validPort(port)) {
@@ -230,21 +248,20 @@ function addAdvancedRule() {
     message.warning(t('settings.firewall.sourceRequired', 'Enter an address or network'))
     return false
   }
-  if (ruleAction.value === 'allow' && duplicateAllow(port, ruleProtocol.value, ruleDirection.value, source)) {
+  if (ruleAction.value === 'allow' && duplicateAllow(draft.value?.rules ?? [], { port, protocol: ruleProtocol.value, direction: ruleDirection.value, source }, editingRuleId.value ?? undefined)) {
     message.warning(t('settings.firewall.duplicate', 'That port is already allowed'))
     return false
   }
   updateDraft((current) => ({
     ...current,
-    rules: [...current.rules, {
-      id: nextId--,
+    rules: saveFirewallRule(current.rules, {
       action: ruleAction.value,
       direction: ruleDirection.value,
       protocol: ruleProtocol.value,
       port,
       source,
       comment: ruleComment.value.trim(),
-    }],
+    }, editingRuleId.value),
   }))
   rulePort.value = ''
   ruleSource.value = ''
@@ -253,7 +270,8 @@ function addAdvancedRule() {
 }
 
 function submitRule() {
-  const added = ruleModalSimple.value ? addSimplePort() : addAdvancedRule()
+  if (busy.value) return
+  const added = ruleModalSimple.value ? addSimplePort() : saveAdvancedRule()
   if (added) ruleModal.value = false
 }
 
@@ -550,9 +568,15 @@ onUnmounted(() => {
                 <GripVertical :size="16" />
               </button>
               <div class="firewall-rule-main">
-                <strong>{{ endpoint(rule) }}</strong>
-                <small v-if="ruleDetail(rule)">{{ ruleDetail(rule) }}</small>
+                <div class="firewall-rule-title">
+                  <n-tag size="small" :type="actionType(rule.action)" :bordered="false">{{ t(`settings.firewall.${rule.action}`, rule.action) }}</n-tag>
+                  <strong>{{ endpoint(rule) }}</strong>
+                </div>
+                <small>{{ ruleDetail(rule, true) }}</small>
               </div>
+              <n-button quaternary circle :disabled="busy" :aria-label="`${t('settings.firewall.editRule', 'Edit rule')}: ${endpoint(rule)}`" @click="editRule(rule)">
+                <template #icon><Pencil :size="15" /></template>
+              </n-button>
               <n-button quaternary circle :disabled="busy" :aria-label="t('settings.firewall.remove', 'Remove')" @click="removeRule(rule.id)">
                 <template #icon><Trash2 :size="15" /></template>
               </n-button>
@@ -600,13 +624,13 @@ onUnmounted(() => {
       :to="overlayTo"
       :z-index="4600"
       :style="{ width: 'min(480px, calc(100vw - 32px))' }"
-      :title="ruleModalSimple ? t('settings.firewall.addPort', 'Add port') : t('settings.firewall.addRule', 'Add a rule')"
+      :title="editingRuleId !== null ? t('settings.firewall.editRule', 'Edit rule') : ruleModalSimple ? t('settings.firewall.addPort', 'Add port') : t('settings.firewall.addRule', 'Add a rule')"
       :mask-closable="!busy"
       :closable="!busy"
       :close-on-esc="!busy"
     >
       <form class="firewall-modal" @submit.prevent="submitRule">
-        <p>{{ ruleModalSimple ? t('settings.firewall.portOnlyHint', 'Enter a protocol and port, such as TCP/5900. An IP address is not needed.') : t('settings.firewall.addRuleHint', 'It is added to the list first. Nothing changes until you apply.') }}</p>
+        <p>{{ editingRuleId !== null ? t('settings.firewall.editRuleHint', 'Changes take effect after you apply.') : ruleModalSimple ? t('settings.firewall.portOnlyHint', 'Enter a protocol and port, such as TCP/5900. An IP address is not needed.') : t('settings.firewall.addRuleHint', 'It is added to the list first. Nothing changes until you apply.') }}</p>
         <template v-if="!ruleModalSimple">
           <label>{{ t('settings.firewall.action', 'What to do') }}<n-select v-model:value="ruleAction" :options="actionOptions" /></label>
           <label>{{ t('settings.firewall.direction', 'Direction') }}<n-select v-model:value="ruleDirection" :options="directionOptions" /></label>
@@ -624,10 +648,10 @@ onUnmounted(() => {
         <label>{{ t('settings.firewall.comment', 'Note') }}
           <n-input v-model:value="ruleComment" :placeholder="t('settings.firewall.commentPlaceholder', 'Optional, so you can recognize it later')" />
         </label>
-        <p class="firewall-preview"><span>{{ t('settings.firewall.preview', 'This will add') }}</span>{{ preview }}</p>
+        <p class="firewall-preview"><span>{{ editingRuleId !== null ? t('settings.firewall.updatedRule', 'Updated rule') : t('settings.firewall.preview', 'This will add') }}</span>{{ preview }}</p>
         <div class="firewall-modal-actions">
           <n-button @click="ruleModal = false">{{ t('auth.cancel', 'Cancel') }}</n-button>
-          <n-button attr-type="submit" type="primary">{{ t('settings.firewall.addToList', 'Add to list') }}</n-button>
+          <n-button attr-type="submit" type="primary" :disabled="busy">{{ editingRuleId !== null ? t('settings.firewall.saveRule', 'Save rule') : t('settings.firewall.addToList', 'Add to list') }}</n-button>
         </div>
       </form>
     </n-modal>
@@ -696,6 +720,8 @@ onUnmounted(() => {
 .firewall-list li:first-child { border-top: 0; padding-top: 0; }
 .firewall-list strong { font-size: 13px; }
 .firewall-rule-main { flex: 1; min-width: 0; }
+.firewall-rule-main small { overflow-wrap: anywhere; }
+.firewall-rule-title { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
 .firewall-rule { transition: opacity 160ms ease, background-color 160ms ease; }
 .firewall-rule-move { transition: transform 200ms ease, opacity 160ms ease, background-color 160ms ease; }
 .firewall-rule.is-dragging { opacity: 0.45; }

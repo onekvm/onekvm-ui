@@ -591,6 +591,8 @@ const en = {
         outgoingReject: 'Connections started by this device fail immediately.',
         allow: 'Allow', deny: 'Block', reject: 'Reject', limit: 'Limit',
         addRule: 'Add rule',
+        editRule: 'Edit rule', saveRule: 'Save rule',
+        editRuleHint: 'Changes take effect after you apply.', updatedRule: 'Updated rule',
         addRuleHint: 'It joins the list first. Nothing changes until you apply.',
         action: 'Action', direction: 'Direction',
         source: 'Source', anywhere: 'Any address', specificSource: 'This address',

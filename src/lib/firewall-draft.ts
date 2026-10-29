@@ -36,6 +36,20 @@ export function protocolPort(protocol: string, port: string) {
   return `${name}/${port}`
 }
 
+export function duplicateAllow(rules: FirewallRuleDraft[], candidate: Pick<FirewallRuleDraft, 'port' | 'protocol' | 'direction' | 'source'>, excludeId?: number) {
+  return rules.some(rule => rule.id !== excludeId && rule.action === 'allow'
+    && rule.direction === candidate.direction && rule.port === candidate.port
+    && (rule.protocol === candidate.protocol || rule.protocol === 'any' || candidate.protocol === 'any')
+    && isAnywhere(rule.source) === isAnywhere(candidate.source)
+    && (isAnywhere(candidate.source) || rule.source === candidate.source))
+}
+
+export function saveFirewallRule(rules: FirewallRuleDraft[], values: Omit<FirewallRuleDraft, 'id'>, id: number | null) {
+  if (id !== null) return rules.map(rule => rule.id === id ? { ...values, id } : rule)
+  const nextId = Math.min(0, ...rules.map(rule => rule.id)) - 1
+  return [...rules, { ...values, id: nextId }]
+}
+
 export function whitelistRules(rules: FirewallRuleDraft[]) {
   return rules.filter((rule) => rule.action === 'allow' && rule.direction === 'in')
 }

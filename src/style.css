@@ -6044,7 +6044,7 @@ body:has(.toolbar:is(.has-context-menu, .is-item-dragging)) .n-tooltip { visibil
 .toolbar-item-drag-ghost { display: flex; align-items: center; padding: 3px; color: var(--foreground); background: var(--popover); border: 1px solid var(--ring); border-radius: 6px; box-shadow: var(--onekvm-shadow-panel); }
 .toolbar-item-drag-ghost .toolbar-action-label { display: none; }
 .is-toolbar-item-dragging { opacity: .35; }
-.is-toolbar-drop-target { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
+.is-toolbar-drop-target { outline: 2px solid var(--ring); outline-offset: -2px; border-radius: 0; }
 .is-toolbar-drop-target:is([data-toolbar-drop-mode="into"], [data-toolbar-drop-mode="merge"]) { background: var(--accent); }
 .toolbar.is-item-dragging [data-toolbar-item] { cursor: grabbing; }
 .toolbar-tray.is-centered .toolbar-layout { display: flex; flex-direction: column; align-items: stretch; overflow: visible; width: 100%; max-width: none; gap: 0; }

@@ -3,10 +3,10 @@ import { computed, onMounted, ref } from 'vue'
 
 import { api, type ManagedNetworkInterface, type NetworkInterfaceStatus } from '@/api/client'
 import { t } from '@/i18n/runtime'
-import { validMACAddress } from '@/lib/network'
 
 import IosChoice from './IosChoice.vue'
 import NetworkAddressSettingsForm from './NetworkAddressSettingsForm.vue'
+import NetworkAdvancedSettings from './NetworkAdvancedSettings.vue'
 
 const props = withDefaults(defineProps<{
   modelValue: ManagedNetworkInterface
@@ -78,31 +78,31 @@ const interfaceOptions = computed(() => {
       />
     </n-form-item>
 
-    <n-form-item v-if="showMAC" :label="t('network.interfaces.macAddress', 'MAC address')">
-      <n-input
-        :value="modelValue.mac_address || ''"
-        :disabled="disabled"
-        placeholder="02:00:00:00:00:01"
-        clearable
-        :status="!validMACAddress(modelValue.mac_address) ? 'error' : undefined"
-        @update:value="update('mac_address', $event.trim())"
-      />
-      <template #feedback>
-        {{ t('network.interfaces.macAddressHint', 'Leave empty to use the hardware MAC address.') }}
-      </template>
-    </n-form-item>
-
     <NetworkAddressSettingsForm
       v-if="showAddress"
       :model-value="modelValue"
       :disabled="disabled"
       :hide-disabled-ipv4="!allowIPv4Disabled"
-      :hide-route-metric="props.hideRouteMetric || props.inset"
+      hide-route-metric
       :inset="props.inset"
       @update:model-value="emit('update:modelValue', {
         ...modelValue,
         ...$event,
       })"
+    />
+
+    <NetworkAdvancedSettings
+      :mtu="modelValue.mtu"
+      :mac-address="modelValue.mac_address"
+      :route-metric="modelValue.route_metric"
+      :ipv6="modelValue.ipv6_mode !== 'disabled'"
+      :disabled="disabled"
+      :show-mac="showMAC"
+      :show-route-metric="showAddress && !hideRouteMetric && !inset"
+      :inset="inset"
+      @update:mtu="update('mtu', $event)"
+      @update:mac-address="update('mac_address', $event)"
+      @update:route-metric="update('route_metric', $event)"
     />
 
   </div>

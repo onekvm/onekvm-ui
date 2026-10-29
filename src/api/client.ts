@@ -190,6 +190,7 @@ export interface VpnClientConfig {
 export interface ManagedNetworkInterface {
   kind: 'physical' | 'vlan' | 'gre' | 'ipip' | 'sit' | 'vxlan' | 'geneve' | 'fou' | 'bareudp' | 'gretap'
   name: string
+  mtu?: number
   disabled?: boolean
   mac_address?: string
   dns?: string[]
@@ -215,6 +216,7 @@ export interface ManagedNetworkInterface {
 
 export interface WireGuardConfig {
   name: string
+  mtu?: number
   private_key: string
   public_key: string
   addresses: string[]
@@ -258,6 +260,7 @@ export interface WireGuardPeer {
 export interface NetworkInterfaceStatus {
   wifi_role?: '' | 'ap' | 'station'
   name: string
+  mtu?: number
   up: boolean
   configured: boolean
   mac: string

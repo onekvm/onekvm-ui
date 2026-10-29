@@ -6,6 +6,7 @@ import { t } from '@/i18n/runtime'
 import { DEFAULT_FALLBACK_IPV4, ipv4ModeUsesStaticAddress, isIPv6, validCIDR } from '@/lib/network'
 
 import IosChoice from './IosChoice.vue'
+import NetworkAdvancedSettings from './NetworkAdvancedSettings.vue'
 import NetworkGatewayField from './NetworkGatewayField.vue'
 
 interface NetworkAddressConfig {
@@ -146,23 +147,21 @@ function update<K extends keyof NetworkAddressConfig>(key: K, value: NetworkAddr
       </div>
     </section>
 
-    <n-form-item v-if="!hideRouteMetric" class="network-route-metric" :label="t('network.interfaces.routeMetric', 'Route metric')">
-      <n-input-number
-        :value="modelValue.route_metric"
-        :disabled="disabled"
-        :min="0"
-        :precision="0"
-        @update:value="update('route_metric', $event ?? 0)"
-      />
-    </n-form-item>
+    <NetworkAdvancedSettings
+      v-if="!hideRouteMetric"
+      :show-mtu="false"
+      :route-metric="modelValue.route_metric"
+      :disabled="disabled"
+      :inset="inset"
+      @update:route-metric="update('route_metric', $event)"
+    />
   </div>
 </template>
 
 <style scoped>
 .network-address-settings { display: grid; gap: 8px; }
 .network-address-settings.is-inset { gap: 0; }
-.network-address-settings.is-inset .network-config-section,
-.network-address-settings.is-inset > .network-route-metric {
+.network-address-settings.is-inset .network-config-section {
   margin-top: 20px;
   padding-top: 16px;
   border-top: 1px solid var(--border-strong);
@@ -172,7 +171,6 @@ function update<K extends keyof NetworkAddressConfig>(key: K, value: NetworkAddr
   gap: 14px;
 }
 .network-address-settings.is-inset .network-fields { display: grid; gap: 14px; }
-.network-address-settings.is-inset .network-route-metric { width: 100%; }
 .network-address-settings.is-inset h3 { margin: 0 4px; font-size: 13px; font-weight: 400; color: var(--muted-foreground); }
 .network-config-section {
   padding-top: 12px;
@@ -190,11 +188,8 @@ function update<K extends keyof NetworkAddressConfig>(key: K, value: NetworkAddr
   gap: 0 12px;
 }
 .network-fields > :first-child { grid-column: 1 / -1; }
-.network-route-metric { width: calc(50% - 6px); }
-.network-route-metric :deep(.n-input-number) { width: 100%; }
 @media (max-width: 760px) {
   .network-fields { grid-template-columns: 1fr; }
   .network-fields > * { grid-column: 1 !important; }
-  .network-route-metric { width: 100%; }
 }
 </style>

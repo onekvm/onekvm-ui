@@ -132,6 +132,7 @@ const visibleInterfaces = computed(() => {
       kind: 'wireguard' as const,
       port_type: 'virtual' as const,
       link_speed_mbps: 0,
+      mtu: status?.mtu || 0,
       configuration,
       wireGuardIndex,
     }
@@ -149,6 +150,7 @@ const visibleInterfaces = computed(() => {
       kind: configuration.kind === 'physical' && props.wifiAvailable && status?.wifi_role === 'station' ? 'wifi_station' as const : configuration.kind,
       port_type: configuration.kind === 'physical' ? 'physical' as const : 'virtual' as const,
       link_speed_mbps: status?.link_speed_mbps || 0,
+      mtu: status?.mtu || 0,
       configuration,
       managedIndex,
     }
@@ -166,6 +168,7 @@ const visibleInterfaces = computed(() => {
       kind: configuration.kind,
       port_type: 'virtual' as const,
       link_speed_mbps: 0,
+      mtu: status?.mtu || 0,
       configuration,
       vpnIndex,
     }
@@ -520,8 +523,8 @@ watch(() => props.disabled, (disabled, previous) => {
 
           <ExpandablePanel :show="expanded === networkInterface.name">
             <div class="settings-list-detail">
-              <dl v-if="networkInterface.kind === 'physical'" class="interface-facts">
-                <div>
+              <dl class="interface-facts">
+                <div v-if="networkInterface.kind === 'physical'">
                   <dt>{{ t('network.interfaces.currentMAC', 'Current MAC address') }}</dt>
                   <dd>{{ networkInterface.mac || '-' }}</dd>
                 </div>
@@ -530,6 +533,10 @@ watch(() => props.disabled, (disabled, previous) => {
                   <dd>{{ networkInterface.link_speed_mbps > 0
                     ? `${networkInterface.link_speed_mbps} Mbps`
                     : t('network.interfaces.speedUnavailable', 'Unavailable') }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t('network.interfaces.currentMTU', 'Current MTU') }}</dt>
+                  <dd>{{ networkInterface.mtu || '-' }}</dd>
                 </div>
                 <div>
                   <dt>{{ t('network.interfaces.addresses', 'Addresses') }}</dt>

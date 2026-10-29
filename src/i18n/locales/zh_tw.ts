@@ -156,6 +156,8 @@ const zh_tw = {
       colorRangeHint: '視訊亮度與色度的數值範圍。8 bit 時，全範圍為 0–255；有限範圍的標稱亮度為 16–235、色度為 16–240。H.264/H.265 未明確標記時按有限範圍解讀。',
       bitDepth: '色深',
       bitDepthHint: '目前視訊串流中，每個色彩分量的編碼精度。8 bit 對應 256 階，10 bit 對應 1024 階。',
+      connectionType: '連線類型',
+      connectionTypeHint: 'P2P：點對點連線，視訊無需中繼伺服器轉發。\nRelay：透過中繼伺服器轉發視訊。\nDirect：透過目前網頁位址接收視訊。',
       performance: '效能',
       showPerformance: '顯示效能監控',
       hidePerformance: '隱藏效能監控',

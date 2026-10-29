@@ -23,6 +23,17 @@ export type WebRTCConnectionStats = {
 
 type Stat = RTCStats & Record<string, unknown>
 
+export function videoConnectionType(
+  transport: 'webrtc' | 'websocket' | 'mjpeg',
+  stats?: WebRTCConnectionStats | null,
+): 'P2P' | 'Relay' | 'Direct' | null {
+  if (transport !== 'webrtc') return 'Direct'
+  if (stats?.connectionState !== 'connected') return null
+  const types = [stats.local?.type, stats.remote?.type]
+  if (types.includes('relay')) return 'Relay'
+  return types.every(type => type && ['host', 'srflx', 'prflx'].includes(type)) ? 'P2P' : null
+}
+
 function stringValue(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null
 }

@@ -156,6 +156,8 @@ const zh = {
       colorRangeHint: '视频亮度和色度的数值范围。8 bit 时，全范围为 0–255；有限范围的标称亮度为 16–235、色度为 16–240。H.264/H.265 未显式标记时按有限范围解释。',
       bitDepth: '色深',
       bitDepthHint: '当前视频码流中，每个颜色分量的编码精度。8 bit 对应 256 级，10 bit 对应 1024 级。',
+      connectionType: '连接类型',
+      connectionTypeHint: 'P2P：点对点连接，视频无需中继服务器转发。\nRelay：通过中继服务器转发视频。\nDirect：通过当前网页地址接收视频。',
       performance: '性能',
       showPerformance: '显示性能监控',
       hidePerformance: '隐藏性能监控',

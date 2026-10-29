@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { formatCandidateEndpoint, readWebRTCConnectionStats } from '../src/lib/webrtc-connection-stats.ts'
+import { formatCandidateEndpoint, readWebRTCConnectionStats, videoConnectionType } from '../src/lib/webrtc-connection-stats.ts'
 
 const peer = { connectionState: 'connected', iceConnectionState: 'completed' } as const
 function stat(id: string, type: string, values: Record<string, unknown> = {}): RTCStats {
@@ -15,6 +15,19 @@ const reports = [standby, transport, video, pair, local, remote]
 
 const actual = readWebRTCConnectionStats(new Map(reports.map(item => [item.id, item])) as RTCStatsReport, peer)
 assert.equal(actual.local?.type, 'relay')
+assert.equal(videoConnectionType('webrtc', actual), 'Relay')
+const p2p = { ...actual, local: { ...actual.local!, type: 'host' } }
+assert.equal(videoConnectionType('webrtc', p2p), 'P2P')
+for (const type of ['srflx', 'prflx']) {
+  assert.equal(videoConnectionType('webrtc', { ...p2p, local: { ...p2p.local, type } }), 'P2P')
+}
+assert.equal(videoConnectionType('webrtc', { ...p2p, remote: { ...p2p.remote!, type: 'relay' } }), 'Relay')
+assert.equal(videoConnectionType('webrtc', { ...p2p, remote: null }), null)
+assert.equal(videoConnectionType('webrtc', { ...p2p, remote: { ...p2p.remote!, type: null } }), null)
+assert.equal(videoConnectionType('webrtc', { ...p2p, connectionState: 'disconnected' }), null)
+assert.equal(videoConnectionType('webrtc'), null)
+assert.equal(videoConnectionType('websocket', actual), 'Direct')
+assert.equal(videoConnectionType('mjpeg'), 'Direct')
 assert.equal(actual.local?.relayProtocol, 'tls')
 assert.equal(actual.remote?.address, '10.0.0.107')
 assert.equal(actual.connectionState, 'connected')

@@ -31,6 +31,7 @@ import { AdaptiveJitterBuffer, applyJitterBufferTargets } from '@/lib/adaptive-j
 import { activateBrowserMicrophone } from '@/lib/microphone-access'
 import { WebRTCAudio, AudioLatencyRecovery, type AudioRecoveryReason } from '@/lib/webrtc-audio'
 import { KeyboardReportState } from '@/lib/keyboard-report-state'
+import { audioPlaybackAvailable } from '@/lib/audio-settings'
 
 export type ConnectionState =
   | 'idle'
@@ -541,7 +542,7 @@ class OneKVMTransport {
     // PATCH, so every new session must read the current pipeline directly.
     const status = await api.getStatus()
     if (generation !== this.connectionGeneration) return
-    this.deviceSpeakerEnabled = Boolean(status.audio.enabled)
+    this.deviceSpeakerEnabled = audioPlaybackAvailable(status.audio)
     this.audioPCM = status.audio.quality === 'pcm'
     const automatic = status.video.codec.toLowerCase() === 'auto'
     const [hevcWebRTC, hevcWebSocket] = automatic
@@ -606,7 +607,7 @@ class OneKVMTransport {
     await this.startWebRTC(
       generation,
       codec,
-      Boolean(status.audio.enabled),
+      audioPlaybackAvailable(status.audio),
       this.wantMicrophone,
       status.audio.channels === 'stereo',
       autoCodec,

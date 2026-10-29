@@ -812,6 +812,7 @@ const en = {
           gamepadEnable: 'Enable gamepad',
           gamepadBlocked: 'Not enough USB capacity. Turn off audio, the microphone, virtual storage, or file transfer first.',
           audioBlocked: 'Not enough USB capacity. Turn off the microphone, virtual storage, or file transfer first.',
+          speakerHint: 'The controlled device sees OneKVM as a speaker. If this device also supports HDMI audio, turning this off leaves audio available.',
           microphone: 'USB microphone',
           microphoneHint: 'Forwards this browser’s microphone to the controlled device. Turn it off and that device will not see a microphone.',
           microphoneBlocked: 'Not enough USB capacity. Turn off the speaker, virtual storage, or file transfer first.',

@@ -811,6 +811,7 @@ const zh_tw = {
           gamepadEnable: '啟用手把',
           gamepadBlocked: 'USB 額度不夠了。請先關掉音訊、麥克風、虛擬儲存或檔案傳輸。',
           audioBlocked: 'USB 額度不夠了。請先關掉麥克風、虛擬儲存或檔案傳輸。',
+          speakerHint: '受控裝置會把 OneKVM 識別為揚聲器。本機同時支援 HDMI 音訊時，關閉後仍可使用音訊。',
           microphone: 'USB 麥克風',
           microphoneHint: '把目前瀏覽器的麥克風轉發給受控裝置。關掉後，受控裝置就看不到麥克風了。',
           microphoneBlocked: 'USB 額度不夠了。請先關掉音訊、虛擬儲存或檔案傳輸。',

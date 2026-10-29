@@ -41,6 +41,7 @@ import { useTransport } from '@/composables/useTransport'
 import { usePictureInPicture } from '@/composables/usePictureInPicture'
 import type { WebRTCConnectionStats } from '@/lib/webrtc-connection-stats'
 import { onekvm, type BrowserAudioStats, type BrowserVideoLatencyUs } from '@/lib/onekvm'
+import { audioPlaybackAvailable } from '@/lib/audio-settings'
 import { effectiveVideoCodec } from '@/lib/video-transport'
 import { loadLocalShortcuts, saveLocalShortcuts } from '@/lib/keyboard-shortcuts'
 import { statusEvents } from '@/lib/status-events'
@@ -523,7 +524,7 @@ onMounted(() => {
 	unsubscribeStatus = statusEvents.subscribe(
 		(next) => {
 			status.value = { ...next, hid: keyboardLockOverlay.applyStatus(next.hid) }
-			onekvm.setDeviceSpeakerEnabled(Boolean(next.audio.enabled))
+			onekvm.setDeviceSpeakerEnabled(audioPlaybackAvailable(next.audio))
 			serverUnavailable.value = false
 		},
 		() => {
@@ -727,7 +728,7 @@ onBeforeUnmount(() => {
           :present-us="presentUs"
           :transport-us="transportUs"
           :transport-error-us="transportErrorUs"
-          :audio-enabled="status?.audio.enabled ?? false"
+          :audio-enabled="audioPlaybackAvailable(status?.audio ?? {})"
           :audio-encoder="browserAudioCodec ?? status?.audio.encoder ?? ''"
           :audio-quality="status?.audio.quality ?? ''"
           :audio-sample-rate="status?.audio.sample_rate ?? 0"

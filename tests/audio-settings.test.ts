@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { audioConfigPatch, normalizeAudioConfig } from '../src/lib/audio-settings.ts'
+import { audioConfigPatch, audioPlaybackAvailable, normalizeAudioConfig } from '../src/lib/audio-settings.ts'
 import { usbEndpointUse, usbFunctionsFit } from '../src/lib/usb-capacity.ts'
 import type { USBConfig } from '../src/api/client.ts'
 
@@ -20,4 +20,8 @@ assert.deepEqual(audioConfigPatch(audio, hdmi), { source: 'hdmi' })
 // A stale draft changing quality leaves a newer popover selection untouched.
 assert.deepEqual(audioConfigPatch(audio, { ...audio, quality: 'high' }), { quality: 'high' })
 assert.deepEqual(normalizeAudioConfig(hdmi), { ...audio, source: 'hdmi' })
+assert.equal(audioPlaybackAvailable({ enabled: false, source: 'hdmi', sources: ['usb', 'hdmi'] }), true)
+assert.equal(audioPlaybackAvailable({ enabled: false, source: 'usb', sources: ['usb', 'hdmi'] }), true)
+assert.equal(audioPlaybackAvailable({ enabled: false, source: 'usb', sources: ['usb'] }), false)
+assert.equal(audioPlaybackAvailable({ enabled: true, source: 'usb', sources: ['usb'] }), true)
 console.log('audio settings and USB capacity tests passed')

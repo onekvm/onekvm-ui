@@ -56,6 +56,13 @@ const gamepadBlocked = computed(() => !usb.value.gamepad && !wouldFit({ gamepad:
 const storageBlocked = computed(() => usb.value.mass_storage === false && !wouldFit({ storage: true }))
 const mtpBlocked = computed(() => usb.value.mtp === false && !wouldFit({ mtp: true }))
 const networkBlocked = computed(() => !usb.value.network_sharing && !wouldFit({ network: true }))
+const speakerOn = computed({
+  get: () => Boolean(audio.value.enabled),
+  set: (value: boolean) => { audio.value = { ...audio.value, enabled: value } },
+})
+const speakerBlocked = computed(() => !audio.value.enabled && (audio.value.source || 'usb') === 'usb'
+  && !wouldFit({ audio: true }))
+const speakerShowsCapacity = computed(() => (audio.value.source || 'usb') === 'usb')
 const networkSharing = computed({
   get: () => Boolean(usb.value.network_sharing),
   set: (value: boolean) => { usb.value.network_sharing = value },
@@ -197,6 +204,28 @@ const remoteWakeup = computed({
           <div class="usb-function-controls">
             <USBCapacityBadge :endpoints="endpointCosts.keyboardLeds" />
             <n-switch v-model:value="keyboardLeds" :disabled="props.disabled" />
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>{{ t('settings.advancedSettings.audioPage.enable', 'USB speaker') }}</strong>
+            <small>{{ t('settings.advancedSettings.usbPage.speakerHint', 'The controlled device sees OneKVM as a speaker. If this device also supports HDMI audio, turning this off leaves audio available.') }}</small>
+          </div>
+          <div class="usb-function-controls">
+            <USBCapacityBadge v-if="speakerShowsCapacity" :endpoints="endpointCosts.audio" />
+            <n-tooltip :disabled="!speakerBlocked" placement="left">
+              <template #trigger>
+                <span class="usb-function-switch">
+                  <n-switch
+                    v-model:value="speakerOn"
+                    :disabled="props.disabled || speakerBlocked"
+                    :aria-disabled="Boolean(props.disabled || speakerBlocked)"
+                    :aria-label="t('settings.advancedSettings.audioPage.enable', 'USB speaker')"
+                  />
+                </span>
+              </template>
+              {{ t('settings.advancedSettings.usbPage.audioBlocked', 'Not enough USB capacity. Turn off the microphone, virtual storage, or file transfer first.') }}
+            </n-tooltip>
           </div>
         </li>
         <li v-if="USB_GAMEPAD_UI_ENABLED">

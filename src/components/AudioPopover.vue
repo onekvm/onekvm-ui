@@ -5,7 +5,7 @@ import { useMessage } from 'naive-ui'
 import { api, type ConfigSchema, type OneKVMStatus } from '@/api/client'
 import { useAudioSettings, type AudioFormat, type AudioQuality } from '@/composables/useAudioSettings'
 import { useAudioInputs } from '@/composables/useAudioInputs'
-import type { AudioInputSource } from '@/lib/audio-settings'
+import { audioPlaybackAvailable, type AudioInputSource } from '@/lib/audio-settings'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { t } from '@/i18n/runtime'
 import { microphoneAccessErrorKind } from '@/lib/microphone-access'
@@ -46,7 +46,11 @@ const audioError = shallowRef('')
 const unsubscribe = onekvm.subscribe(state => { audioError.value = state.audioError })
 onBeforeUnmount(unsubscribe)
 
-const speakerAvailable = computed(() => Boolean(props.status?.audio.enabled))
+const speakerAvailable = computed(() => audioPlaybackAvailable({
+  enabled: props.status?.audio.enabled,
+  source: source.value,
+  sources: props.status?.audio.sources ?? schema.value?.audio_sources,
+}))
 const microphoneAvailable = computed(() => Boolean(props.status?.audio.microphone_available))
 const audioAvailable = computed(() => schema.value?.capabilities?.audio === true
   && (Boolean(props.status?.audio.sources?.length) || speakerAvailable.value || microphoneAvailable.value))

@@ -13,10 +13,6 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ validity: [valid: boolean] }>()
 const audio = defineModel<OneKVMConfig['audio']>({ required: true })
-const enabled = computed({
-  get: () => Boolean(audio.value.enabled),
-  set: (value: boolean) => { audio.value = { ...audio.value, enabled: value } },
-})
 const microphone = computed({
   get: () => Boolean(audio.value.microphone),
   set: (value: boolean) => { audio.value = { ...audio.value, microphone: value } },
@@ -25,11 +21,8 @@ const productName = computed({
   get: () => audio.value.product_name ?? 'OneKVM Audio',
   set: (value: string) => { audio.value = { ...audio.value, product_name: value } },
 })
-const source = computed(() => audio.value.source || 'usb')
 const usbStringValid = (value: string) =>
   value.length > 0 && new TextEncoder().encode(value).length <= 126 && !/[\u0000-\u001f\u007f]/.test(value)
-const enabledBlocked = computed(() => !enabled.value && source.value === 'usb'
-  && !usbFunctionsFit(props.usb, audio.value, props.gadget, { audio: true }))
 const microphoneBlocked = computed(() => !microphone.value
   && !usbFunctionsFit(props.usb, audio.value, props.gadget, { microphone: true }))
 const usbAudioActive = computed(() => usbSpeakerEnabled(audio.value) || microphone.value)
@@ -48,15 +41,6 @@ watch(valid, (value) => emit('validity', value), { immediate: true })
       {{ t('settings.advancedSettings.audioPage.restartHint', 'Changing USB audio functions, channels or the USB device name briefly reconnects the keyboard and mouse.') }}
     </n-alert>
     <n-form label-placement="top" :show-feedback="false" class="audio-settings-grid">
-      <n-form-item :label="t('settings.advancedSettings.audioPage.enable', 'USB speaker')">
-        <div class="audio-enable-field">
-          <n-tooltip :disabled="!enabledBlocked">
-            <template #trigger><span><n-switch v-model:value="enabled" :disabled="props.disabled || enabledBlocked" :aria-label="t('settings.advancedSettings.audioPage.enable', 'USB speaker')" /></span></template>
-            {{ t('settings.advancedSettings.usbPage.audioBlocked', 'Not enough USB capacity. Turn off the microphone, virtual storage, or file transfer first.') }}
-          </n-tooltip>
-          <USBCapacityBadge v-if="source === 'usb'" :endpoints="{ inn: 0, out: 1 }" />
-        </div>
-      </n-form-item>
       <n-form-item :label="t('settings.advancedSettings.usbPage.microphone', 'USB microphone')">
         <div class="audio-enable-field">
           <n-tooltip :disabled="!microphoneBlocked">

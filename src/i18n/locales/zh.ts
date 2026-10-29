@@ -811,6 +811,7 @@ const zh = {
           gamepadEnable: '启用手柄',
           gamepadBlocked: 'USB 额度不够了。请先关掉音频、麦克风、虚拟存储或文件传输。',
           audioBlocked: 'USB 额度不够了。请先关掉麦克风、虚拟存储或文件传输。',
+          speakerHint: '被控设备会把 OneKVM 识别为扬声器。本机同时支持 HDMI 音频时，关闭后仍可使用音频。',
           microphone: 'USB 麦克风',
           microphoneHint: '把当前浏览器的麦克风转发给被控设备。关掉后，被控设备就看不到麦克风了。',
           microphoneBlocked: 'USB 额度不够了。请先关掉音频、虚拟存储或文件传输。',

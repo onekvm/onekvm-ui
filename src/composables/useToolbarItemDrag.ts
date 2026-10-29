@@ -1,0 +1,139 @@
+import { onBeforeUnmount, onMounted, shallowRef } from 'vue'
+
+export interface ToolbarDrop { folder?: string; before?: string }
+export function useToolbarItemDrag(options: {
+  enabled: () => boolean
+  order: () => string[]
+  folderItems: (folder: string) => string[]
+  vertical: () => boolean
+  openFolder: (folder: string) => void
+  commit: (item: string, target: ToolbarDrop) => void
+}) {
+  const dragging = shallowRef(false)
+  let active: { id: string; pointer: number; x: number; y: number; source: HTMLElement; ghost: HTMLElement | null; target: ToolbarDrop | null } | null = null
+  let marker: HTMLElement | null = null
+  let folderTimer = 0
+  let hoveredFolder = ''
+  let clickTimer = 0
+  const suppressClick = (event: MouseEvent) => { event.preventDefault(); event.stopImmediatePropagation(); window.removeEventListener('click', suppressClick, true) }
+  function suppressNextClick() {
+    window.addEventListener('click', suppressClick, true)
+    clearTimeout(clickTimer)
+    clickTimer = window.setTimeout(() => window.removeEventListener('click', suppressClick, true), 350)
+  }
+  function finishCanceledGesture(event: PointerEvent) {
+    event.preventDefault(); event.stopImmediatePropagation()
+    suppressNextClick()
+  }
+  function clearMarker() { marker?.classList.remove('is-toolbar-drop-target'); marker?.removeAttribute('data-toolbar-drop-mode'); marker = null }
+  function cancel() {
+    active?.ghost?.remove()
+    active?.source.classList.remove('is-toolbar-item-dragging')
+    active = null
+    dragging.value = false
+    clearMarker()
+    clearTimeout(folderTimer)
+    hoveredFolder = ''
+    window.removeEventListener('pointermove', move, true)
+    window.removeEventListener('pointerup', end, true)
+    window.removeEventListener('pointercancel', cancel, true)
+    window.removeEventListener('keydown', keydown, true)
+  }
+  function keydown(event: KeyboardEvent) {
+    if (event.key !== 'Escape' || !active) return
+    event.preventDefault(); event.stopImmediatePropagation()
+    window.addEventListener('click', suppressClick, true)
+    clearTimeout(clickTimer)
+    window.addEventListener('pointerup', finishCanceledGesture, { capture: true, once: true })
+    cancel()
+  }
+  function start(event: PointerEvent) {
+    if (!event.shiftKey || event.button !== 0 || !event.isPrimary || !options.enabled() || active) return
+    const source = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-toolbar-item]') : null
+    if (!source || !source.closest('[data-toolbar-surface]')) return
+    event.preventDefault(); event.stopImmediatePropagation()
+    active = { id: source.dataset.toolbarItem!, pointer: event.pointerId, x: event.clientX, y: event.clientY, source, ghost: null, target: null }
+    window.addEventListener('pointermove', move, true)
+    window.addEventListener('pointerup', end, true)
+    window.addEventListener('pointercancel', cancel, true)
+    window.addEventListener('keydown', keydown, true)
+  }
+  function move(event: PointerEvent) {
+    if (!active || event.pointerId !== active.pointer) return
+    event.preventDefault(); event.stopImmediatePropagation()
+    if (!active.ghost && Math.hypot(event.clientX - active.x, event.clientY - active.y) < 5) return
+    if (!active.ghost) {
+      const rect = active.source.getBoundingClientRect()
+      const ghost = active.source.cloneNode(true) as HTMLElement
+      ghost.removeAttribute('data-toolbar-item'); ghost.setAttribute('aria-hidden', 'true'); ghost.inert = true
+      ghost.classList.add('toolbar-item-drag-ghost')
+      Object.assign(ghost.style, { position: 'fixed', left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`, margin: '0', pointerEvents: 'none', zIndex: '6000', order: '0' })
+      ;(document.fullscreenElement || document.body).append(ghost)
+      active.ghost = ghost
+      active.source.classList.add('is-toolbar-item-dragging')
+      dragging.value = true
+      if (document.pointerLockElement) void document.exitPointerLock()
+    }
+    active.ghost.style.transform = `translate(${event.clientX - active.x}px, ${event.clientY - active.y}px)`
+    const hit = document.elementFromPoint(event.clientX, event.clientY)
+    const item = hit?.closest<HTMLElement>('[data-toolbar-item]')
+    const folderList = hit?.closest<HTMLElement>('[data-toolbar-folder-list]')
+    clearMarker()
+    active.target = null
+    let folder = ''
+    let mode = 'before'
+    if (item && item !== active.source) {
+      const id = item.dataset.toolbarItem!
+      const rect = item.getBoundingClientRect()
+      const vertical = Boolean(folderList) || options.vertical()
+      const ratio = vertical ? (event.clientY - rect.top) / rect.height : (event.clientX - rect.left) / rect.width
+      if (id.startsWith('folder:') && !active.id.startsWith('folder:') && active.id !== 'settings' && ratio > .2 && ratio < .8) {
+        folder = id.slice(7)
+        active.target = { folder }
+        mode = 'into'
+      } else {
+        const parent = folderList?.dataset.toolbarFolderList
+        if (!parent || (!active.id.startsWith('folder:') && active.id !== 'settings')) {
+          const order = parent ? options.folderItems(parent) : options.order()
+          const next = ratio > .5 ? order.slice(order.indexOf(id) + 1).find(candidate => candidate !== active!.id) : id
+          active.target = { folder: parent, before: next }
+          mode = ratio > .5 ? 'after' : 'before'
+        }
+      }
+      if (active.target) marker = item
+    } else if (!item && folderList && !active.id.startsWith('folder:') && active.id !== 'settings') {
+      active.target = { folder: folderList.dataset.toolbarFolderList }
+      marker = folderList
+      mode = 'into'
+    } else if (!item && hit?.closest('.toolbar-layout')) {
+      active.target = {}
+      marker = hit.closest<HTMLElement>('.toolbar-layout')
+      mode = 'after'
+    }
+    if (marker) { marker.classList.add('is-toolbar-drop-target'); marker.dataset.toolbarDropMode = mode }
+    if (folder !== hoveredFolder) {
+      clearTimeout(folderTimer)
+      hoveredFolder = folder
+      if (folder) folderTimer = window.setTimeout(() => options.openFolder(folder), 450)
+    }
+  }
+  function end(event: PointerEvent) {
+    if (!active || event.pointerId !== active.pointer) return
+    event.preventDefault(); event.stopImmediatePropagation()
+    if (active.ghost) move(event)
+    const item = active.id
+    const target = active.target
+    const moved = dragging.value
+    cancel()
+    suppressNextClick()
+    if (moved && target && options.enabled()) options.commit(item, target)
+  }
+  onMounted(() => { window.addEventListener('pointerdown', start, true); window.addEventListener('blur', cancel) })
+  onBeforeUnmount(() => {
+    cancel(); clearTimeout(clickTimer)
+    window.removeEventListener('pointerdown', start, true); window.removeEventListener('blur', cancel)
+    window.removeEventListener('pointerup', finishCanceledGesture, true)
+    window.removeEventListener('click', suppressClick, true)
+  })
+  return { dragging, cancel }
+}

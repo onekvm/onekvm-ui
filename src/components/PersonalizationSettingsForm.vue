@@ -1,25 +1,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { NMessageProvider } from 'naive-ui'
-import {
-  Activity,
-  ChevronDown,
-  ChevronUp,
-  CircleUserRound,
-  Disc3,
-  Gamepad2,
-  GripVertical,
-  Keyboard,
-  Languages,
-  Maximize,
-  Monitor,
-  MousePointer2,
-  Power,
-  Settings,
-  TextCursorInput,
-  Toolbox,
-  Volume2,
-} from '@/icons'
+import { ChevronDown, ChevronUp, GripVertical } from '@/icons'
 
 import type { ConsoleSubtitlePart, ConsoleTitleSource, PersonalizationConfig, ToolbarIconId } from '@/api/client'
 import { serviceURL } from '@/api/service-url'
@@ -39,14 +21,16 @@ import MessagePlacementTestButton from './MessagePlacementTestButton.vue'
 import {
   defaultToolbarIcons,
   isDeviceToolbarIcon,
-  isKeyboardActionToolbarIcon,
   normalizeToolbarIcons,
   reorderToolbarIcon,
   setToolbarIconHidden,
   toolbarIconsEqual,
 } from '@/lib/toolbar-icons'
 import ConsoleBrandCopy from './ConsoleBrandCopy.vue'
-import KeyboardChordIcon from './KeyboardChordIcon'
+import ToolbarFoldersSettings from './ToolbarFoldersSettings.vue'
+import { syncToolbarIconOrder } from '@/lib/toolbar-layout'
+import { toolbarIconGlyph as iconGlyph, toolbarIconLabel as iconLabel } from '@/lib/toolbar-labels'
+import ToolbarLayoutPreview from './ToolbarLayoutPreview.vue'
 
 const props = defineProps<{
   modelValue: PersonalizationConfig
@@ -130,31 +114,12 @@ function updateSubtitleParts(values: Array<string | number>) {
   })
 }
 
-const iconGlyph = {
-  display: Monitor,
-  mouse: MousePointer2,
-  keyboard: Keyboard,
-  virtual_keyboard: Keyboard,
-  keyboard_text: TextCursorInput,
-  ctrl_alt_del: KeyboardChordIcon,
-  gamepad: Gamepad2,
-  power: Power,
-  audio: Volume2,
-  virtual_media: Disc3,
-  performance: Activity,
-  fullscreen: Maximize,
-  toolbox: Toolbox,
-  settings: Settings,
-  language: Languages,
-  account: CircleUserRound,
-}
-
 const toolbarIcons = computed(() => normalizeToolbarIcons(props.modelValue.toolbar_icons))
-const iconsCustomized = computed(() => !toolbarIconsEqual(toolbarIcons.value, defaultToolbarIcons()))
+const iconsCustomized = computed(() => !toolbarIconsEqual(toolbarIcons.value, defaultToolbarIcons()) || Boolean(props.modelValue.toolbar_order?.length))
 const { dragId, previewIcons, startIconDrag, moveIconDrag, endIconDrag, cancelIconDrag } = useToolbarIconDrag(
   () => toolbarIcons.value,
   () => props.disabled,
-  toolbar_icons => update({ toolbar_icons }),
+  updateToolbarIcons,
 )
 const iconGroups = computed(() => [
   {
@@ -168,29 +133,8 @@ const iconGroups = computed(() => [
     icons: previewIcons.value.filter(icon => !isDeviceToolbarIcon(icon.id)),
   },
 ])
-const previewDeviceIcons = computed(() => toolbarIcons.value.filter(icon => isDeviceToolbarIcon(icon.id) && !icon.hidden && (icon.id !== 'gamepad' || USB_GAMEPAD_UI_ENABLED)))
-const previewActionIcons = computed(() => toolbarIcons.value.filter(icon => !isDeviceToolbarIcon(icon.id) && !icon.hidden))
-
-function iconLabel(id: ToolbarIconId) {
-  const labels: Record<ToolbarIconId, string> = {
-    display: t('screen.title', 'Screen'),
-    mouse: t('mouse.title', 'Mouse'),
-    keyboard: t('keyboard.title', 'Keyboard'),
-    virtual_keyboard: t('keyboard.virtualKeyboard', 'Virtual Keyboard'),
-    keyboard_text: t('keyboard.paste', 'Send text'),
-    ctrl_alt_del: t('keyboard.ctrlaltdel', 'Ctrl+Alt+Del'),
-    gamepad: t('gamepad.title', 'Gamepad'),
-    power: t('power.title', 'Power'),
-    audio: t('usbAudio.title', 'Audio'),
-    virtual_media: t('virtualMedia.title', 'Virtual Media'),
-    performance: t('toolbar.performance', 'Stats'),
-    fullscreen: t('toolbar.fullscreen', 'Full screen'),
-    toolbox: t('toolbox.title', 'Toolbox'),
-    settings: t('settings.title', 'Settings'),
-    language: t('settings.appearance.language', 'Language'),
-    account: t('settings.account.title', 'Account'),
-  }
-  return labels[id]
+function updateToolbarIcons(toolbar_icons: ReturnType<typeof normalizeToolbarIcons>) {
+  update({ toolbar_icons, toolbar_order: syncToolbarIconOrder(props.modelValue.toolbar_order, toolbar_icons) })
 }
 
 function iconNeighbor(id: ToolbarIconId, direction: -1 | 1) {
@@ -202,7 +146,7 @@ function iconNeighbor(id: ToolbarIconId, direction: -1 | 1) {
 function moveIcon(id: ToolbarIconId, direction: -1 | 1) {
   const target = iconNeighbor(id, direction)
   if (!target || props.disabled) return
-  update({ toolbar_icons: reorderToolbarIcon(toolbarIcons.value, id, target.id) })
+  updateToolbarIcons(reorderToolbarIcon(toolbarIcons.value, id, target.id))
 }
 
 function showIcon(id: ToolbarIconId, shown: boolean) {
@@ -210,7 +154,7 @@ function showIcon(id: ToolbarIconId, shown: boolean) {
 }
 
 function resetIcons() {
-  update({ toolbar_icons: defaultToolbarIcons() })
+  update({ toolbar_icons: defaultToolbarIcons(), toolbar_order: [] })
 }
 
 </script>
@@ -257,12 +201,21 @@ function resetIcons() {
       <header class="personalization-section-heading">
         <div>
           <h2>{{ t('settings.advancedSettings.personalizationPage.toolbarIcons', 'Toolbar icons') }}</h2>
-          <p>{{ t('settings.advancedSettings.personalizationPage.toolbarIconsHint', 'Drag to reorder icons. Hidden controls remain available in the keyboard or collection menu. Settings stays visible.') }}</p>
+          <p>{{ t('settings.advancedSettings.personalizationPage.toolbarIconsHint', 'Drag to reorder icons, or hold Shift and drag them directly on the toolbar. Hidden controls remain available in the keyboard or collection menu. Settings stays visible.') }}</p>
         </div>
         <n-button size="small" quaternary :disabled="disabled || !iconsCustomized" @click="resetIcons">
           {{ t('settings.advancedSettings.personalizationPage.resetIcons', 'Reset') }}
         </n-button>
       </header>
+      <div class="personalization-switch-row">
+        <label id="toolbar-show-labels">{{ t('toolbar.folders.showLabels', 'Show text') }}</label>
+        <n-switch :value="modelValue.toolbar_show_labels ?? false" :disabled="disabled" aria-labelledby="toolbar-show-labels" @update:value="update({ toolbar_show_labels: $event })" />
+      </div>
+      <n-form-item v-if="modelValue.toolbar_show_labels" class="toolbar-label-position-field" :label="t('toolbar.folders.labelPosition', 'Text position')">
+        <n-radio-group :value="modelValue.toolbar_label_position ?? 'right'" :disabled="disabled" :aria-label="t('toolbar.folders.labelPosition', 'Text position')" @update:value="update({ toolbar_label_position: $event })">
+          <n-radio-button v-for="position in (['top', 'bottom', 'left', 'right'] as const)" :key="position" :value="position">{{ t(`toolbar.folders.labelPositions.${position}`, position) }}</n-radio-button>
+        </n-radio-group>
+      </n-form-item>
       <div class="personalization-icon-groups">
         <div v-for="group in iconGroups" :key="group.id" class="personalization-icon-group">
           <h3>{{ group.title }}</h3>
@@ -314,6 +267,7 @@ function resetIcons() {
           </TransitionGroup>
         </div>
       </div>
+      <ToolbarFoldersSettings :model-value="modelValue" :disabled="disabled" @update:model-value="emit('update:modelValue', $event)" />
     </section>
 
     <section class="personalization-section">
@@ -454,25 +408,7 @@ function resetIcons() {
         <span class="toolbar-spacer personalization-preview-spacer" aria-hidden="true">
           <span class="toolbar-handle"><GripVertical :size="14" /></span>
         </span>
-        <div class="device-controls personalization-preview-devices" :class="{ 'is-iconless': previewDeviceIcons.length === 0 }" aria-hidden="true">
-          <n-button
-            v-for="icon in previewDeviceIcons"
-            :key="icon.id"
-            quaternary
-            size="small"
-            class="device-indicator"
-            data-state="ready"
-            tabindex="-1"
-          >
-            <template #icon><component :is="iconGlyph[icon.id]" /></template>
-            <span v-if="!isKeyboardActionToolbarIcon(icon.id)" class="device-led" />
-          </n-button>
-        </div>
-        <div class="toolbar-actions personalization-preview-actions" aria-hidden="true">
-          <n-button v-for="icon in previewActionIcons" :key="icon.id" quaternary size="small" tabindex="-1">
-            <template #icon><component :is="iconGlyph[icon.id]" /></template>
-          </n-button>
-        </div>
+        <ToolbarLayoutPreview :config="modelValue" />
       </div>
       <small>{{ t('settings.advancedSettings.personalizationPage.browserTab', 'Browser tab') }} · {{ previewTitle }} - OneKVM</small>
     </section>
@@ -488,6 +424,7 @@ function resetIcons() {
 .personalization-section :deep(.n-form-item) { margin-bottom: 0; }
 .personalization-switch-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px; }
 .personalization-switch-row label { color: var(--foreground); font-size: 13px; }
+.toolbar-label-position-field { margin-top: 16px; }
 .personalization-switch-row p { margin: 4px 0 0; color: var(--muted-foreground); font-size: 11px; line-height: 1.5; }
 .personalization-reference { margin: -2px 0 0; }
 .personalization-reference > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px; min-height: 36px; }

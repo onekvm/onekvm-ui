@@ -3,7 +3,7 @@ import { toolbarPinCapacity } from '@/lib/toolbar-pin-capacity'
 
 export function useToolbarPinCapacity(
   root: Ref<HTMLElement | null>, count: () => number,
-  mobile: () => boolean, vertical: () => boolean,
+  mobile: () => boolean, vertical: () => boolean, showLabels: () => boolean = () => false,
 ) {
   const capacity = shallowRef(count())
   let frame = 0
@@ -12,7 +12,7 @@ export function useToolbarPinCapacity(
     return [...element.children].flatMap(child => {
       if (!(child instanceof HTMLElement)) return []
       const display = getComputedStyle(child).display
-      return display === 'none' ? [] : display === 'contents' ? layoutChildren(child) : [child]
+      return display === 'none' ? [] : (display === 'contents' || child.classList.contains('toolbar-layout')) ? layoutChildren(child) : [child]
     })
   }
   function measure() {
@@ -27,7 +27,7 @@ export function useToolbarPinCapacity(
     const gap = number(rail ? css.rowGap : css.columnGap)
     let occupied = padding + Math.max(0, children.length - 1) * gap
     for (const child of children) {
-      if (child === pins) continue
+      if (child === pins || pins.contains(child)) continue
       const style = getComputedStyle(child)
       const handle = child.querySelector<HTMLElement>('.toolbar-handle')
       occupied += child.classList.contains('toolbar-spacer')
@@ -36,16 +36,17 @@ export function useToolbarPinCapacity(
       occupied += rail ? number(style.marginTop) + number(style.marginBottom) : number(style.marginLeft) + number(style.marginRight)
     }
     const pinStyle = getComputedStyle(pins)
-    occupied += rail
+    if (pinStyle.display !== 'contents') occupied += rail
       ? number(pinStyle.paddingTop) + number(pinStyle.paddingBottom) + number(pinStyle.borderTopWidth) + number(pinStyle.marginTop)
       : number(pinStyle.paddingLeft) + number(pinStyle.borderLeftWidth) + number(pinStyle.marginLeft)
     const available = rail ? window.innerHeight : toolbar.classList.contains('is-floating') || toolbar.classList.contains('is-dragging') ? window.innerWidth - 16 : toolbar.clientWidth
-    capacity.value = toolbarPinCapacity(count(), available - occupied, rail ? 2 : 1)
+    const pinSize = showLabels() ? Math.max(30, ...[...pins.querySelectorAll<HTMLElement>('.toolbar-pin-button')].map(button => rail ? button.offsetHeight : button.offsetWidth)) : 30
+    capacity.value = toolbarPinCapacity(count(), available - occupied, 1, pinSize)
   }
   function schedule() {
     if (!frame) frame = requestAnimationFrame(measure)
   }
-  watch([root, count, mobile, vertical], (_value, _previous, cleanup) => {
+  watch([root, count, mobile, vertical, showLabels], (_value, _previous, cleanup) => {
     const toolbar = root.value?.closest<HTMLElement>('.toolbar')
     if (toolbar) {
       const observer = new ResizeObserver(schedule)

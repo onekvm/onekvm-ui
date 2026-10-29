@@ -352,12 +352,20 @@ export type ToolbarIconId =
   | 'language'
   | 'account'
 
+export interface ToolbarFolder {
+  id: string
+  name: string
+  icon: string
+  items: string[]
+}
+
 export interface ToolbarIconPreference {
   id: ToolbarIconId
   hidden: boolean
 }
 
 export type MessagePlacement = 'top-left' | 'top' | 'top-right' | 'bottom-left' | 'bottom' | 'bottom-right'
+export type ToolbarLabelPosition = 'top' | 'bottom' | 'left' | 'right'
 
 export interface PersonalizationConfig {
   device_name: string
@@ -368,6 +376,10 @@ export interface PersonalizationConfig {
   dim_windows_on_kvm_focus: boolean
   message_placement?: MessagePlacement
   toolbar_icons?: ToolbarIconPreference[]
+  toolbar_folders?: ToolbarFolder[]
+  toolbar_order?: string[]
+  toolbar_show_labels?: boolean
+  toolbar_label_position?: ToolbarLabelPosition
 }
 
 export interface InputConfig {

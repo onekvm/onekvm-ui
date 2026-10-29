@@ -157,7 +157,7 @@ const zh_tw = {
       bitDepth: '色深',
       bitDepthHint: '目前視訊串流中，每個色彩分量的編碼精度。8 bit 對應 256 階，10 bit 對應 1024 階。',
       connectionType: '連線類型',
-      connectionTypeHint: 'P2P：點對點連線，視訊無需中繼伺服器轉發。\nRelay：透過中繼伺服器轉發視訊。\nDirect：透過目前網頁位址接收視訊。',
+      connectionTypeHint: 'P2P：透過網路打洞連線，視訊不經過中繼伺服器。\nRelay：透過中繼伺服器轉發視訊。\nDirect：透過區域網路等可直接存取的位址連線，或透過目前網頁位址接收視訊。',
       performance: '效能',
       showPerformance: '顯示效能監控',
       hidePerformance: '隱藏效能監控',
@@ -206,6 +206,8 @@ const zh_tw = {
       audioEncodeLatencyHint: '裝置編碼或封裝一塊音訊的耗時。',
       audioJitterBufferHint: '音訊在用戶端播放緩衝區的平均等待時間。',
       webrtcDetails: {
+        addressHidden: '瀏覽器已隱藏',
+        localAddressHiddenHint: '瀏覽器已隱藏本機 IP 位址。',
         title: 'WebRTC 連線詳情',
         connectionState: '連線狀態',
         iceState: 'ICE 狀態',

@@ -157,7 +157,7 @@ const zh = {
       bitDepth: '色深',
       bitDepthHint: '当前视频码流中，每个颜色分量的编码精度。8 bit 对应 256 级，10 bit 对应 1024 级。',
       connectionType: '连接类型',
-      connectionTypeHint: 'P2P：点对点连接，视频无需中继服务器转发。\nRelay：通过中继服务器转发视频。\nDirect：通过当前网页地址接收视频。',
+      connectionTypeHint: 'P2P：通过网络打洞连接，视频不经过中继服务器。\nRelay：通过中继服务器转发视频。\nDirect：通过局域网等可直接访问的地址连接，或通过当前网页地址接收视频。',
       performance: '性能',
       showPerformance: '显示性能监控',
       hidePerformance: '隐藏性能监控',
@@ -206,6 +206,8 @@ const zh = {
       audioEncodeLatencyHint: '设备编码或封装一块音频的耗时。',
       audioJitterBufferHint: '音频在客户端播放缓冲区的平均等待时间。',
       webrtcDetails: {
+        addressHidden: '浏览器已隐藏',
+        localAddressHiddenHint: '浏览器已隐藏本地 IP 地址。',
         title: 'WebRTC 连接详情',
         connectionState: '连接状态',
         iceState: 'ICE 状态',

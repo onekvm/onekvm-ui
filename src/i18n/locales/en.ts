@@ -157,7 +157,7 @@ const en = {
       bitDepth: 'Depth',
       bitDepthHint: 'Encoding precision per color component in the current video stream. 8 bit provides 256 levels; 10 bit provides 1024 levels.',
       connectionType: 'Connection',
-      connectionTypeHint: 'P2P: A peer-to-peer connection; video does not pass through a relay server.\nRelay: Video passes through a relay server.\nDirect: Video is received through the current web address.',
+      connectionTypeHint: 'P2P: Connect through NAT traversal; video does not pass through a relay server.\nRelay: Video passes through a relay server.\nDirect: Connect using a directly reachable address, such as a LAN address, or receive video through the current web address.',
       performance: 'Performance',
       showPerformance: 'Show performance overlay',
       hidePerformance: 'Hide performance overlay',
@@ -206,6 +206,8 @@ const en = {
       audioEncodeLatencyHint: 'Time for the device to encode or package a block of audio.',
       audioJitterBufferHint: 'Average wait in the client audio playback buffer.',
       webrtcDetails: {
+        addressHidden: 'Hidden by browser',
+        localAddressHiddenHint: 'Your browser hides the local IP address.',
         title: 'WebRTC connection details',
         connectionState: 'Connection state',
         iceState: 'ICE state',

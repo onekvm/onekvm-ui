@@ -339,6 +339,7 @@ const zh_tw = {
       swapCommandCtrl: '對調 Command 與 Ctrl',
       swapCommandCtrlTip: 'Command 發給遠端 Ctrl，Ctrl 發給遠端 Win。右 Ctrl 映射為遠端 Win 開啟時，右 Ctrl 仍發給遠端 Win。',
       magicKey: 'Magic Key',
+      magicKeyHelp: '幫助',
       magicKeyTip: '先按所選按鍵，再按組合。按住時可反覆按一般鍵，修飾鍵保持按下；再按一次 Magic Key 鬆開。所選按鍵不會發給遠端。',
       magicOff: '關閉',
       magicSideLeft: '左',

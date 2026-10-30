@@ -339,6 +339,7 @@ const en = {
       swapCommandCtrl: 'Swap Command and Ctrl',
       swapCommandCtrlTip: 'Command is sent as Ctrl. Ctrl is sent as Win. Right Ctrl is still sent as Win while that mapping is on.',
       magicKey: 'Magic Key',
+      magicKeyHelp: 'Help',
       magicKeyTip: 'Press the selected key, then the shortcut. Hold it to repeat a normal key while modifiers stay down, then press Magic Key again to release them. The selected key is not sent.',
       magicOff: 'Off',
       magicSideLeft: 'Left',

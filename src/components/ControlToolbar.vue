@@ -4,6 +4,7 @@ import { cloudDeviceName, serviceURL } from '@/api/service-url'
 import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import {
   Check,
+  CircleQuestionMark,
   CircleUserRound,
   Command,
   Disc3,
@@ -1349,14 +1350,25 @@ const keyboardOptions = computed<DropdownOption[]>(() => {
     off: t('keyboard.magicOff', 'Off'),
     right: t('keyboard.magicSideRight', 'Right'),
   }
-  const menuTip = (label: string, tip: string) => () => h(NTooltip, {
-    placement: 'top',
+  const stopMenuEvent = (event: Event) => {
+    event.stopPropagation()
+  }
+  const menuTooltip = {
+    placement: 'top' as const,
     to: tooltipTo,
     zIndex: 4500,
-  }, {
-    trigger: () => h('span', label),
-    default: () => tip,
-  })
+    contentStyle: { maxWidth: '240px', whiteSpace: 'normal', lineHeight: '1.45' },
+  }
+  const menuChoice = (label: string, checked: boolean, tip?: string) => () => h('span', { class: 'keyboard-menu-choice' }, [
+    tip
+      ? h(NTooltip, menuTooltip, {
+          trigger: () => h('span', label),
+          default: () => tip,
+        })
+      : h('span', label),
+    checked ? h('span', { class: 'keyboard-menu-check', 'aria-hidden': 'true' }, [h(Check, { size: 16 })]) : null,
+  ])
+  const magicHelp = t('keyboard.magicKeyTip', 'Press the selected key, then the shortcut. Hold it to repeat a normal key while modifiers stay down, then press Magic Key again to release them. The selected key is not sent.')
   const magicCodes = ['', ...MAGIC_KEY_CODES.filter((code) => clientKeys.offerMeta || !code.startsWith('Meta'))]
   return [
   {
@@ -1389,28 +1401,35 @@ const keyboardOptions = computed<DropdownOption[]>(() => {
   { type: 'divider', key: 'keyboard-options-divider' },
   {
     key: 'right-control-as-meta',
-    label: t('keyboard.rightControlAsWin', 'Right Ctrl as remote Win'),
-    icon: props.rightControlAsMeta ? icon(Check) : undefined,
+    label: menuChoice(t('keyboard.rightControlAsWin', 'Right Ctrl as remote Win'), props.rightControlAsMeta),
   },
   {
     key: 'swap-command-ctrl',
-    label: menuTip(
+    label: menuChoice(
       t('keyboard.swapCommandCtrl', 'Swap Command and Ctrl'),
+      props.swapCommandCtrl,
       t('keyboard.swapCommandCtrlTip', 'Command is sent as Ctrl. Ctrl is sent as Win. Right Ctrl is still sent as Win while that mapping is on.'),
     ),
-    icon: props.swapCommandCtrl ? icon(Check) : undefined,
   },
   {
     key: 'magic-key',
-    label: menuTip(
+    label: () => h('span', { class: 'keyboard-menu-choice-label' }, [
       t('keyboard.magicKey', 'Magic Key'),
-      t('keyboard.magicKeyTip', 'Press the selected key, then the shortcut. Hold it to repeat a normal key while modifiers stay down, then press Magic Key again to release them. The selected key is not sent.'),
-    ),
+      h(NTooltip, menuTooltip, {
+        trigger: () => h('button', {
+          type: 'button',
+          class: 'keyboard-menu-help',
+          ariaLabel: t('keyboard.magicKeyHelp', 'Help'),
+          onClick: stopMenuEvent,
+          onPointerdown: stopMenuEvent,
+        }, [h(CircleQuestionMark, { size: 14 })]),
+        default: () => magicHelp,
+      }),
+    ]),
     extra: magicKeyLabel(props.magicKey, chordNames),
     children: magicCodes.map((code) => ({
       key: `magic-key:${code}`,
-      label: magicKeyLabel(code, chordNames),
-      icon: props.magicKey === code ? icon(Check) : undefined,
+      label: menuChoice(magicKeyLabel(code, chordNames), props.magicKey === code),
     })),
   },
 ]

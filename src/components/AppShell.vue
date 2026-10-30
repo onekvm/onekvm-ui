@@ -36,7 +36,7 @@ import {
 import { storedHideLocalCursor } from '@/lib/console-pointer'
 import { resolveConsoleTitle } from '@/lib/console-title'
 import { consumeConsoleBack, lockConsoleHistory } from '@/lib/history-lock'
-import { consoleFullscreenOptions, syncConsoleKeyboardLock, type ConsoleKeyboardLock } from '@/lib/console-keyboard-lock'
+import { consoleFullscreenOptions, scheduleConsoleKeyboardLock, type ConsoleKeyboardLock } from '@/lib/console-keyboard-lock'
 import { fullscreenTopInsetPx, isIpadLikeUserAgent, readSafeAreaTop } from '@/lib/fullscreen-inset'
 import { useTransport } from '@/composables/useTransport'
 import { usePictureInPicture } from '@/composables/usePictureInPicture'
@@ -359,9 +359,15 @@ function browserKeyboard(): ConsoleKeyboardLock | undefined {
   return keyboard?.lock ? keyboard : undefined
 }
 
+let stopKeyboardLock: (() => void) | undefined
+
+function consoleKeyboardLockActive() {
+  const workspace = consoleWorkspace.value
+  return Boolean(workspace && document.fullscreenElement === workspace)
+}
+
 async function toggleFullscreen() {
   if (document.fullscreenElement) {
-    await syncConsoleKeyboardLock(false, browserKeyboard()).catch(() => undefined)
     await document.exitFullscreen().catch(() => undefined)
     return
   }
@@ -373,8 +379,6 @@ async function toggleFullscreen() {
   } catch {
     return
   }
-  // Chrome ignores lock() until the tab is already fullscreen, and still resolves that call.
-  await syncConsoleKeyboardLock(document.fullscreenElement === workspace, browserKeyboard()).catch(() => undefined)
   await nextTick()
   applyFullscreenInset()
   remoteConsole.value?.focusVideo()
@@ -393,9 +397,11 @@ function applyFullscreenInset() {
 }
 
 function syncFullscreen() {
-  const active = document.fullscreenElement === consoleWorkspace.value
-  fullscreen.value = active
-  void syncConsoleKeyboardLock(active, browserKeyboard()).catch(() => undefined)
+  fullscreen.value = consoleKeyboardLockActive()
+  stopKeyboardLock?.()
+  stopKeyboardLock = fullscreen.value
+    ? scheduleConsoleKeyboardLock(consoleKeyboardLockActive, browserKeyboard())
+    : undefined
   applyFullscreenInset()
 }
 
@@ -568,7 +574,8 @@ onBeforeUnmount(() => {
   document.removeEventListener('fullscreenchange', syncFullscreen)
   window.visualViewport?.removeEventListener('resize', applyFullscreenInset)
   window.visualViewport?.removeEventListener('scroll', applyFullscreenInset)
-  void syncConsoleKeyboardLock(false, browserKeyboard()).catch(() => undefined)
+  stopKeyboardLock?.()
+  stopKeyboardLock = undefined
   closeSession()
 })
 </script>

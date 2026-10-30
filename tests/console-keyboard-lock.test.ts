@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 
-import { consoleFullscreenOptions, syncConsoleKeyboardLock, type ConsoleKeyboardLock } from '../src/lib/console-keyboard-lock.ts'
+import { consoleFullscreenOptions, consoleKeyboardLockRetryDelaysMs, scheduleConsoleKeyboardLock, syncConsoleKeyboardLock, type ConsoleKeyboardLock } from '../src/lib/console-keyboard-lock.ts'
 
 assert.equal(consoleFullscreenOptions().navigationUI, 'hide')
 assert.equal(consoleFullscreenOptions().keyboardLock, true)
@@ -41,5 +41,35 @@ const failing: ConsoleKeyboardLock = {
 await assert.rejects(syncConsoleKeyboardLock(true, failing))
 await syncConsoleKeyboardLock(false, failing)
 assert.equal(calls.at(-1), 'unlock-after-deny')
+
+const scheduled: Array<() => void> = []
+let fullscreen = true
+const stop = scheduleConsoleKeyboardLock(
+  () => fullscreen,
+  keyboard,
+  (callback) => {
+    scheduled.push(callback)
+    return () => {
+      const index = scheduled.indexOf(callback)
+      if (index >= 0) scheduled.splice(index, 1)
+    }
+  },
+)
+assert.equal(scheduled.length, consoleKeyboardLockRetryDelaysMs.length)
+const flush = async () => {
+  for (let i = 0; i < 5; i += 1) await Promise.resolve()
+}
+scheduled[0]!()
+await flush()
+assert.equal(calls.at(-1), 'lock')
+fullscreen = false
+const lengthBeforeSkippedRetry = calls.length
+scheduled[1]!()
+await flush()
+assert.equal(calls.length, lengthBeforeSkippedRetry)
+stop()
+await flush()
+assert.equal(calls.at(-1), 'unlock')
+assert.equal(scheduled.length, 0)
 
 console.log('console-keyboard-lock tests passed')

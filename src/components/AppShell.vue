@@ -34,6 +34,7 @@ import {
   settingsAppActive,
 } from '@/lib/settings-nav'
 import { storedHideLocalCursor } from '@/lib/console-pointer'
+import { sanitizeMagicKey } from '@/lib/keyboard-magic'
 import { resolveConsoleTitle } from '@/lib/console-title'
 import { consumeConsoleBack, lockConsoleHistory } from '@/lib/history-lock'
 import { consoleFullscreenOptions, scheduleConsoleKeyboardLock, type ConsoleKeyboardLock } from '@/lib/console-keyboard-lock'
@@ -72,6 +73,8 @@ const VirtualKeyboard = defineAsyncComponent(() => import('./VirtualKeyboard.vue
 const MOUSE_MODE_KEY = 'nano-kvm-mouse-mode'
 const HIDE_LOCAL_CURSOR_KEY = 'onekvm-hide-local-cursor'
 const RIGHT_CONTROL_AS_META_KEY = 'onekvm-right-control-as-meta'
+const SWAP_COMMAND_CTRL_KEY = 'onekvm-swap-command-ctrl'
+const MAGIC_KEY_STORAGE = 'onekvm-keyboard-magic'
 const PERFORMANCE_OVERLAY_KEY = 'onekvm-performance-overlay'
 
 function isAdvancedSettingsRoute(hash: string) {
@@ -139,6 +142,8 @@ const fullscreen = ref(false)
 const performanceOpen = ref(localStorage.getItem(PERFORMANCE_OVERLAY_KEY) !== 'false')
 const performanceOrigin = ref<{ x: number, y: number } | null>(null)
 const rightControlAsMeta = ref(localStorage.getItem(RIGHT_CONTROL_AS_META_KEY) === 'true')
+const swapCommandCtrl = ref(localStorage.getItem(SWAP_COMMAND_CTRL_KEY) === 'true')
+const magicKey = ref(sanitizeMagicKey(localStorage.getItem(MAGIC_KEY_STORAGE)))
 const userShortcuts = ref<KeyboardShortcut[]>(loadLocalShortcuts())
 const deviceShortcuts = ref<KeyboardShortcut[]>([])
 const keyboardLayout = ref<KeyboardLayout>('us')
@@ -212,6 +217,8 @@ watch(videoFit, (value) => localStorage.setItem(VIDEO_FIT_KEY, value))
 watch(videoRotation, (value) => localStorage.setItem(VIDEO_ROTATION_KEY, String(value)))
 watch(hideLocalCursor, (value) => localStorage.setItem(HIDE_LOCAL_CURSOR_KEY, String(value)))
 watch(rightControlAsMeta, (value) => localStorage.setItem(RIGHT_CONTROL_AS_META_KEY, String(value)))
+watch(swapCommandCtrl, (value) => localStorage.setItem(SWAP_COMMAND_CTRL_KEY, String(value)))
+watch(magicKey, (value) => localStorage.setItem(MAGIC_KEY_STORAGE, value))
 watch(performanceOpen, (value) => localStorage.setItem(PERFORMANCE_OVERLAY_KEY, String(value)))
 watch(
   () => state.value.fallbackPrompt,
@@ -651,6 +658,8 @@ onBeforeUnmount(() => {
           :fullscreen="fullscreen"
           :performance-open="performanceOpen"
           :right-control-as-meta="rightControlAsMeta"
+          :swap-command-ctrl="swapCommandCtrl"
+          :magic-key="magicKey"
           :keyboard-layout="keyboardLayout"
           :user-shortcuts="userShortcuts"
           :device-shortcuts="deviceShortcuts"
@@ -666,6 +675,8 @@ onBeforeUnmount(() => {
           @picture-in-picture="togglePictureInPicture"
           @update:performance-open="setPerformanceOpen"
           @update:right-control-as-meta="rightControlAsMeta = $event"
+          @update:swap-command-ctrl="swapCommandCtrl = $event"
+          @update:magic-key="magicKey = $event"
           @overlay="toolbarOverlayOpen = $event"
           @dock="toolbarDock = $event"
           @update:video-fit="videoFit = $event"
@@ -697,6 +708,8 @@ onBeforeUnmount(() => {
           :keyboard-blocked="keyboardBlocked"
           :input-suspended="pipActive"
           :right-control-as-meta="rightControlAsMeta"
+          :swap-command-ctrl="swapCommandCtrl"
+          :magic-key="magicKey"
           :trackpad="trackpadOpen"
           :usb-connected="Boolean(status?.hid.connected)"
           :connection-animation="Boolean(status) && status?.identity?.connection_animation !== false"

@@ -13,6 +13,7 @@ import { canvasDeviceSize, mapAbsoluteMouse, originalCssSize, paintedCssSize, ro
 import { MOUSE_BUTTON_LEFT, sendRelativeMotion } from '@/lib/hid-mouse'
 import { cursorToScreen, viewOverflows } from '@/lib/viewport-zoom'
 import { useKeyboard } from '@/composables/useKeyboard'
+import KeyboardMagicHint from './KeyboardMagicHint.vue'
 import ConnectionTrace from './ConnectionTrace.vue'
 import TrackpadOverlay from './TrackpadOverlay.vue'
 import { useVideoFps } from '@/composables/useVideoFps'
@@ -40,6 +41,8 @@ const props = defineProps<{
   keyboardBlocked: boolean
   inputSuspended: boolean
   rightControlAsMeta: boolean
+  swapCommandCtrl: boolean
+  magicKey: string
   trackpad?: boolean
   usbConnected?: boolean
   connectionAnimation?: boolean
@@ -136,7 +139,13 @@ const {
   zoomToOneToOne,
 } = useViewportZoom(inputSurface, stage, trackpadOn)
 const { shown: zoomBadgeShown } = useZoomBadge(() => zoomView.scale, zooming)
-useKeyboard(toRef(props, 'keyboardBlocked'), inputSurface, toRef(props, 'rightControlAsMeta'))
+useKeyboard(
+  toRef(props, 'keyboardBlocked'),
+  inputSurface,
+  toRef(props, 'rightControlAsMeta'),
+  toRef(props, 'swapCommandCtrl'),
+  toRef(props, 'magicKey'),
+)
 const webrtcPresent = computed(() => props.state.videoMode === 'webrtc')
 useVideoFps(video, (fps) => {
   if (!isMJPEG.value) emit('fps', fps)
@@ -556,6 +565,7 @@ watch(
     />
     </div>
     </div>
+    <KeyboardMagicHint />
     <div
       ref="inputSurface"
       class="console-hid-layer"

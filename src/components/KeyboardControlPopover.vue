@@ -105,7 +105,9 @@ function selectOption(key: string | number) {
     return
   }
   emit('select', key)
-  if (!pinned.value && key !== 'right-control-as-meta') updateShow(false)
+  const value = String(key)
+  const keepsOpen = value === 'right-control-as-meta' || value === 'swap-command-ctrl' || value.startsWith('magic-key')
+  if (!pinned.value && !keepsOpen) updateShow(false)
 }
 
 function startDrag(event: PointerEvent) {

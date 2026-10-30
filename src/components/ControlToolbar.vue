@@ -29,7 +29,7 @@ import {
   UserRound,
   Volume2,
 } from '@/icons'
-import { NIcon, useMessage, type DialogReactive, type DropdownOption } from 'naive-ui'
+import { NIcon, NTooltip, useMessage, type DialogReactive, type DropdownOption } from 'naive-ui'
 
 import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type OneKVMStatus, type ToolbarIconId } from '@/api/client'
 import type { BrowserISOProgress } from '@/lib/browser-iso'
@@ -48,6 +48,7 @@ import ToolbarIconSlot from './ToolbarIconSlot.vue'
 import { useToolboxContext } from '@/composables/useToolbox'
 import { toolbarItemsFor } from '@/extensions/pluginUi'
 import { hidIndicatorState } from '@/lib/hid-status'
+import { clientModifierNames, MAGIC_KEY_CODES, magicKeyLabel, sanitizeMagicKey, type ChordNameSet } from '@/lib/keyboard-magic'
 import { USB_GAMEPAD_UI_ENABLED } from '@/lib/ui-features'
 import { dismissControlOverlays } from '@/lib/overlay-target'
 import { resolveConsoleSubtitle } from '@/lib/console-title'
@@ -150,6 +151,8 @@ const props = defineProps<{
   fullscreen: boolean
   performanceOpen: boolean
   rightControlAsMeta: boolean
+  swapCommandCtrl: boolean
+  magicKey: string
   keyboardLayout: KeyboardLayout
   userShortcuts: KeyboardShortcut[]
   deviceShortcuts: KeyboardShortcut[]
@@ -167,6 +170,8 @@ const emit = defineEmits<{
   'picture-in-picture': []
   'update:performanceOpen': [open: boolean, event?: MouseEvent]
   'update:rightControlAsMeta': [enabled: boolean]
+  'update:swapCommandCtrl': [enabled: boolean]
+  'update:magicKey': [key: string]
   'edit-user-shortcuts': []
   overlay: [visible: boolean]
   dock: [dock: ToolbarDock]
@@ -1333,7 +1338,27 @@ const keyboardToolbarActions = computed(() => [
   { id: 'ctrl_alt_del' as const, key: 'cad', label: t('keyboard.ctrlaltdel', 'Ctrl+Alt+Del'), icon: KeyboardChordIcon },
 ].filter(action => !toolbarIconHidden(toolbarIcons.value, action.id)))
 
-const keyboardOptions = computed<DropdownOption[]>(() => [
+const keyboardOptions = computed<DropdownOption[]>(() => {
+  const clientKeys = clientModifierNames()
+  const tooltipTo = overlayTo.value
+  const chordNames: ChordNameSet = {
+    alt: clientKeys.alt,
+    left: t('keyboard.magicSideLeft', 'Left'),
+    menu: t('keyboard.magicMenu', 'Menu'),
+    meta: clientKeys.meta,
+    off: t('keyboard.magicOff', 'Off'),
+    right: t('keyboard.magicSideRight', 'Right'),
+  }
+  const menuTip = (label: string, tip: string) => () => h(NTooltip, {
+    placement: 'top',
+    to: tooltipTo,
+    zIndex: 4500,
+  }, {
+    trigger: () => h('span', label),
+    default: () => tip,
+  })
+  const magicCodes = ['', ...MAGIC_KEY_CODES.filter((code) => clientKeys.offerMeta || !code.startsWith('Meta'))]
+  return [
   {
     type: 'group',
     key: 'keyboard-actions',
@@ -1367,7 +1392,29 @@ const keyboardOptions = computed<DropdownOption[]>(() => [
     label: t('keyboard.rightControlAsWin', 'Right Ctrl as remote Win'),
     icon: props.rightControlAsMeta ? icon(Check) : undefined,
   },
-])
+  {
+    key: 'swap-command-ctrl',
+    label: menuTip(
+      t('keyboard.swapCommandCtrl', 'Swap Command and Ctrl'),
+      t('keyboard.swapCommandCtrlTip', 'Command is sent as Ctrl. Ctrl is sent as Win. Right Ctrl is still sent as Win while that mapping is on.'),
+    ),
+    icon: props.swapCommandCtrl ? icon(Check) : undefined,
+  },
+  {
+    key: 'magic-key',
+    label: menuTip(
+      t('keyboard.magicKey', 'Magic Key'),
+      t('keyboard.magicKeyTip', 'Press the selected key, then the shortcut. Hold it to repeat a normal key while modifiers stay down, then press Magic Key again to release them. The selected key is not sent.'),
+    ),
+    extra: magicKeyLabel(props.magicKey, chordNames),
+    children: magicCodes.map((code) => ({
+      key: `magic-key:${code}`,
+      label: magicKeyLabel(code, chordNames),
+      icon: props.magicKey === code ? icon(Check) : undefined,
+    })),
+  },
+]
+})
 
 const languageMenuOptions = computed<DropdownOption[]>(() =>
   languageOptions.map((language) => ({
@@ -1425,6 +1472,8 @@ function selectKeyboard(key: string | number) {
   }
   if (key === 'edit-user-shortcuts') emit('edit-user-shortcuts')
   if (key === 'right-control-as-meta') emit('update:rightControlAsMeta', !props.rightControlAsMeta)
+  if (key === 'swap-command-ctrl') emit('update:swapCommandCtrl', !props.swapCommandCtrl)
+  if (String(key).startsWith('magic-key:')) emit('update:magicKey', sanitizeMagicKey(String(key).slice('magic-key:'.length)))
   const match = String(key).match(/^shortcut:(user|device):(\d+)$/)
   if (!match) return
   const shortcuts = match[1] === 'user' ? props.userShortcuts : props.deviceShortcuts

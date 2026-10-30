@@ -283,7 +283,8 @@ onBeforeUnmount(() => {
 .tool-window-system-menu { width: 24px; height: 24px; padding: 0; }
 .drawer .tool-window-header, .fullscreen .tool-window-header { cursor: default; }
 .tool-window :focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
-.tool-window :deep(.n-input :is(input, textarea):focus-visible) { outline: none; }
+.tool-window :deep(.n-input :is(input, textarea):focus-visible),
+.tool-window :deep(.n-base-selection :is(.n-base-selection-input, .n-base-selection-label):focus-visible) { outline: none; }
 .tool-window-content { flex: 1; min-height: 0; overflow: auto; padding: 16px; overscroll-behavior: contain; scroll-padding: 16px; isolation: isolate; }
 .tool-window-content.edge-to-edge { display: flex; flex-direction: column; overflow: hidden; padding: 0; scroll-padding: 0; }
 .tool-window-content.edge-to-edge > :deep(.extension-tool-view) { flex: 1 1 0; width: 100%; min-height: 0; }

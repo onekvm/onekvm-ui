@@ -90,7 +90,6 @@ const actionOptions = computed(() => [
   { value: 'allow', label: t('settings.firewall.allow', 'Allow') },
   { value: 'deny', label: t('settings.firewall.deny', 'Block') },
   { value: 'reject', label: t('settings.firewall.reject', 'Reject') },
-  { value: 'limit', label: t('settings.firewall.limit', 'Limit connection rate') },
 ])
 const directionOptions = computed(() => [
   { value: 'in', label: t('settings.firewall.in', 'incoming') },
@@ -628,7 +627,6 @@ onUnmounted(() => {
         <p>{{ editingRuleId !== null ? t('settings.firewall.editRuleHint', 'Changes take effect after you apply.') : ruleModalSimple ? t('settings.firewall.portOnlyHint', 'Enter a protocol and port, such as TCP/5900. An IP address is not needed.') : t('settings.firewall.addRuleHint', 'It is added to the list first. Nothing changes until you apply.') }}</p>
         <template v-if="!ruleModalSimple">
           <label>{{ t('settings.firewall.action', 'What to do') }}<n-select v-model:value="ruleAction" :options="actionOptions" /></label>
-          <p v-if="ruleAction === 'limit'">{{ t('settings.firewall.limitHint', 'Limits new connections, not bandwidth. Excess connections follow the remaining rules.') }}</p>
           <label>{{ t('settings.firewall.direction', 'Direction') }}<n-select v-model:value="ruleDirection" :options="directionOptions" /></label>
         </template>
         <label>{{ t('settings.firewall.protocol', 'Protocol') }}<n-select v-model:value="ruleProtocol" :options="protocolOptions" /></label>

@@ -29,7 +29,7 @@ export interface NetworkConfig {
 
 export interface FirewallRule {
   id: number
-  action: 'allow' | 'deny' | 'reject' | 'limit' | string
+  action: 'allow' | 'deny' | 'reject' | string
   direction: 'in' | 'out' | string
   protocol: 'tcp' | 'udp' | 'any' | string
   port: string

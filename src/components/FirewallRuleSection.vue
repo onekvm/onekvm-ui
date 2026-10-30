@@ -31,7 +31,7 @@ const policyHint = computed(() => {
 const policies = computed(() => incoming.value ? ['deny', 'reject', 'allow'] : ['allow', 'deny', 'reject'])
 
 function actionType(action: string) {
-  return ({ allow: 'success', deny: 'error', reject: 'warning', limit: 'info' } as const)[action as 'allow' | 'deny' | 'reject' | 'limit'] ?? 'default'
+  return ({ allow: 'success', deny: 'error', reject: 'warning' } as const)[action as 'allow' | 'deny' | 'reject'] ?? 'default'
 }
 
 function detail(rule: FirewallRuleDraft) {

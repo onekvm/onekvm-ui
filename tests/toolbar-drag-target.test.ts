@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { toolbarSlotAt, type ToolbarSlotRect } from '../src/lib/toolbar-drag-target.ts'
+import { toolbarDropBefore, toolbarSlotAt, type ToolbarSlotRect } from '../src/lib/toolbar-drag-target.ts'
 
 const rect = (left: number, width: number): ToolbarSlotRect => ({ left, right: left + width, top: 5, bottom: 35 })
 // The keyboard starts at the far right. A pointer in the 4px gap after
@@ -34,4 +34,18 @@ assert.equal(toolbarSlotAt(grid, 40, 20, 'grid'), 1)
 assert.equal(toolbarSlotAt(grid, 56, 37, 'grid'), 1)
 assert.equal(toolbarSlotAt(grid, 56, 79, 'grid'), 4)
 assert.equal(toolbarSlotAt([], 0, 0), -1)
+// Leaving Keyboard's merge zone toward its LED inserts after Keyboard. The
+// dragged Power icon and unavailable Audio/Gamepad must not become anchors:
+// an invisible anchor would make the preview append at the far right.
+const order = ['mouse', 'keyboard', 'gamepad', 'power', 'audio', 'virtual_media', 'settings']
+const visible = new Set(['mouse', 'keyboard', 'power', 'virtual_media', 'settings'])
+assert.equal(toolbarDropBefore(order, visible, 'power', 'keyboard', true), 'virtual_media')
+assert.equal(toolbarDropBefore(order, visible, 'mouse', 'keyboard', false), 'keyboard')
+assert.equal(toolbarDropBefore(order, visible, 'power', 'settings', true), undefined)
+// Closed folder members and hidden separators also cannot anchor root drops.
+assert.equal(toolbarDropBefore(['keyboard', 'mouse', 'separator:controls', 'folder:input', 'settings'],
+  new Set(['keyboard', 'folder:input', 'settings']), 'settings', 'keyboard', true), 'folder:input')
+// Folder lists use their own visible members and skip the dragged member.
+assert.equal(toolbarDropBefore(['keyboard', 'mouse', 'audio', 'power'],
+  new Set(['keyboard', 'mouse', 'power']), 'mouse', 'keyboard', true), 'power')
 console.log('toolbar drag target tests passed')

@@ -1,4 +1,6 @@
-import { onBeforeUnmount, onMounted, shallowRef } from 'vue'
+import { h, onBeforeUnmount, onMounted, render, shallowRef } from 'vue'
+import { Folder } from '@/icons'
+import { toolbarDropBefore } from '@/lib/toolbar-drag-target'
 import { isToolbarItem } from '@/lib/toolbar-layout'
 import { useToolbarItemPreview } from './useToolbarItemPreview'
 
@@ -17,6 +19,7 @@ export function useToolbarItemDrag(options: {
   const preview = useToolbarItemPreview()
   let active: { id: string; pointer: number; x: number; y: number; source: HTMLElement; ghost: HTMLElement | null; target: ToolbarDrop | null } | null = null
   let marker: HTMLElement | null = null
+  let mergeIcon: HTMLElement | null = null
   let folderTimer = 0
   let hoveredFolder = ''
   let clickTimer = 0
@@ -30,7 +33,12 @@ export function useToolbarItemDrag(options: {
     event.preventDefault(); event.stopImmediatePropagation()
     suppressNextClick()
   }
-  function clearMarker() { marker?.classList.remove('is-toolbar-drop-target'); marker?.removeAttribute('data-toolbar-drop-mode'); marker = null }
+  function clearMarker() {
+    if (mergeIcon) { render(null, mergeIcon); mergeIcon.remove(); mergeIcon = null }
+    marker?.classList.remove('is-toolbar-drop-target')
+    marker?.removeAttribute('data-toolbar-drop-mode')
+    marker = null
+  }
   function cancel() {
     active?.ghost?.remove()
     active?.source.classList.remove('is-toolbar-item-dragging')
@@ -108,7 +116,7 @@ export function useToolbarItemDrag(options: {
         const parent = folderList?.dataset.toolbarFolderList
         if (!parent || (isToolbarItem(active.id) && active.id !== 'settings')) {
           const order = parent ? options.folderItems(parent) : options.order()
-          const next = ratio > .5 ? order.slice(order.indexOf(id) + 1).find(candidate => candidate !== active!.id) : id
+          const next = toolbarDropBefore(order, new Set(preview.items(surface!)), active.id, id, ratio > .5)
           active.target = { folder: parent, before: next }
           mode = ratio > .5 ? 'after' : 'before'
         }
@@ -120,9 +128,20 @@ export function useToolbarItemDrag(options: {
       mode = 'into'
     }
     if (marker) { marker.classList.add('is-toolbar-drop-target'); marker.dataset.toolbarDropMode = mode }
+    active.ghost.style.visibility = active.target?.merge ? 'hidden' : ''
+    if (marker && mode === 'merge') {
+      const icon = marker.querySelector('.n-button__icon')
+      if (icon) {
+        mergeIcon = document.createElement('span')
+        mergeIcon.className = 'toolbar-item-merge-icon'
+        mergeIcon.setAttribute('aria-hidden', 'true')
+        icon.append(mergeIcon)
+        render(h(Folder), mergeIcon)
+      }
+    }
     if (active.target && mode !== 'into' && mode !== 'merge') {
       preview.preview(active.source, marker?.closest<HTMLElement>('[data-toolbar-surface]') ?? null, active.target.before, options.vertical())
-    } else preview.clear()
+    } else preview.reset()
     hint.value = active.target && (mode === 'into' || mode === 'merge')
       ? { mode, x: Math.max(100, Math.min(window.innerWidth - 100, event.clientX)), y: event.clientY < 76 ? event.clientY + 42 : event.clientY - 44 }
       : null

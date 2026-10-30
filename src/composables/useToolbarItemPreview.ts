@@ -7,14 +7,16 @@ export function useToolbarItemPreview() {
   const originals = new Map<HTMLElement, { rect: DOMRect; translate: string; order: string }>()
   const animations = new Set<Animation>()
   let shown: { source: HTMLElement; surface: HTMLElement; before?: string } | null = null
-  function clear() {
+  function reset() {
+    // Switching between insertion and merging restores the layout, but keeps
+    // the same hit-test rectangles until this gesture finishes.
     for (const [element, original] of originals) {
-      element.style.translate = original.translate
       element.classList.remove('toolbar-item-preview')
+      element.style.translate = original.translate
     }
-    originals.clear()
     shown = null
   }
+  function clear() { reset(); originals.clear() }
   function bounds(element: HTMLElement) { return originals.get(element)?.rect ?? element.getBoundingClientRect() }
   function slots(surface: HTMLElement) {
     const elements = [...surface.querySelectorAll<HTMLElement>('[data-toolbar-item]')]
@@ -37,14 +39,14 @@ export function useToolbarItemPreview() {
     return elements[toolbarSlotAt(elements.map(bounds), x, y, layout)]
   }
   function preview(source: HTMLElement, surface: HTMLElement | null, before?: string, vertical = false) {
-    if (!surface || source.closest('[data-toolbar-surface]') !== surface) { clear(); return }
+    if (!surface || source.closest('[data-toolbar-surface]') !== surface) { reset(); return }
     if (shown?.source === source && shown.surface === surface && shown.before === before) return
     const elements = slots(surface)
     const layout = direction(surface, vertical)
     elements.sort((a, b) => layout === 'horizontal' ? bounds(a).left - bounds(b).left
       : bounds(a).top - bounds(b).top || bounds(a).left - bounds(b).left)
     const from = elements.indexOf(source)
-    if (from < 0) { clear(); return }
+    if (from < 0) { reset(); return }
     const reordered = elements.filter(element => element !== source)
     const index = before ? reordered.findIndex(element => element.dataset.toolbarItem === before) : -1
     reordered.splice(index < 0 ? reordered.length : index, 0, source)
@@ -96,5 +98,5 @@ export function useToolbarItemPreview() {
     }
   }
   onBeforeUnmount(() => { clear(); for (const animation of animations) animation.cancel() })
-  return { clear, bounds, direction, hit, preview, capture, settle }
+  return { clear, reset, bounds, direction, hit, items: (surface: HTMLElement) => slots(surface).map(element => element.dataset.toolbarItem!), preview, capture, settle }
 }

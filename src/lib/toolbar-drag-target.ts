@@ -6,6 +6,12 @@ export interface ToolbarSlotRect {
 }
 export type ToolbarDragLayout = 'horizontal' | 'vertical' | 'grid'
 
+// The saved order also contains hidden icons and folder members. Only visible
+// siblings can anchor the insertion preview and the resulting drop.
+export function toolbarDropBefore(order: readonly string[], visible: ReadonlySet<string>, source: string, target: string, after: boolean): string | undefined {
+  return after ? order.slice(order.indexOf(target) + 1).find(id => id !== source && visible.has(id)) : target
+}
+
 // Gaps and surface padding belong to the nearest slot edge, not to the end
 // of the toolbar. Use the original rectangles so animated icons cannot move
 // the drop target out from under a stationary pointer.

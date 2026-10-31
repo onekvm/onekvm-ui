@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render no-signal PNGs for each language pack under l10n-out."""
+"""Render localized copies of the original gray no-signal card."""
 
 import json
 import os
@@ -14,10 +14,10 @@ CARD = (212, 215, 217, 255)
 BORDER = (174, 180, 184, 255)
 TITLE = (23, 26, 29, 255)
 BODY = (82, 90, 97, 255)
-ONE = (6, 26, 58, 255)
-KVM = (22, 119, 255, 255)
+BRAND = (105, 113, 120, 255)
 WARN = (240, 180, 41, 255)
 WARN_EDGE = (216, 149, 22, 255)
+SCALE = 4
 
 
 def clamp(value, low, high):
@@ -74,7 +74,7 @@ def fonts_for(code):
 
 def load_font(spec, size):
     path, index = spec
-    return ImageFont.truetype(path, size=max(8, int(round(size))), index=index)
+    return ImageFont.truetype(path, size=max(8, int(round(size * SCALE))), index=index)
 
 
 def wrap(draw, text, font, width):
@@ -111,125 +111,103 @@ def wrap(draw, text, font, width):
     return lines
 
 
-def text_height(draw, lines, font, spacing):
-    height = 0
-    for line in lines:
-        box = draw.textbbox((0, 0), line or " ", font=font)
-        height += box[3] - box[1]
-    if len(lines) > 1:
-        height += spacing * (len(lines) - 1)
-    return height
+def text_height(lines, line_height):
+    return len(lines) * line_height
 
 
-def draw_lines(draw, lines, font, xy, fill, spacing):
+def draw_lines(draw, lines, font, xy, fill, line_height):
     x, y = xy
     for line in lines:
-        draw.text((x, y), line, font=font, fill=fill)
-        box = draw.textbbox((0, 0), line or " ", font=font)
-        y += box[3] - box[1] + spacing
+        box = draw.textbbox((0, 0), line or " ", font=font, anchor="lt")
+        ink_height = box[3] - box[1]
+        draw.text((x, y + (line_height - ink_height) / 2), line,
+                  font=font, fill=fill, anchor="lt")
+        y += line_height
     return y
 
 
 def draw_icon(draw, x, y, size):
-    margin = size * 0.08
-    top = (x + size / 2, y + margin)
-    right = (x + size - margin, y + size - margin)
-    left = (x + margin, y + size - margin)
-    draw.polygon([top, right, left], fill=WARN)
-    stroke = max(2, int(size * 0.035))
-    draw.line([top, right, left, top], fill=WARN_EDGE, width=stroke)
-    bar = max(4, int(size * 0.075))
-    cx = x + size / 2
-    draw.rounded_rectangle(
-        [cx - bar / 2, y + size * 0.34, cx + bar / 2, y + size * 0.62],
-        radius=bar / 2,
-        fill=(255, 255, 255, 255),
-    )
-    dot = bar * 1.15
-    draw.ellipse(
-        [cx - dot / 2, y + size * 0.70, cx + dot / 2, y + size * 0.70 + dot],
-        fill=(255, 255, 255, 255),
-    )
+    # The approved SVG uses an 84x84 viewBox and a 3px mitered outline.
+    unit = size / 84
+    points = lambda values: [(x + px * unit, y + py * unit) for px, py in values]
+    draw.polygon(points([(42, 1.79), (2.51, 76.5), (81.49, 76.5)]), fill=WARN_EDGE)
+    draw.polygon(points([(42, 8.21), (7.49, 73.5), (76.51, 73.5)]), fill=WARN)
+    for top, bottom in [(27, 48), (60, 61)]:
+        draw.rounded_rectangle(
+            [x + 38.5 * unit, y + (top - 3.5) * unit,
+             x + 45.5 * unit, y + (bottom + 3.5) * unit],
+            radius=3.5 * unit, fill=(255, 255, 255, 255),
+        )
 
 
 def render(copy, regular, bold, width, height):
-    canvas = Image.new("RGBA", (width, height), (0, 0, 0, 255))
+    canvas = Image.new("RGBA", (width * SCALE, height * SCALE), (0, 0, 0, 255))
     draw = ImageDraw.Draw(canvas)
-    card_w = min(720, width * 0.92)
-    gap = clamp(width * 0.028, 24, 34)
-    pad_x = clamp(width * 0.034, 26, 40)
-    pad_y = clamp(width * 0.034, 28, 40)
-    icon = clamp(width * 0.13, 110, 180)
-    brand_w = clamp(width * 0.10, 86, 120)
-    brand_top = clamp(width * 0.017, 14, 20)
-    brand_left = clamp(width * 0.023, 18, 28)
+    # Match the original artwork's border-box dimensions and spacing. The
+    # brand sits inside the top padding, rather than adding another header row.
+    outer_pad = clamp(width * 0.05, 18, 64)
+    card_w = min(720, (width - outer_pad * 2) * 0.92) * SCALE
+    gap = clamp(width * 0.028, 24, 34) * SCALE
+    pad_x = clamp(width * 0.034, 26, 40) * SCALE
+    pad_y = clamp(width * 0.034, 28, 40) * SCALE
+    icon = clamp(width * 0.13, 110, 180) * SCALE
+    brand_top = clamp(width * 0.017, 14, 20) * SCALE
+    brand_left = clamp(width * 0.023, 18, 28) * SCALE
     title_size = clamp(width * 0.025, 23, 28)
     body_size = clamp(width * 0.016, 13, 17)
     list_size = clamp(width * 0.0145, 12, 15)
     title_font = load_font(bold, title_size)
     body_font = load_font(regular, body_size)
     list_font = load_font(regular, list_size)
-    text_w = card_w - pad_x * 2 - icon - gap
+    text_w = card_w - pad_x * 2 - icon - gap - 2 * SCALE
     title_lines = wrap(draw, copy["title"], title_font, text_w)
     check_lines = wrap(draw, copy["check"], body_font, text_w)
     items = []
     for index, line in enumerate(copy["lines"], start=1):
         prefix = f"{index}. "
-        prefix_w = draw.textlength(prefix, font=list_font)
-        wrapped = wrap(draw, line, list_font, max(40, text_w - prefix_w))
+        wrapped = wrap(draw, line, list_font, text_w - list_size * 1.6 * SCALE)
         items.append((prefix, wrapped))
-    title_h = text_height(draw, title_lines, title_font, 2)
-    check_h = text_height(draw, check_lines, body_font, 1)
-    list_h = 0
-    for prefix, wrapped in items:
-        list_h += text_height(draw, wrapped, list_font, 1)
-    list_h += 4 * max(0, len(items) - 1)
-    text_h = title_h + clamp(width * 0.012, 8, 13) + check_h + 7 + list_h
-    brand_font = load_font(bold, 28)
-    while brand_font.size > 12 and draw.textlength("OneKVM", font=brand_font) > brand_w:
-        brand_font = load_font(bold, brand_font.size - 1)
-    brand_box = draw.textbbox((0, 0), "OneKVM", font=brand_font)
-    brand_h = brand_box[3] - brand_box[1]
+    title_line = title_size * 1.05 * SCALE
+    body_line = body_size * 1.2 * SCALE
+    list_line = list_size * 1.25 * SCALE
+    title_gap = clamp(width * 0.012, 8, 13) * SCALE
+    title_h = text_height(title_lines, title_line)
+    check_h = text_height(check_lines, body_line)
+    list_h = sum(text_height(lines, list_line) for _, lines in items)
+    list_h += 4 * SCALE * max(0, len(items) - 1)
+    text_h = title_h + title_gap + check_h + 7 * SCALE + list_h
+    brand_font = load_font(bold, 14)
     content_h = max(icon, text_h)
-    card_h = brand_top + brand_h + 16 + content_h + pad_y
-    card_x = (width - card_w) / 2
-    card_y = (height - card_h) / 2
-    shadow = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    shadow_draw = ImageDraw.Draw(shadow)
-    shadow_draw.rounded_rectangle(
-        [card_x, card_y + 14, card_x + card_w, card_y + card_h + 22],
-        radius=10,
-        fill=(0, 0, 0, 90),
-    )
-    canvas.alpha_composite(shadow)
-    draw = ImageDraw.Draw(canvas)
+    card_h = content_h + pad_y * 2 + 2 * SCALE
+    card_x = (width * SCALE - card_w) / 2
+    card_y = (height * SCALE - card_h) / 2
     draw.rounded_rectangle(
-        [card_x, card_y, card_x + card_w, card_y + card_h],
-        radius=10,
+        [card_x, card_y, card_x + card_w - 1, card_y + card_h - 1],
+        radius=10 * SCALE,
         fill=CARD,
         outline=BORDER,
-        width=1,
+        width=SCALE,
     )
-    one_w = draw.textlength("One", font=brand_font)
-    brand_y = card_y + brand_top
     brand_x = card_x + brand_left
-    draw.text((brand_x, brand_y), "One", font=brand_font, fill=ONE)
-    draw.text((brand_x + one_w, brand_y), "KVM", font=brand_font, fill=KVM)
-    row_y = brand_y + brand_h + 16
+    brand_y = card_y + brand_top - draw.textbbox((0, 0), "OneKVM", font=brand_font, anchor="ls")[1]
+    for letter in "OneKVM":
+        draw.text((brand_x, brand_y), letter, font=brand_font, fill=BRAND, anchor="ls")
+        brand_x += draw.textlength(letter, font=brand_font) + 1.12 * SCALE
+    row_y = card_y + pad_y + SCALE
     icon_y = row_y + max(0, (content_h - icon) / 2)
     draw_icon(draw, card_x + pad_x, icon_y, icon)
     text_x = card_x + pad_x + icon + gap
     text_y = row_y + max(0, (content_h - text_h) / 2)
-    text_y = draw_lines(draw, title_lines, title_font, (text_x, text_y), TITLE, 2)
-    text_y += clamp(width * 0.012, 8, 13) - 2
-    text_y = draw_lines(draw, check_lines, body_font, (text_x, text_y), BODY, 1)
-    text_y += 7
+    text_y = draw_lines(draw, title_lines, title_font, (text_x, text_y), TITLE, title_line)
+    text_y += title_gap
+    text_y = draw_lines(draw, check_lines, body_font, (text_x, text_y), BODY, body_line)
+    text_y += 7 * SCALE
     for prefix, wrapped in items:
-        prefix_w = draw.textlength(prefix, font=list_font)
-        draw.text((text_x, text_y), prefix, font=list_font, fill=BODY)
-        text_y = draw_lines(draw, wrapped, list_font, (text_x + prefix_w, text_y), BODY, 1)
-        text_y += 4
-    return canvas.convert("RGB")
+        draw_lines(draw, [prefix], list_font, (text_x, text_y), BODY, list_line)
+        text_y = draw_lines(draw, wrapped, list_font,
+                            (text_x + list_size * 1.6 * SCALE, text_y), BODY, list_line)
+        text_y += 4 * SCALE
+    return canvas.convert("RGB").resize((width, height), Image.Resampling.LANCZOS)
 
 
 def main():

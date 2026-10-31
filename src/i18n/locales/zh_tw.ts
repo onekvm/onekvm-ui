@@ -2262,6 +2262,7 @@ const zh_tw = {
 		turnUrl: '伺服器位址',
 		username: '使用者名稱',
 		credential: '密碼',
+		keepCredential: '留空使用已儲存的密碼',
 		removeTurn: '移除 TURN 伺服器',
 	  },
 	  mdns: {

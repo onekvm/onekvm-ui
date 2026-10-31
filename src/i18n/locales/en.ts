@@ -2258,6 +2258,7 @@ const en = {
 		turnUrl: 'Server URL',
 		username: 'Username',
 		credential: 'Password',
+		keepCredential: 'Leave blank to use the saved password',
 		removeTurn: 'Remove TURN server',
 	  },
 	  mdns: {

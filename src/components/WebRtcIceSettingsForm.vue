@@ -17,6 +17,7 @@ function turnServers(value?: WebRtcIceConfig): WebRtcTurnServerConfig[] {
     url: server.url || '',
     username: server.username || '',
     credential: server.credential || '',
+    ...(server.credential_set ? { credential_set: true } : {}),
   }))
 }
 
@@ -94,9 +95,12 @@ function addTurnServer() {
 }
 
 function updateTurnServer(index: number, update: Partial<WebRtcTurnServerConfig>) {
-  const servers = currentTurnServers.value.map((server, serverIndex) => (
-    serverIndex === index ? { ...server, ...update } : server
-  ))
+  const servers = currentTurnServers.value.map((server, serverIndex) => {
+    if (serverIndex !== index) return server
+    const next = { ...server, ...update }
+    if (update.url !== undefined && update.url !== server.url) delete next.credential_set
+    return next
+  })
   updateModel(canonicalConfig(currentStun.value, servers))
 }
 
@@ -186,13 +190,14 @@ function removeTurnServer(index: number) {
                   @update:value="updateTurnServer(index, { username: $event })"
                 />
               </n-form-item>
-              <n-form-item :label="t('network.webrtc.credential', 'Credential')">
+              <n-form-item :label="t('network.webrtc.credential', 'Password')">
                 <n-input
                   type="password"
                   show-password-on="click"
                   :value="server.credential"
                   :disabled="disabled"
-                  :status="server.credential.trim() ? undefined : 'error'"
+                  :placeholder="server.credential_set && !server.credential.trim() ? t('network.webrtc.keepCredential', 'Leave blank to use the saved password') : ''"
+                  :status="server.credential.trim() || server.credential_set ? undefined : 'error'"
                   @update:value="updateTurnServer(index, { credential: $event })"
                 />
               </n-form-item>

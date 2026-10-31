@@ -2257,6 +2257,7 @@ const zh = {
 		turnUrl: '服务器地址',
 		username: '用户名',
 		credential: '密码',
+		keepCredential: '留空使用已保存的密码',
 		removeTurn: '删除 TURN 服务器',
 	  },
 	  mdns: {

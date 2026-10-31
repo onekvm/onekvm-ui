@@ -94,6 +94,14 @@ assert.equal(
 assert.equal(
   isNetworkConfigValid({
     ...base,
+    webrtc: { turn_servers: [{ url: 'turn:turn.example:3478', username: 'kvm', credential: '', credential_set: true }] },
+  }),
+  true,
+  'a stored TURN password can be omitted on reload',
+)
+assert.equal(
+  isNetworkConfigValid({
+    ...base,
     webrtc: {
       stun: 'stun:stun.l.google.com:19302',
       turn_servers: [{ url: 'turn:turn.example:3478', username: 'kvm', credential: 'secret' }],

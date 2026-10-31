@@ -164,6 +164,8 @@ export interface WebRtcTurnServerConfig {
   url: string
   username: string
   credential: string
+  /** Set on reads when a password is stored and omitted from the response. */
+  credential_set?: boolean
 }
 
 export interface IceServer {

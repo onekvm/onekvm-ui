@@ -421,7 +421,8 @@ export function isNetworkConfigValid(config: NetworkConfig) {
   if (!validProxyURL(config.proxy?.http) || !validProxyURL(config.proxy?.https)) return false
   if (!validIceURL(config.webrtc?.stun, 'stun')) return false
   for (const server of config.webrtc?.turn_servers || []) {
-    if (!validIceURL(server.url, 'turn') || !server.url.trim() || !server.username.trim() || !server.credential.trim()) return false
+    if (!validIceURL(server.url, 'turn') || !server.url.trim() || !server.username.trim()) return false
+    if (!server.credential.trim() && !server.credential_set) return false
   }
   return true
 }

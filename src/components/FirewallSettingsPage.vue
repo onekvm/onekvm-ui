@@ -479,15 +479,13 @@ onUnmounted(() => {
 
     <n-spin :show="loading && !draft">
       <div v-if="draft && status?.available" class="firewall-stack">
-        <section class="firewall-card">
-          <header>
+        <section class="firewall-card firewall-enable">
+          <div class="firewall-enable-copy">
             <h2>{{ t('settings.firewall.enabled', 'Turn on the firewall') }}</h2>
             <p>{{ t('settings.firewall.enabledHint', 'Only the services below can connect in. Connections started by this device are unchanged. Turning the firewall off does not delete those allows.') }}</p>
-          </header>
-          <div class="firewall-switch-row">
             <p>{{ summary }}</p>
-            <n-switch :value="draft.enabled" :disabled="busy" @update:value="(enabled: boolean) => mode === 'simple' ? toggleEnabled(enabled) : updateDraft((current) => ({ ...current, enabled }))" />
           </div>
+          <n-switch :value="draft.enabled" :disabled="busy" @update:value="(enabled: boolean) => mode === 'simple' ? toggleEnabled(enabled) : updateDraft((current) => ({ ...current, enabled }))" />
         </section>
 
         <section v-if="mode === 'simple'" class="firewall-card">
@@ -704,12 +702,15 @@ onUnmounted(() => {
 .firewall-toolbar-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .firewall-stack { display: grid; gap: 16px; }
 .firewall-card { display: grid; gap: 14px; padding: 16px; border: 1px solid var(--border); border-radius: 7px; background: var(--card); }
-.firewall-card header h2, .firewall-policy span, .firewall-modal label { font-size: 14px; font-weight: 600; }
-.firewall-card header h2 { margin: 0; }
+.firewall-card header h2, .firewall-enable h2, .firewall-policy span, .firewall-modal label { font-size: 14px; font-weight: 600; }
+.firewall-card header h2, .firewall-enable h2 { margin: 0; }
 .firewall-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.firewall-card header p, .firewall-policy p, .firewall-empty, .firewall-preview, .firewall-modal p { margin: 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
-.firewall-switch-row, .firewall-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.firewall-switch-row p, .firewall-switch-row small, .firewall-list small { display: block; margin: 4px 0 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.45; }
+.firewall-card header p, .firewall-enable p, .firewall-policy p, .firewall-empty, .firewall-preview, .firewall-modal p { margin: 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
+.firewall-enable { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.firewall-enable :deep(.n-switch) { align-self: center; }
+.firewall-enable p + p { margin-top: 14px; }
+.firewall-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.firewall-list small { display: block; margin: 4px 0 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.45; }
 .firewall-list { display: grid; margin: 0; padding: 0; list-style: none; }
 .firewall-list li { padding: 8px 0; border-top: 1px solid var(--border); }
 .firewall-list li:first-child { border-top: 0; padding-top: 0; }
@@ -737,7 +738,7 @@ onUnmounted(() => {
   .firewall-rule, .firewall-rule-move { transition: none; }
 }
 @container (max-width: 640px) {
-  .firewall-toolbar, .firewall-switch-row, .firewall-card-heading { align-items: stretch; flex-direction: column; }
+  .firewall-toolbar, .firewall-card-heading { align-items: stretch; flex-direction: column; }
   .firewall-defaults { grid-template-columns: 1fr; }
   .firewall-toolbar-actions { display: grid; grid-template-columns: auto minmax(0, 1fr); width: 100%; }
   .firewall-toolbar-actions :deep(.n-button-group) { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
@@ -747,7 +748,7 @@ onUnmounted(() => {
   .firewall-actions { position: sticky; bottom: 0; padding-top: 8px; background: var(--background); }
 }
 @media (max-width: 760px) {
-  .firewall-toolbar, .firewall-switch-row, .firewall-card-heading { align-items: stretch; flex-direction: column; }
+  .firewall-toolbar, .firewall-card-heading { align-items: stretch; flex-direction: column; }
   .firewall-defaults { grid-template-columns: 1fr; }
   .firewall-toolbar-actions { display: grid; grid-template-columns: auto minmax(0, 1fr); width: 100%; }
   .firewall-toolbar-actions :deep(.n-button-group) { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }

@@ -110,6 +110,7 @@ class OneKVMTransport {
   private peer: RTCPeerConnection | null = null
   private videoTiming: WebRTCVideoTiming | null = null
   private control: RTCDataChannel | null = null
+  private pointer: RTCDataChannel | null = null
   private stream: MediaStream | null = null
   private localAudio: MediaStream | null = null
   private webRTCAudio: WebRTCAudio | null = null
@@ -742,7 +743,7 @@ class OneKVMTransport {
 
   private async startWebRTC(generation: number, codec: string, _speaker: boolean, _microphone: boolean, stereo = false, autoCodec?: string) {
 
-    const ice = await api.getWebRTCIce().catch(() => ({ ice_servers: [], trickle: false }))
+    const ice = await api.getWebRTCIce().catch(() => ({ ice_servers: [], trickle: false, hid_pointer_channel: false }))
     const iceServers = ice.ice_servers || []
     if (generation !== this.connectionGeneration) return
     const peer = new RTCPeerConnection(iceServers.length ? { iceServers } : undefined)
@@ -811,6 +812,12 @@ class OneKVMTransport {
     }
     control.onclose = () => {
       if (this.control === control) this.setState({ controlReady: false })
+    }
+    // Separate ordered streams keep an unpolled mouse endpoint in firmware
+    // menus from delaying keyboard releases. Older Core keeps one stream.
+    if (ice.hid_pointer_channel) {
+      this.pointer = peer.createDataChannel('pointer')
+      this.pointer.binaryType = 'arraybuffer'
     }
 
     const video = peer.addTransceiver('video', { direction: 'recvonly' })
@@ -1105,8 +1112,9 @@ class OneKVMTransport {
 		return false
 	  }
 	}
-    if (this.control?.readyState !== 'open') return false
-    this.control.send(Uint8Array.from(report))
+    const channel = report[0] === 2 || report[0] === 3 ? this.pointer ?? this.control : this.control
+    if (channel?.readyState !== 'open') return false
+    channel.send(Uint8Array.from(report))
     this.emitHIDReport(report)
     return true
   }
@@ -1307,10 +1315,13 @@ class OneKVMTransport {
     this.audioOpening = null
     this.disposeLocalAudio()
     const control = this.control
+    const pointer = this.pointer
     const peer = this.peer
     this.control = null
+    this.pointer = null
     this.peer = null
     control?.close()
+    pointer?.close()
     peer?.close()
     this.stream = null
     if (this.video) this.video.srcObject = null

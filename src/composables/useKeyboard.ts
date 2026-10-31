@@ -105,6 +105,9 @@ export function useKeyboard(
     if (!modifier && !key) return
     event.preventDefault()
     event.stopPropagation()
+    // The host repeats held keys. Browser repeat events must not build a
+    // second queue of identical held-state reports ahead of the release.
+    if (modifier ? pressedModifiers.has(routed.code) : key && pressedKeys.has(key)) return
     pressMapped(routed.code)
     sendState()
   }

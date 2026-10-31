@@ -2042,7 +2042,7 @@ export const api = {
       method: 'DELETE',
       body: JSON.stringify({ delete_data: Boolean(options?.deleteData) }),
     }),
-  getWebRTCIce: () => request<{ ice_servers: IceServer[]; trickle?: boolean }>('/api/webrtc/ice', { cache: 'no-store' }),
+  getWebRTCIce: () => request<{ ice_servers: IceServer[]; trickle?: boolean; hid_pointer_channel?: boolean }>('/api/webrtc/ice', { cache: 'no-store' }),
   createWebRTCSession: (sdp: string, microphone = false, media: 'audio_video' | 'video' | 'audio' = 'audio_video', videoCodec?: string, trickle = false) =>
     request<WebRTCAnswer>('/api/webrtc/offer', {
       method: 'POST',

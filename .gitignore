@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-recovery/
+l10n-out/
 test-results/
 *.local
 /artifacts/

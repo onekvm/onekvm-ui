@@ -1436,7 +1436,7 @@ const keyboardOptions = computed<DropdownOption[]>(() => {
 })
 
 const languageMenuOptions = computed<DropdownOption[]>(() =>
-  languageOptions.map((language) => ({
+  languageOptions.value.map((language) => ({
     key: language.value,
     label: language.label,
     disabled: language.value === currentLanguage.value,

@@ -3,6 +3,8 @@ import { fileURLToPath, URL } from 'node:url'
 import vue from '@vitejs/plugin-vue'
 import { defineConfig, loadEnv, type ProxyOptions } from 'vite'
 
+import { l10nDevPlugin } from './scripts/l10n-dev.mjs'
+
 function proxyOptions(target: string): ProxyOptions {
   return {
     target,
@@ -33,7 +35,7 @@ export default defineConfig(({ mode }) => {
     : undefined
 
   return {
-    plugins: [vue()],
+    plugins: [vue(), l10nDevPlugin(fileURLToPath(new URL('.', import.meta.url)))],
     base: mode === 'cloud' ? './' : '/',
     resolve: {
       alias: {

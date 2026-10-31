@@ -3,7 +3,7 @@ import type { WifiApNetwork } from '../lib/wifi-ap-network'
 import { resolveServiceURL, serviceBaseUrl, serviceURL, serviceWebSocketURL } from './service-url.ts'
 export type IPv4Mode = 'disabled' | 'dhcp' | 'dhcp-static' | 'static'
 export type IPv6Mode = 'disabled' | 'slaac' | 'dhcp' | 'static'
-export type DeviceLanguage = 'en' | 'zh' | 'zh_tw'
+export type DeviceLanguage = string
 
 export interface NetworkConfig {
   primary_interface: string
@@ -1770,6 +1770,12 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(personalization),
     }),
+  uploadNoSignalImage: (file: Blob) => request<Record<string, never>>('/api/personalization/no-signal', {
+    method: 'POST',
+    body: file,
+    headers: { 'Content-Type': file.type || 'application/octet-stream' },
+  }),
+  clearNoSignalImage: () => request<void>('/api/personalization/no-signal', { method: 'DELETE' }),
   getInputConfig: () => request<InputConfig>('/api/config/input', { cache: 'no-store' }),
   saveInputConfig: (input: InputConfig) =>
     request<InputConfig>('/api/config/input', {

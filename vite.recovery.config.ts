@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url'
 import vue from '@vitejs/plugin-vue'
 import { defineConfig, type Plugin } from 'vite'
 
+import { l10nDevPlugin } from './scripts/l10n-dev.mjs'
+
 const rootDir = fileURLToPath(new URL('.', import.meta.url))
 const outDir = path.join(rootDir, 'dist-recovery')
 
@@ -114,7 +116,7 @@ function inlineRecoveryHtml(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [vue(), recoveryDevMock(), inlineRecoveryHtml()],
+  plugins: [vue(), l10nDevPlugin(rootDir), recoveryDevMock(), inlineRecoveryHtml()],
   publicDir: false,
   resolve: {
     alias: {

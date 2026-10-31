@@ -127,7 +127,8 @@ h2 { margin: 0; font-size: 14px; font-weight: 600; }
 .firewall-policy { display: grid; gap: 8px; padding-top: 14px; border-top: 1px solid var(--border); }
 .firewall-policy span { font-size: 13px; font-weight: 600; }
 .firewall-policy :deep(.n-radio-group) { display: flex; flex-wrap: wrap; width: fit-content; max-width: 100%; }
-.firewall-policy :deep(.n-radio-button) { flex: 1 1 0; justify-content: center; min-width: 4.5rem; }
+.firewall-policy :deep(.n-radio-group .n-radio-button) { display: flex; flex: 1 1 0; align-items: center; justify-content: center; min-width: 4.5rem; }
+.firewall-policy :deep(.n-radio-button .n-radio__label) { width: 100%; text-align: center; }
 @container (max-width: 640px) {
   header { align-items: stretch; flex-direction: column; }
   .firewall-drag { width: 44px; height: 44px; }

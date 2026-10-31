@@ -726,7 +726,8 @@ onUnmounted(() => {
 .firewall-defaults { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px 24px; }
 .firewall-policy { display: grid; gap: 8px; align-content: start; min-width: 0; }
 .firewall-policy :deep(.n-radio-group) { display: flex; flex-wrap: wrap; width: 100%; }
-.firewall-policy :deep(.n-radio-button) { flex: 1 1 0; justify-content: center; min-width: 4.5rem; }
+.firewall-policy :deep(.n-radio-group .n-radio-button) { display: flex; flex: 1 1 0; align-items: center; justify-content: center; min-width: 4.5rem; }
+.firewall-policy :deep(.n-radio-button .n-radio__label) { width: 100%; text-align: center; }
 .firewall-preview span { display: block; margin-bottom: 2px; }
 .firewall-modal { display: grid; gap: 12px; }
 .firewall-modal label { display: grid; gap: 6px; }

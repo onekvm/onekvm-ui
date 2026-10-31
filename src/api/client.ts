@@ -350,6 +350,7 @@ export type ToolbarIconId =
   | 'performance'
   | 'fullscreen'
   | 'toolbox'
+  | 'collection'
   | 'settings'
   | 'language'
   | 'account'

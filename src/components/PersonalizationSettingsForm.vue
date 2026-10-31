@@ -21,6 +21,7 @@ import MessagePlacementTestButton from './MessagePlacementTestButton.vue'
 import {
   defaultToolbarIcons,
   isDeviceToolbarIcon,
+  isRootOnlyToolbarIcon,
   normalizeToolbarIcons,
   reorderToolbarIcon,
   setToolbarIconHidden,
@@ -348,7 +349,7 @@ onMounted(refreshNoSignalPreview)
               </span>
               <n-switch
                 :value="!icon.hidden"
-                :disabled="disabled || icon.id === 'settings'"
+                :disabled="disabled || isRootOnlyToolbarIcon(icon.id)"
                 :aria-label="t('settings.advancedSettings.personalizationPage.showIcon', 'Show {name}').replace('{name}', iconLabel(icon.id))"
                 @update:value="showIcon(icon.id, $event)"
               />

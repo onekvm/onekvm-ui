@@ -2,6 +2,7 @@ import { h, onBeforeUnmount, onMounted, render, shallowRef } from 'vue'
 import { Folder } from '@/icons'
 import { toolbarDropBefore } from '@/lib/toolbar-drag-target'
 import { isToolbarItem } from '@/lib/toolbar-layout'
+import { isRootOnlyToolbarIcon } from '@/lib/toolbar-icons'
 import { useToolbarItemPreview } from './useToolbarItemPreview'
 
 export interface ToolbarDrop { folder?: string; before?: string; merge?: string }
@@ -105,16 +106,16 @@ export function useToolbarItemDrag(options: {
       const rect = preview.bounds(item)
       const ratio = vertical ? (event.clientY - rect.top) / rect.height : (event.clientX - rect.left) / rect.width
       const inside = event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom
-      if (inside && id.startsWith('folder:') && isToolbarItem(active.id) && active.id !== 'settings' && ratio > .25 && ratio < .75) {
+      if (inside && id.startsWith('folder:') && isToolbarItem(active.id) && !isRootOnlyToolbarIcon(active.id) && ratio > .25 && ratio < .75) {
         folder = id.slice(7)
         active.target = { folder }
         mode = 'into'
-      } else if (inside && !folderList && isToolbarItem(id) && id !== 'settings' && isToolbarItem(active.id) && active.id !== 'settings' && ratio > .3 && ratio < .7 && options.canCreateFolder()) {
+      } else if (inside && !folderList && isToolbarItem(id) && !isRootOnlyToolbarIcon(id) && isToolbarItem(active.id) && !isRootOnlyToolbarIcon(active.id) && ratio > .3 && ratio < .7 && options.canCreateFolder()) {
         active.target = { merge: id }
         mode = 'merge'
       } else {
         const parent = folderList?.dataset.toolbarFolderList
-        if (!parent || (isToolbarItem(active.id) && active.id !== 'settings')) {
+        if (!parent || (isToolbarItem(active.id) && !isRootOnlyToolbarIcon(active.id))) {
           const order = parent ? options.folderItems(parent) : options.order()
           const next = toolbarDropBefore(order, new Set(preview.items(surface!)), active.id, id, ratio > .5)
           active.target = { folder: parent, before: next }
@@ -122,7 +123,7 @@ export function useToolbarItemDrag(options: {
         }
       }
       if (active.target) marker = item
-    } else if (!item && folderList && isToolbarItem(active.id) && active.id !== 'settings') {
+    } else if (!item && folderList && isToolbarItem(active.id) && !isRootOnlyToolbarIcon(active.id)) {
       active.target = { folder: folderList.dataset.toolbarFolderList }
       marker = folderList
       mode = 'into'

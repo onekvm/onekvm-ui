@@ -1,5 +1,5 @@
 import type { ToolbarFolder, ToolbarIconPreference, ToolbarLabelPosition } from '../api/client.ts'
-import { isDeviceToolbarIcon, isToolbarIconId, normalizeToolbarIcons } from './toolbar-icons.ts'
+import { isDeviceToolbarIcon, isRootOnlyToolbarIcon, isToolbarIconId, normalizeToolbarIcons } from './toolbar-icons.ts'
 
 // Icon sets may register additional names; rendering falls back to Folder when
 // the selected set does not provide a glyph.
@@ -43,7 +43,7 @@ export function normalizeToolbarFolders(value: readonly ToolbarFolder[] | null |
       name: typeof folder.name === 'string' ? folder.name.trim() : '',
       icon: validToolbarFolderIcon(folder.icon) ? folder.icon : 'Folder',
       items: (Array.isArray(folder.items) ? folder.items : []).slice(0, 256)
-        .filter(item => item !== 'settings' && isToolbarItem(item) && !members.has(item) && Boolean(members.add(item))),
+        .filter(item => !isRootOnlyToolbarIcon(item) && isToolbarItem(item) && !members.has(item) && Boolean(members.add(item))),
     }))
 }
 
@@ -64,14 +64,18 @@ export function toolbarLayoutOrder(layout: ToolbarLayout, pinnedToolIds: readonl
   ]
   const valid = (id: unknown): id is string => isToolbarItem(id) || isToolbarSeparator(id)
     || (typeof id === 'string' && folders.some(folder => `folder:${folder.id}` === id))
-  return [...new Set(layout.toolbar_order?.length
-    ? [...layout.toolbar_order.filter(valid), ...defaults.filter(id => !isToolbarSeparator(id))]
+  const order = layout.toolbar_order?.filter(valid) ?? []
+  if (order.length && !order.includes('collection') && order.includes('settings')) {
+    order.splice(order.indexOf('settings'), 0, 'collection')
+  }
+  return [...new Set(order.length
+    ? [...order, ...defaults.filter(id => !isToolbarSeparator(id))]
     : defaults)]
 }
 
 export function upsertToolbarFolder<T extends ToolbarLayout>(layout: T, folder: ToolbarFolder): T {
   const folders = normalizeToolbarFolders(layout.toolbar_folders)
-  const next = { ...folder, items: folder.items.filter(item => item !== 'settings' && isToolbarItem(item)) }
+  const next = { ...folder, items: folder.items.filter(item => !isRootOnlyToolbarIcon(item) && isToolbarItem(item)) }
   const index = folders.findIndex(item => item.id === next.id)
   if (index < 0 && folders.length >= MAX_TOOLBAR_FOLDERS) return layout
   const transferred = folders.map(item => ({ ...item, items: item.items.filter(id => !next.items.includes(id)) }))
@@ -89,7 +93,7 @@ export function removeToolbarFolder<T extends ToolbarLayout>(layout: T, id: stri
 }
 
 export function groupToolbarItems<T extends ToolbarLayout>(layout: T, item: string, other: string, folder: ToolbarFolder, rootOrder = toolbarLayoutOrder(layout)): T {
-  if (item === other || item === 'settings' || other === 'settings' || !isToolbarItem(item) || !isToolbarItem(other)) return layout
+  if (item === other || isRootOnlyToolbarIcon(item) || isRootOnlyToolbarIcon(other) || !isToolbarItem(item) || !isToolbarItem(other)) return layout
   if (normalizeToolbarFolders(layout.toolbar_folders).length >= MAX_TOOLBAR_FOLDERS) return layout
   const grouped = upsertToolbarFolder(layout, { ...folder, items: [other, item] })
   const order = rootOrder.filter(id => id !== item)
@@ -100,7 +104,7 @@ export function groupToolbarItems<T extends ToolbarLayout>(layout: T, item: stri
 export function moveToolbarItem<T extends ToolbarLayout>(
   layout: T, item: string, target: { folder?: string; before?: string }, rootOrder = toolbarLayoutOrder(layout),
 ): T {
-  if (item === target.before || (item === 'settings' && target.folder)) return layout
+  if (item === target.before || (isRootOnlyToolbarIcon(item) && target.folder)) return layout
   const folders = normalizeToolbarFolders(layout.toolbar_folders)
   if (!isToolbarItem(item) && !isToolbarSeparator(item) && !folders.some(folder => `folder:${folder.id}` === item)) return layout
   if (target.folder && (!isToolbarItem(item) || !folders.some(folder => folder.id === target.folder))) return layout
@@ -123,9 +127,13 @@ export function moveToolbarItem<T extends ToolbarLayout>(
 export function syncToolbarIconOrder(order: readonly string[] | undefined, icons: readonly ToolbarIconPreference[]) {
   if (!order?.length) return []
   const next = [...order]
+  if (!next.includes('collection')) {
+    const index = next.indexOf('settings')
+    next.splice(index < 0 ? next.length : index, 0, 'collection')
+  }
   for (const device of [true, false]) {
-    const ids = icons.filter(icon => isDeviceToolbarIcon(icon.id) === device && order.includes(icon.id)).map(icon => icon.id)
-    const positions = order.flatMap((id, index) => isToolbarIconId(id) && isDeviceToolbarIcon(id) === device ? [index] : [])
+    const ids = icons.filter(icon => isDeviceToolbarIcon(icon.id) === device && next.includes(icon.id)).map(icon => icon.id)
+    const positions = next.flatMap((id, index) => isToolbarIconId(id) && isDeviceToolbarIcon(id) === device ? [index] : [])
     positions.forEach((position, index) => { next[position] = ids[index]! })
   }
   return next

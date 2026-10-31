@@ -11,7 +11,7 @@ import {
 } from '../src/lib/toolbar-icons.ts'
 
 const defaults = defaultToolbarIcons()
-assert.equal(defaults.length, 16)
+assert.equal(defaults.length, 17)
 assert.equal(defaults[0]?.id, 'display')
 assert.equal(defaults.at(-1)?.id, 'account')
 assert.deepEqual(defaults.filter(icon => icon.hidden).map(icon => icon.id), [
@@ -32,7 +32,7 @@ const mixed = normalizeToolbarIcons([
 assert.deepEqual(mixed.map(icon => icon.id), [
   'mouse', 'display', 'keyboard', 'virtual_keyboard', 'keyboard_text', 'ctrl_alt_del',
   'gamepad', 'power', 'audio', 'virtual_media',
-  'account', 'settings', 'language', 'performance', 'fullscreen', 'toolbox',
+  'account', 'collection', 'settings', 'language', 'performance', 'fullscreen', 'toolbox',
 ])
 assert.equal(toolbarIconHidden(mixed, 'mouse'), true)
 assert.equal(toolbarIconHidden(mixed, 'account'), true)
@@ -47,6 +47,13 @@ assert.deepEqual(reorderToolbarIcon(defaults, 'display', 'fullscreen').map(icon 
 const hiddenPower = setToolbarIconHidden(defaults, 'power', true)
 assert.equal(toolbarIconHidden(hiddenPower, 'power'), true)
 assert.equal(setToolbarIconHidden(defaults, 'settings', true).some(icon => icon.id === 'settings' && icon.hidden), false)
+assert.equal(toolbarIconHidden(setToolbarIconHidden(defaults, 'collection', true), 'collection'), false)
+const collectionFirst = reorderToolbarIcon(defaults, 'collection', 'performance')
+assert.ok(collectionFirst.findIndex(icon => icon.id === 'collection') < collectionFirst.findIndex(icon => icon.id === 'performance'))
+assert.equal(toolbarIconsEqual(collectionFirst, normalizeToolbarIcons(JSON.parse(JSON.stringify(collectionFirst)))), true)
+const oldIcons = defaults.filter(icon => icon.id !== 'collection')
+const upgradedIcons = normalizeToolbarIcons(oldIcons)
+assert.equal(upgradedIcons.findIndex(icon => icon.id === 'collection') + 1, upgradedIcons.findIndex(icon => icon.id === 'settings'))
 
 const legacy = defaults.filter(icon => !['virtual_keyboard', 'keyboard_text', 'ctrl_alt_del'].includes(icon.id))
 for (const id of ['virtual_keyboard', 'keyboard_text', 'ctrl_alt_del'] as const) {

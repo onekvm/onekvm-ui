@@ -4,7 +4,7 @@ import { groupToolbarItems, isToolbarSeparator, moveToolbarItem, normalizeToolba
 
 const initial: ToolbarLayout = { toolbar_icons: defaultToolbarIcons() }
 assert.deepEqual(normalizeToolbarFolders(undefined), [])
-assert.equal(toolbarLayoutOrder(initial).length, 18)
+assert.equal(toolbarLayoutOrder(initial).length, 19)
 assert.ok(toolbarLayoutOrder(initial).includes('separator:controls'))
 assert.equal(toolbarLayoutOrder(initial).at(-2), 'separator:account')
 assert.deepEqual(visibleToolbarSeparators(toolbarLayoutOrder(initial), new Set(['display', 'fullscreen', 'account'])), ['separator:controls', 'separator:account'])
@@ -30,6 +30,13 @@ assert.equal(first.toolbar_icons!.find(icon => icon.id === 'virtual_keyboard')!.
 assert.equal(first.toolbar_folders![0]!.items.includes('settings'), false)
 assert.equal(initial.toolbar_icons!.find(icon => icon.id === 'virtual_keyboard')!.hidden, true)
 assert.equal(first.toolbar_folders![0]!.items.includes('tool:terminal/main'), true)
+const collectionInFolder = upsertToolbarFolder(initial, { ...input, items: ['collection', 'mouse'] })
+assert.deepEqual(collectionInFolder.toolbar_folders![0]!.items, ['mouse'])
+assert.equal(groupToolbarItems(initial, 'collection', 'display', { id: 'bad', name: 'Folder', icon: 'Folder', items: [] }), initial)
+assert.equal(moveToolbarItem(first, 'collection', { folder: 'input' }), first)
+const collectionMoved = moveToolbarItem(initial, 'collection', { before: 'performance' })
+assert.ok(toolbarLayoutOrder(collectionMoved).indexOf('collection') < toolbarLayoutOrder(collectionMoved).indexOf('performance'))
+assert.equal(toolbarLayoutOrder(JSON.parse(JSON.stringify(collectionMoved))).indexOf('collection'), toolbarLayoutOrder(collectionMoved).indexOf('collection'))
 
 const second = upsertToolbarFolder(first, { id: 'other', name: 'Other', icon: 'invalid!', items: ['virtual_keyboard'] })
 assert.equal(second.toolbar_folders![1]!.icon, 'Folder')
@@ -67,7 +74,7 @@ const customOrder = ['display', 'folder:input', 'mouse', 'tool:terminal/main', '
 const iconsReordered = defaultToolbarIcons().map(icon => ({ ...icon }))
 const mouseIndex = iconsReordered.findIndex(icon => icon.id === 'mouse')
 ;[iconsReordered[0], iconsReordered[mouseIndex]] = [iconsReordered[mouseIndex]!, iconsReordered[0]!]
-assert.deepEqual(syncToolbarIconOrder(customOrder, iconsReordered), ['mouse', 'folder:input', 'display', 'tool:terminal/main', 'settings', 'account'])
+assert.deepEqual(syncToolbarIconOrder(customOrder, iconsReordered), ['mouse', 'folder:input', 'display', 'tool:terminal/main', 'collection', 'settings', 'account'])
 assert.deepEqual(customOrder, ['display', 'folder:input', 'mouse', 'tool:terminal/main', 'settings', 'account'])
 assert.deepEqual(syncToolbarIconOrder(undefined, iconsReordered), [])
 console.log('toolbar folder and layout tests passed')

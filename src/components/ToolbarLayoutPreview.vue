@@ -16,10 +16,12 @@ const toolbox = useToolboxContext()
 const items = computed(() => {
   const folders = normalizeToolbarFolders(props.config.toolbar_folders)
   const icons = normalizeToolbarIcons(props.config.toolbar_icons)
+  const hasCollectedIcons = icons.some(icon => icon.hidden && !isKeyboardActionToolbarIcon(icon.id) && (icon.id !== 'gamepad' || USB_GAMEPAD_UI_ENABLED))
   const rendered = toolbarLayoutOrder(props.config, toolbox.pinned.map(({ tool }) => tool.id)).flatMap<PreviewItem>(id => {
     if (toolbarFolderFor(folders, id)) return []
     if (isToolbarSeparator(id)) return [{ id, title: '', glyph: Folder, tool: null, status: false }]
     if (isToolbarIconId(id)) {
+      if (id === 'collection' && !hasCollectedIcons) return []
       if (icons.find(icon => icon.id === id)?.hidden || (id === 'gamepad' && !USB_GAMEPAD_UI_ENABLED)) return []
       return [{ id, title: toolbarIconLabel(id), glyph: toolbarIconGlyph[id], tool: null, status: ['display', 'mouse', 'keyboard', 'power', 'audio', 'virtual_media'].includes(id) && !isKeyboardActionToolbarIcon(id) }]
     }

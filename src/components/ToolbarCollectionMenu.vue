@@ -136,7 +136,7 @@ onBeforeUnmount(() => {
             @keydown="triggerKeydown"
           >
             <template #icon><component :is="glyph" aria-hidden="true" /></template>
-            <span v-if="title" class="toolbar-action-label">{{ title }}</span>
+            <span class="toolbar-action-label">{{ heading }}</span>
           </n-button>
         </template>
         {{ heading }} ({{ count }})

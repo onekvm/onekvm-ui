@@ -282,6 +282,7 @@ function onPinnedToolActivate() {
   setLauncherMenuOpen(false)
 }
 function folderItemAvailable(id: string) {
+  if (id === 'collection') return collectedIcons.value.length > 0
   if (id.startsWith('tool:')) return toolbox.pinned.some(({ tool }) => `tool:${tool.id}` === id)
   if (id === 'gamepad') return USB_GAMEPAD_UI_ENABLED && Boolean(props.status?.hid?.gamepad)
   if (id === 'audio' && !audioControlAvailable.value) return false
@@ -2165,7 +2166,7 @@ onBeforeUnmount(() => {
       <ToolboxMenu :menu-item="!toolbarIconShown('toolbox')" :mobile="toolbarLauncher || !toolbarIconShown('toolbox')" :placement="menuPlacement" />
       </ToolbarIconSlot>
 
-      <div v-if="collectedIcons.length" class="toolbar-icon-slot" style="order: 21">
+      <div v-if="collectedIcons.length" data-toolbar-item="collection" class="toolbar-icon-slot" :style="toolbarIconStyle('collection')">
         <ToolbarCollectionMenu
           :show="collectionMenuOpen"
           :count="collectedIcons.length"

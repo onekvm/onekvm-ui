@@ -1759,6 +1759,8 @@ const zh_tw = {
         manage: '管理外掛程式'
       },
       plugins: {
+      installedDisabled: '{name} 已安裝，尚未啟用。',
+      enableAfterInstall: '安裝後啟用',
         installLogDetails: '詳情',
         installLog: '安裝日誌',
         installLogWaiting: '等待安裝日誌輸出…',

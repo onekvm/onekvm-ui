@@ -29,6 +29,7 @@
     "test:extension-settings": "node --experimental-strip-types tests/extension-settings.test.ts",
     "test:cloud-services": "node --experimental-strip-types tests/cloud-services.test.ts",
     "test:marketplace-install": "node --experimental-strip-types tests/marketplace-install.test.ts",
+    "test:extension-query": "node --experimental-strip-types tests/extension-query.test.ts",
     "test:vpn-config": "node --experimental-strip-types tests/vpn-config.test.ts",
     "test:connection-trace": "node --experimental-strip-types tests/connection-trace.test.ts",
     "test:recovery": "node --experimental-strip-types tests/recovery.test.ts",

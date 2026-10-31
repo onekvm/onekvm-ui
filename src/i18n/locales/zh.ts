@@ -1754,6 +1754,8 @@ const zh = {
         manage: '管理插件'
       },
       plugins: {
+      installedDisabled: '{name} 已安装，尚未启用。',
+      enableAfterInstall: '安装后启用',
         installLogDetails: '详情',
         installLog: '安装日志',
         installLogWaiting: '等待安装日志输出…',

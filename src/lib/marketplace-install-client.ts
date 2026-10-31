@@ -91,6 +91,7 @@ export async function installMarketplacePackage(
   pkg: MarketplaceInstallPackage,
   errors: MarketplaceInstallErrors,
   onProgress?: (progress: MarketplaceInstallProgress) => void,
+  enableAfterInstall?: boolean,
 ) {
   const response = await invokeExtensionShell<MarketplaceInstallResponse>(
     PLUGIN_MARKETPLACE_ID,
@@ -99,10 +100,17 @@ export async function installMarketplacePackage(
       package: pkg.packageName,
       wait: false,
       size_bytes: pkg.sizeBytes,
+      ...(enableAfterInstall === undefined ? {} : { enable_after_install: enableAfterInstall }),
     },
   )
   if (response?.status && !['started', 'ok'].includes(response.status)) {
     throw new Error(errors.rejected)
   }
-  await waitForMarketplaceInstall(pkg.packageName, errors, onProgress)
+  try {
+    await waitForMarketplaceInstall(pkg.packageName, errors, onProgress)
+  } finally {
+    // Success publishes new contributions; a failed upgrade can restore old
+    // contributions after the install-start notification already removed them.
+    window.dispatchEvent(new Event('onekvm:extensions-changed'))
+  }
 }

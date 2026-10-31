@@ -19,6 +19,7 @@ import { currentLanguage, t } from '@/i18n/runtime'
 import { extensionHostErrorText } from '@/lib/extension-host-error'
 import { pluginIcon } from '@/lib/plugin-icons'
 import ExtensionDetailsModal from './ExtensionDetailsModal.vue'
+import InstallEnableOption from './InstallEnableOption.vue'
 
 const props = defineProps<{ active: boolean; catalog?: ExtensionSummary[]; catalogLoading?: boolean }>()
 const emit = defineEmits<{ catalog: [value: ExtensionSummary[]] }>()
@@ -51,6 +52,11 @@ const stagedUpload = ref<ExtensionUpload | null>(null)
 const uploadProgress = ref(0)
 const installError = ref('')
 const packageDragging = ref(false)
+const enableAfterInstall = shallowRef(true)
+const canEnableAfterInstall = computed(() => {
+  const entry = stagedUpload.value?.package
+  return entry && !entry.installed && !['environment', 'cloud-provider'].includes(entry.kind)
+})
 
 const memoryBudget = computed(() => {
 	const status = extensions.value.find((extension) => (extension.memory_budget_total_bytes || 0) > 0)
@@ -203,6 +209,7 @@ function openInstaller() {
 }
 
 function resetInstaller() {
+  enableAfterInstall.value = true
   installPhase.value = 'select'
   installFile.value = null
   stagedUpload.value = null
@@ -290,7 +297,7 @@ async function installStagedPackage() {
   installError.value = ''
   installPhase.value = 'installing'
   try {
-    await api.installStagedExtension(upload.token)
+    await api.installStagedExtension(upload.token, canEnableAfterInstall.value ? enableAfterInstall.value : undefined)
     installPhase.value = 'success'
     message.success(t('settings.plugins.installed', 'Plugin installed'))
     await load(false)
@@ -778,6 +785,7 @@ watch(() => props.active, (active) => {
             </ul>
           </section>
           <n-alert v-if="installError" type="error" :show-icon="false">{{ installError }}</n-alert>
+          <InstallEnableOption v-if="canEnableAfterInstall" v-model="enableAfterInstall" />
           <p class="installer-confirm-copy">
             {{ uploadedPackage()!.installed
               ? t('settings.plugins.updateConfirmation', 'The installed plugin will be updated with this package.')
@@ -797,7 +805,9 @@ watch(() => props.active, (active) => {
         <div v-else-if="installPhase === 'success' && uploadedPackage()" class="installer-stage installer-centered">
           <span class="installer-hero-icon installer-success"><CheckCircle2 :size="34" /></span>
           <strong>{{ t('settings.plugins.installComplete', 'Plugin installed') }}</strong>
-          <span>{{ replace(t('settings.plugins.installCompleteDescription', '{name} is ready to use.'), { name: extensionName(uploadedPackage()!) }) }}</span>
+          <span>{{ replace(canEnableAfterInstall && !enableAfterInstall
+            ? t('settings.plugins.installedDisabled', '{name} is installed and disabled.')
+            : t('settings.plugins.installCompleteDescription', '{name} is ready to use.'), { name: extensionName(uploadedPackage()!) }) }}</span>
         </div>
 
         <template #footer>

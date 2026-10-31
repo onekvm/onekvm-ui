@@ -1755,6 +1755,8 @@ const en = {
         manage: 'Manage plugin'
       },
       plugins: {
+      installedDisabled: '{name} is installed and disabled.',
+      enableAfterInstall: 'Enable after installation',
         installLogDetails: 'Details',
         installLog: 'Installation log',
         installLogWaiting: 'Waiting for installation output…',

@@ -78,6 +78,13 @@ Definitions cache by extension/version/tool/entrypoint. Concurrent requests
 share a promise, queued scripts load serially, and loads time out after 15s.
 Errors provide a retry. Stale results cannot mount after close or invalidation.
 
+`onekvm:extensions-changed` invalidates the shared console and extension media
+catalogs before consumers use their next result. Queries already in flight
+follow the new catalog rather than publishing an obsolete snapshot. Asynchronous
+installers publish this event when the job finishes, including rollback after
+failure; accepting an install job is not its completion. New tools become
+available without closing the success dialog or reloading the page.
+
 Styles are reference counted. Closing unmounts the instance; reopening reuses
 the definition and reattaches styles. Retired versions release resources after
 their last consumer leaves. Components must clean up subscriptions, timers,

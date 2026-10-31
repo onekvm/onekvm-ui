@@ -17,6 +17,8 @@ export interface MarketplaceInstallPackage {
   packageVersion: string
   installedPackageVersion: string
   updateAvailable: boolean
+  installed?: boolean
+  kind?: string
   sizeBytes: number
   installedSizeBytes: number
   iconDataUrl: string
@@ -118,6 +120,8 @@ export function marketplaceInstallPackageFromRecord(value: unknown, id: string):
     packageVersion: readText(record.package_version),
     installedPackageVersion: readText(record.installed_package_version),
     updateAvailable: record.update_available === true,
+    installed: record.installed === true,
+    kind: readText(record.kind),
     sizeBytes: Number(record.size_bytes) || 0,
     installedSizeBytes: Number(record.installed_size_bytes) || 0,
     iconDataUrl,

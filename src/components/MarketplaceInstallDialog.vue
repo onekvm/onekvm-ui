@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import { CircleCheck, Download, Info, PackageCheck } from '@/icons'
 import { NAlert, NButton, NCard, NModal, NProgress, NTag } from 'naive-ui'
 
@@ -19,6 +19,7 @@ import {
 } from '@/lib/marketplace-install'
 import ExtensionDetailsDialog from './ExtensionDetailsDialog.vue'
 import InstallLogDetails from './InstallLogDetails.vue'
+import InstallEnableOption from './InstallEnableOption.vue'
 
 const props = defineProps<{
   show: boolean
@@ -38,6 +39,9 @@ type InstallerPhase = 'confirm' | 'installing' | 'success'
 const phase = ref<InstallerPhase>('confirm')
 const error = ref('')
 const detailsOpen = ref(false)
+const enableAfterInstall = shallowRef(true)
+const canEnableAfterInstall = computed(() => props.entry && !props.entry.installed && !props.entry.installedVersion
+  && !props.entry.updateAvailable && !['environment', 'cloud-provider'].includes(props.entry.kind || ''))
 const progress = ref<MarketplaceInstallProgress>({
   phase: '',
   percent: null,
@@ -124,6 +128,9 @@ const confirmCopy = computed(() => {
 
 const completeCopy = computed(() => {
   if (!props.entry) return ''
+  if (canEnableAfterInstall.value && !enableAfterInstall.value) {
+    return fillMarketplaceTemplate(t('settings.plugins.installedDisabled', '{name} is installed and disabled.'), { name: localized.value.name })
+  }
   if (props.entry.updateAvailable) {
     return fillMarketplaceTemplate(
       t('network.wireguard.installerUpdateCompleteDescription', '{name} has been updated to {latest}.'),
@@ -140,6 +147,7 @@ watch(() => props.show, (open) => {
   if (!open) detailsOpen.value = false
   if (!open || phase.value === 'installing') return
   phase.value = 'confirm'
+  enableAfterInstall.value = true
   error.value = ''
   progress.value = {
     phase: '',
@@ -192,7 +200,7 @@ async function runInstall() {
   try {
     await installMarketplacePackage(entry, installErrors(), (next) => {
       progress.value = next
-    })
+    }, canEnableAfterInstall.value ? enableAfterInstall.value : undefined)
     const ready = await props.onInstalled()
     if (!ready) {
       error.value = props.unavailableText || t(
@@ -303,6 +311,7 @@ async function runInstall() {
         </div>
         <n-alert v-if="error" type="error" :show-icon="false">{{ error }}</n-alert>
         <p class="plugin-marketplace-installer-copy">{{ confirmCopy }}</p>
+        <InstallEnableOption v-if="canEnableAfterInstall" v-model="enableAfterInstall" />
       </div>
 
       <InstallLogDetails

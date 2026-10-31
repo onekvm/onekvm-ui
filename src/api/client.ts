@@ -1,4 +1,4 @@
-import { createPersistentQuery } from '../lib/persistent-query.ts'
+import { createExtensionQuery } from '../lib/extension-query.ts'
 import type { WifiApNetwork } from '../lib/wifi-ap-network'
 import { resolveServiceURL, serviceBaseUrl, serviceURL, serviceWebSocketURL } from './service-url.ts'
 export type IPv4Mode = 'disabled' | 'dhcp' | 'dhcp-static' | 'static'
@@ -1243,8 +1243,9 @@ export function isUnauthorizedError(error: unknown): boolean {
   return error instanceof APIError && error.status === 401
 }
 
-const consoleExtensions = createPersistentQuery<ConsoleExtension[]>()
-const msdSources = createPersistentQuery<MSDSource[]>()
+const extensionEvents = typeof window !== 'undefined' && typeof window.addEventListener === 'function' ? window : undefined
+const consoleExtensions = createExtensionQuery<ConsoleExtension[]>(extensionEvents)
+const msdSources = createExtensionQuery<MSDSource[]>(extensionEvents)
 
 export function invalidateExtensionCaches() {
   consoleExtensions.invalidate()
@@ -1280,7 +1281,6 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
   }
 
   if (changesExtensions(path, options.method)) {
-    invalidateExtensionCaches()
     window.dispatchEvent(new Event('onekvm:extensions-changed'))
   }
   if (response.status === 204) return undefined as T
@@ -2003,15 +2003,15 @@ export const api = {
     }
     return request<ExtensionLayout>(extensionPagePath(extension, extension.page.entrypoint))
   },
-  installExtension: (id: string) =>
+  installExtension: (id: string, enableAfterInstall?: boolean) =>
     request<{ status: string }>('/api/extensions', {
       method: 'POST',
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({ id, enable_after_install: enableAfterInstall }),
     }),
   refreshExtensions: () =>
     request<{ status: string }>('/api/extensions/refresh', { method: 'POST' }),
-  installLocalExtension: (file: File) =>
-    request<{ status: string }>('/api/extensions/upload', {
+  installLocalExtension: (file: File, enableAfterInstall?: boolean) =>
+    request<{ status: string }>(`/api/extensions/upload${enableAfterInstall === undefined ? '' : `?enable_after_install=${enableAfterInstall}`}`, {
       method: 'POST',
       body: file,
       headers: {
@@ -2021,8 +2021,8 @@ export const api = {
       },
     }),
   stageLocalExtension,
-  installStagedExtension: (token: string) =>
-    request<{ status: string }>(`/api/extensions/uploads/${encodeURIComponent(token)}/install`, { method: 'POST' }),
+  installStagedExtension: (token: string, enableAfterInstall?: boolean) =>
+    request<{ status: string }>(`/api/extensions/uploads/${encodeURIComponent(token)}/install${enableAfterInstall === undefined ? '' : `?enable_after_install=${enableAfterInstall}`}`, { method: 'POST' }),
   discardStagedExtension: (token: string) =>
     request<void>(`/api/extensions/uploads/${encodeURIComponent(token)}`, { method: 'DELETE' }),
   updateExtension: (id: string, update: { enabled?: boolean; settings?: Record<string, ExtensionSettingValue> }) =>

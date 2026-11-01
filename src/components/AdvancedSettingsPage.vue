@@ -114,6 +114,7 @@ import HostnameSettingsForm from './HostnameSettingsForm.vue'
 import DiscoverySettingsForm from './DiscoverySettingsForm.vue'
 import MarketplaceInstallDialog from './MarketplaceInstallDialog.vue'
 import NetworkInterfaceManager from './NetworkInterfaceManager.vue'
+import NetworkSharingSettings from './NetworkSharingSettings.vue'
 import FirewallSettingsPage from './FirewallSettingsPage.vue'
 import ProxySettingsForm from './ProxySettingsForm.vue'
 import WebRtcIceSettingsForm from './WebRtcIceSettingsForm.vue'
@@ -1341,7 +1342,7 @@ async function usbSaveConfig() {
   const current = await api.getConfig()
   const patch = savedAudio.value && config.value
     ? audioConfigPatch(savedAudio.value, config.value.audio) : {}
-  return { ...current, usb: config.value!.usb, audio: { ...current.audio, ...patch } }
+  return { ...current, usb: { ...config.value!.usb, network_sharing: current.usb.network_sharing }, audio: { ...current.audio, ...patch } }
 }
 
 async function save() {
@@ -1988,6 +1989,7 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
               </section>
 
               <section v-else-if="paneSection === 'network' && config" class="advanced-settings-section">
+                <NetworkSharingSettings :config="config" :status="status" :video-session-id="videoSessionId" :disabled="saving || Boolean(networkApply?.pending)" @update:usb="config.usb = $event" />
                 <NetworkInterfaceManager
                   v-model="config.network"
                   :disabled="saving"

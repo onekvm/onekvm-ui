@@ -1,6 +1,7 @@
 export interface WifiApNetwork {
   address: string
   dhcp_enabled?: boolean
+  network_sharing?: boolean
   dhcp_start: string
   dhcp_end: string
 }
@@ -8,6 +9,7 @@ export interface WifiApNetwork {
 export const defaultWifiApNetwork: WifiApNetwork = {
   address: '192.168.77.1/24',
   dhcp_enabled: true,
+  network_sharing: false,
   dhcp_start: '192.168.77.100',
   dhcp_end: '192.168.77.199',
 }

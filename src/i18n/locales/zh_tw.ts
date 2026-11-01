@@ -2061,6 +2061,11 @@ const zh_tw = {
     },
     network: {
       title: '網路',
+      sharing: {
+        title: '網路共享',
+        usbReconnectHint: '變更 USB 共享會使鍵盤和滑鼠短暫重新連接。',
+        staticClientHint: '關閉 DHCP 時，需在連接裝置上將熱點位址設為閘道和 DNS 伺服器。',
+      },
       wifi: {
         dnsHint: '每行一個 DNS 伺服器；自動 DNS 來自 DHCP 或 IPv6 RA。',
         savedNetworks: "已儲存網路",
@@ -2097,6 +2102,8 @@ const zh_tw = {
         apAddress: 'AP IPv4 位址 / 前綴',
         apInterface: '無線熱點',
         apDhcpEnabled: 'DHCP 服務',
+        apNetworkSharing: 'AP 網路共享',
+        apNetworkSharingHint: '熱點開啟後，讓連接熱點的裝置透過 OneKVM 上網。OneKVM 需要已有可用的網路連線。',
         apNoChannels: '沒有偵測到可用的熱點頻道，請檢查無線驅動和管制區域設定。',
         apSettingsAdjusted: '儲存的熱點頻段或頻道不適用於此網卡。請先儲存目前可用的選項，再開啟熱點。',
         apDhcpEnabledHint: '自動為連接裝置分配 IP 位址。關閉後，需要在連接裝置上手動設定 AP 網段內的靜態位址。',

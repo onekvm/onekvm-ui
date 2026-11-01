@@ -2057,6 +2057,11 @@ const en = {
     },
     network: {
       title: 'Network',
+      sharing: {
+        title: 'Network sharing',
+        usbReconnectHint: 'Changing USB sharing briefly reconnects the keyboard and mouse.',
+        staticClientHint: 'With DHCP off, set the AP address as the gateway and DNS server on connected devices.',
+      },
       wifi: {
         dnsHint: 'One DNS server per line; automatic DNS comes from DHCP or IPv6 RA.',
         savedNetworks: "Saved networks",
@@ -2093,6 +2098,8 @@ const en = {
         apAddress: 'AP IPv4 address / prefix',
         apInterface: 'Wireless access point',
         apDhcpEnabled: 'DHCP server',
+        apNetworkSharing: 'AP internet sharing',
+        apNetworkSharingHint: 'Share OneKVM’s internet connection with devices on this access point. The access point must be on and OneKVM must have a working uplink.',
         apNoChannels: 'No usable AP channels were detected. Check the wireless driver and regulatory settings.',
         apSettingsAdjusted: 'The saved AP band or channel is unavailable on this radio. Save the supported selection before enabling the hotspot.',
         apDhcpEnabledHint: 'Assign IP addresses to connected devices automatically. When disabled, configure a static address in the AP subnet on each device.',

@@ -1766,6 +1766,22 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
   <div ref="settingsRoot" class="advanced-settings-root">
   <section class="advanced-settings-page" :class="settingsPageClass">
     <header v-if="!embedded" class="advanced-settings-header">
+      <div v-if="fileTransfer.uploading || mediaTransfer.uploading" class="toolbar-temporary-actions" data-toolbar-temporary-tasks>
+        <MediaTransferIndicator
+          :state="fileTransfer"
+          task-id="files"
+          :tooltip-disabled="mobileSettings"
+          always-visible
+          @restore="fileManagerPage?.restoreUploadDialog()"
+        />
+        <MediaTransferIndicator
+          :state="mediaTransfer"
+          :tooltip-disabled="mobileSettings"
+          always-visible
+          @restore="emit('restore-media-transfer')"
+        />
+      </div>
+      <div v-if="fileTransfer.uploading || mediaTransfer.uploading" class="toolbar-separator toolbar-temporary-separator" role="separator" aria-orientation="vertical" />
       <n-button
         quaternary
         size="small"
@@ -1782,19 +1798,6 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
         <span v-if="!mobileDetail" class="advanced-settings-device">{{ deviceVariant }}</span>
       </div>
       <div class="advanced-settings-account">
-        <MediaTransferIndicator
-          :state="fileTransfer"
-          task-id="files"
-          :tooltip-disabled="mobileSettings"
-          always-visible
-          @restore="fileManagerPage?.restoreUploadDialog()"
-        />
-        <MediaTransferIndicator
-          :state="mediaTransfer"
-          :tooltip-disabled="mobileSettings"
-          always-visible
-          @restore="emit('restore-media-transfer')"
-        />
         <n-dropdown trigger="click" placement="bottom-end" :options="accountOptions" :menu-props="themeMenuProps" @select="selectAccount">
           <n-tooltip>
             <template #trigger>

@@ -88,8 +88,16 @@ export function upsertToolbarFolder<T extends ToolbarLayout>(layout: T, folder: 
   }
 }
 
-export function removeToolbarFolder<T extends ToolbarLayout>(layout: T, id: string): T {
-  return { ...layout, toolbar_folders: normalizeToolbarFolders(layout.toolbar_folders).filter(folder => folder.id !== id), toolbar_order: (layout.toolbar_order ?? []).filter(item => item !== `folder:${id}`) }
+export function removeToolbarFolder<T extends ToolbarLayout>(layout: T, id: string, rootOrder: readonly string[] = toolbarLayoutOrder(layout)): T {
+  const folders = normalizeToolbarFolders(layout.toolbar_folders)
+  const folder = folders.find(folder => folder.id === id)
+  if (!folder) return layout
+  const members = new Set(folder.items)
+  return {
+    ...layout,
+    toolbar_folders: folders.filter(folder => folder.id !== id),
+    toolbar_order: rootOrder.flatMap(item => item === `folder:${id}` ? folder.items : members.has(item) ? [] : [item]),
+  }
 }
 
 export function groupToolbarItems<T extends ToolbarLayout>(layout: T, item: string, other: string, folder: ToolbarFolder, rootOrder = toolbarLayoutOrder(layout)): T {

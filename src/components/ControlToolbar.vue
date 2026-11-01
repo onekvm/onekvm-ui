@@ -224,7 +224,8 @@ const toolbarContext = useToolbarContextMenu({
   editFolder: id => openFolderEditor(toolbarLayout.folders.value.find(folder => folder.id === id) ?? null),
   removeFolder: id => {
     setFolderOpen(id, false)
-    void toolbarLayout.save(layout => removeToolbarFolder(layout, id))
+    const order = toolbarLayout.order.value
+    void toolbarLayout.save(layout => removeToolbarFolder(layout, id, order))
   },
   addSeparator: before => {
     const id = `separator:${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
@@ -1195,6 +1196,7 @@ function onCollectedIconClick(id: ToolbarIconId) {
 watch(() => collectedIcons.value.length, count => {
   if (!count) collectionMenuOpen.value = false
 })
+const mediaTransferVisible = computed(() => props.mediaTransfer.uploading && props.mediaTransfer.minimized)
 const deviceClusterShown = computed(() => {
   const builtin = (['display', 'mouse', 'keyboard', 'virtual_keyboard', 'keyboard_text', 'ctrl_alt_del', 'power', 'virtual_media'] as const).some(toolbarIconShown)
     || (USB_GAMEPAD_UI_ENABLED && Boolean(props.status?.hid?.gamepad) && toolbarIconShown('gamepad'))
@@ -1202,7 +1204,6 @@ const deviceClusterShown = computed(() => {
     || (hddIndicatorVisible.value && toolbarIconShown('power'))
   return builtin
     || deviceControlExtensions.value.length > 0
-    || (props.mediaTransfer.uploading && props.mediaTransfer.minimized)
     || (performanceDock.docked.value && performanceDock.visible.value)
     || performanceDock.dragging.value
 })
@@ -1754,6 +1755,14 @@ onBeforeUnmount(() => {
         <span v-if="consoleSubtitle">{{ consoleSubtitle }}</span>
       </div>
       <div class="toolbar-layout" :class="{ 'has-text-labels': toolbarLayout.showLabels.value }" :data-toolbar-label-position="toolbarLayout.layout.value.toolbar_label_position ?? 'right'" data-toolbar-surface>
+      <div v-if="mediaTransferVisible" class="toolbar-icon-slot toolbar-temporary-actions" style="order: -3" data-toolbar-temporary-tasks>
+        <MediaTransferIndicator
+          :state="mediaTransfer"
+          :tooltip-disabled="toolbarLauncher"
+          @restore="emit('restore-media-transfer')"
+        />
+      </div>
+      <div v-if="mediaTransferVisible" class="toolbar-separator toolbar-temporary-separator" role="separator" :aria-orientation="toolbarVertical || toolbarLauncher ? 'horizontal' : 'vertical'" style="order: -2" />
       <div v-for="id in toolbarSeparators" :key="id" class="toolbar-separator" role="separator" :aria-orientation="toolbarVertical || toolbarLauncher ? 'horizontal' : 'vertical'" :data-toolbar-item="id" :style="{ order: toolbarItemOrder(id) }" />
       <div class="device-controls" :class="{ 'is-iconless': !deviceClusterShown }" :aria-label="t('deviceStatus.title', 'Device status')">
       <div
@@ -2074,17 +2083,6 @@ onBeforeUnmount(() => {
         <component :is="item.component" v-bind="extensionHostProps" />
       </div>
 
-      <div
-        v-show="mediaTransfer.uploading && mediaTransfer.minimized"
-        class="toolbar-icon-slot"
-        style="order: 3000"
-      >
-        <MediaTransferIndicator
-          :state="mediaTransfer"
-          :tooltip-disabled="toolbarLauncher"
-          @restore="emit('restore-media-transfer')"
-        />
-      </div>
     </div>
 
     <PinnedTools :mobile="toolbarLauncher" :vertical="toolbarVertical" :placement="menuPlacement" :layout="toolbarLayout.layout.value" :order="toolbarLayout.order.value" :folder-targets="folderTargets" :show-labels="toolbarLayout.showLabels.value" @overlay="pinnedOverflowOpen = $event" @activate="onPinnedToolActivate" />

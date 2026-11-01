@@ -17,7 +17,10 @@ const editing = ref<ToolbarFolder | null>(null)
 const dialogOpen = ref(false)
 function edit(folder: ToolbarFolder | null) { editing.value = folder; dialogOpen.value = true }
 function save(folder: ToolbarFolder) { emit('update:modelValue', upsertToolbarFolder(props.modelValue, folder)); dialogOpen.value = false }
-function remove(id: string) { emit('update:modelValue', removeToolbarFolder(props.modelValue, id)) }
+function remove(id: string) {
+  const order = toolbarLayoutOrder(props.modelValue, toolbox.pinned.map(({ tool }) => tool.id))
+  emit('update:modelValue', removeToolbarFolder(props.modelValue, id, order))
+}
 function move(id: string, direction: number) {
   const order = toolbarLayoutOrder(props.modelValue, toolbox.pinned.map(({ tool }) => tool.id))
   const ordered = [...folders.value].sort((a, b) => order.indexOf(`folder:${a.id}`) - order.indexOf(`folder:${b.id}`))

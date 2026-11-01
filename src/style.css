@@ -6064,6 +6064,9 @@ body {
 .toolbar-layout .toolbar-account { margin-left: 0; padding-left: 0; border-left: 0; }
 .toolbar-layout > .toolbar-actions::before,
 .toolbar-layout .toolbar-account::before { display: none; }
+.toolbar-temporary-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 4px; }
+.toolbar-temporary-actions .n-button { width: 30px; min-width: 30px; padding: 0; }
+.toolbar-temporary-actions .n-button__icon { margin: 0 !important; }
 .toolbar:not(.is-launcher) :is(.toolbar-layout, .toolbar-layout-preview).has-text-labels .n-button { width: auto !important; max-width: 160px; padding: 0 8px !important; }
 :is(.toolbar, .toolbar-tray) :is(.toolbar-layout, .toolbar-layout-preview).has-text-labels .n-button { gap: 6px; }
 :is(.toolbar, .toolbar-tray) :is(.toolbar-layout, .toolbar-layout-preview).has-text-labels .n-button .n-button__icon { order: 0; flex-shrink: 0; margin: 0 !important; }
@@ -6083,6 +6086,7 @@ body {
 .toolbar-folder-edit-button { margin-top: 6px; border-top: 1px solid var(--border); }
 .toolbar-separator { display: flex; align-items: center; justify-content: center; flex: 0 0 8px; align-self: stretch; min-height: 24px; cursor: grab; }
 .toolbar-separator::before { content: ''; height: 20px; width: 1px; background: var(--border); }
+.toolbar-temporary-separator { cursor: default; }
 .toolbar.is-vertical .toolbar-separator, .toolbar-tray.is-centered .toolbar-separator { flex-basis: 12px; min-height: 12px; width: 100%; }
 .toolbar.is-vertical .toolbar-separator::before, .toolbar-tray.is-centered .toolbar-separator::before { height: 1px; width: calc(100% - 16px); }
 .toolbar-item-preview { transition: translate 180ms cubic-bezier(0.23, 1, 0.32, 1); }
@@ -6104,6 +6108,7 @@ body:has(.toolbar:is(.has-context-menu, .is-item-dragging)) .n-tooltip { visibil
 .toolbar.is-vertical .toolbar-layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; align-items: center; justify-items: center; flex: 0 1 auto; min-height: 0; width: 100%; overflow-x: hidden; overflow-y: auto; }
 .toolbar.is-vertical .toolbar-layout .toolbar-icon-slot { width: 100%; justify-content: center; }
 .toolbar.is-vertical .toolbar-layout .toolbar-separator,
+.toolbar.is-vertical .toolbar-layout .toolbar-temporary-actions,
 .toolbar.is-vertical .toolbar-layout [data-toolbar-item="account"] { grid-column: 1 / -1; }
 .toolbar.is-vertical .toolbar-layout .toolbar-separator::before { width: 100%; }
 .toolbar.is-vertical .toolbar-layout .toolbar-account { padding-top: 0; }

@@ -67,6 +67,37 @@ assert.equal(removed.toolbar_folders!.some(folder => folder.id === 'input'), fal
 assert.equal(removed.toolbar_order!.includes('folder:input'), false)
 assert.equal(toolbarLayoutOrder(removed).includes('virtual_keyboard'), true)
 assert.equal(removed.toolbar_icons!.find(icon => icon.id === 'virtual_keyboard')!.hidden, false)
+
+// Dissolve a folder at its displayed position, preserving member order even
+// when members still have stale root positions or have never appeared there.
+const dissolveFolder = { id: 'dissolve', name: 'Dissolve', icon: 'Folder', items: ['keyboard', 'tool:terminal/main', 'performance'] }
+for (const rootOrder of [
+  ['folder:dissolve', 'display', 'mouse', 'account'],
+  ['display', 'keyboard', 'separator:custom', 'folder:dissolve', 'mouse', 'tool:terminal/main', 'account'],
+  ['display', 'mouse', 'account', 'folder:dissolve'],
+]) {
+  const layout: ToolbarLayout = { ...initial, toolbar_folders: [dissolveFolder], toolbar_order: rootOrder }
+  const before = JSON.stringify(layout)
+  const dissolved = removeToolbarFolder(layout, 'dissolve', rootOrder)
+  const unrelated = ['display', 'mouse', 'account', 'separator:custom']
+  assert.deepEqual(dissolved.toolbar_order!.filter(id => unrelated.includes(id)), rootOrder.filter(id => unrelated.includes(id)))
+  const position = dissolved.toolbar_order!.indexOf('keyboard')
+  assert.deepEqual(dissolved.toolbar_order!.slice(position, position + 3), dissolveFolder.items)
+  assert.equal(position, rootOrder.slice(0, rootOrder.indexOf('folder:dissolve')).filter(id => unrelated.includes(id)).length)
+  for (const member of dissolveFolder.items) assert.equal(dissolved.toolbar_order!.filter(id => id === member).length, 1)
+  assert.deepEqual(dissolved.toolbar_folders, [])
+  assert.equal(JSON.stringify(layout), before)
+  assert.deepEqual(toolbarLayoutOrder(JSON.parse(JSON.stringify(dissolved))).slice(0, dissolved.toolbar_order!.length), dissolved.toolbar_order)
+}
+const defaultFolderLayout: ToolbarLayout = { ...initial, toolbar_folders: [dissolveFolder, { id: 'keep', name: 'Keep', icon: 'Folder', items: ['audio'] }] }
+const defaultRoot = toolbarLayoutOrder(defaultFolderLayout, ['terminal/main', 'other/main'])
+const defaultDissolved = removeToolbarFolder(defaultFolderLayout, 'dissolve', defaultRoot)
+assert.ok(defaultDissolved.toolbar_order!.indexOf('tool:other/main') < defaultDissolved.toolbar_order!.indexOf('keyboard'))
+assert.deepEqual(defaultDissolved.toolbar_folders, [defaultFolderLayout.toolbar_folders![1]])
+assert.equal(removeToolbarFolder(defaultFolderLayout, 'missing'), defaultFolderLayout)
+const emptyFolderLayout: ToolbarLayout = { ...initial, toolbar_folders: [{ ...dissolveFolder, items: [] }] }
+assert.deepEqual(removeToolbarFolder(emptyFolderLayout, 'dissolve').toolbar_order, toolbarLayoutOrder(emptyFolderLayout).filter(id => id !== 'folder:dissolve'))
+
 assert.deepEqual(normalizeToolbarFolders([{ id: '../bad', name: 'Bad', icon: 'Folder', items: [] }]), [])
 assert.deepEqual(toolbarLayoutOrder({ toolbar_order: ['folder:missing', 'unknown', 'display', 'display'] }).slice(0, 2), ['display', 'mouse'])
 

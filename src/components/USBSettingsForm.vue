@@ -164,23 +164,6 @@ const remoteWakeup = computed({
             <n-switch v-model:value="remoteWakeup" :disabled="props.disabled" :aria-label="t('settings.advancedSettings.usbPage.remoteWakeup', 'USB remote wakeup')" />
           </div>
         </li>
-        <li v-if="gadget?.network_adapter != null">
-          <div>
-            <strong>{{ t('settings.advancedSettings.usbPage.networkAdapter', 'USB network adapter') }}</strong>
-            <small>{{ t('settings.advancedSettings.usbPage.networkAdapterHint', 'Access OneKVM over USB from Linux or macOS. For internet access, also enable sharing in Network settings.') }}</small>
-          </div>
-          <div class="usb-function-controls">
-            <USBCapacityBadge :endpoints="endpointCosts.network" />
-            <n-tooltip :disabled="!networkBlocked" placement="left">
-              <template #trigger>
-                <span class="usb-function-switch">
-                  <n-switch v-model:value="networkAdapterOn" :disabled="props.disabled || networkBlocked" :aria-label="t('settings.advancedSettings.usbPage.networkAdapter', 'USB network adapter')" />
-                </span>
-              </template>
-              {{ t('settings.advancedSettings.usbPage.networkSharingBlocked', 'Not enough USB capacity. Turn off unused USB functions first.') }}
-            </n-tooltip>
-          </div>
-        </li>
         <li>
           <div>
             <strong>{{ t('settings.advancedSettings.usbPage.keyboard', 'USB keyboard') }}</strong>
@@ -286,6 +269,23 @@ const remoteWakeup = computed({
                 </span>
               </template>
               {{ t('settings.advancedSettings.usbPage.storageBlocked', 'Not enough USB capacity. Turn off audio, the microphone, or file transfer first.') }}
+            </n-tooltip>
+          </div>
+        </li>
+        <li v-if="gadget?.network_adapter != null">
+          <div>
+            <strong>{{ t('settings.advancedSettings.usbPage.networkAdapter', 'USB network adapter') }}</strong>
+            <small>{{ t('settings.advancedSettings.usbPage.networkAdapterHint', 'Access OneKVM over USB from Linux or macOS. For internet access, also enable sharing in Network settings.') }}</small>
+          </div>
+          <div class="usb-function-controls">
+            <USBCapacityBadge :endpoints="endpointCosts.network" />
+            <n-tooltip :disabled="!networkBlocked" placement="left">
+              <template #trigger>
+                <span class="usb-function-switch">
+                  <n-switch v-model:value="networkAdapterOn" :disabled="props.disabled || networkBlocked" :aria-label="t('settings.advancedSettings.usbPage.networkAdapter', 'USB network adapter')" />
+                </span>
+              </template>
+              {{ t('settings.advancedSettings.usbPage.networkSharingBlocked', 'Not enough USB capacity. Turn off unused USB functions first.') }}
             </n-tooltip>
           </div>
         </li>

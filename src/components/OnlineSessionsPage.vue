@@ -5,6 +5,7 @@ import { Globe2, MonitorPlay, PlugZap, RadioTower, UserRound } from '@/icons'
 import { api, type OnlineSession } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { videoCodecLabel } from '@/lib/video-transport'
+import { formatSessionDuration } from '@/lib/session-duration'
 
 const props = defineProps<{
   actualCodec?: string
@@ -48,16 +49,7 @@ function sourceLabel(source: OnlineSession['source']) {
 }
 
 function formatDuration(connectedAt: string) {
-	const elapsed = Math.max(0, Math.floor((now.value - Date.parse(connectedAt)) / 1000))
-	if (!Number.isFinite(elapsed)) return '-'
-	const days = Math.floor(elapsed / 86400)
-	const hours = Math.floor((elapsed % 86400) / 3600)
-	const minutes = Math.floor((elapsed % 3600) / 60)
-	const seconds = elapsed % 60
-	if (days > 0) return `${days}d ${hours}h ${minutes}m`
-	if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`
-	if (minutes > 0) return `${minutes}m ${seconds}s`
-	return `${seconds}s`
+	return formatSessionDuration(connectedAt, now.value)
 }
 
 async function refresh() {

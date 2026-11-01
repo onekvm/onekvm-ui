@@ -802,8 +802,10 @@ const zh = {
           productNameHint: '提供给被控端声音设置的 USB 音频设备名称，具体显示方式由被控端系统决定。',
         },
         usbPage: {
-          networkSharing: 'USB 网络共享',
-          networkSharingHint: '通过 USB 将 OneKVM 的互联网连接共享给被控设备。支持 Linux 和 macOS，被控设备需设为自动获取 IP。',
+          networkAdapter: 'USB 网卡',
+          networkSharing: '共享网络给 USB 网卡',
+          networkAdapterHint: '通过 USB 从 Linux 或 macOS 访问 OneKVM。需要上网时，再到网络设置中开启共享。',
+          networkSharingHint: '被控设备需设为自动获取 IP 和 DNS，OneKVM 需已有可用的上网连接。',
           networkSharingBlocked: 'USB 容量不足，请先关闭不用的 USB 功能。',
           remoteWakeup: 'USB 远程唤醒',
           remoteWakeupHint: '通过按键或鼠标点击唤醒被控设备，需主板支持，并在 BIOS 和操作系统中允许 USB 唤醒。更改此设置会让 USB 短暂重连。',
@@ -2058,7 +2060,8 @@ const zh = {
       title: '网络',
       sharing: {
         title: '网络共享',
-        usbReconnectHint: '更改 USB 共享会使键盘和鼠标短暂重新连接。',
+        usbChangeHint: '切换共享会短暂中断 USB 网络；若未恢复，请重新获取 IP。',
+        usbAdapterRequired: '请先在 USB 设置中开启 USB 网卡。',
         staticClientHint: '关闭 DHCP 时，需在连接设备上将热点地址设为网关和 DNS 服务器。',
       },
       wifi: {
@@ -2098,7 +2101,7 @@ const zh = {
         apInterface: '无线热点',
         apDhcpEnabled: 'DHCP 服务',
         apNetworkSharing: 'AP 网络共享',
-        apNetworkSharingHint: '热点开启后，让连接热点的设备通过 OneKVM 上网。OneKVM 需要已有可用的上网连接。',
+        apNetworkSharingHint: '让连接热点的设备通过 OneKVM 上网。需开启热点，并已有可用的上网连接。',
         apNoChannels: '没有检测到可用的热点信道，请检查无线驱动和监管区域设置。',
         apSettingsAdjusted: '保存的热点频段或信道不适用于此网卡。请先保存当前可用的选项，再开启热点。',
         apDhcpEnabledHint: '自动为连接设备分配 IP 地址。关闭后，需要在连接设备上手动设置 AP 网段内的静态地址。',

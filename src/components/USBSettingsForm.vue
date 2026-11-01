@@ -33,9 +33,6 @@ if (usb.value.mouse_interval == null) usb.value.mouse_interval = 0
 
 
 const gadget = computed(() => props.gadget)
-watch(() => gadget.value?.network_sharing, value => {
-  if (typeof value === 'boolean') usb.value.network_sharing = value
-}, { immediate: true })
 const hasBudget = computed(() => Boolean(gadget.value && (gadget.value.in_limit > 0 || gadget.value.out_limit > 0)))
 
 function endpointUse(options: USBFunctionOverrides) {
@@ -55,6 +52,13 @@ function wouldFit(options: USBFunctionOverrides) {
   return usbFunctionsFit(usb.value, audio.value, gadget.value, options)
 }
 
+const networkAdapterOn = computed({
+  get: () => Boolean(usb.value.network_adapter),
+  set: (value: boolean) => {
+    usb.value = { ...usb.value, network_adapter: value, network_sharing: value && Boolean(usb.value.network_sharing) }
+  },
+})
+const networkBlocked = computed(() => !usb.value.network_adapter && !wouldFit({ network: true }))
 const gamepadBlocked = computed(() => !usb.value.gamepad && !wouldFit({ gamepad: true }))
 const storageBlocked = computed(() => usb.value.mass_storage === false && !wouldFit({ storage: true }))
 const mtpBlocked = computed(() => usb.value.mtp === false && !wouldFit({ mtp: true }))
@@ -158,6 +162,23 @@ const remoteWakeup = computed({
           </div>
           <div class="usb-function-controls">
             <n-switch v-model:value="remoteWakeup" :disabled="props.disabled" :aria-label="t('settings.advancedSettings.usbPage.remoteWakeup', 'USB remote wakeup')" />
+          </div>
+        </li>
+        <li v-if="gadget?.network_adapter != null">
+          <div>
+            <strong>{{ t('settings.advancedSettings.usbPage.networkAdapter', 'USB network adapter') }}</strong>
+            <small>{{ t('settings.advancedSettings.usbPage.networkAdapterHint', 'Access OneKVM over USB from Linux or macOS. For internet access, also enable sharing in Network settings.') }}</small>
+          </div>
+          <div class="usb-function-controls">
+            <USBCapacityBadge :endpoints="endpointCosts.network" />
+            <n-tooltip :disabled="!networkBlocked" placement="left">
+              <template #trigger>
+                <span class="usb-function-switch">
+                  <n-switch v-model:value="networkAdapterOn" :disabled="props.disabled || networkBlocked" :aria-label="t('settings.advancedSettings.usbPage.networkAdapter', 'USB network adapter')" />
+                </span>
+              </template>
+              {{ t('settings.advancedSettings.usbPage.networkSharingBlocked', 'Not enough USB capacity. Turn off unused USB functions first.') }}
+            </n-tooltip>
           </div>
         </li>
         <li>

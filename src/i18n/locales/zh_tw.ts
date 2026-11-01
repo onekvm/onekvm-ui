@@ -802,8 +802,10 @@ const zh_tw = {
           productNameHint: '提供給被控端聲音設定的 USB 音訊裝置名稱，具體顯示方式由被控端系統決定。',
         },
         usbPage: {
-          networkSharing: 'USB 網路共享',
-          networkSharingHint: '透過 USB 將 OneKVM 的網際網路連線分享給受控裝置。支援 Linux 和 macOS，受控裝置需設為自動取得 IP。',
+          networkAdapter: 'USB 網路卡',
+          networkSharing: '共享網路給 USB 網路卡',
+          networkAdapterHint: '透過 USB 從 Linux 或 macOS 存取 OneKVM。需要上網時，再到網路設定中開啟共享。',
+          networkSharingHint: '受控裝置需設為自動取得 IP 和 DNS，OneKVM 需已有可用的網際網路連線。',
           networkSharingBlocked: 'USB 容量不足，請先關閉不用的 USB 功能。',
           remoteWakeup: 'USB 遠端喚醒',
           remoteWakeupHint: '透過按鍵或滑鼠點擊喚醒受控裝置，需主機板支援，並在 BIOS 和作業系統中允許 USB 喚醒。變更此設定會讓 USB 短暫重新連線。',
@@ -2063,7 +2065,8 @@ const zh_tw = {
       title: '網路',
       sharing: {
         title: '網路共享',
-        usbReconnectHint: '變更 USB 共享會使鍵盤和滑鼠短暫重新連接。',
+        usbChangeHint: '切換共享會短暫中斷 USB 網路；若未恢復，請重新取得 IP。',
+        usbAdapterRequired: '請先在 USB 設定中開啟 USB 網路卡。',
         staticClientHint: '關閉 DHCP 時，需在連接裝置上將熱點位址設為閘道和 DNS 伺服器。',
       },
       wifi: {
@@ -2103,7 +2106,7 @@ const zh_tw = {
         apInterface: '無線熱點',
         apDhcpEnabled: 'DHCP 服務',
         apNetworkSharing: 'AP 網路共享',
-        apNetworkSharingHint: '熱點開啟後，讓連接熱點的裝置透過 OneKVM 上網。OneKVM 需要已有可用的網路連線。',
+        apNetworkSharingHint: '讓連接熱點的裝置透過 OneKVM 上網。需開啟熱點，並已有可用的網際網路連線。',
         apNoChannels: '沒有偵測到可用的熱點頻道，請檢查無線驅動和管制區域設定。',
         apSettingsAdjusted: '儲存的熱點頻段或頻道不適用於此網卡。請先儲存目前可用的選項，再開啟熱點。',
         apDhcpEnabledHint: '自動為連接裝置分配 IP 位址。關閉後，需要在連接裝置上手動設定 AP 網段內的靜態位址。',

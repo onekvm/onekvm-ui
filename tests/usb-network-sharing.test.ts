@@ -6,7 +6,7 @@ const usb = { keyboard_no_out: true, mass_storage: false, mtp: false, gamepad: f
 const audio = { enabled: false, microphone: false } as OneKVMConfig['audio']
 const gadget = { in_limit: 5, out_limit: 1, mass_storage: true, mtp: false, mtp_available: true }
 assert.deepEqual(usbEndpointUse(usb, audio, gadget), { inn: 3, out: 0 })
-const sharing = { ...usb, network_sharing: true }
+const sharing = { ...usb, network_adapter: true, network_sharing: false }
 assert.deepEqual(usbEndpointUse(sharing, audio, gadget), { inn: 5, out: 1 })
 assert.equal(usbFunctionsFit(sharing, audio, gadget), true)
 assert.equal(usbFunctionsFit(sharing, audio, gadget, { storage: true }), false)
@@ -14,4 +14,5 @@ assert.equal(usbFunctionsFit(sharing, audio, gadget, { mtp: true }), false)
 assert.equal(usbFunctionsFit(sharing, audio, gadget, { microphone: true }), false)
 assert.equal(usbFunctionsFit(sharing, audio, gadget, { audio: true }), false)
 assert.deepEqual(usbEndpointUse(sharing, audio, gadget, { network: false }), { inn: 3, out: 0 })
-console.log('USB network sharing capacity tests passed')
+assert.deepEqual(usbEndpointUse({ ...sharing, network_sharing: true }, audio, gadget), usbEndpointUse(sharing, audio, gadget))
+console.log('USB network adapter capacity tests passed')

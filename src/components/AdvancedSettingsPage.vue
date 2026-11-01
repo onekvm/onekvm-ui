@@ -1342,7 +1342,7 @@ async function usbSaveConfig() {
   const current = await api.getConfig()
   const patch = savedAudio.value && config.value
     ? audioConfigPatch(savedAudio.value, config.value.audio) : {}
-  return { ...current, usb: { ...config.value!.usb, network_sharing: current.usb.network_sharing }, audio: { ...current.audio, ...patch } }
+  return { ...current, usb: { ...config.value!.usb, network_sharing: Boolean(config.value!.usb.network_adapter && current.usb.network_sharing) }, audio: { ...current.audio, ...patch } }
 }
 
 async function save() {
@@ -1989,7 +1989,6 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
               </section>
 
               <section v-else-if="paneSection === 'network' && config" class="advanced-settings-section">
-                <NetworkSharingSettings :config="config" :status="status" :video-session-id="videoSessionId" :disabled="saving || Boolean(networkApply?.pending)" @update:usb="config.usb = $event" />
                 <NetworkInterfaceManager
                   v-model="config.network"
                   :disabled="saving"
@@ -2037,6 +2036,7 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
 				  @update:custom-dns-enabled="systemCustomDNS = $event"
 				  @update:dnssec="config.network.dnssec = $event"
 				/>
+                <NetworkSharingSettings :config="config" :status="status" :video-session-id="videoSessionId" :disabled="saving || Boolean(networkApply?.pending)" @update:usb="config.usb = $event" />
 				<ActiveRoutesPanel />
 				<StaticRoutesForm
 				  v-model="config.network.static_routes"

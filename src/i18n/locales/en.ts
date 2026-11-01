@@ -803,8 +803,10 @@ const en = {
           productNameHint: 'A name for the USB audio device in the controlled device’s sound settings. The operating system determines how it is displayed.',
         },
         usbPage: {
-          networkSharing: 'USB network sharing',
-          networkSharingHint: 'Share OneKVM’s internet connection with the controlled device over USB. Supports Linux and macOS with automatic IP configuration.',
+          networkAdapter: 'USB network adapter',
+          networkSharing: 'Share internet with the USB adapter',
+          networkAdapterHint: 'Access OneKVM over USB from Linux or macOS. For internet access, also enable sharing in Network settings.',
+          networkSharingHint: 'Set the controlled device to obtain its IP address and DNS automatically. OneKVM needs an internet connection.',
           networkSharingBlocked: 'Not enough USB capacity. Turn off unused USB functions first.',
           remoteWakeup: 'USB remote wakeup',
           remoteWakeupHint: 'Wake the controlled device with a key press or mouse click. Requires USB wake support and permission in its BIOS and operating system. Changing this setting briefly reconnects USB.',
@@ -2059,7 +2061,8 @@ const en = {
       title: 'Network',
       sharing: {
         title: 'Network sharing',
-        usbReconnectHint: 'Changing USB sharing briefly reconnects the keyboard and mouse.',
+        usbChangeHint: 'Changing sharing briefly interrupts the USB network. Renew its IP address if it does not recover.',
+        usbAdapterRequired: 'Enable the USB network adapter in USB settings first.',
         staticClientHint: 'With DHCP off, set the AP address as the gateway and DNS server on connected devices.',
       },
       wifi: {
@@ -2099,7 +2102,7 @@ const en = {
         apInterface: 'Wireless access point',
         apDhcpEnabled: 'DHCP server',
         apNetworkSharing: 'AP internet sharing',
-        apNetworkSharingHint: 'Share OneKVM’s internet connection with devices on this access point. The access point must be on and OneKVM must have a working uplink.',
+        apNetworkSharingHint: 'Let devices on the access point use OneKVM’s internet connection. Requires the access point and an internet connection.',
         apNoChannels: 'No usable AP channels were detected. Check the wireless driver and regulatory settings.',
         apSettingsAdjusted: 'The saved AP band or channel is unavailable on this radio. Save the supported selection before enabling the hotspot.',
         apDhcpEnabledHint: 'Assign IP addresses to connected devices automatically. When disabled, configure a static address in the AP subnet on each device.',

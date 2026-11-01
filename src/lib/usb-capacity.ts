@@ -22,7 +22,7 @@ export function usbEndpointUse(usb: USBConfig, audio: OneKVMConfig['audio'], gad
     audio: overrides.audio ?? usbSpeakerEnabled(audio),
     microphone: overrides.microphone ?? Boolean(audio.microphone),
     gamepad: overrides.gamepad ?? Boolean(usb.gamepad),
-    network: overrides.network ?? Boolean(usb.network_sharing),
+    network: overrides.network ?? Boolean(usb.network_adapter),
     storage: (gadget?.mass_storage ?? true) && (overrides.storage ?? usb.mass_storage !== false),
     mtp: (gadget?.mtp_available ?? Boolean(gadget?.mtp)) && (overrides.mtp ?? usb.mtp !== false),
   }

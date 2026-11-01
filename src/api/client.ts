@@ -392,6 +392,7 @@ export interface InputConfig {
 }
 
 export interface USBConfig {
+  network_adapter?: boolean
   network_sharing?: boolean
   remote_wakeup?: boolean
 	vendor_id: string
@@ -632,6 +633,7 @@ export interface OneKVMStatus {
       mass_storage: boolean
       mtp_available?: boolean
       mtp: boolean
+      network_adapter?: boolean
       network_sharing?: boolean
     }
   }

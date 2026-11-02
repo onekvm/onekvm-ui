@@ -172,6 +172,7 @@ class OneKVMTransport {
     audioError: '',
   }
   private statsTimer = 0
+  private statsGeneration = 0
   private peerConnectTimer = 0
   private peerDisconnectTimer = 0
   private unlockAudioListener: (() => void) | null = null
@@ -1296,7 +1297,8 @@ class OneKVMTransport {
   private disposePeer() {
     this.videoTiming?.destroy()
     this.videoTiming = null
-    window.clearInterval(this.statsTimer)
+    window.clearTimeout(this.statsTimer)
+    this.statsGeneration++
     window.clearTimeout(this.peerConnectTimer)
     window.clearTimeout(this.peerDisconnectTimer)
     this.statsTimer = 0
@@ -1353,29 +1355,34 @@ class OneKVMTransport {
   }
 
   private startVideoStats(peer: RTCPeerConnection) {
-    window.clearInterval(this.statsTimer)
+    window.clearTimeout(this.statsTimer)
+    const generation = ++this.statsGeneration
     this.playbackStats.reset()
     const initialTargets = this.adaptiveJitterBuffer.reset()
     applyJitterBufferTargets(peer.getReceivers(), initialTargets)
-    let sampling = false
     const sample = async () => {
-      if (sampling || this.peer !== peer) return
-      sampling = true
+      if (this.peer !== peer || generation !== this.statsGeneration) return
       const reports = await peer.getStats().catch(() => null)
-      sampling = false
-      if (!reports || this.peer !== peer) return
-      const connection = readWebRTCConnectionStats(reports, peer)
-      const route = connection.remote ? JSON.stringify([connection.local, connection.remote]) : null
-      this.browserBitrate?.sample(reports, connection.rttMs, route, document.visibilityState === 'visible')
-      this.emitWebRTCConnectionStats({ ...connection, autoBitrateKbps: this.autoBitrateKbps })
-      applyJitterBufferTargets(peer.getReceivers(), this.adaptiveJitterBuffer.sample(reports))
-      const { bitrateKbps, bitrateSampled, latency } = this.playbackStats.sample(reports)
-      if (bitrateSampled) this.emitVideoBitrate(bitrateKbps)
-      this.emitBrowserLatency({ ...latency, ...this.videoTiming?.sampler.sample(performance.now() * 1000) })
+      if (this.peer !== peer || generation !== this.statsGeneration) return
+      try {
+        if (reports) {
+          const connection = readWebRTCConnectionStats(reports, peer)
+          const route = connection.remote ? JSON.stringify([connection.local, connection.remote]) : null
+          this.browserBitrate?.sample(reports, connection.rttMs, route, document.visibilityState === 'visible')
+          this.emitWebRTCConnectionStats({ ...connection, autoBitrateKbps: this.autoBitrateKbps })
+          applyJitterBufferTargets(peer.getReceivers(), this.adaptiveJitterBuffer.sample(reports))
+          const { bitrateKbps, bitrateSampled, latency } = this.playbackStats.sample(reports)
+          if (bitrateSampled) this.emitVideoBitrate(bitrateKbps)
+          this.emitBrowserLatency({ ...latency, ...this.videoTiming?.sampler.sample(performance.now() * 1000) })
+        }
+      } finally {
+        if (this.peer === peer && generation === this.statsGeneration) {
+          this.statsTimer = window.setTimeout(sample, this.browserBitrate?.sampleIntervalMs ?? 1000)
+        }
+      }
     }
 
     void sample()
-    this.statsTimer = window.setInterval(sample, 1000)
   }
 
   private emitVideoBitrate(kbps: number) {

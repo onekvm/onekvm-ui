@@ -19,6 +19,19 @@ max(0, presentUs - jitterBufferUs - decodeUs)
 是链路诊断指标，不作为单向延迟直接相加。各浏览器指标使用独立的一秒窗口，
 单点允许有少量偏差。该合计不是 glass-to-glass。
 
+## WebSocket 编码到收帧
+
+WebSocket 播放器复用 `VideoTimingSampler` 的四时间戳校准与误差估计。
+完整 OKVF 消息到达 JavaScript 时立即记录 `performance.now()`；仅当帧头明确
+标记了编码出包的单调时钟时间时才采样，不把旧版 PTS 或收包时刻当编码时间。
+Core 的时间戳从后端穿过媒体 fan-out，不能在 WebSocket 发送时重打戳。
+协议字段和旧版兼容见 Core 的 `docs/websocket-video-v1.md`。
+
+读数包含编码出包后的设备排队、WebSocket 传输和浏览器消息调度；它不是纯网络
+延迟，也不含 MSE 解码／显示。面板仍将不可测的解码、缓冲和显示段保留为未知，
+不能用同步 `muxer.feed` 耗时补值。没有校时、没有时间戳、样本过期或断线时清空
+编码到收帧统计；重连建立新样本。WebRTC 继续按 RTP 时间戳匹配帧回调。
+
 ## 2026-09-04 低延迟修复
 
 107 的旧生产页面在 1920x1080 H.264 下观测到：

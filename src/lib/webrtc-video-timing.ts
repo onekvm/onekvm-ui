@@ -50,6 +50,13 @@ export class VideoTimingSampler {
     this.join(metadata.rtpTimestamp >>> 0, { received: metadata.receiveTime * 1000 }, nowUs)
   }
 
+  // WebSocket delivers timing and payload together, so there is no RTP join.
+  received(encodedUs: number, receivedUs: number) {
+    if (!Number.isFinite(encodedUs) || encodedUs <= 0 || !Number.isFinite(receivedUs) || receivedUs < 0) return
+    this.matched.push({ at: receivedUs, encoded: encodedUs, received: receivedUs })
+    if (this.matched.length > 32) this.matched.shift()
+  }
+
   private join(timestamp: number, part: Partial<Frame>, nowUs: number) {
     for (const [key, value] of this.frames) {
       if (nowUs - value.at > FRAME_MAX_AGE_US) this.frames.delete(key)

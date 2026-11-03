@@ -957,6 +957,9 @@ class OneKVMTransport {
         bitrate: (kbps) => {
           if (this.websocketVideo === player) this.emitVideoBitrate(kbps)
         },
+        latency: (latency) => {
+          if (this.websocketVideo === player) this.emitBrowserLatency(latency)
+        },
         disconnected: (message, codecUnsupported) => {
           if (this.websocketVideo !== player) return
           this.disposeWebSocketVideo()
@@ -1219,6 +1222,7 @@ class OneKVMTransport {
     const player = this.websocketVideo
     this.websocketVideo = null
     player?.destroy()
+    if (player) this.emitBrowserLatency(emptyBrowserVideoLatency())
   }
 
   private disposeWebSocketAudio(releaseMicrophone = false) {

@@ -5,6 +5,9 @@ import { createServer } from 'vite'
 class Video extends EventTarget {
   readyState = 0
   videoWidth = 0
+  playbackRate = 1
+  paused = true
+  buffered = { length: 0 }
   muted = false
   playsInline = false
   preload = ''

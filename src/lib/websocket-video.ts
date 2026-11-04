@@ -1,5 +1,7 @@
 import JMuxer from 'jmuxer'
 
+import { MseLivePlayback } from '@/lib/mse-live-playback'
+
 import { VideoTimingSampler } from '@/lib/webrtc-video-timing'
 import { emptyBrowserVideoLatency, type BrowserVideoLatencyUs } from '@/lib/webrtc-playback-stats'
 
@@ -33,6 +35,7 @@ export class WebSocketVideo {
 
   private socket: WebSocket | null = null
   private muxer: JMuxer | null = null
+  private playback: MseLivePlayback | null = null
   private codec: WebSocketVideoCodec
   private closed = false
   private opened = false
@@ -134,6 +137,8 @@ export class WebSocketVideo {
     const socket = this.socket
     this.socket = null
     if (socket && socket.readyState < WebSocket.CLOSING) socket.close()
+    this.playback?.stop()
+    this.playback = null
     this.muxer?.destroy()
     this.muxer = null
     this.video.pause()
@@ -153,14 +158,19 @@ export class WebSocketVideo {
   }
 
   private createMuxer() {
+    this.playback?.stop()
     this.muxer?.destroy()
+    this.playback = new MseLivePlayback(this.video, () => this.requestKeyframe())
+    this.playback.start()
     const options: ExtendedJMuxerOptions = {
       node: this.video,
       mode: 'video',
       videoCodec: this.codec === 'h264' ? 'H264' : 'H265',
       live: true,
       flushingTime: 0,
-      maxDelay: 120,
+      // Own the live-playback policy: JMuxer otherwise seeks to the last
+      // millisecond of a GOP, resetting and replaying the decoder reference chain.
+      maxDelay: Infinity,
       clearBuffer: true,
       debug: false,
       onReady: () => {
@@ -169,6 +179,8 @@ export class WebSocketVideo {
       },
       onError: (data: { name?: string }) => {
         if (data.name === 'InvalidStateError' && !this.video.error) {
+          this.playback?.reset()
+          this.durationRemainderUs = 0
           this.waitingForKeyframe = true
           this.requestKeyframe()
         } else {
@@ -249,6 +261,7 @@ export class WebSocketVideo {
       }, 5000)
     }
     try {
+      this.playback?.fed(frame.duration!, keyframe)
       this.muxer?.feed(frame)
     } catch {
       this.failPlayback(`Video decoder failed for ${this.codec.toUpperCase()} over WebSocket`, true)

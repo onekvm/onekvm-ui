@@ -61,7 +61,7 @@
     "test:startup-bandwidth": "node --experimental-strip-types tests/startup-bandwidth.test.ts",
     "test:video-stream-chart": "node --experimental-strip-types tests/video-stream-chart.test.ts",
     "test:video-transport": "node --experimental-strip-types tests/video-transport.test.ts",
-    "test:websocket-video": "node --experimental-strip-types tests/websocket-video.test.ts",
+    "test:websocket-video": "node --experimental-strip-types tests/websocket-video.test.ts && node --experimental-strip-types tests/mse-live-playback.test.ts",
     "test:websocket-audio": "node --experimental-strip-types tests/websocket-audio.test.ts && node --experimental-strip-types tests/websocket-audio-connection.test.ts && node --experimental-strip-types tests/websocket-lz4.test.ts",
     "test:transport-reconnect": "node --experimental-strip-types tests/transport-reconnect.test.ts && node --experimental-strip-types tests/console-connection.test.ts && node --experimental-strip-types tests/status-events.test.ts",
     "test:webrtc-opus-sdp": "node --experimental-strip-types tests/webrtc-opus-sdp.test.ts",

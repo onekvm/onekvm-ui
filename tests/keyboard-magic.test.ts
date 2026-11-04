@@ -39,10 +39,37 @@ if (tabDown.kind === 'magic') {
 const tabUp = press(tap, 'Tab', false)
 if (tabUp.kind === 'magic') {
   assert.deepEqual(tabUp.effect.up, ['Tab'])
-  assert.deepEqual(tabUp.effect.releaseMods, ['AltLeft'])
-  assert.equal(tabUp.effect.hint.active, false)
+  assert.deepEqual(tabUp.effect.releaseMods, [])
+  assert.deepEqual(tabUp.effect.hint, { active: true, codes: ['AltLeft'] })
 }
+assert.equal(tap.started, true)
+
+// Tap Magic once, then repeat a shortcut with gaps between normal key presses.
+// Releasing the physical modifier must leave the remote modifier latched.
+press(tap, 'AltLeft', false)
+for (let index = 0; index < 3; index++) {
+  await new Promise((resolve) => setTimeout(resolve, 25))
+  assert.deepEqual(tap.hint(), { active: true, codes: ['AltLeft'] })
+  const nextDown = press(tap, 'Tab', true)
+  assert.equal(nextDown.kind, 'magic')
+  if (nextDown.kind === 'magic') {
+    assert.deepEqual(nextDown.effect.down, ['Tab'])
+    assert.deepEqual(nextDown.effect.hint.codes, ['AltLeft', 'Tab'])
+  }
+  const nextUp = press(tap, 'Tab', false)
+  if (nextUp.kind === 'magic') {
+    assert.deepEqual(nextUp.effect.up, ['Tab'])
+    assert.deepEqual(nextUp.effect.releaseMods, [])
+  }
+}
+const exit = press(tap, 'ControlRight', true)
+if (exit.kind === 'magic') {
+  assert.deepEqual(exit.effect.releaseMods, ['AltLeft'])
+  assert.equal(exit.effect.hint.active, false)
+}
+press(tap, 'ControlRight', false)
 assert.equal(tap.started, false)
+assert.equal(press(tap, 'Tab', true).kind, 'passthrough')
 
 const held = new MagicComposer()
 press(held, 'ControlRight', true)
@@ -57,9 +84,12 @@ if (tabRelease.kind === 'magic') {
 press(held, 'Tab', true)
 const magicUp = press(held, 'ControlRight', false)
 if (magicUp.kind === 'magic') {
-  assert.deepEqual(magicUp.effect.releaseMods, ['AltLeft'])
-  assert.equal(magicUp.effect.hint.active, false)
+  assert.deepEqual(magicUp.effect.releaseMods, [])
+  assert.deepEqual(magicUp.effect.hint, { active: true, codes: ['AltLeft', 'Tab'] })
 }
+press(held, 'Tab', false)
+const heldExit = press(held, 'ControlRight', true)
+if (heldExit.kind === 'magic') assert.deepEqual(heldExit.effect.releaseMods, ['AltLeft'])
 
 const modsOnly = new MagicComposer()
 press(modsOnly, 'ControlRight', true)

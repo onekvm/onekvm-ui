@@ -143,16 +143,12 @@ function isModifier(code: string) {
 
 export class MagicComposer {
   current = ''
-  fired = false
   mods: string[] = []
-  pressed = false
   started = false
 
   reset() {
     this.current = ''
-    this.fired = false
     this.mods = []
-    this.pressed = false
     this.started = false
   }
 
@@ -169,14 +165,6 @@ export class MagicComposer {
         return { handled: true, down: [], up: [], releaseMods, hint: this.hint() }
       }
       this.started = true
-      this.pressed = true
-      return { handled: true, down: [], up: [], releaseMods: [], hint: this.hint() }
-    }
-    this.pressed = false
-    if (this.started && this.fired) {
-      const releaseMods = [...this.mods]
-      this.reset()
-      return { handled: true, down: [], up: [], releaseMods, hint: this.hint() }
     }
     return { handled: true, down: [], up: [], releaseMods: [], hint: this.hint() }
   }
@@ -194,15 +182,9 @@ export class MagicComposer {
     }
     if (down) {
       this.current = code
-      this.fired = true
       return { handled: true, down: [code], up: [], releaseMods: [], hint: this.hint() }
     }
     this.current = ''
-    if (!this.pressed) {
-      const releaseMods = [...this.mods]
-      this.reset()
-      return { handled: true, down: [], up: [code], releaseMods, hint: this.hint() }
-    }
     return { handled: true, down: [], up: [code], releaseMods: [], hint: this.hint() }
   }
 }

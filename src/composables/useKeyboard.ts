@@ -114,9 +114,7 @@ export function useKeyboard(
 
   const keyUp = (event: KeyboardEvent) => {
     const physical = physicalKeyCode(event)
-    const selectedMagic = sanitizeMagicKey(magic.value)
-    const ownsMagic = composer.started || (selectedMagic !== '' && physical === selectedMagic && composer.pressed)
-    if (ownsMagic) {
+    if (composer.started) {
       const routed = routeKeyboardKey(composer, {
         physical,
         down: false,

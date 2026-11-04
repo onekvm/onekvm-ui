@@ -2,7 +2,9 @@
 import { computed, shallowRef, useTemplateRef } from 'vue'
 import { GripVertical, Pencil, Plus, Trash2 } from '@/icons'
 import { t } from '@/i18n/runtime'
-import { isAnywhere, protocolPort, type FirewallDirection, type FirewallRuleDraft } from '@/lib/firewall-draft'
+import { type FirewallDirection, type FirewallRuleDraft } from '@/lib/firewall-draft'
+import { ruleMatches } from '@/lib/firewall-matches'
+import FirewallMatchTable from './FirewallMatchTable.vue'
 
 const props = defineProps<{
   direction: FirewallDirection
@@ -34,9 +36,7 @@ function actionType(action: string) {
   return ({ allow: 'success', deny: 'error', reject: 'warning' } as const)[action as 'allow' | 'deny' | 'reject'] ?? 'default'
 }
 
-function detail(rule: FirewallRuleDraft) {
-  return [isAnywhere(rule.source) ? '' : rule.source, rule.comment].filter(Boolean).join(' · ')
-}
+const ruleName = (rule: FirewallRuleDraft, index: number) => rule.comment || t('settings.firewall.ruleNumber', 'Rule {number}').replace('{number}', String(index + 1))
 
 function ruleAtPoint(x: number, y: number) {
   for (const row of section.value?.querySelectorAll<HTMLElement>('[data-rule-id]') ?? []) {
@@ -77,23 +77,23 @@ function endDrag(event: PointerEvent) {
     </header>
     <p v-if="!rules.length" class="firewall-empty">{{ t('settings.firewall.noRules', 'No rules yet.') }}</p>
     <TransitionGroup v-else tag="ul" name="firewall-rule" class="firewall-list">
-      <li v-for="rule in rules" :key="rule.id" class="firewall-rule" :class="{ 'is-dragging': dragId === rule.id, 'is-over': overId === rule.id && dragId !== rule.id }" :data-rule-id="rule.id">
+      <li v-for="(rule, index) in rules" :key="rule.id" class="firewall-rule" :class="{ 'is-dragging': dragId === rule.id, 'is-over': overId === rule.id && dragId !== rule.id }" :data-rule-id="rule.id">
         <button type="button" class="firewall-drag" :disabled="busy" :aria-label="t('settings.firewall.drag', 'Drag to reorder')" @pointerdown="startDrag($event, rule.id)" @pointermove="moveDrag" @pointerup="endDrag" @pointercancel="endDrag" @lostpointercapture="dragId = null; overId = null">
           <GripVertical :size="16" />
         </button>
         <div class="firewall-rule-main">
           <div class="firewall-rule-title">
             <n-tag size="small" :type="actionType(rule.action)" :bordered="false">{{ t(`settings.firewall.${rule.action}`, rule.action) }}</n-tag>
-            <strong>{{ protocolPort(rule.protocol, rule.port) }}</strong>
+            <strong>{{ ruleName(rule, index) }}</strong>
           </div>
-          <small v-if="detail(rule)">{{ detail(rule) }}</small>
         </div>
-        <n-button quaternary circle :disabled="busy" :aria-label="`${t('settings.firewall.editRule', 'Edit rule')}: ${protocolPort(rule.protocol, rule.port)}`" @click="emit('edit', rule)">
+        <n-button quaternary circle :disabled="busy" :aria-label="`${t('settings.firewall.editRule', 'Edit rule')}: ${ruleName(rule, index)}`" @click="emit('edit', rule)">
           <template #icon><Pencil :size="15" /></template>
         </n-button>
         <n-button quaternary circle :disabled="busy" :aria-label="t('settings.firewall.remove', 'Remove')" @click="emit('remove', rule.id)">
           <template #icon><Trash2 :size="15" /></template>
         </n-button>
+        <FirewallMatchTable class="rule-match-table" :model-value="ruleMatches(rule)" :direction="rule.direction" readonly />
       </li>
     </TransitionGroup>
     <div class="firewall-policy">
@@ -112,11 +112,12 @@ header { display: flex; align-items: center; justify-content: space-between; gap
 h2 { margin: 0; font-size: 14px; font-weight: 600; }
 .firewall-empty, .firewall-policy p { margin: 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
 .firewall-list { display: grid; margin: 0; padding: 0; list-style: none; }
-.firewall-rule { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--border); transition: opacity 160ms ease, background-color 160ms ease; }
+.firewall-rule { display: grid; grid-template-columns: 32px minmax(0, 1fr) 34px 34px; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); transition: opacity 160ms ease, background-color 160ms ease; }
 .firewall-rule:first-child { border-top: 0; padding-top: 0; }
-.firewall-rule-main { flex: 1; min-width: 0; }
+.rule-match-table { grid-column: 2 / -1; }
+.firewall-rule-main { display: grid; gap: 10px; flex: 1; min-width: 0; }
 .firewall-rule-title { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
-.firewall-rule-title strong { font-size: 13px; }
+.firewall-rule-title strong { min-width: 0; overflow-wrap: anywhere; font-size: 13px; }
 .firewall-rule-main small { display: block; margin-top: 4px; color: var(--muted-foreground); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
 .firewall-rule-move { transition: transform 200ms ease; }
 .firewall-rule.is-dragging { opacity: 0.45; }
@@ -132,13 +133,15 @@ h2 { margin: 0; font-size: 14px; font-weight: 600; }
 @container (max-width: 640px) {
   header { align-items: stretch; flex-direction: column; }
   .firewall-drag { width: 44px; height: 44px; }
-  .firewall-rule { min-height: 48px; }
+  .firewall-rule { min-height: 48px; grid-template-columns: 44px minmax(0, 1fr) 34px 34px; }
+  .rule-match-table { grid-column: 1 / -1; }
   .firewall-policy :deep(.n-radio-group) { width: 100%; }
 }
 @media (max-width: 760px) {
   header { align-items: stretch; flex-direction: column; }
   .firewall-drag { width: 44px; height: 44px; }
-  .firewall-rule { min-height: 48px; }
+  .firewall-rule { min-height: 48px; grid-template-columns: 44px minmax(0, 1fr) 34px 34px; }
+  .rule-match-table { grid-column: 1 / -1; }
   .firewall-policy :deep(.n-radio-group) { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -27,6 +27,12 @@ export interface NetworkConfig {
   webrtc?: WebRtcIceConfig
 }
 
+export interface FirewallMatch {
+  field: string
+  operator: 'eq' | 'neq'
+  value: string
+}
+
 export interface FirewallRule {
   id: number
   action: 'allow' | 'deny' | 'reject' | string
@@ -36,6 +42,7 @@ export interface FirewallRule {
   source: string
   comment: string
   enabled: boolean
+  matches?: FirewallMatch[]
 }
 
 export interface FirewallConfirmation {
@@ -64,6 +71,7 @@ export interface FirewallRuleInput {
   port: string
   source?: string
   comment?: string
+  matches?: FirewallMatch[]
 }
 
 export interface FirewallUpdate {

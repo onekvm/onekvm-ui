@@ -3,9 +3,11 @@ import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
 import { GripVertical, Pencil, Plus, Trash2 } from '@/icons'
 import { NButtonGroup, useMessage } from 'naive-ui'
 
-import { api, type ExtensionSummary, type FirewallStatus } from '@/api/client'
+import { api, type ExtensionSummary, type FirewallMatch, type FirewallStatus } from '@/api/client'
 import FirewallInstallCard from './FirewallInstallCard.vue'
 import FirewallRuleSection from './FirewallRuleSection.vue'
+import FirewallMatchTable from './FirewallMatchTable.vue'
+import { legacyMatchFields, ruleMatches, simpleMatches, validMatches } from '@/lib/firewall-matches'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { t } from '@/i18n/runtime'
 import {
@@ -13,7 +15,6 @@ import {
   collapseDraft,
   draftFromStatus,
   draftsEqual,
-  duplicateAllow,
   duplicateServicePort,
   enableProtection,
   expandDraft,
@@ -63,8 +64,7 @@ const ruleAction = ref('allow')
 const ruleDirection = ref('in')
 const ruleProtocol = ref('tcp')
 const rulePort = ref('')
-const ruleSourceMode = ref<'any' | 'address'>('any')
-const ruleSource = ref('')
+const matches = ref<FirewallMatch[]>([])
 const ruleComment = ref('')
 let pollTimer: number | null = null
 let clockTimer: number | null = null
@@ -74,6 +74,7 @@ const dirty = computed(() => Boolean(saved.value && draft.value && !draftsEqual(
 const pending = computed(() => Boolean(status.value?.confirmation?.pending))
 const seconds = computed(() => pending.value ? Math.max(0, Math.ceil((expiresAt.value - now.value) / 1000)) : 0)
 const busy = computed(() => saving.value || pending.value)
+const advancedOnlyCount = computed(() => draft.value?.rules.filter(rule => rule.matches !== undefined).length ?? 0)
 const servicePortsList = computed(() => draft.value ? servicePortRules(draft.value.rules) : [])
 const directionSections = computed(() => ([
   { direction: 'in', policyKey: 'defaultIncoming' },
@@ -82,6 +83,7 @@ const directionSections = computed(() => ([
 const summary = computed(() => {
   if (!draft.value) return ''
   if (!draft.value.enabled) return t('settings.firewall.openHint', 'The firewall is off, so every incoming connection is accepted. The choices below take effect after you turn it on.')
+  if (mode.value === 'advanced' || advancedOnlyCount.value) return t('settings.firewall.advancedActiveHint', 'Traffic that matches no rule follows the default action for its direction.')
   if (draft.value.defaultIncoming === 'allow') return t('settings.firewall.allowAllHint', 'The firewall is on, but incoming connections that match no rule are still accepted.')
   return t('settings.firewall.protectedHint', 'Only the services switched on below can connect in. Other incoming connections are blocked.')
 })
@@ -108,14 +110,6 @@ function policyHint(direction: 'incoming' | 'outgoing', policy: string) {
 
 function endpoint(rule: Pick<FirewallRuleDraft, 'protocol' | 'port'>) {
   return protocolPort(rule.protocol, rule.port)
-}
-
-function sentence(rule: FirewallRuleDraft) {
-  return t('settings.firewall.sentence', '{action} {direction} {endpoint} from {source}')
-    .replace('{action}', t(`settings.firewall.${rule.action}`, rule.action))
-    .replace('{direction}', t(rule.direction === 'out' ? 'settings.firewall.out' : 'settings.firewall.in', rule.direction))
-    .replace('{endpoint}', endpoint(rule))
-    .replace('{source}', isAnywhere(rule.source) ? t('settings.firewall.anywhere', 'Anywhere') : rule.source)
 }
 
 function ruleDetail(rule: FirewallRuleDraft) {
@@ -204,8 +198,7 @@ function openRuleModal(simple: boolean, direction: FirewallDirection = 'in') {
   ruleDirection.value = direction
   ruleProtocol.value = 'tcp'
   rulePort.value = ''
-  ruleSourceMode.value = 'any'
-  ruleSource.value = ''
+  matches.value = [{ field: 'protocol', operator: 'eq', value: 'tcp' }, { field: 'destination-port', operator: 'eq', value: '' }]
   ruleComment.value = ''
   ruleModal.value = true
 }
@@ -218,8 +211,7 @@ function editRule(rule: FirewallRuleDraft, simple = false) {
   ruleDirection.value = rule.direction
   ruleProtocol.value = rule.protocol || 'any'
   rulePort.value = rule.port
-  ruleSourceMode.value = isAnywhere(rule.source) ? 'any' : 'address'
-  ruleSource.value = rule.source
+  matches.value = ruleMatches(rule)
   ruleComment.value = rule.comment
   ruleModal.value = true
 }
@@ -242,34 +234,20 @@ function saveSimplePort() {
 }
 
 function saveAdvancedRule() {
-  const port = rulePort.value.trim()
-  const source = ruleSourceMode.value === 'address' ? ruleSource.value.trim() : ''
-  if (!validPort(port)) {
-    message.warning(t('settings.firewall.portRequired', 'Enter a port, such as 22, 443, or 8000:8010'))
+  const next = matches.value.map(item => ({ ...item, value: item.value.trim() }))
+  if (!validMatches(next, ruleDirection.value)) {
+    message.warning(t('settings.firewall.matchesInvalid', 'Check the match values, protocol, address family, and interface direction.'))
     return false
   }
-  if (ruleSourceMode.value === 'address' && !source) {
-    message.warning(t('settings.firewall.sourceRequired', 'Enter an address or network'))
-    return false
-  }
-  if (ruleAction.value === 'allow' && duplicateAllow(draft.value?.rules ?? [], { port, protocol: ruleProtocol.value, direction: ruleDirection.value, source }, editingRuleId.value ?? undefined)) {
-    message.warning(t('settings.firewall.duplicate', 'That port is already allowed'))
-    return false
-  }
-  updateDraft((current) => ({
+  const fields = legacyMatchFields(next)
+  updateDraft(current => ({
     ...current,
     rules: saveFirewallRule(current.rules, {
-      action: ruleAction.value,
-      direction: ruleDirection.value,
-      protocol: ruleProtocol.value,
-      port,
-      source,
+      action: ruleAction.value, direction: ruleDirection.value,
+      ...fields, matches: simpleMatches(next) ? undefined : next,
       comment: ruleComment.value.trim(),
     }, editingRuleId.value),
   }))
-  rulePort.value = ''
-  ruleSource.value = ''
-  ruleComment.value = ''
   return true
 }
 
@@ -436,10 +414,9 @@ const preview = computed(() => {
     direction: ruleDirection.value,
     protocol: ruleProtocol.value,
     port: rulePort.value.trim() || '…',
-    source: ruleSourceMode.value === 'address' ? ruleSource.value.trim() : '',
+    source: '',
     comment: ruleComment.value,
   }
-  if (!ruleModalSimple.value) return sentence(rule)
   return t('settings.firewall.portSentence', '{action} {direction} {endpoint}')
     .replace('{action}', t(`settings.firewall.${rule.action}`, rule.action))
     .replace('{direction}', t(rule.direction === 'out' ? 'settings.firewall.out' : 'settings.firewall.in', rule.direction))
@@ -482,7 +459,7 @@ onUnmounted(() => {
         <section class="firewall-card firewall-enable">
           <div class="firewall-enable-copy">
             <h2>{{ t('settings.firewall.enabled', 'Turn on the firewall') }}</h2>
-            <p>{{ t('settings.firewall.enabledHint', 'Only the services below can connect in. Connections started by this device are unchanged. Turning the firewall off does not delete those allows.') }}</p>
+            <p>{{ mode === 'advanced' || advancedOnlyCount ? t('settings.firewall.advancedEnabledHint', 'Established connections and loopback traffic are always allowed.') : t('settings.firewall.enabledHint', 'Only the services below can connect in. Connections started by this device are unchanged. Turning the firewall off does not delete those allows.') }}</p>
             <p>{{ summary }}</p>
           </div>
           <n-switch :value="draft.enabled" :disabled="busy" @update:value="(enabled: boolean) => mode === 'simple' ? toggleEnabled(enabled) : updateDraft((current) => ({ ...current, enabled }))" />
@@ -559,6 +536,11 @@ onUnmounted(() => {
           </ul>
         </section>
 
+        <section v-if="mode === 'simple' && advancedOnlyCount" class="firewall-card">
+          <p>{{ t('settings.firewall.advancedRulesPresent', '{count} rules have additional matches.').replace('{count}', String(advancedOnlyCount)) }}</p>
+          <n-button :disabled="busy" @click="setMode('advanced')">{{ t('settings.firewall.editAdvancedRules', 'Edit advanced rules') }}</n-button>
+        </section>
+
         <template v-if="mode === 'advanced'">
           <p class="firewall-order-hint">{{ t('settings.firewall.orderHint', 'Rules higher in the list match first. Drag the handle to change the order. Nothing changes until you apply.') }}</p>
           <FirewallRuleSection
@@ -615,7 +597,7 @@ onUnmounted(() => {
       preset="card"
       :to="overlayTo"
       :z-index="4600"
-      :style="{ width: 'min(480px, calc(100vw - 32px))' }"
+      :style="{ width: `min(${ruleModalSimple ? 480 : 760}px, calc(100vw - 32px))` }"
       :title="editingRuleId !== null ? ruleModalSimple ? t('settings.firewall.editPort', 'Edit port') : t('settings.firewall.editRule', 'Edit rule') : ruleModalSimple ? t('settings.firewall.addPort', 'Add port') : t('settings.firewall.addRule', 'Add a rule')"
       :mask-closable="!busy"
       :closable="!busy"
@@ -627,20 +609,15 @@ onUnmounted(() => {
           <label>{{ t('settings.firewall.action', 'What to do') }}<n-select v-model:value="ruleAction" :options="actionOptions" /></label>
           <label>{{ t('settings.firewall.direction', 'Direction') }}<n-select v-model:value="ruleDirection" :options="directionOptions" /></label>
         </template>
-        <label>{{ t('settings.firewall.protocol', 'Protocol') }}<n-select v-model:value="ruleProtocol" :options="protocolOptions" /></label>
-        <label>{{ t('settings.firewall.port', 'Port') }}<n-input v-model:value="rulePort" autofocus :placeholder="t('settings.firewall.portPlaceholder', 'For example 5900 or 8000:8010')" /></label>
-        <template v-if="!ruleModalSimple">
-          <label>{{ t('settings.firewall.source', 'From') }}
-            <n-select v-model:value="ruleSourceMode" :options="[{ value: 'any', label: t('settings.firewall.anywhere', 'Anywhere') }, { value: 'address', label: t('settings.firewall.specificSource', 'Only this address') }]" />
-          </label>
-          <label v-if="ruleSourceMode === 'address'">{{ t('settings.firewall.specificSource', 'Only this address') }}
-            <n-input v-model:value="ruleSource" :placeholder="t('settings.firewall.sourcePlaceholder', 'For example 10.0.0.0/24')" />
-          </label>
+        <template v-if="ruleModalSimple">
+          <label>{{ t('settings.firewall.protocol', 'Protocol') }}<n-select v-model:value="ruleProtocol" :options="protocolOptions" /></label>
+          <label>{{ t('settings.firewall.port', 'Port') }}<n-input v-model:value="rulePort" autofocus :placeholder="t('settings.firewall.portPlaceholder', 'For example 5900 or 8000:8010')" /></label>
         </template>
+        <FirewallMatchTable v-else v-model="matches" :direction="ruleDirection" :disabled="busy" />
         <label>{{ t('settings.firewall.comment', 'Note') }}
           <n-input v-model:value="ruleComment" :placeholder="t('settings.firewall.commentPlaceholder', 'Optional, so you can recognize it later')" />
         </label>
-        <p class="firewall-preview"><span>{{ editingRuleId !== null ? t('settings.firewall.updatedRule', 'Updated rule') : t('settings.firewall.preview', 'This will add') }}</span>{{ preview }}</p>
+        <p v-if="ruleModalSimple" class="firewall-preview"><span>{{ editingRuleId !== null ? t('settings.firewall.updatedRule', 'Updated rule') : t('settings.firewall.preview', 'This will add') }}</span>{{ preview }}</p>
         <div class="firewall-modal-actions">
           <n-button @click="ruleModal = false">{{ t('auth.cancel', 'Cancel') }}</n-button>
           <n-button attr-type="submit" type="primary" :disabled="busy">{{ editingRuleId !== null ? ruleModalSimple ? t('settings.firewall.savePort', 'Save port') : t('settings.firewall.saveRule', 'Save rule') : t('settings.firewall.addToList', 'Add to list') }}</n-button>

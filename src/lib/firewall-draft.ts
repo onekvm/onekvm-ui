@@ -1,4 +1,6 @@
-import type { FirewallRule, FirewallStatus, FirewallUpdate } from '@/api/client'
+import type { FirewallMatch, FirewallRule, FirewallStatus, FirewallUpdate } from '@/api/client'
+
+import { legacyMatchFields, simpleMatches } from './firewall-matches.ts'
 
 export interface FirewallRuleDraft {
   id: number
@@ -8,6 +10,7 @@ export interface FirewallRuleDraft {
   port: string
   source: string
   comment: string
+  matches?: FirewallMatch[]
 }
 
 export type FirewallDirection = 'in' | 'out'
@@ -82,7 +85,7 @@ export function saveServicePort(rules: FirewallRuleDraft[], values: Pick<Firewal
 }
 
 export function whitelistRules(rules: FirewallRuleDraft[]) {
-  return rules.filter((rule) => rule.action === 'allow' && rule.direction === 'in')
+  return rules.filter((rule) => rule.matches === undefined && rule.action === 'allow' && rule.direction === 'in')
 }
 
 export function servicePortRules(rules: FirewallRuleDraft[]) {
@@ -128,6 +131,7 @@ export function applyPayload(draft: FirewallDraft): FirewallUpdate {
       port: rule.port.trim(),
       source: isAnywhere(rule.source) ? undefined : rule.source.trim(),
       comment: rule.comment.trim() || undefined,
+      ...(rule.matches !== undefined ? { matches: rule.matches.map(item => ({ ...item })) } : {}),
     })),
   }
 }
@@ -137,7 +141,7 @@ export function expandDraft(draft: FirewallDraft): FirewallDraft {
   let nextId = Math.min(0, ...draft.rules.map((rule) => rule.id)) - 1
   const rules: FirewallRuleDraft[] = []
   for (const rule of draft.rules) {
-    if (!(rule.action === 'allow' && rule.direction === 'in' && isAnywhere(rule.source))) {
+    if (!(rule.matches === undefined && rule.action === 'allow' && rule.direction === 'in' && isAnywhere(rule.source))) {
       rules.push(rule)
       continue
     }
@@ -211,7 +215,7 @@ export function reorderVisible(rules: FirewallRuleDraft[], visibleIds: number[],
 }
 
 export function matchesServicePort(rule: FirewallRuleDraft, service: ServiceDef, port: number) {
-  return rule.action === 'allow'
+  return rule.matches === undefined && rule.action === 'allow'
     && rule.direction === 'in'
     && rule.port.trim() === String(port)
     && (rule.protocol === service.protocol || rule.protocol === 'any' || rule.protocol === '')
@@ -219,14 +223,14 @@ export function matchesServicePort(rule: FirewallRuleDraft, service: ServiceDef,
 }
 
 function normalizeRule(rule: FirewallRule): FirewallRuleDraft {
+  const simple = rule.matches !== undefined && simpleMatches(rule.matches)
+  const fields = simple ? legacyMatchFields(rule.matches!) : {
+    protocol: rule.protocol || 'any', port: rule.port, source: isAnywhere(rule.source) ? '' : rule.source,
+  }
   return {
-    id: rule.id,
-    action: rule.action,
-    direction: rule.direction,
-    protocol: rule.protocol || 'any',
-    port: rule.port,
-    source: isAnywhere(rule.source) ? '' : rule.source,
-    comment: rule.comment || '',
+    id: rule.id, action: rule.action, direction: rule.direction,
+    ...fields, comment: rule.comment || '',
+    ...(rule.matches !== undefined && !simple ? { matches: rule.matches.map(item => ({ ...item })) } : {}),
   }
 }
 
@@ -239,7 +243,7 @@ function expandAllowSources(rules: FirewallRuleDraft[], sources: string[]) {
   if (!allowSources.length) return rules
   const expanded: FirewallRuleDraft[] = []
   for (const rule of rules) {
-    if (!(rule.action === 'allow' && rule.direction === 'in' && isAnywhere(rule.source))) {
+    if (!(rule.matches === undefined && rule.action === 'allow' && rule.direction === 'in' && isAnywhere(rule.source))) {
       expanded.push(rule)
       continue
     }
@@ -266,7 +270,7 @@ function collapseAllowSources(rules: FirewallRuleDraft[]) {
   const seen = new Set<string>()
   const collapsed: FirewallRuleDraft[] = []
   for (const rule of rules) {
-    if (!(rule.action === 'allow' && rule.direction === 'in')) {
+    if (!(rule.matches === undefined && rule.action === 'allow' && rule.direction === 'in')) {
       collapsed.push(rule)
       continue
     }
@@ -290,6 +294,7 @@ function signature(draft: FirewallDraft) {
       port: rule.port.trim(),
       source: isAnywhere(rule.source) ? '' : rule.source.trim(),
       comment: rule.comment.trim(),
+      ...(rule.matches !== undefined ? { matches: rule.matches } : {}),
     })),
   }
 }

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { ruleMatches, simpleMatches, validMatches } from '../src/lib/firewall-matches.ts'
 
 import {
   applyPayload,
@@ -8,6 +9,7 @@ import {
   duplicateAllow,
   duplicateServicePort,
   enableProtection,
+  expandDraft,
   extraRules,
   managementServices,
   protocolPort,
@@ -182,3 +184,31 @@ assert.deepEqual(rulesForDirection(movedDirection, 'in').map(rule => rule.id), [
 assert.deepEqual(rulesForDirection(movedDirection, 'out').map(rule => rule.id), [1, 2, 4])
 assert.deepEqual(applyPayload(draft(reorderDirectionRules(directional, 4, 2))).rules?.map(rule => `${rule.direction}/${rule.port}`), ['in/22', 'out/123', 'in/443', 'out/53'])
 console.log('firewall draft tests passed')
+
+const predicates = [
+  { field: 'protocol', operator: 'eq' as const, value: 'udp' },
+  { field: 'destination-address', operator: 'neq' as const, value: '192.0.2.1' },
+  { field: 'destination-port', operator: 'eq' as const, value: '53' },
+  { field: 'out-interface', operator: 'eq' as const, value: 'eth0' },
+]
+const complex = allow('53', { id: 8, direction: 'out', protocol: 'udp', matches: predicates })
+assert.equal(validMatches(predicates, 'out'), true)
+assert.equal(validMatches(predicates, 'in'), false)
+assert.equal(validMatches([...predicates, { field: 'source-address', operator: 'eq', value: 'fd00::/8' }], 'out'), false)
+assert.equal(validMatches([{ field: 'protocol', operator: 'eq', value: 'icmp' }, predicates[2]], 'in'), false)
+assert.equal(validMatches([{ field: 'source-port', operator: 'eq', value: '65536' }], 'out'), false)
+assert.equal(validMatches([{ field: 'source-port', operator: 'eq', value: '90:80' }], 'out'), false)
+assert.equal(simpleMatches([{ field: 'source-address', operator: 'eq', value: '::/0' }, predicates[2]]), false)
+assert.equal(validMatches([], 'in'), true)
+const withAdvanced = draft([allow('22'), complex], ['10.0.0.0/8'])
+const roundTrip = collapseDraft(expandDraft(withAdvanced))
+assert.deepEqual(applyPayload(roundTrip).rules?.find(rule => rule.direction === 'out')?.matches, predicates)
+assert.deepEqual(ruleMatches(complex), predicates)
+const copied = ruleMatches(complex)
+copied[0].value = 'tcp'
+assert.equal(predicates[0].value, 'udp')
+assert.equal(draftsEqual(draft([complex]), draft([{ ...complex, matches: copied }])), false)
+const addressOnly = allow('', { matches: [{ field: 'source-address', operator: 'eq', value: '10.0.0.0/8' }] })
+assert.deepEqual(servicePortRules([addressOnly]), [])
+assert.deepEqual(applyPayload(collapseDraft(draft([addressOnly], ['192.0.2.1']))).rules?.[0].matches, addressOnly.matches)
+console.log('independent match validation and advanced/simple round trips passed')

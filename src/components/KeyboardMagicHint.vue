@@ -17,13 +17,15 @@ const sequence = computed(() => {
   const hint = magicHint.value
   if (!hint.active || hint.playing) return ''
   const chords = hint.sequence?.length ? hint.sequence : hint.codes.length ? [hint.codes] : []
-  return chords.map((codes) => codes.map((code) => chordKeyLabel(code, names.value)).join(' + ')).join(' → ')
+  return chords.map((step) => typeof step === 'number'
+    ? `${step} ms`
+    : step.map((code) => chordKeyLabel(code, names.value)).join(' + ')).join(' → ')
 })
 const instruction = computed(() => {
   if (magicHint.value.playing) return t('keyboard.magicOverlaySending', 'Sending · Esc to cancel')
   return sequence.value
-    ? t('keyboard.magicOverlaySend', 'Magic Key to send · Esc to cancel')
-    : t('keyboard.magicOverlayWait', 'Enter the shortcut · Esc to cancel')
+    ? t('keyboard.magicOverlaySend', 'Double-tap Magic Key to send · Esc to cancel')
+    : t('keyboard.magicOverlayWait', 'Enter keys · Tap Magic Key for a 100 ms pause · Esc to cancel')
 })
 </script>
 
@@ -53,11 +55,12 @@ const instruction = computed(() => {
   pointer-events: none;
   text-align: center;
   transform: translateX(-50%);
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .keyboard-magic-sequence {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

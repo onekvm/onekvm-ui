@@ -87,8 +87,10 @@ export function useKeyboard(
   }
 
   const applyMagic = (effect: MagicEffect) => {
-    publishHint(effect.hint)
-    if (!effect.frames.length) return
+    if (!effect.frames.length) {
+      if (!magicFrames.length) publishHint(effect.hint)
+      return
+    }
     magicFrames = [...effect.frames]
     publishHint({ active: true, codes: [], playing: true })
     const sendNext = () => {
@@ -106,7 +108,8 @@ export function useKeyboard(
       magicTimer = magicFrames.length ? window.setTimeout(sendNext, magicFrames[0]!.delayMS) : 0
       if (!magicFrames.length) publishHint(idleHint)
     }
-    sendNext()
+    magicTimer = magicFrames[0]!.delayMS ? window.setTimeout(sendNext, magicFrames[0]!.delayMS) : 0
+    if (!magicTimer) sendNext()
   }
 
   const keyDown = (event: KeyboardEvent) => {
@@ -157,7 +160,7 @@ export function useKeyboard(
   const keyUp = (event: KeyboardEvent) => {
     const physical = physicalKeyCode(event)
     const captured = capturedKeys.delete(physical)
-    if (composer.started) {
+    if (composer.started || (captured && physical === sanitizeMagicKey(magic.value))) {
       const routed = routeKeyboardKey(composer, {
         physical,
         down: false,

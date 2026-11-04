@@ -12,7 +12,10 @@ export const MAGIC_KEY_CODES = [
   'ContextMenu',
 ] as const
 
-export type MagicHintState = { active: boolean; codes: string[]; sequence?: string[][]; playing?: boolean }
+export const MAGIC_DOUBLE_TAP_MS = 350
+export const MAGIC_PAUSE_MS = 100
+
+export type MagicHintState = { active: boolean; codes: string[]; sequence?: Array<string[] | number>; playing?: boolean }
 
 export type MagicFrame = { codes: string[]; delayMS: number }
 
@@ -146,7 +149,12 @@ export class MagicComposer {
   started = false
   private keys = new Set<string>()
   private frames: MagicFrame[] = []
-  private sequence: string[][] = []
+  private sequence: Array<string[] | number> = []
+  private pendingMagicAt: number | null = null
+  private magicPressed = false
+  private nextDelayMS: number | null = null
+  private segmentStart = 0
+  private segmentHasKeys = false
   private lastAt = 0
   private now: () => number
 
@@ -160,15 +168,23 @@ export class MagicComposer {
     this.keys.clear()
     this.frames = []
     this.sequence = []
+    this.pendingMagicAt = null
+    this.magicPressed = false
+    this.nextDelayMS = null
+    this.segmentStart = 0
+    this.segmentHasKeys = false
     this.lastAt = 0
   }
 
   hint(): MagicHintState {
     if (!this.started) return idleHint()
+    const sequence = this.sequence.map((step) => typeof step === 'number' ? step : [...step])
+    if (!this.segmentHasKeys && this.mods.length) sequence.push([...this.mods])
+    if (this.pendingMagicAt !== null) sequence.push(MAGIC_PAUSE_MS)
     return {
       active: true,
       codes: [...this.mods],
-      sequence: this.sequence.map((codes) => [...codes]),
+      sequence,
     }
   }
 
@@ -176,26 +192,63 @@ export class MagicComposer {
     const at = this.now()
     this.frames.push({
       codes: [...this.mods, ...this.keys],
-      delayMS: this.frames.length ? Math.max(20, at - this.lastAt) : 0,
+      delayMS: this.nextDelayMS ?? (this.frames.length ? Math.max(20, at - this.lastAt) : 0),
     })
+    this.nextDelayMS = null
     this.lastAt = at
   }
 
+  private endSegment() {
+    if (!this.segmentHasKeys && this.mods.length) {
+      this.sequence.push([...this.mods])
+      this.record()
+      this.frames.push({ codes: [], delayMS: 100 })
+    } else if (this.frames.length > this.segmentStart) {
+      if (this.keys.size) this.frames.push({ codes: [], delayMS: 100 })
+      else this.frames[this.frames.length - 1]!.codes = []
+    }
+    this.mods = []
+    this.keys.clear()
+    this.segmentStart = this.frames.length
+    this.segmentHasKeys = false
+  }
+
+  private insertPause() {
+    this.endSegment()
+    this.nextDelayMS = (this.nextDelayMS ?? 0) + MAGIC_PAUSE_MS
+    this.sequence.push(MAGIC_PAUSE_MS)
+    this.pendingMagicAt = null
+  }
+
   onMagic(down: boolean): MagicEffect {
-    if (down) {
-      if (this.started) {
-        const frames = this.frames.length
-          ? [...this.frames, { codes: [], delayMS: this.keys.size ? 100 : 20 }]
-          : []
-        this.reset()
-        return { handled: true, frames, hint: this.hint() }
+    if (!down) this.magicPressed = false
+    else if (!this.magicPressed) {
+      this.magicPressed = true
+      const at = this.now()
+      if (this.pendingMagicAt !== null && at - this.pendingMagicAt <= MAGIC_DOUBLE_TAP_MS) {
+        this.pendingMagicAt = null
+        if (this.started) {
+          this.endSegment()
+          const frames = this.nextDelayMS === null
+            ? this.frames
+            : [...this.frames, { codes: [], delayMS: this.nextDelayMS }]
+          this.reset()
+          return { handled: true, frames, hint: this.hint() }
+        }
+        this.started = true
+      } else {
+        if (this.pendingMagicAt !== null && this.started) this.insertPause()
+        this.pendingMagicAt = at
       }
-      this.started = true
     }
     return { handled: true, frames: [], hint: this.hint() }
   }
 
   onKey(code: string, down: boolean): MagicEffect {
+    if (down && this.pendingMagicAt !== null) {
+      if (this.started && code !== 'Escape') this.insertPause()
+      else this.pendingMagicAt = null
+    }
     if (!this.started || !knownKey(code)) {
       return { handled: false, frames: [], hint: this.hint() }
     }
@@ -208,10 +261,12 @@ export class MagicComposer {
         return { handled: true, frames: [], hint: this.hint() }
       }
       this.mods.push(code)
+      return { handled: true, frames: [], hint: this.hint() }
     } else if (down) {
       if (this.keys.has(code)) return { handled: true, frames: [], hint: this.hint() }
       this.keys.add(code)
       this.sequence.push([...this.mods, ...this.keys])
+      this.segmentHasKeys = true
     } else if (!this.keys.delete(code)) {
       return { handled: true, frames: [], hint: this.hint() }
     }
@@ -237,6 +292,6 @@ export function routeKeyboardKey(
     return { kind: 'magic', effect: composer.onMagic(input.down) }
   }
   const code = mapKeyboardCode(input.physical, input)
-  if (!composer.started) return { kind: 'passthrough', code }
-  return { kind: 'magic', effect: composer.onKey(code, input.down) }
+  const effect = composer.onKey(code, input.down)
+  return composer.started || effect.handled ? { kind: 'magic', effect } : { kind: 'passthrough', code }
 }

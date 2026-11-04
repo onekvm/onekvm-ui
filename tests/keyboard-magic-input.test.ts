@@ -7,9 +7,10 @@ import { KeyboardReportState } from '../src/lib/keyboard-report-state.ts'
 const surface = { tagName: 'DIV', getAttribute: () => null }
 const documentMock = Object.assign(new EventTarget(), { activeElement: surface })
 const scheduled = new Map<number, () => void>()
+const delays: number[] = []
 let timerId = 0
 const windowMock = Object.assign(new EventTarget(), {
-  setTimeout(callback: () => void) { scheduled.set(++timerId, callback); return timerId },
+  setTimeout(callback: () => void, delayMS: number) { delays.push(delayMS); scheduled.set(++timerId, callback); return timerId },
   clearTimeout(id: number) { scheduled.delete(id) },
 })
 const reports: { keys: number[]; modifiers: number }[] = []
@@ -56,23 +57,35 @@ try {
       callback()
     }
   }
-  const record = () => { tap('ControlRight'); tap('AltLeft'); tap('Tab'); tap('Tab') }
+  const doubleTap = () => { tap('ControlRight'); tap('ControlRight') }
+  const record = () => { doubleTap(); tap('AltLeft'); tap('Tab'); tap('Tab') }
   record()
   assert.deepEqual(reports, [], 'Tapping Magic and entering the shortcut must not reach the host')
   assert.equal(magicHint.value.sequence.length, 2)
-  tap('ControlRight')
-  assert.deepEqual(reports, [{ keys: [], modifiers: 4 }])
+  doubleTap()
+  assert.deepEqual(reports, [{ keys: [43], modifiers: 4 }])
   assert.equal(magicHint.value.playing, true)
   flush()
   assert.deepEqual(reports, [
-    { keys: [], modifiers: 4 },
     { keys: [43], modifiers: 4 }, { keys: [], modifiers: 4 },
-    { keys: [43], modifiers: 4 }, { keys: [], modifiers: 4 },
-    { keys: [], modifiers: 0 },
+    { keys: [43], modifiers: 4 }, { keys: [], modifiers: 0 },
   ])
   assert.equal(magicHint.value.active, false)
   tap('KeyA')
   assert.deepEqual(reports.slice(-2), [{ keys: [4], modifiers: 0 }, { keys: [], modifiers: 0 }], 'Sending once must restore normal input')
+
+  const beforeExample = reports.length
+  doubleTap()
+  tap('ControlLeft'); tap('KeyB'); tap('ControlRight'); tap('ShiftLeft'); tap('Digit5')
+  assert.equal(reports.length, beforeExample, 'The example must remain local until the exit double-tap')
+  delays.length = 0
+  doubleTap()
+  flush()
+  assert.deepEqual(reports.slice(beforeExample), [
+    { keys: [5], modifiers: 1 }, { keys: [], modifiers: 0 },
+    { keys: [34], modifiers: 2 }, { keys: [], modifiers: 0 },
+  ], 'A pause must release Ctrl before sending %')
+  assert.equal(delays[1], 100, 'The inserted pause must last 100 ms after releasing the previous shortcut')
 
   const beforeCancel = reports.length
   record()
@@ -85,9 +98,10 @@ try {
   assert.equal(reports.length, beforeCancel, 'Losing focus must discard recording')
 
   for (const confirm of [false, true]) {
-    tap('ControlRight')
+    doubleTap()
     key('KeyB', true)
-    tap(confirm ? 'ControlRight' : 'Escape')
+    if (confirm) doubleTap()
+    else tap('Escape')
     flush()
     const count = reports.length
     key('KeyB', true, true)
@@ -107,9 +121,9 @@ try {
     async () => { app!.unmount(); app = undefined },
   ]) {
     record()
-    tap('ControlRight')
+    doubleTap()
     assert.equal(scheduled.size, 1)
-    assert.deepEqual(reports.at(-1), { keys: [], modifiers: 12 })
+    assert.deepEqual(reports.at(-1), { keys: [43], modifiers: 12 })
     await cancel()
     assert.equal(scheduled.size, 0, 'Cancellation must remove pending sends')
     assert.deepEqual(reports.at(-1), { keys: [], modifiers: 8 })

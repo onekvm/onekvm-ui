@@ -1,108 +1,129 @@
 import assert from 'node:assert/strict'
 
-import { MagicComposer, mapKeyboardCode, routeKeyboardKey } from '../src/lib/keyboard-magic.ts'
+import { MAGIC_DOUBLE_TAP_MS, MagicComposer, mapKeyboardCode, routeKeyboardKey, type MagicEffect } from '../src/lib/keyboard-magic.ts'
 
 const plain = { rightControlAsMeta: false, swapCommandCtrl: false }
 const swapped = { rightControlAsMeta: false, swapCommandCtrl: true }
 const both = { rightControlAsMeta: true, swapCommandCtrl: true }
-
 assert.equal(mapKeyboardCode('ControlLeft', swapped), 'MetaLeft')
 assert.equal(mapKeyboardCode('MetaRight', swapped), 'ControlRight')
 assert.equal(mapKeyboardCode('ControlLeft', plain), 'ControlLeft')
 assert.equal(mapKeyboardCode('ControlRight', both), 'MetaLeft')
-assert.equal(mapKeyboardCode('ControlLeft', both), 'MetaLeft')
 assert.equal(mapKeyboardCode('AltLeft', swapped), 'AltLeft')
 
 let now = 0
 const composer = new MagicComposer(() => now)
-function press(physical: string, down: boolean, repeat = false, options = plain) {
+function key(physical: string, down: boolean, at: number, repeat = false, options = plain) {
+  now = at
   return routeKeyboardKey(composer, { physical, down, repeat, magicKey: 'ControlRight', ...options })
 }
-function record(physical: string, down: boolean, at: number, repeat = false) {
-  now = at
-  const routed = press(physical, down, repeat)
+function tap(code: string, at: number, options = plain): MagicEffect {
+  const routed = key(code, true, at, false, options)
+  key(code, false, at + 20, false, options)
   assert.equal(routed.kind, 'magic')
-  if (routed.kind !== 'magic') throw new Error('Expected Magic Key to consume the input')
-  assert.deepEqual(routed.effect.frames, [], 'Recording must not send anything to the remote host')
+  if (routed.kind !== 'magic') throw new Error('Expected local recording')
   return routed.effect
 }
-
-// Capture repeated normal keys and their intervals after tapping Magic once.
-record('ControlRight', true, 0)
-record('ControlRight', false, 50)
-record('AltLeft', true, 100)
-record('AltLeft', false, 150)
-record('Tab', true, 200)
-record('Tab', false, 250)
-record('Tab', true, 900)
-record('Tab', false, 950)
-record('Tab', true, 2450)
-record('Tab', false, 2500)
-assert.deepEqual(composer.hint().sequence, Array.from({ length: 3 }, () => ['AltLeft', 'Tab']))
-const confirmed = press('ControlRight', true)
-assert.equal(confirmed.kind, 'magic')
-if (confirmed.kind === 'magic') {
-  assert.deepEqual(confirmed.effect.frames, [
-    { codes: ['AltLeft'], delayMS: 0 },
-    { codes: ['AltLeft', 'Tab'], delayMS: 100 },
-    { codes: ['AltLeft'], delayMS: 50 },
-    { codes: ['AltLeft', 'Tab'], delayMS: 650 },
-    { codes: ['AltLeft'], delayMS: 50 },
-    { codes: ['AltLeft', 'Tab'], delayMS: 1500 },
-    { codes: ['AltLeft'], delayMS: 50 },
-    { codes: [], delayMS: 20 },
-  ])
-  assert.equal(confirmed.effect.hint.active, false)
+function doubleTap(at: number, options = plain) {
+  assert.deepEqual(tap('ControlRight', at, options).frames, [], 'The first tap must not send')
+  return tap('ControlRight', at + 100, options)
 }
-assert.equal(composer.started, false)
-press('ControlRight', false)
-assert.equal(press('Tab', true).kind, 'passthrough', 'Sending once must exit composition')
-
-// Starting a new composition must not retain the old sequence. Confirming
-// before releasing a captured key must still produce a final release report.
-record('ControlRight', true, 3000)
-record('ControlRight', false, 3050)
-record('KeyA', true, 3100)
-record('KeyA', true, 3150, true)
-record('KeyA', true, 3160) // Duplicate keydown without a keyup is not another tap.
-const held = press('ControlRight', true)
-if (held.kind === 'magic') {
-  assert.deepEqual(held.effect.frames, [
-    { codes: ['KeyA'], delayMS: 0 },
-    { codes: [], delayMS: 100 },
-  ])
+function record(code: string, at: number) {
+  assert.deepEqual(tap(code, at).frames, [], 'Recorded keys must not reach the remote host')
 }
 
-// Magic autorepeat cannot confirm, and Esc cancels without sending a shortcut.
-record('ControlRight', true, 4000)
-record('MetaLeft', true, 4100)
-record('ControlRight', true, 4200, true)
-assert.equal(composer.started, true)
-record('Escape', true, 4300)
+// A single Magic tap stays idle. Other input breaks a possible double-tap.
+tap('ControlRight', 0)
 assert.equal(composer.started, false)
-assert.equal(press('KeyA', true).kind, 'passthrough')
-
-// Empty compositions exit silently; focus/setting resets discard recorded keys.
-record('ControlRight', true, 5000)
-record('ControlRight', false, 5050)
-record('ControlRight', true, 5100)
+assert.equal(key('KeyA', true, 30).kind, 'passthrough')
+tap('ControlRight', 100)
 assert.equal(composer.started, false)
-record('ControlRight', true, 5200)
-record('KeyA', true, 5300)
 composer.reset()
-record('ControlRight', true, 5400)
-record('ControlRight', true, 5500)
+tap('ControlRight', 500)
+tap('ControlRight', 500 + MAGIC_DOUBLE_TAP_MS + 1)
+assert.equal(composer.started, false, 'Slow taps must not enter recording')
+composer.reset()
+
+// The requested example: Ctrl+B, one Magic tap, %, then double Magic to send.
+doubleTap(1000)
+assert.equal(composer.started, true)
+record('ControlLeft', 1200)
+record('KeyB', 1400)
+record('ControlRight', 1500)
+assert.equal(composer.started, true, 'A single tap must insert a pause, not exit')
+assert.equal(composer.hint().sequence?.at(-1), 100)
+record('ShiftLeft', 1600)
+record('Digit5', 1700)
+assert.deepEqual(composer.hint().sequence, [['ControlLeft', 'KeyB'], 100, ['ShiftLeft', 'Digit5']])
+const sent = doubleTap(2000)
+assert.deepEqual(sent.frames, [
+  { codes: ['ControlLeft', 'KeyB'], delayMS: 0 },
+  { codes: [], delayMS: 20 },
+  { codes: ['ShiftLeft', 'Digit5'], delayMS: 100 },
+  { codes: [], delayMS: 20 },
+])
 assert.equal(composer.started, false)
+assert.equal(sent.hint.active, false)
+assert.equal(key('KeyA', true, 2300).kind, 'passthrough')
 
-// Map the recorded chord, but never send the physical Magic Key itself.
-assert.deepEqual(press('MetaLeft', true, false, swapped), { kind: 'passthrough', code: 'ControlLeft' })
-press('ControlRight', true, false, swapped)
-press('MetaLeft', true, false, swapped)
-press('MetaLeft', false, false, swapped)
-const command = press('ControlRight', true, false, swapped)
-if (command.kind === 'magic') {
-  assert.deepEqual(command.effect.frames[0]?.codes, ['ControlLeft'])
-  assert.deepEqual(command.effect.frames.at(-1)?.codes, [])
-}
+// Repeated keys within one group retain their intervals and latched modifiers.
+doubleTap(3000)
+record('AltLeft', 3200)
+record('Tab', 3300)
+record('Tab', 3970)
+const repeated = doubleTap(5000)
+assert.deepEqual(repeated.frames, [
+  { codes: ['AltLeft', 'Tab'], delayMS: 0 },
+  { codes: ['AltLeft'], delayMS: 20 },
+  { codes: ['AltLeft', 'Tab'], delayMS: 650 },
+  { codes: [], delayMS: 20 },
+])
 
+// Separate single taps add pauses. The exit double-tap contributes no pause.
+doubleTap(6000)
+record('KeyB', 6200)
+record('ControlRight', 6300)
+record('ControlRight', 6800)
+record('KeyB', 7000)
+const twoPauses = doubleTap(7500)
+assert.equal(twoPauses.frames[2]?.delayMS, 200)
+assert.deepEqual(twoPauses.frames.map(frame => frame.codes), [['KeyB'], [], ['KeyB'], []])
+
+doubleTap(8000)
+record('ControlRight', 8200)
+record('KeyA', 8300)
+assert.deepEqual(doubleTap(9000).frames[0], { codes: ['KeyA'], delayMS: 100 }, 'Leading pauses must delay the first key')
+
+// Autorepeat and duplicate keydowns never count as a double-tap or a new key.
+tap('ControlRight', 10000)
+assert.equal(key('ControlRight', true, 10100, true).kind, 'magic')
+assert.equal(composer.started, false)
+composer.reset()
+doubleTap(11000)
+key('KeyA', true, 11200)
+key('KeyA', true, 11220, true)
+key('KeyA', true, 11230)
+const held = doubleTap(11500)
+assert.deepEqual(held.frames, [{ codes: ['KeyA'], delayMS: 0 }, { codes: [], delayMS: 100 }])
+
+doubleTap(12000)
+record('MetaLeft', 12200)
+record('ControlRight', 12300)
+record('Escape', 12400)
+assert.equal(composer.started, false)
+assert.deepEqual(doubleTap(12500).frames, [])
+assert.deepEqual(doubleTap(13000).frames, [], 'An empty recording must exit silently')
+
+doubleTap(14000)
+record('KeyA', 14200)
+composer.reset()
+assert.deepEqual(doubleTap(14500).frames, [])
+assert.deepEqual(doubleTap(15000).frames, [], 'Reset must discard pending taps and recorded keys')
+
+// Modifier-only shortcuts and mapping still work; the Magic Key is never sent.
+doubleTap(16000, swapped)
+tap('MetaLeft', 16200, swapped)
+assert.deepEqual(doubleTap(16500, swapped).frames, [
+  { codes: ['ControlLeft'], delayMS: 0 }, { codes: [], delayMS: 100 },
+])
 console.log('keyboard-magic tests passed')

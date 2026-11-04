@@ -10,6 +10,7 @@ import {
   routeKeyboardKey,
   sanitizeMagicKey,
   type MagicEffect,
+  type MagicFrame,
 } from '@/lib/keyboard-magic'
 
 const idleHint = { active: false, codes: [] as string[] }
@@ -25,7 +26,10 @@ export function useKeyboard(
   const magic = magicKey ?? ref('')
   const pressedKeys = new Set<number>()
   const pressedModifiers = new Map<string, number>()
+  const capturedKeys = new Set<string>()
   const composer = new MagicComposer()
+  let magicTimer = 0
+  let magicFrames: MagicFrame[] = []
 
   const modifierMask = () =>
     Array.from(pressedModifiers.values()).reduce((mask, modifier) => mask | modifier, 0)
@@ -37,6 +41,12 @@ export function useKeyboard(
   }
 
   const releaseAll = () => {
+    window.clearTimeout(magicTimer)
+    magicTimer = 0
+    if (magicFrames.length) {
+      magicFrames = []
+      onekvm.keyboardState.release('magic')
+    }
     composer.reset()
     publishHint(idleHint)
     if (pressedKeys.size === 0 && pressedModifiers.size === 0) return
@@ -77,17 +87,48 @@ export function useKeyboard(
   }
 
   const applyMagic = (effect: MagicEffect) => {
-    for (const code of effect.down) pressMapped(code)
-    for (const code of effect.up) releaseMapped(code, false)
-    for (const code of effect.releaseMods) pressedModifiers.delete(code)
     publishHint(effect.hint)
-    if (effect.down.length > 0 || effect.up.length > 0 || effect.releaseMods.length > 0) sendState()
+    if (!effect.frames.length) return
+    magicFrames = [...effect.frames]
+    publishHint({ active: true, codes: [], playing: true })
+    const sendNext = () => {
+      const frame = magicFrames.shift()
+      if (!frame) return
+      const keys: number[] = []
+      let modifiers = 0
+      for (const code of frame.codes) {
+        const modifier = ModifierCodes.get(code)
+        const key = KeyboardCodes.get(code)
+        if (modifier) modifiers |= modifier
+        else if (key) keys.push(key)
+      }
+      onekvm.keyboardState.set('magic', keys, modifiers)
+      magicTimer = magicFrames.length ? window.setTimeout(sendNext, magicFrames[0]!.delayMS) : 0
+      if (!magicFrames.length) publishHint(idleHint)
+    }
+    sendNext()
   }
 
   const keyDown = (event: KeyboardEvent) => {
     if (blocked.value || acceptsText() || document.activeElement !== target.value) return
+    const physical = physicalKeyCode(event)
+    if (!event.repeat) capturedKeys.delete(physical)
+    // Keys held while composing remain local until released, including after
+    // confirmation or cancellation. A fresh press can start normal input.
+    if (event.repeat && capturedKeys.has(physical)) {
+      event.preventDefault()
+      event.stopPropagation()
+      return
+    }
+    if (magicFrames.length) {
+      capturedKeys.add(physical)
+      event.preventDefault()
+      event.stopPropagation()
+      if (physical === 'Escape') releaseAll()
+      return
+    }
     const routed = routeKeyboardKey(composer, {
-      physical: physicalKeyCode(event),
+      physical,
       down: true,
       repeat: event.repeat,
       magicKey: magic.value,
@@ -95,6 +136,7 @@ export function useKeyboard(
     })
     if (routed.kind === 'magic') {
       if (!routed.effect.handled) return
+      capturedKeys.add(physical)
       event.preventDefault()
       event.stopPropagation()
       applyMagic(routed.effect)
@@ -114,6 +156,7 @@ export function useKeyboard(
 
   const keyUp = (event: KeyboardEvent) => {
     const physical = physicalKeyCode(event)
+    const captured = capturedKeys.delete(physical)
     if (composer.started) {
       const routed = routeKeyboardKey(composer, {
         physical,
@@ -128,6 +171,13 @@ export function useKeyboard(
           event.stopPropagation()
         }
         applyMagic(routed.effect)
+      }
+      return
+    }
+    if (captured) {
+      if (!blocked.value) {
+        event.preventDefault()
+        event.stopPropagation()
       }
       return
     }
@@ -155,14 +205,7 @@ export function useKeyboard(
     if (isBlocked) releaseAll()
   })
 
-  watch([rightControlAsMeta, swap, magic], () => {
-    composer.reset()
-    publishHint(idleHint)
-    if (pressedKeys.size === 0 && pressedModifiers.size === 0) return
-    pressedKeys.clear()
-    pressedModifiers.clear()
-    onekvm.keyboardState.release('physical')
-  })
+  watch([rightControlAsMeta, swap, magic], releaseAll)
 
   onMounted(() => {
     window.addEventListener('keydown', keyDown, { capture: true })

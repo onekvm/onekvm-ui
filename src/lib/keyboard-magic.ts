@@ -12,13 +12,13 @@ export const MAGIC_KEY_CODES = [
   'ContextMenu',
 ] as const
 
-export type MagicHintState = { active: boolean; codes: string[] }
+export type MagicHintState = { active: boolean; codes: string[]; sequence?: string[][]; playing?: boolean }
+
+export type MagicFrame = { codes: string[]; delayMS: number }
 
 export type MagicEffect = {
   handled: boolean
-  down: string[]
-  releaseMods: string[]
-  up: string[]
+  frames: MagicFrame[]
   hint: MagicHintState
 }
 
@@ -142,50 +142,81 @@ function isModifier(code: string) {
 }
 
 export class MagicComposer {
-  current = ''
   mods: string[] = []
   started = false
+  private keys = new Set<string>()
+  private frames: MagicFrame[] = []
+  private sequence: string[][] = []
+  private lastAt = 0
+  private now: () => number
+
+  constructor(now = () => performance.now()) {
+    this.now = now
+  }
 
   reset() {
-    this.current = ''
     this.mods = []
     this.started = false
+    this.keys.clear()
+    this.frames = []
+    this.sequence = []
+    this.lastAt = 0
   }
 
   hint(): MagicHintState {
     if (!this.started) return idleHint()
-    return { active: true, codes: this.current ? [...this.mods, this.current] : [...this.mods] }
+    return {
+      active: true,
+      codes: [...this.mods],
+      sequence: this.sequence.map((codes) => [...codes]),
+    }
+  }
+
+  private record() {
+    const at = this.now()
+    this.frames.push({
+      codes: [...this.mods, ...this.keys],
+      delayMS: this.frames.length ? Math.max(20, at - this.lastAt) : 0,
+    })
+    this.lastAt = at
   }
 
   onMagic(down: boolean): MagicEffect {
     if (down) {
       if (this.started) {
-        const releaseMods = [...this.mods]
+        const frames = this.frames.length
+          ? [...this.frames, { codes: [], delayMS: this.keys.size ? 100 : 20 }]
+          : []
         this.reset()
-        return { handled: true, down: [], up: [], releaseMods, hint: this.hint() }
+        return { handled: true, frames, hint: this.hint() }
       }
       this.started = true
     }
-    return { handled: true, down: [], up: [], releaseMods: [], hint: this.hint() }
+    return { handled: true, frames: [], hint: this.hint() }
   }
 
   onKey(code: string, down: boolean): MagicEffect {
     if (!this.started || !knownKey(code)) {
-      return { handled: false, down: [], up: [], releaseMods: [], hint: this.hint() }
+      return { handled: false, frames: [], hint: this.hint() }
+    }
+    if (code === 'Escape') {
+      if (down) this.reset()
+      return { handled: true, frames: [], hint: this.hint() }
     }
     if (isModifier(code)) {
       if (!down || this.mods.includes(code)) {
-        return { handled: true, down: [], up: [], releaseMods: [], hint: this.hint() }
+        return { handled: true, frames: [], hint: this.hint() }
       }
       this.mods.push(code)
-      return { handled: true, down: [code], up: [], releaseMods: [], hint: this.hint() }
+    } else if (down) {
+      if (this.keys.has(code)) return { handled: true, frames: [], hint: this.hint() }
+      this.keys.add(code)
+      this.sequence.push([...this.mods, ...this.keys])
+    } else if (!this.keys.delete(code)) {
+      return { handled: true, frames: [], hint: this.hint() }
     }
-    if (down) {
-      this.current = code
-      return { handled: true, down: [code], up: [], releaseMods: [], hint: this.hint() }
-    }
-    this.current = ''
-    return { handled: true, down: [], up: [code], releaseMods: [], hint: this.hint() }
+    this.record()
+    return { handled: true, frames: [], hint: this.hint() }
   }
 }
 
@@ -200,7 +231,7 @@ export function routeKeyboardKey(
 ): { kind: 'passthrough'; code: string } | { kind: 'magic'; effect: MagicEffect } {
   const magic = sanitizeMagicKey(input.magicKey)
   if (input.repeat && (composer.started || (magic !== '' && input.physical === magic))) {
-    return { kind: 'magic', effect: { handled: true, down: [], up: [], releaseMods: [], hint: composer.hint() } }
+    return { kind: 'magic', effect: { handled: true, frames: [], hint: composer.hint() } }
   }
   if (magic && input.physical === magic) {
     return { kind: 'magic', effect: composer.onMagic(input.down) }

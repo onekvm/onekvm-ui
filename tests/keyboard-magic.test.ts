@@ -13,122 +13,96 @@ assert.equal(mapKeyboardCode('ControlRight', both), 'MetaLeft')
 assert.equal(mapKeyboardCode('ControlLeft', both), 'MetaLeft')
 assert.equal(mapKeyboardCode('AltLeft', swapped), 'AltLeft')
 
-function press(composer: MagicComposer, physical: string, down: boolean, repeat = false) {
-  return routeKeyboardKey(composer, {
-    physical,
-    down,
-    repeat,
-    magicKey: 'ControlRight',
-    ...plain,
-  })
+let now = 0
+const composer = new MagicComposer(() => now)
+function press(physical: string, down: boolean, repeat = false, options = plain) {
+  return routeKeyboardKey(composer, { physical, down, repeat, magicKey: 'ControlRight', ...options })
+}
+function record(physical: string, down: boolean, at: number, repeat = false) {
+  now = at
+  const routed = press(physical, down, repeat)
+  assert.equal(routed.kind, 'magic')
+  if (routed.kind !== 'magic') throw new Error('Expected Magic Key to consume the input')
+  assert.deepEqual(routed.effect.frames, [], 'Recording must not send anything to the remote host')
+  return routed.effect
 }
 
-const tap = new MagicComposer()
-assert.equal(press(tap, 'ControlRight', true).kind, 'magic')
-assert.equal(tap.started, true)
-assert.deepEqual(tap.hint().codes, [])
-press(tap, 'ControlRight', false)
-const alt = press(tap, 'AltLeft', true)
-assert.equal(alt.kind, 'magic')
-if (alt.kind === 'magic') assert.deepEqual(alt.effect.down, ['AltLeft'])
-const tabDown = press(tap, 'Tab', true)
-if (tabDown.kind === 'magic') {
-  assert.deepEqual(tabDown.effect.down, ['Tab'])
-  assert.deepEqual(tabDown.effect.hint.codes, ['AltLeft', 'Tab'])
+// Capture repeated normal keys and their intervals after tapping Magic once.
+record('ControlRight', true, 0)
+record('ControlRight', false, 50)
+record('AltLeft', true, 100)
+record('AltLeft', false, 150)
+record('Tab', true, 200)
+record('Tab', false, 250)
+record('Tab', true, 900)
+record('Tab', false, 950)
+record('Tab', true, 2450)
+record('Tab', false, 2500)
+assert.deepEqual(composer.hint().sequence, Array.from({ length: 3 }, () => ['AltLeft', 'Tab']))
+const confirmed = press('ControlRight', true)
+assert.equal(confirmed.kind, 'magic')
+if (confirmed.kind === 'magic') {
+  assert.deepEqual(confirmed.effect.frames, [
+    { codes: ['AltLeft'], delayMS: 0 },
+    { codes: ['AltLeft', 'Tab'], delayMS: 100 },
+    { codes: ['AltLeft'], delayMS: 50 },
+    { codes: ['AltLeft', 'Tab'], delayMS: 650 },
+    { codes: ['AltLeft'], delayMS: 50 },
+    { codes: ['AltLeft', 'Tab'], delayMS: 1500 },
+    { codes: ['AltLeft'], delayMS: 50 },
+    { codes: [], delayMS: 20 },
+  ])
+  assert.equal(confirmed.effect.hint.active, false)
 }
-const tabUp = press(tap, 'Tab', false)
-if (tabUp.kind === 'magic') {
-  assert.deepEqual(tabUp.effect.up, ['Tab'])
-  assert.deepEqual(tabUp.effect.releaseMods, [])
-  assert.deepEqual(tabUp.effect.hint, { active: true, codes: ['AltLeft'] })
-}
-assert.equal(tap.started, true)
+assert.equal(composer.started, false)
+press('ControlRight', false)
+assert.equal(press('Tab', true).kind, 'passthrough', 'Sending once must exit composition')
 
-// Tap Magic once, then repeat a shortcut with gaps between normal key presses.
-// Releasing the physical modifier must leave the remote modifier latched.
-press(tap, 'AltLeft', false)
-for (let index = 0; index < 3; index++) {
-  await new Promise((resolve) => setTimeout(resolve, 25))
-  assert.deepEqual(tap.hint(), { active: true, codes: ['AltLeft'] })
-  const nextDown = press(tap, 'Tab', true)
-  assert.equal(nextDown.kind, 'magic')
-  if (nextDown.kind === 'magic') {
-    assert.deepEqual(nextDown.effect.down, ['Tab'])
-    assert.deepEqual(nextDown.effect.hint.codes, ['AltLeft', 'Tab'])
-  }
-  const nextUp = press(tap, 'Tab', false)
-  if (nextUp.kind === 'magic') {
-    assert.deepEqual(nextUp.effect.up, ['Tab'])
-    assert.deepEqual(nextUp.effect.releaseMods, [])
-  }
-}
-const exit = press(tap, 'ControlRight', true)
-if (exit.kind === 'magic') {
-  assert.deepEqual(exit.effect.releaseMods, ['AltLeft'])
-  assert.equal(exit.effect.hint.active, false)
-}
-press(tap, 'ControlRight', false)
-assert.equal(tap.started, false)
-assert.equal(press(tap, 'Tab', true).kind, 'passthrough')
-
-const held = new MagicComposer()
-press(held, 'ControlRight', true)
-press(held, 'AltLeft', true)
-press(held, 'Tab', true)
-const tabRelease = press(held, 'Tab', false)
-if (tabRelease.kind === 'magic') {
-  assert.deepEqual(tabRelease.effect.up, ['Tab'])
-  assert.deepEqual(tabRelease.effect.releaseMods, [])
-  assert.deepEqual(tabRelease.effect.hint.codes, ['AltLeft'])
-}
-press(held, 'Tab', true)
-const magicUp = press(held, 'ControlRight', false)
-if (magicUp.kind === 'magic') {
-  assert.deepEqual(magicUp.effect.releaseMods, [])
-  assert.deepEqual(magicUp.effect.hint, { active: true, codes: ['AltLeft', 'Tab'] })
-}
-press(held, 'Tab', false)
-const heldExit = press(held, 'ControlRight', true)
-if (heldExit.kind === 'magic') assert.deepEqual(heldExit.effect.releaseMods, ['AltLeft'])
-
-const modsOnly = new MagicComposer()
-press(modsOnly, 'ControlRight', true)
-press(modsOnly, 'ControlRight', false)
-press(modsOnly, 'MetaLeft', true)
-const again = press(modsOnly, 'ControlRight', true)
-if (again.kind === 'magic') {
-  assert.deepEqual(again.effect.releaseMods, ['MetaLeft'])
-  assert.equal(again.effect.hint.active, false)
-}
-assert.equal(press(modsOnly, 'KeyA', true).kind, 'passthrough')
-
-const repeat = new MagicComposer()
-press(repeat, 'ControlRight', true)
-press(repeat, 'AltLeft', true)
-const repeated = press(repeat, 'ControlRight', true, true)
-if (repeated.kind === 'magic') {
-  assert.deepEqual(repeated.effect.releaseMods, [])
-  assert.equal(repeat.mods.includes('AltLeft'), true)
+// Starting a new composition must not retain the old sequence. Confirming
+// before releasing a captured key must still produce a final release report.
+record('ControlRight', true, 3000)
+record('ControlRight', false, 3050)
+record('KeyA', true, 3100)
+record('KeyA', true, 3150, true)
+record('KeyA', true, 3160) // Duplicate keydown without a keyup is not another tap.
+const held = press('ControlRight', true)
+if (held.kind === 'magic') {
+  assert.deepEqual(held.effect.frames, [
+    { codes: ['KeyA'], delayMS: 0 },
+    { codes: [], delayMS: 100 },
+  ])
 }
 
-const swapChord = new MagicComposer()
-const swappedMeta = routeKeyboardKey(swapChord, {
-  physical: 'MetaLeft',
-  down: true,
-  repeat: false,
-  magicKey: 'ControlRight',
-  ...swapped,
-})
-assert.equal(swappedMeta.kind, 'passthrough')
-if (swappedMeta.kind === 'passthrough') assert.equal(swappedMeta.code, 'ControlLeft')
-routeKeyboardKey(swapChord, { physical: 'ControlRight', down: true, repeat: false, magicKey: 'ControlRight', ...swapped })
-const command = routeKeyboardKey(swapChord, {
-  physical: 'MetaLeft',
-  down: true,
-  repeat: false,
-  magicKey: 'ControlRight',
-  ...swapped,
-})
-if (command.kind === 'magic') assert.deepEqual(command.effect.down, ['ControlLeft'])
+// Magic autorepeat cannot confirm, and Esc cancels without sending a shortcut.
+record('ControlRight', true, 4000)
+record('MetaLeft', true, 4100)
+record('ControlRight', true, 4200, true)
+assert.equal(composer.started, true)
+record('Escape', true, 4300)
+assert.equal(composer.started, false)
+assert.equal(press('KeyA', true).kind, 'passthrough')
+
+// Empty compositions exit silently; focus/setting resets discard recorded keys.
+record('ControlRight', true, 5000)
+record('ControlRight', false, 5050)
+record('ControlRight', true, 5100)
+assert.equal(composer.started, false)
+record('ControlRight', true, 5200)
+record('KeyA', true, 5300)
+composer.reset()
+record('ControlRight', true, 5400)
+record('ControlRight', true, 5500)
+assert.equal(composer.started, false)
+
+// Map the recorded chord, but never send the physical Magic Key itself.
+assert.deepEqual(press('MetaLeft', true, false, swapped), { kind: 'passthrough', code: 'ControlLeft' })
+press('ControlRight', true, false, swapped)
+press('MetaLeft', true, false, swapped)
+press('MetaLeft', false, false, swapped)
+const command = press('ControlRight', true, false, swapped)
+if (command.kind === 'magic') {
+  assert.deepEqual(command.effect.frames[0]?.codes, ['ControlLeft'])
+  assert.deepEqual(command.effect.frames.at(-1)?.codes, [])
+}
 
 console.log('keyboard-magic tests passed')

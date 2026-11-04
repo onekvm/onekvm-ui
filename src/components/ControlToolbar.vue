@@ -1370,7 +1370,7 @@ const keyboardOptions = computed<DropdownOption[]>(() => {
       : h('span', label),
     checked ? h('span', { class: 'keyboard-menu-check', 'aria-hidden': 'true' }, [h(Check, { size: 16 })]) : null,
   ])
-  const magicHelp = t('keyboard.magicKeyTip', 'Tap Magic Key, then the shortcut. Modifiers stay down so you can press normal keys repeatedly with pauses. Tap Magic Key again to release the modifiers and exit. The selected key is not sent.')
+  const magicHelp = t('keyboard.magicKeyTip', 'Tap Magic Key to start, then enter the shortcut. Tap Magic Key again to send once and exit. Repeated key presses keep their intervals. Esc cancels recording or sending. The selected key is not sent.')
   const magicCodes = ['', ...MAGIC_KEY_CODES.filter((code) => clientKeys.offerMeta || !code.startsWith('Meta'))]
   return [
   {

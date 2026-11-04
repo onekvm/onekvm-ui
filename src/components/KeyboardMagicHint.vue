@@ -13,16 +13,25 @@ const names = computed<ChordNameSet>(() => ({
   off: t('keyboard.magicOff', 'Off'),
   right: t('keyboard.magicSideRight', 'Right'),
 }))
-const text = computed(() => {
+const sequence = computed(() => {
   const hint = magicHint.value
-  if (!hint.active) return ''
-  if (!hint.codes.length) return t('keyboard.magicOverlayWait', 'Press the shortcut to send')
-  return hint.codes.map((code) => chordKeyLabel(code, names.value)).join(' + ')
+  if (!hint.active || hint.playing) return ''
+  const chords = hint.sequence?.length ? hint.sequence : hint.codes.length ? [hint.codes] : []
+  return chords.map((codes) => codes.map((code) => chordKeyLabel(code, names.value)).join(' + ')).join(' → ')
+})
+const instruction = computed(() => {
+  if (magicHint.value.playing) return t('keyboard.magicOverlaySending', 'Sending · Esc to cancel')
+  return sequence.value
+    ? t('keyboard.magicOverlaySend', 'Magic Key to send · Esc to cancel')
+    : t('keyboard.magicOverlayWait', 'Enter the shortcut · Esc to cancel')
 })
 </script>
 
 <template>
-  <div v-if="text" class="keyboard-magic-hint" role="status" aria-live="polite">{{ text }}</div>
+  <div v-if="magicHint.active" class="keyboard-magic-hint" role="status" aria-live="polite">
+    <div v-if="sequence" class="keyboard-magic-sequence">{{ sequence }}</div>
+    <div>{{ instruction }}</div>
+  </div>
 </template>
 
 <style scoped>
@@ -43,8 +52,12 @@ const text = computed(() => {
   line-height: 1.4;
   pointer-events: none;
   text-align: center;
-  text-overflow: ellipsis;
   transform: translateX(-50%);
   white-space: nowrap;
+}
+
+.keyboard-magic-sequence {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>

@@ -1950,6 +1950,14 @@ const en = {
           unknownDescription: 'This system plugin declares this device capability. No description is available in this version.',
         },
         capabilityDetails: {
+          edidRead: {
+            label: 'Read HDMI display information',
+            description: 'Reads the current HDMI EDID, display modes and supported write modes.',
+          },
+          edidWrite: {
+            label: 'Change HDMI display information',
+            description: 'Applies a temporary or permanent EDID to the HDMI input, which may interrupt video.',
+          },
           extensionContributions: {
             label: 'Plugin extension calls',
             description: 'Discovers and invokes features other plugins expose to this plugin, subject to the target plugin\'s permissions.',

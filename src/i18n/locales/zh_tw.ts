@@ -1954,6 +1954,14 @@ const zh_tw = {
           unknownDescription: '此系統外掛程式宣告提供該裝置能力，目前版本暫無對應說明。',
         },
         capabilityDetails: {
+          edidRead: {
+            label: '讀取 HDMI 顯示器資訊',
+            description: '讀取目前 HDMI EDID、顯示模式和支援的寫入模式。',
+          },
+          edidWrite: {
+            label: '修改 HDMI 顯示器資訊',
+            description: '向 HDMI 輸入套用暫時或永久 EDID，可能導致視訊中斷。',
+          },
           extensionContributions: {
             label: '外掛程式擴充呼叫',
             description: '探索並呼叫其他外掛程式向此外掛程式開放的功能，呼叫仍受目標外掛程式的權限限制。',

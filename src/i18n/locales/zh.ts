@@ -1949,6 +1949,14 @@ const zh = {
           unknownDescription: '此系统插件声明提供该设备能力，当前版本暂无对应说明。',
         },
         capabilityDetails: {
+          edidRead: {
+            label: '读取 HDMI 显示器信息',
+            description: '读取当前 HDMI EDID、显示模式和支持的写入模式。',
+          },
+          edidWrite: {
+            label: '修改 HDMI 显示器信息',
+            description: '向 HDMI 输入应用临时或永久 EDID，可能导致视频中断。',
+          },
           extensionContributions: {
             label: '插件扩展调用',
             description: '发现并调用其他插件向此插件开放的功能，调用仍受目标插件的权限限制。',

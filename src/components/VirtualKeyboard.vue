@@ -70,6 +70,11 @@ const hasPlaced = shallowRef(false)
 const modifiers = shallowRef(0)
 const heldModifiers = shallowRef(0)
 const unsubscribeModifiers = onekvm.keyboardState.subscribeModifiers(value => { heldModifiers.value = value })
+const requestedCapsLock = shallowRef(false)
+const capsLocked = computed(() => props.capsLock ?? requestedCapsLock.value)
+watch(() => props.capsLock, value => {
+  if (typeof value === 'boolean') requestedCapsLock.value = value
+}, { immediate: true })
 const pressedCode = shallowRef('')
 let launcherMedia: MediaQueryList | undefined
 let pointerMedia: MediaQueryList | undefined
@@ -79,11 +84,11 @@ let dragHandle: HTMLElement | null = null
 let dragPointerId: number | null = null
 let chordTimer: number | undefined
 
-const mainRows = computed(() => applyKeyboardState(desktopKeyboardRows(mode.value), props.layout, heldModifiers.value, props.capsLock))
+const mainRows = computed(() => applyKeyboardState(desktopKeyboardRows(mode.value), props.layout, heldModifiers.value, capsLocked.value))
 const mobileModifiers = computed(() => mobileKeyboardModifiers(mode.value))
 const mainFunctionRow = functionRow.slice(0, 13)
 const systemFunctionRow = functionRow.slice(13)
-const mobileRows = computed(() => applyKeyboardState(mobileLayerRows(layer.value), props.layout, heldModifiers.value, props.capsLock))
+const mobileRows = computed(() => applyKeyboardState(mobileLayerRows(layer.value), props.layout, heldModifiers.value, capsLocked.value))
 const panelStyle = computed(() => {
   if (landscape.value) return undefined
   return {
@@ -93,7 +98,7 @@ const panelStyle = computed(() => {
 })
 
 function keyActive(item: VirtualKey) {
-  if (item.code === 'CapsLock') return props.capsLock === true
+  if (item.code === 'CapsLock') return capsLocked.value
   if (item.code === 'NumLock') return props.numLock === true
   if (item.code === 'ScrollLock') return props.scrollLock === true
   return Boolean(item.modifier && heldModifiers.value & item.modifier)
@@ -167,6 +172,7 @@ function press(item: VirtualKey, event: PointerEvent) {
   }
   const usage = KeyboardCodes.get(item.code)
   if (!usage) return
+  if (item.code === 'CapsLock') requestedCapsLock.value = !capsLocked.value
   pressedCode.value = item.code
   sendState()
 }

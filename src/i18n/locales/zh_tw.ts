@@ -1860,8 +1860,8 @@ const zh_tw = {
         risk: '風險',
         featureDetails: {
           console: {
-            label: '控制台載入指令碼',
-            description: '進入控制台時執行指令碼，可讀取或修改此頁面，並以目前登入身分呼叫介面。僅啟用你信任的外掛。',
+            label: '啟動控制台時載入指令碼',
+            description: '指令碼可讀取或修改控制台頁面，並使用目前帳號的權限執行操作。',
           },
           page: {
             label: '外掛程式頁面',

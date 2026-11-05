@@ -1855,8 +1855,8 @@ const zh = {
         risk: '风险',
         featureDetails: {
           console: {
-            label: '控制台加载脚本',
-            description: '进入控制台时运行脚本，可读取或修改此页面，并以当前登录身份调用接口。仅启用你信任的插件。',
+            label: '启动控制台时加载脚本',
+            description: '脚本可读取或修改控制台页面，并使用当前账号的权限执行操作。',
           },
           page: {
             label: '插件页面',

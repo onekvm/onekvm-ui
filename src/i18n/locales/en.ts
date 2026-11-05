@@ -1856,8 +1856,8 @@ const en = {
         risk: 'Risk',
         featureDetails: {
           console: {
-            label: 'Console load script',
-            description: 'Runs code when you enter the console. It can read or change this page and call APIs as your signed-in user. Enable only plugins you trust.',
+            label: 'Load script when the console starts',
+            description: 'Scripts can read or modify the console page and perform actions with the current account’s permissions.',
           },
           page: {
             label: 'Plugin page',

@@ -111,7 +111,7 @@ the main UI IPK leaves the device's previous translations in place.
 
 ## Risk disclosure
 
-Declaring `console` automatically adds **Console load script · Risk** to the
+Declaring `console` automatically adds **Load script when the console starts · Risk** to the
 plugin details' provided features, including before installation. It cannot be
 hidden by omitting the backend `capabilities` array. The script executes in the
 main console document and can read/change that page and call APIs as the

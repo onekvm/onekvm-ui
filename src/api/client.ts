@@ -944,6 +944,7 @@ export interface ExtensionSummary {
   enabled: boolean
   running: boolean
   system?: boolean
+  removable?: boolean
   error?: string
   icon?:
     | { source: 'lucide'; name: string }

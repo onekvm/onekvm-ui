@@ -665,7 +665,7 @@ watch(() => props.active, (active) => {
       </template>
       <template #actions>
         <n-button
-          v-if="selected?.installed && !selected.system"
+          v-if="selected?.installed && !selected.system && selected.removable !== false"
           class="extension-uninstall"
           size="small"
           type="error"

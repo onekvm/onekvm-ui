@@ -1852,7 +1852,12 @@ const zh = {
         providedFeatures: '提供的功能',
         noProvidedFeatures: '未声明功能',
         usedCapabilities: '使用的核心能力',
+        risk: '风险',
         featureDetails: {
+          console: {
+            label: '控制台加载脚本',
+            description: '进入控制台时运行脚本，可读取或修改此页面，并以当前登录身份调用接口。仅启用你信任的插件。',
+          },
           page: {
             label: '插件页面',
             description: '在高级设置的插件菜单中打开 {name} 页面。',

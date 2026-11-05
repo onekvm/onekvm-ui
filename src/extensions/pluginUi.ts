@@ -78,6 +78,7 @@ import XpStorageDirectoryPicker from '@/components/XpStorageDirectoryPicker.vue'
 import { registerTool } from './toolboxRuntime'
 import type { ExtensionViewDefinitionV1 } from './webComponentView'
 import { registerPage as register } from './pageRuntime'
+import { registerConsole, type ExtensionConsoleDefinitionV1 } from './consoleRuntime'
 export { loadVueExtensionPage, type LoadedVueExtensionPage } from './pageRuntime'
 
 export { validateExtensionSettings } from '@/lib/extension-settings'
@@ -161,6 +162,7 @@ interface PluginUIRuntimeV1 {
   register: (id: string, definition: ExtensionViewDefinitionV1) => void
   toolbar: { register: (id: string, definition: ToolbarRegistrationV1) => void }
   shell: { register: (id: string, definition: ExtensionShellRegistrationV1) => void }
+  console: { register: (id: string, definition: ExtensionConsoleDefinitionV1) => void }
   toolbox: { register: (extensionId: string, toolId: string, definition: ExtensionViewDefinitionV1) => void; Window: typeof ExtensionChildWindow }
 }
 
@@ -364,6 +366,7 @@ window.OneKVMPluginUI = {
     register,
     toolbar: Object.freeze({ register: registerToolbar }),
     shell: Object.freeze({ register: registerShell }),
+    console: Object.freeze({ register: registerConsole }),
     toolbox: Object.freeze({ register: registerTool, Window: markRaw(ExtensionChildWindow) }),
   }),
 }

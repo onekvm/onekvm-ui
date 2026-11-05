@@ -49,6 +49,7 @@ import { loadLocalShortcuts, saveLocalShortcuts } from '@/lib/keyboard-shortcuts
 import { statusEvents } from '@/lib/status-events'
 import { t } from '@/i18n/runtime'
 import { loadExtensionShells, loadExtensionToolbars } from '@/extensions/pluginUi'
+import { clearExtensionConsoles, syncExtensionConsoles } from '@/extensions/consoleRuntime'
 import { uiProduct } from '@/product'
 
 import ControlToolbar from './ControlToolbar.vue'
@@ -253,9 +254,11 @@ watch(
 )
 
 let contributionGeneration = 0
+let consoleDocumentActive = true
 async function refreshExtensionContributions() {
   const generation = ++contributionGeneration
-  if (!auth.authenticated || !hasPermission(auth, 'settings.view')) {
+  if (!consoleDocumentActive || !auth.authenticated || !hasPermission(auth, 'settings.view')) {
+    clearExtensionConsoles()
     await Promise.all([loadExtensionToolbars([]), loadExtensionShells([])])
     return
   }
@@ -263,9 +266,10 @@ async function refreshExtensionContributions() {
     const extensions = await api.getConsoleExtensions()
     if (generation !== contributionGeneration) return
     toolbox.acceptCatalog(extensions)
-    await Promise.all([loadExtensionToolbars(extensions), loadExtensionShells(extensions)])
+    await Promise.all([loadExtensionToolbars(extensions), loadExtensionShells(extensions), syncExtensionConsoles(advancedSettingsOpen.value ? [] : extensions)])
   } catch {
     if (generation !== contributionGeneration) return
+    clearExtensionConsoles()
     await Promise.all([loadExtensionToolbars([]), loadExtensionShells([])])
   }
 }
@@ -292,7 +296,18 @@ function updateUserShortcuts(shortcuts: KeyboardShortcut[]) {
 }
 
 function closeSession() {
+  contributionGeneration += 1
+  clearExtensionConsoles()
   return onekvm.close()
+}
+
+function onPageHide() {
+  consoleDocumentActive = false
+  void closeSession()
+}
+function onPageShow() {
+  consoleDocumentActive = true
+  void refreshExtensionContributions()
 }
 
 function setMetadata(width: number, height: number) {
@@ -523,10 +538,12 @@ function navigateAdvancedSettings(route: string) {
 
 watch(advancedSettingsOpen, (open) => {
   if (open) {
+    clearExtensionConsoles()
     settingsWindowOpen.value = false
     toolbox.closeAll()
     return
   }
+  void refreshExtensionContributions()
   void nextTick(applyFullscreenInset)
 })
 
@@ -558,7 +575,8 @@ onMounted(() => {
   void refreshDeviceShortcuts()
   void refreshExtensionContributions()
   window.addEventListener('onekvm:extensions-changed', refreshExtensionContributions)
-  window.addEventListener('pagehide', closeSession)
+  window.addEventListener('pagehide', onPageHide)
+  window.addEventListener('pageshow', onPageShow)
   window.addEventListener('hashchange', syncRoute)
   window.addEventListener('popstate', onPopState)
   document.addEventListener('fullscreenchange', syncFullscreen)
@@ -575,7 +593,8 @@ onBeforeUnmount(() => {
 	unsubscribeStatus?.()
 	unsubscribeKeyboardLED?.()
   window.removeEventListener('onekvm:extensions-changed', refreshExtensionContributions)
-  window.removeEventListener('pagehide', closeSession)
+  window.removeEventListener('pagehide', onPageHide)
+  window.removeEventListener('pageshow', onPageShow)
   window.removeEventListener('hashchange', syncRoute)
   window.removeEventListener('popstate', onPopState)
   document.removeEventListener('fullscreenchange', syncFullscreen)

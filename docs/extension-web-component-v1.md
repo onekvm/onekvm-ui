@@ -5,6 +5,9 @@ including Lit elements. They use the existing authenticated asset routes,
 settings actions, tool windows, mobile presentation, and extension-scoped methods.
 The host does not require a Vue dependency in the extension bundle.
 
+For initialization on console entry without opening a page or tool, use the
+[console load hook](extension-console-v1.md).
+
 ## Manifest and registration
 
 Use `renderer: "web-component"` for `page` or a toolbox item's `view`:

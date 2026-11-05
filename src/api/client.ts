@@ -929,7 +929,7 @@ export interface ExtensionToolboxItem {
 }
 
 export type ConsoleExtension = Pick<ExtensionSummary,
-  'id' | 'name' | 'i18n' | 'version' | 'installed' | 'enabled' | 'error' | 'toolbox' | 'toolbar' | 'shell' | 'icon'>
+  'id' | 'name' | 'i18n' | 'version' | 'installed' | 'enabled' | 'error' | 'toolbox' | 'toolbar' | 'shell' | 'console' | 'icon'>
 
 export interface ExtensionSummary {
   id: string
@@ -955,6 +955,7 @@ export interface ExtensionSummary {
     entrypoint: string
   }
   has_shell?: boolean
+  console?: { entrypoint: string }
   shell?: {
     entrypoint: string
   }
@@ -1157,6 +1158,7 @@ export interface ExtensionStatus extends ExtensionSummary {
   toolbar?: {
     entrypoint: string
   }
+  console?: { entrypoint: string }
   shell?: {
     entrypoint: string
   }

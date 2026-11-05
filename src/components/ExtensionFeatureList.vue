@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue'
-import { Cpu, Fingerprint, HardDrive, Keyboard, LayoutDashboard, PanelTop, PanelsTopLeft, Plug, Power, Puzzle, Server, Settings2, Toolbox, Video } from '@/icons'
+import { Cpu, Fingerprint, HardDrive, Keyboard, LayoutDashboard, PanelTop, PanelsTopLeft, Plug, Power, Puzzle, Server, Settings2, ShieldAlert, Toolbox, Video } from '@/icons'
 import { extensionLocalizedText, extensionTranslation, type ExtensionStatus } from '@/api/client'
 import { currentLanguage, t } from '@/i18n/runtime'
 import IconDescriptionList from './IconDescriptionList.vue'
@@ -32,6 +32,7 @@ const items = computed(() => {
   }
   if (detail.toolbar) add('toolbar', 'toolbar', PanelTop)
   if (detail.shell) add('shell', 'shell', LayoutDashboard)
+  if (detail.console) add('console', 'console', ShieldAlert)
   if (detail.auth_provider) add('auth-provider', 'authProvider', Fingerprint)
   if (!detail.page && Object.keys(detail.settings_schema.properties || {}).length) add('settings', 'settings', Settings2)
   for (const service of detail.services || []) {
@@ -55,7 +56,11 @@ const items = computed(() => {
 <template>
   <section class="plugin-features" data-declaration="features" aria-labelledby="plugin-features-title">
     <PluginDetailsSectionTitle id="plugin-features-title" :icon="Puzzle">{{ t('settings.plugins.providedFeatures', 'Provided features') }}</PluginDetailsSectionTitle>
-    <IconDescriptionList v-if="items.length" :items="items" />
+    <IconDescriptionList v-if="items.length" :items="items">
+      <template #label-suffix="{ item }">
+        <n-tag v-if="item.id === 'console'" type="warning" size="small" :bordered="false">{{ t('settings.plugins.risk', 'Risk') }}</n-tag>
+      </template>
+    </IconDescriptionList>
     <p v-else class="plugin-feature-empty">{{ t('settings.plugins.noProvidedFeatures', 'No features declared') }}</p>
   </section>
 </template>

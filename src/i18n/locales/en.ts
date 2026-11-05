@@ -1853,7 +1853,12 @@ const en = {
         providedFeatures: 'Provided features',
         noProvidedFeatures: 'No features declared',
         usedCapabilities: 'Core capabilities used',
+        risk: 'Risk',
         featureDetails: {
+          console: {
+            label: 'Console load script',
+            description: 'Runs code when you enter the console. It can read or change this page and call APIs as your signed-in user. Enable only plugins you trust.',
+          },
           page: {
             label: 'Plugin page',
             description: 'Open the {name} page from the plugins menu in advanced settings.',

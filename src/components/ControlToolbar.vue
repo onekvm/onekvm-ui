@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { cloudDeviceName, serviceURL } from '@/api/service-url'
-import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import {
   Check,
   CircleQuestionMark,
@@ -110,7 +110,7 @@ import {
 
 import DisplaySettingsPopover from './DisplaySettingsPopover.vue'
 import KeyboardControlPopover from './KeyboardControlPopover.vue'
-import KeyboardTextModal from './KeyboardTextModal.vue'
+import KeyboardTextWindow from './KeyboardTextWindow.vue'
 import KeyboardChordIcon from './KeyboardChordIcon'
 import GamepadPopover from './GamepadPopover.vue'
 import MouseSettingsPopover from './MouseSettingsPopover.vue'
@@ -498,13 +498,15 @@ function persistLauncherPos() {
   localStorage.setItem(TOOLBAR_LAUNCHER_KEY, JSON.stringify(launcherPos.value))
 }
 
-const keyboardTextModal = ref(false)
+const keyboardTextWindowOpen = ref(false)
+const keyboardTextWindow = useTemplateRef<InstanceType<typeof KeyboardTextWindow>>('keyboardTextWindow')
 function emitToolbarOverlay() {
-  emit('overlay', openMenu.value !== null || launcherMenuOpen.value || toolbox.menuOpen || collectionMenuOpen.value || pinnedOverflowOpen.value || keyboardTextModal.value || Boolean(folderOpen.value) || folderEditorOpen.value || itemDrag.dragging.value || toolbarContext.show.value)
+  emit('overlay', openMenu.value !== null || launcherMenuOpen.value || toolbox.menuOpen || collectionMenuOpen.value || pinnedOverflowOpen.value || keyboardTextWindowOpen.value || Boolean(folderOpen.value) || folderEditorOpen.value || itemDrag.dragging.value || toolbarContext.show.value)
 }
-function onKeyboardTextModal(open: boolean) {
+function onKeyboardTextWindow(open: boolean) {
   if (open) { setLauncherMenuOpen(false); folderOpen.value = '' }
-  keyboardTextModal.value = open
+  if (open && keyboardTextWindowOpen.value) keyboardTextWindow.value?.focus()
+  keyboardTextWindowOpen.value = open
   emitToolbarOverlay()
 }
 
@@ -1486,7 +1488,7 @@ function selectKeyboard(key: string | number) {
     setLauncherMenuOpen(false)
     sendCtrlAltDelete()
   }
-  if (key === 'send-text') onKeyboardTextModal(true)
+  if (key === 'send-text') onKeyboardTextWindow(true)
   if (key === 'virtual') {
     setLauncherMenuOpen(false)
     emit('keyboard')
@@ -1878,7 +1880,7 @@ onBeforeUnmount(() => {
         :sheet="toolbarLauncher"
         @select="selectKeyboard"
         @update:show="updateMenu('keyboard', $event)"
-        @text-modal="onKeyboardTextModal"
+        @text-window="onKeyboardTextWindow"
       >
         <n-tooltip :disabled="!toolbarIconShown('keyboard') || toolbarLauncher || openMenu === 'keyboard'">
           <template #trigger>
@@ -2088,7 +2090,7 @@ onBeforeUnmount(() => {
     <PinnedTools :mobile="toolbarLauncher" :vertical="toolbarVertical" :placement="menuPlacement" :layout="toolbarLayout.layout.value" :order="toolbarLayout.order.value" :folder-targets="folderTargets" :show-labels="toolbarLayout.showLabels.value" @overlay="pinnedOverflowOpen = $event" @activate="onPinnedToolActivate" />
 
     <div v-for="folder in toolbarLayout.folders.value" :key="folder.id" class="toolbar-icon-slot toolbar-folder-slot" :data-toolbar-item="`folder:${folder.id}`" :data-toolbar-folder="folder.id" :style="{ order: toolbarItemOrder(`folder:${folder.id}`) }">
-      <ToolbarCollectionMenu :title="folder.name" :icon="folder.icon" :folder-id="folder.id" :show="folderOpen === folder.id" :count="folderItemCount(folder)" :mobile="toolbarLauncher" :child-open="openMenu !== null || toolbox.menuOpen || keyboardTextModal" :placement="menuPlacement" @update:show="setFolderOpen(folder.id, $event)" @target="setFolderTarget(folder.id, $event)">
+      <ToolbarCollectionMenu :title="folder.name" :icon="folder.icon" :folder-id="folder.id" :show="folderOpen === folder.id" :count="folderItemCount(folder)" :mobile="toolbarLauncher" :child-open="openMenu !== null || toolbox.menuOpen || keyboardTextWindowOpen" :placement="menuPlacement" @update:show="setFolderOpen(folder.id, $event)" @target="setFolderTarget(folder.id, $event)">
         <template v-if="canArrangeToolbar && !toolbarContext.locked.value" #footer><n-button quaternary block class="toolbar-folder-edit-button" @click="openFolderEditor(folder)">{{ t('toolbar.folders.edit', 'Edit folder') }}</n-button></template>
       </ToolbarCollectionMenu>
     </div>
@@ -2169,7 +2171,7 @@ onBeforeUnmount(() => {
           :show="collectionMenuOpen"
           :count="collectedIcons.length"
           :mobile="toolbarLauncher"
-          :child-open="openMenu !== null || toolbox.menuOpen || keyboardTextModal"
+          :child-open="openMenu !== null || toolbox.menuOpen || keyboardTextWindowOpen"
           :placement="menuPlacement"
           @update:show="collectionMenuOpen = $event"
           @target="collectedIconsTarget = $event"
@@ -2344,11 +2346,12 @@ onBeforeUnmount(() => {
   </header>
   <n-dropdown trigger="manual" :show="toolbarContext.show.value" :x="toolbarContext.position.value.x" :y="toolbarContext.position.value.y" :options="toolbarContext.menuOptions.value" :to="overlayTo" :menu-props="() => ({ class: 'host-menu' })" @select="toolbarContext.select" @clickoutside="toolbarContext.show.value = false" @update:show="toolbarContext.show.value = $event" />
   <ToolbarFolderDialog :show="folderEditorOpen" :folder="editingFolder" :options="folderOptions" :saving="toolbarLayout.saving.value" @update:show="folderEditorOpen = $event" @save="saveFolder" />
-  <KeyboardTextModal
-    :show="keyboardTextModal"
+  <KeyboardTextWindow
+    ref="keyboardTextWindow"
+    :show="keyboardTextWindowOpen"
     :layout="keyboardLayout"
     :input-suspended="pipActive"
-    @update:show="onKeyboardTextModal"
+    @update:show="onKeyboardTextWindow"
   />
   <Teleport :to="overlayTo">
     <div v-if="itemDrag.hint.value" class="toolbar-item-drop-hint" role="status" :style="{ left: `${itemDrag.hint.value.x}px`, top: `${itemDrag.hint.value.y}px` }">{{ itemDrag.hint.value.mode === 'merge' ? t('toolbar.folders.dropToCreate', 'Release to create a folder') : t('toolbar.folders.dropToAdd', 'Release to add to folder') }}</div>

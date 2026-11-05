@@ -26,7 +26,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   select: [key: string | number]
   'update:show': [show: boolean]
-  'text-modal': [open: boolean]
+  'text-window': [open: boolean]
 }>()
 
 const popoverOpen = ref(false)
@@ -101,7 +101,7 @@ function selectOption(key: string | number) {
   if (props.inputSuspended) return
   if (key === 'send-text') {
     if (!pinned.value) updateShow(false)
-    emit('text-modal', true)
+    emit('text-window', true)
     return
   }
   emit('select', key)

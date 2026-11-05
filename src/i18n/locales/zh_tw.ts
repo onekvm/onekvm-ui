@@ -1887,6 +1887,10 @@ const zh_tw = {
         usedCapabilities: '使用的核心能力',
         risk: '風險',
         featureDetails: {
+          mcpTools: {
+            label: 'MCP 擴充',
+            description: '提供 {count} 個工具，可在 MCP 設定中管理存取。',
+          },
           console: {
             label: '啟動控制台時載入指令碼',
             description: '指令碼可讀取或修改控制台頁面，並使用目前帳號的權限執行操作。',

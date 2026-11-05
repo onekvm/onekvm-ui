@@ -1142,6 +1142,7 @@ export interface ExtensionStatus extends ExtensionSummary {
   package_dependencies?: string[] | null
   versions?: string[]
   capabilities?: string[]
+  contributions?: Array<{ id: string; point: string; version: number }>
   video?: {
     settings: 'all'
     mode_select: Array<'h264' | 'h265' | 'mjpeg'>

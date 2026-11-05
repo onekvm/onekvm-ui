@@ -1882,6 +1882,10 @@ const zh = {
         usedCapabilities: '使用的核心能力',
         risk: '风险',
         featureDetails: {
+          mcpTools: {
+            label: 'MCP 扩展',
+            description: '提供 {count} 个工具，可在 MCP 设置中管理接入。',
+          },
           console: {
             label: '启动控制台时加载脚本',
             description: '脚本可读取或修改控制台页面，并使用当前账号的权限执行操作。',

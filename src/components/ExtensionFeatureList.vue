@@ -26,6 +26,8 @@ const items = computed(() => {
     result.push({ id, icon, label: text('label'), description: description || text('description') })
   }
   if (detail.page) add('page', 'page', PanelsTopLeft, extensionTranslation(detail, currentLanguage.value).name)
+  const mcpTools = detail.contributions?.filter(item => item.point === 'mcp.tool' && item.version === 1).length || 0
+  if (mcpTools) add('mcp-tools', 'mcpTools', Plug, '', t('settings.plugins.featureDetails.mcpTools.description').replace('{count}', String(mcpTools)))
   for (const tool of detail.toolbox?.items || []) {
     const title = extensionLocalizedText(Object.fromEntries(Object.entries(tool.i18n || {}).map(([locale, value]) => [locale, value.title])), currentLanguage.value, tool.title)
     add(`toolbox:${tool.id}`, tool.presentation === 'drawer' ? 'toolDrawer' : 'toolWindow', Toolbox, title)

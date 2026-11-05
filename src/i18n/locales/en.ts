@@ -1883,6 +1883,10 @@ const en = {
         usedCapabilities: 'Core capabilities used',
         risk: 'Risk',
         featureDetails: {
+          mcpTools: {
+            label: 'MCP extension',
+            description: 'Tools for MCP: {count}. Manage access in MCP settings.',
+          },
           console: {
             label: 'Load script when the console starts',
             description: 'Scripts can read or modify the console page and perform actions with the current account’s permissions.',

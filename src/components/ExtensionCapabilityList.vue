@@ -7,6 +7,7 @@ import PluginDetailsSectionTitle from './PluginDetailsSectionTitle.vue'
 
 const props = defineProps<{ capabilities: readonly string[] }>()
 const capabilityMetadata: Readonly<Record<string, { key: string; icon: Component }>> = {
+  'extensions.contributions': { key: 'extensionContributions', icon: Plug },
   'video.webrtc': { key: 'webrtc', icon: Video },
   'video.encoded': { key: 'encodedVideo', icon: Film },
   'video.mjpeg': { key: 'mjpeg', icon: Film },

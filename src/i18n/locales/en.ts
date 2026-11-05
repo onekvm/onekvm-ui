@@ -1917,6 +1917,10 @@ const en = {
           unknownDescription: 'This system plugin declares this device capability. No description is available in this version.',
         },
         capabilityDetails: {
+          extensionContributions: {
+            label: 'Plugin extension calls',
+            description: 'Discovers and invokes features other plugins expose to this plugin, subject to the target plugin\'s permissions.',
+          },
           webrtc: {
             label: 'WebRTC sessions',
             description: 'Uses OneKVM WebRTC sessions for remote video streaming.',

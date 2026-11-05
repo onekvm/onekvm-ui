@@ -1921,6 +1921,10 @@ const zh_tw = {
           unknownDescription: '此系統外掛程式宣告提供該裝置能力，目前版本暫無對應說明。',
         },
         capabilityDetails: {
+          extensionContributions: {
+            label: '外掛程式擴充呼叫',
+            description: '探索並呼叫其他外掛程式向此外掛程式開放的功能，呼叫仍受目標外掛程式的權限限制。',
+          },
           webrtc: {
             label: 'WebRTC 工作階段',
             description: '使用 OneKVM 的 WebRTC 工作階段進行遠端視訊傳輸。',

@@ -1916,6 +1916,10 @@ const zh = {
           unknownDescription: '此系统插件声明提供该设备能力，当前版本暂无对应说明。',
         },
         capabilityDetails: {
+          extensionContributions: {
+            label: '插件扩展调用',
+            description: '发现并调用其他插件向此插件开放的功能，调用仍受目标插件的权限限制。',
+          },
           webrtc: {
             label: 'WebRTC 会话',
             description: '使用 OneKVM 的 WebRTC 会话进行远程视频传输。',

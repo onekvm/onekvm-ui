@@ -4,6 +4,9 @@ Requires `onekvm-extension-host >= 0.1.0-r35`, `onekvm-ui >= 0.1.0-r67`
 and `onekvm-core >= 0.1.0-r113`. The trusted Vue runtime is shared with
 extension pages; bundle your component as an IIFE with Vue and Naive UI external.
 
+Native custom-element and Lit tools use `renderer: "web-component"` and the
+[Web Components registration and host contract](extension-web-component-v1.md).
+
 ## Manifest
 
 `toolbox` is optional and independent of `page`, `toolbar` and `shell`.
@@ -45,7 +48,7 @@ example validator:
 | `presentation` | Required `drawer` or `window` |
 | `layout` | Optional `padded` (default) or `edge-to-edge`; the latter removes host content padding and scrolling |
 | `size` | Optional width/height, each 1–4096 CSS px; host clamps to viewport |
-| `view` | Required renderer `vue` and normalized `web/*.js` entrypoint |
+| `view` | Required renderer `vue` or `web-component` and normalized `web/*.js` entrypoint |
 
 Declared resources must be regular packaged files, without symlink traversal.
 Absolute paths, backslashes, empty path segments, `.` and `..` are forbidden.

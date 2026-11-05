@@ -2084,7 +2084,7 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
               <section v-else-if="activeExtension" class="advanced-settings-section plugin-page-section">
                 <ExtensionServiceRecovery :extension="activeExtension" @updated="updateExtensionDetail" />
                 <ExtensionVuePage
-                  v-if="activeExtension.page?.renderer === 'vue'"
+                  v-if="activeExtension.page?.renderer === 'vue' || activeExtension.page?.renderer === 'web-component'"
                   :extension="activeExtension"
                   @updated="updateExtensionDetail"
                 />

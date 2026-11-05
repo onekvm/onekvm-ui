@@ -925,7 +925,7 @@ export interface ExtensionToolboxItem {
   presentation: 'drawer' | 'window'
   layout?: 'padded' | 'edge-to-edge'
   size?: { width?: number; height?: number }
-  view: { renderer: 'vue'; entrypoint: string }
+  view: { renderer: 'vue' | 'web-component'; entrypoint: string }
 }
 
 export type ConsoleExtension = Pick<ExtensionSummary,
@@ -1148,7 +1148,7 @@ export interface ExtensionStatus extends ExtensionSummary {
   activation_conflicts?: Array<{ extension: string; machines?: string[] }>
   page?: {
     title: string
-    renderer: 'html' | 'layout' | 'vue'
+    renderer: 'html' | 'layout' | 'vue' | 'web-component'
     entrypoint: string
     icon?:
       | { source: 'lucide'; name: string }

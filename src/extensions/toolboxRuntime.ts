@@ -4,6 +4,7 @@ import { extensionAssetURL, type ExtensionStatus, type ConsoleExtension, type Ex
 import type { ExtensionPageSettingsAdapterV1, VueExtensionPageDefinitionV1 } from './pluginUi'
 import type { HIDReportListener, KeyboardTextListener } from '@/lib/onekvm'
 import type { ConsoleFrame } from '@/lib/console-frame'
+import { normalizeExtensionView, type ExtensionViewDefinitionV1, type ExtensionViewRenderer } from './webComponentView'
 
 export type ToolPresentation = 'drawer' | 'window' | 'fullscreen'
 export interface HIDRecordingActivity {
@@ -52,6 +53,7 @@ interface Entry {
   version: string
   toolId: string
   path: string
+  renderer: ExtensionViewRenderer
   script: HTMLScriptElement
   definition?: VueExtensionPageDefinitionV1
   styles: HTMLStyleElement[]
@@ -66,20 +68,17 @@ const pending = new Map<string, Promise<Entry>>()
 let allowedKeys: Set<string> | null = null
 let queue: Promise<unknown> = Promise.resolve()
 export const toolCacheKey = (extension: Pick<ConsoleExtension, 'id' | 'version'>, tool: ExtensionToolboxItem) =>
-  JSON.stringify([extension.id, extension.version, tool.id, tool.view.entrypoint])
+  JSON.stringify([extension.id, extension.version, tool.id, tool.view.renderer, tool.view.entrypoint])
 
-export function registerTool(extensionId: string, toolId: string, definition: VueExtensionPageDefinitionV1) {
+export function registerTool(extensionId: string, toolId: string, definition: ExtensionViewDefinitionV1) {
   const script = document.currentScript
   const entry = script instanceof HTMLScriptElement ? contexts.get(script) : undefined
   if (!entry || !entry.accepting || entry.retired || entry.extensionId !== extensionId || entry.toolId !== toolId) {
     throw new Error('Tool registration must match the currently executing resource')
   }
   if (entry.definition) throw new Error('Duplicate tool registration')
-  if (definition?.apiVersion !== 1 || !definition.component ||
-    (definition.styles !== undefined && (!Array.isArray(definition.styles) || definition.styles.some(style => typeof style !== 'string')))) {
-    throw new Error('Incompatible tool component')
-  }
-  entry.definition = markRaw({ ...definition, component: markRaw(definition.component), styles: [...(definition.styles || [])] })
+  const view = normalizeExtensionView(definition, entry.renderer)
+  entry.definition = markRaw({ ...view, component: markRaw(view.component) })
 }
 
 function remove(entry: Entry) {
@@ -95,6 +94,7 @@ async function load(extension: ConsoleExtension, tool: ExtensionToolboxItem, key
   const script = document.createElement('script')
   const entry: Entry = {
     extensionId: extension.id, version: extension.version!, toolId: tool.id, path: tool.view.entrypoint,
+    renderer: tool.view.renderer,
     script, styles: [], refs: 0, accepting: true, retired: false,
   }
   entries.set(key, entry)
@@ -127,7 +127,7 @@ async function load(extension: ConsoleExtension, tool: ExtensionToolboxItem, key
 }
 
 export async function loadExtensionTool(extension: ConsoleExtension, tool: ExtensionToolboxItem): Promise<{ component: Component; dispose: () => void }> {
-  if (!extension.installed || !extension.enabled || !extension.version || tool.view.renderer !== 'vue') {
+  if (!extension.installed || !extension.enabled || !extension.version || !['vue', 'web-component'].includes(tool.view.renderer)) {
     throw new Error('Tool is unavailable')
   }
   const key = toolCacheKey(extension, tool)

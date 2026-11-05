@@ -5,6 +5,7 @@ import { t } from '@/i18n/runtime'
 import { useWindowMinimizeTransition } from '@/composables/useWindowMinimizeTransition'
 import { useMinimizedWindowTask, useWindowTaskbarInset } from '@/composables/useWindowTaskbar'
 import { readSafeAreaInsets } from '@/lib/fullscreen-inset'
+import { shadowTabStops } from '@/lib/shadow-focus'
 import { clampOverlayPosition, resizeAnchoredBox, type OverlayResizeHandle } from '@/lib/overlay-drag'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import ConsoleFloatingWindow from '../ConsoleFloatingWindow.vue'
@@ -122,11 +123,12 @@ function keydown(event: KeyboardEvent) {
   if (menuOpen.value && event.key === 'Escape') { menuOpen.value = false; event.preventDefault(); event.stopPropagation(); return }
   if (event.key === 'Escape' && !event.defaultPrevented) { event.preventDefault(); event.stopPropagation(); emit('close') }
   if (event.key !== 'Tab' || !modal.value || !root.value) return
-  const items = [...root.value.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"], a[href]')].filter(e => e.getClientRects().length)
+  const items = shadowTabStops(root.value)
   const first = items[0]
   const last = items.at(-1)
-  if (event.shiftKey && (document.activeElement === first || document.activeElement === root.value)) { last?.focus(); event.preventDefault() }
-  else if (!event.shiftKey && document.activeElement === last) { first?.focus(); event.preventDefault() }
+  const focused = event.composedPath()[0]
+  if (event.shiftKey && (focused === first || focused === root.value)) { last?.focus(); event.preventDefault() }
+  else if (!event.shiftKey && focused === last) { first?.focus(); event.preventDefault() }
 }
 function guardParent(event: Event) {
   if (!props.childWindowActive) return

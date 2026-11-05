@@ -701,6 +701,12 @@ const zh_tw = {
         time: '區域和時間',
         update: '系統升級',
         personalizationPage: {
+          tabs: {
+            identity: '名稱與標題',
+            toolbar: '工具列',
+            interface: '介面與提示',
+            noSignal: '無訊號畫面',
+          },
           toastMessages: '訊息提示',
           testMessage: '測試提示',
           testMessageContent: '這是一則測試訊息。',

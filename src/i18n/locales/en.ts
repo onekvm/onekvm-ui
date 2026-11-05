@@ -702,6 +702,12 @@ const en = {
         time: 'Region and time',
         update: 'System update',
         personalizationPage: {
+          tabs: {
+            identity: 'Name and title',
+            toolbar: 'Toolbar',
+            interface: 'Interface and messages',
+            noSignal: 'No-signal image',
+          },
           toastMessages: 'Toast messages',
           testMessage: 'Test message',
           testMessageContent: 'This is a test message.',

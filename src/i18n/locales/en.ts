@@ -1873,7 +1873,6 @@ const en = {
         statusError: 'Error',
         statusDisabled: 'Disabled',
         statusInstalled: 'Installed',
-        environmentHint: 'Use this environment in Network settings after installation. No enabling is needed.',
         statusEnabled: 'Enabled',
         statusStopped: 'Stopped',
         enable: 'Enable',

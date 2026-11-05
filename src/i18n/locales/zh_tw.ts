@@ -1877,7 +1877,6 @@ const zh_tw = {
         statusError: '錯誤',
         statusDisabled: '已停用',
         statusInstalled: '已安裝',
-        environmentHint: '安裝後即可在網路設定中使用，無需啟用。',
         statusEnabled: '已啟用',
         statusStopped: '已停止',
         enable: '啟用',

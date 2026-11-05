@@ -1872,7 +1872,6 @@ const zh = {
         statusError: '错误',
         statusDisabled: '已禁用',
         statusInstalled: '已安装',
-        environmentHint: '安装后即可在网络设置中使用，无需启用。',
         statusEnabled: '已启用',
         statusStopped: '已停止',
         enable: '启用',

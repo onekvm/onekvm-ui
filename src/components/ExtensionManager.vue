@@ -546,8 +546,7 @@ watch(() => props.active, (active) => {
                   {{ t('settings.plugins.systemPlugin', 'System') }}
                 </n-tag>
               </div>
-              <p>{{ extensionDescription(status) }}</p>
-              <p v-if="status.kind === 'environment'" class="extension-environment-hint">{{ t('settings.plugins.environmentHint', 'Use this environment in Network settings after installation. No enabling is needed.') }}</p>
+              <p :title="extensionDescription(status)">{{ extensionDescription(status) }}</p>
             </div>
             <n-tag size="small" :type="statusType(status)" :bordered="false">
               {{ statusText(status) }}
@@ -946,7 +945,7 @@ watch(() => props.active, (active) => {
 .extension-identity { display: grid; min-width: 0; flex: 1; gap: 2px; }
 .extension-identity > div { display: flex; min-width: 0; align-items: center; gap: 7px; }
 .extension-identity strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.extension-identity p { margin: 0; color: var(--muted-foreground); font-size: 11px; line-height: 1.35; }
+.extension-identity p { margin: 0; overflow: hidden; color: var(--muted-foreground); font-size: 11px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 .extension-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 3px; }
 .extension-error { padding: 0 14px 14px; background: var(--card); }
 .extension-settings { display: grid; gap: 12px; padding-top: 16px; border-top: 1px solid var(--border); }

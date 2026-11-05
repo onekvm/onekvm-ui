@@ -20,10 +20,9 @@ import {
 import { onekvm } from '@/lib/onekvm'
 import { TOOLBAR_LAUNCHER_QUERY, toolbarLauncherActive } from '@/lib/toolbar-dock'
 import {
-  applyKeyLabels,
+  applyKeyboardState,
   desktopKeyboardRows,
   functionRow,
-  layoutLabels,
   mobileLayerRows,
   mobileKeyboardModifiers,
   mobileRowClass,
@@ -35,7 +34,10 @@ import {
   type VirtualKey,
 } from '@/lib/virtual-keyboard'
 
-const props = defineProps<{ show: boolean; layout: KeyboardLayout; blocked: boolean }>()
+const props = defineProps<{
+  show: boolean; layout: KeyboardLayout; blocked: boolean
+  capsLock?: boolean; numLock?: boolean; scrollLock?: boolean
+}>()
 const emit = defineEmits<{ 'update:show': [show: boolean]; 'focus-console': [] }>()
 const titleControlHeight = '26px'
 const modeSwitchTheme: GlobalThemeOverrides['Radio'] = {
@@ -66,6 +68,8 @@ const mode = shallowRef(parseVirtualKeyboardMode(localStorage.getItem(VIRTUAL_KE
 const position = ref({ x: 24, y: 96 })
 const hasPlaced = shallowRef(false)
 const modifiers = shallowRef(0)
+const heldModifiers = shallowRef(0)
+const unsubscribeModifiers = onekvm.keyboardState.subscribeModifiers(value => { heldModifiers.value = value })
 const pressedCode = shallowRef('')
 let launcherMedia: MediaQueryList | undefined
 let pointerMedia: MediaQueryList | undefined
@@ -75,11 +79,11 @@ let dragHandle: HTMLElement | null = null
 let dragPointerId: number | null = null
 let chordTimer: number | undefined
 
-const mainRows = computed(() => applyKeyLabels(desktopKeyboardRows(mode.value), layoutLabels[props.layout] || {}))
+const mainRows = computed(() => applyKeyboardState(desktopKeyboardRows(mode.value), props.layout, heldModifiers.value, props.capsLock))
 const mobileModifiers = computed(() => mobileKeyboardModifiers(mode.value))
 const mainFunctionRow = functionRow.slice(0, 13)
 const systemFunctionRow = functionRow.slice(13)
-const mobileRows = computed(() => applyKeyLabels(mobileLayerRows(layer.value), layoutLabels[props.layout] || {}))
+const mobileRows = computed(() => applyKeyboardState(mobileLayerRows(layer.value), props.layout, heldModifiers.value, props.capsLock))
 const panelStyle = computed(() => {
   if (landscape.value) return undefined
   return {
@@ -88,8 +92,15 @@ const panelStyle = computed(() => {
   }
 })
 
-function modifierActive(item: VirtualKey) {
-  return Boolean(item.modifier && modifiers.value & item.modifier)
+function keyActive(item: VirtualKey) {
+  if (item.code === 'CapsLock') return props.capsLock === true
+  if (item.code === 'NumLock') return props.numLock === true
+  if (item.code === 'ScrollLock') return props.scrollLock === true
+  return Boolean(item.modifier && heldModifiers.value & item.modifier)
+}
+
+function toggleKey(item: VirtualKey) {
+  return Boolean(item.modifier || ['CapsLock', 'NumLock', 'ScrollLock'].includes(item.code) || item.kind === 'layer')
 }
 
 function layerActive(item: VirtualKey) {
@@ -98,7 +109,7 @@ function layerActive(item: VirtualKey) {
 
 function mobileKeyClass(item: VirtualKey) {
   return {
-    active: modifierActive(item) || layerActive(item),
+    active: keyActive(item) || layerActive(item),
     pressed: pressedCode.value === item.code,
     'is-space': item.code === 'Space',
     'is-wide': item.code === 'ShiftLeft' || item.code === 'Backspace' || item.code === 'Enter',
@@ -331,6 +342,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  unsubscribeModifiers()
   launcherMedia?.removeEventListener('change', syncViewport)
   pointerMedia?.removeEventListener('change', syncTouchUi)
   window.removeEventListener('resize', syncViewport)
@@ -396,9 +408,11 @@ onBeforeUnmount(() => {
                 <button
                   v-for="item in mainFunctionRow"
                   :key="item.code"
+                  :data-code="item.code"
                   type="button"
                   class="keyboard-key"
-                  :class="{ 'keyboard-key-gap': item.gapAfter, pressed: pressedCode === item.code }"
+                  :class="{ 'keyboard-key-gap': item.gapAfter, active: keyActive(item), pressed: pressedCode === item.code }"
+                  :aria-pressed="toggleKey(item) ? keyActive(item) : undefined"
                   :style="{ '--key-units': item.units || 1 }"
                   :aria-label="keyLabel(item)"
                   :title="keyLabel(item)"
@@ -415,11 +429,12 @@ onBeforeUnmount(() => {
                 <button
                   v-for="item in row"
                   :key="item.code"
+                  :data-code="item.code"
                   type="button"
                   class="keyboard-key"
-                  :class="{ active: modifierActive(item), pressed: pressedCode === item.code }"
+                  :class="{ active: keyActive(item), pressed: pressedCode === item.code }"
                   :style="{ '--key-units': item.units || 1 }"
-                  :aria-pressed="item.modifier ? modifierActive(item) : undefined"
+                  :aria-pressed="toggleKey(item) ? keyActive(item) : undefined"
                   :aria-label="keyLabel(item)"
                   :title="keyLabel(item)"
                   @pointerdown.prevent="press(item, $event)"
@@ -437,9 +452,11 @@ onBeforeUnmount(() => {
                 <button
                   v-for="item in systemFunctionRow"
                   :key="item.code"
+                  :data-code="item.code"
                   type="button"
                   class="keyboard-key"
-                  :class="{ pressed: pressedCode === item.code }"
+                  :class="{ active: keyActive(item), pressed: pressedCode === item.code }"
+                  :aria-pressed="toggleKey(item) ? keyActive(item) : undefined"
                   :aria-label="keyLabel(item)"
                   :title="keyLabel(item)"
                   @pointerdown.prevent="press(item, $event)"
@@ -454,9 +471,11 @@ onBeforeUnmount(() => {
                 <button
                   v-for="item in row"
                   :key="item.code"
+                  :data-code="item.code"
                   type="button"
                   class="keyboard-key"
-                  :class="{ pressed: pressedCode === item.code }"
+                  :class="{ active: keyActive(item), pressed: pressedCode === item.code }"
+                  :aria-pressed="toggleKey(item) ? keyActive(item) : undefined"
                   :aria-label="keyLabel(item)"
                   :title="keyLabel(item)"
                   @pointerdown.prevent="press(item, $event)"
@@ -477,10 +496,11 @@ onBeforeUnmount(() => {
           <button
             v-for="item in mobileModifiers"
             :key="item.code"
+            :data-code="item.code"
             type="button"
             class="keyboard-key keyboard-mobile-key"
             :class="mobileKeyClass(item)"
-            :aria-pressed="item.modifier || item.kind === 'layer' ? modifierActive(item) || layerActive(item) : undefined"
+            :aria-pressed="toggleKey(item) ? keyActive(item) || layerActive(item) : undefined"
             :aria-label="keyLabel(item)"
             :title="keyLabel(item)"
             @pointerdown.prevent="press(item, $event)"
@@ -500,11 +520,12 @@ onBeforeUnmount(() => {
           <button
             v-for="item in row"
             :key="item.code"
+            :data-code="item.code"
             type="button"
             class="keyboard-key keyboard-mobile-key"
             :class="mobileKeyClass(item)"
             :style="item.flex ? { flex: `${item.flex} 1 0` } : undefined"
-            :aria-pressed="item.modifier || item.kind === 'layer' ? modifierActive(item) || layerActive(item) : undefined"
+            :aria-pressed="toggleKey(item) ? keyActive(item) || layerActive(item) : undefined"
             :aria-label="keyLabel(item)"
             :title="keyLabel(item)"
             @pointerdown.prevent="press(item, $event)"

@@ -90,13 +90,14 @@ export const navigationRows: VirtualKey[][] = [
 ]
 
 export const layoutLabels: Partial<Record<KeyboardLayout, Record<string, string>>> = {
+  uk: { Backslash: '#' },
   de: {
-    KeyY: 'Z', KeyZ: 'Y', Minus: 'ß', Equal: '´', BracketLeft: 'Ü', BracketRight: '+',
+    Backquote: '^', KeyY: 'Z', KeyZ: 'Y', Minus: 'ß', Equal: '´', BracketLeft: 'Ü', BracketRight: '+',
     Semicolon: 'Ö', Quote: 'Ä', Backslash: '#', Slash: '-',
   },
   fr: {
     Backquote: '²', Digit1: '&', Digit2: 'É', Digit3: '"', Digit4: "'", Digit5: '(',
-    Digit6: '-', Digit7: 'È', Digit8: '_', Digit9: 'Ç', Digit0: 'À', Minus: ')',
+    Digit6: '-', Digit7: 'È', Digit8: '_', Digit9: 'Ç', Digit0: 'À', Minus: ')', Equal: '=',
     KeyQ: 'A', KeyW: 'Z', BracketLeft: '^', BracketRight: '$', Backslash: '*',
     KeyA: 'Q', Semicolon: 'M', Quote: 'Ù', KeyZ: 'W', KeyM: ',', Comma: ';',
     Period: ':', Slash: '!',
@@ -110,6 +111,7 @@ export const layoutLabels: Partial<Record<KeyboardLayout, Record<string, string>
     Backslash: 'Ù', Semicolon: 'Ò', Quote: 'À', Slash: '-',
   },
   ru: {
+    Backquote: 'Ё', Backslash: '\\', Slash: '.',
     KeyQ: 'Й', KeyW: 'Ц', KeyE: 'У', KeyR: 'К', KeyT: 'Е', KeyY: 'Н', KeyU: 'Г',
     KeyI: 'Ш', KeyO: 'Щ', KeyP: 'З', BracketLeft: 'Х', BracketRight: 'Ъ',
     KeyA: 'Ф', KeyS: 'Ы', KeyD: 'В', KeyF: 'А', KeyG: 'П', KeyH: 'Р', KeyJ: 'О',
@@ -125,6 +127,61 @@ export const layoutLabels: Partial<Record<KeyboardLayout, Record<string, string>
     KeyG: 'ㅎ', KeyH: 'ㅗ', KeyJ: 'ㅓ', KeyK: 'ㅏ', KeyL: 'ㅣ', KeyZ: 'ㅋ', KeyX: 'ㅌ',
     KeyC: 'ㅊ', KeyV: 'ㅍ', KeyB: 'ㅠ', KeyN: 'ㅜ', KeyM: 'ㅡ',
   },
+}
+
+const usShiftLabels: Record<string, string> = {
+  Backquote: '~', Digit1: '!', Digit2: '@', Digit3: '#', Digit4: '$', Digit5: '%',
+  Digit6: '^', Digit7: '&', Digit8: '*', Digit9: '(', Digit0: ')', Minus: '_', Equal: '+',
+  BracketLeft: '{', BracketRight: '}', Backslash: '|', Semicolon: ':', Quote: '"',
+  Comma: '<', Period: '>', Slash: '?',
+}
+
+const layoutShiftLabels: Partial<Record<KeyboardLayout, Record<string, string>>> = {
+  uk: { Backquote: '¬', Digit2: '"', Digit3: '£', Backslash: '~', Quote: '@' },
+  de: {
+    Backquote: '°', Digit2: '"', Digit3: '§', Digit6: '&', Digit7: '/', Digit8: '(',
+    Digit9: ')', Digit0: '=', Minus: '?', Equal: '`', BracketRight: '*', Backslash: "'",
+    Comma: ';', Period: ':', Slash: '_',
+  },
+  fr: {
+    Backquote: '²', Digit1: '1', Digit2: '2', Digit3: '3', Digit4: '4', Digit5: '5',
+    Digit6: '6', Digit7: '7', Digit8: '8', Digit9: '9', Digit0: '0', Minus: '°',
+    BracketLeft: '¨', BracketRight: '£', Backslash: 'µ', Quote: '%', KeyM: '?',
+    Comma: '.', Period: '/', Slash: '§',
+  },
+  es: {
+    Backquote: 'ª', Digit2: '"', Digit3: '·', Digit6: '&', Digit7: '/', Digit8: '(',
+    Digit9: ')', Digit0: '=', Minus: '?', Equal: '¿', BracketLeft: '^', BracketRight: '*',
+    Quote: '¨', Comma: ';', Period: ':', Slash: '_',
+  },
+  it: {
+    Backquote: '|', Digit2: '"', Digit3: '£', Digit6: '&', Digit7: '/', Digit8: '(',
+    Digit9: ')', Digit0: '=', Minus: '?', Equal: '^', BracketLeft: 'é', BracketRight: '*',
+    Backslash: '§', Semicolon: 'ç', Quote: '°', Comma: ';', Period: ':', Slash: '_',
+  },
+  ru: { Digit2: '"', Digit3: '№', Digit4: ';', Digit6: ':', Digit7: '?', Backslash: '/', Slash: ',' },
+  jp: {
+    Digit2: '"', Digit6: '&', Digit7: "'", Digit8: '(', Digit9: ')', Digit0: '0',
+    Minus: '=', Equal: '~', BracketLeft: '`', BracketRight: '{', Backslash: '}',
+    Semicolon: '+', Quote: '*',
+  },
+  ko: { KeyQ: 'ㅃ', KeyW: 'ㅉ', KeyE: 'ㄸ', KeyR: 'ㄲ', KeyT: 'ㅆ', KeyO: 'ㅒ', KeyP: 'ㅖ' },
+}
+
+/** Labels follow the held Shift keys and the remote host's Caps Lock LED. HID codes stay unchanged. */
+export function applyKeyboardState(rows: VirtualKey[][], layout: KeyboardLayout, modifiers = 0, capsLock = false): VirtualKey[][] {
+  const shift = Boolean(modifiers & (2 | 32))
+  return applyKeyLabels(rows, layoutLabels[layout] || {}).map(row => row.map(item => {
+    if (item.kind === 'layer' || Array.from(item.label).length !== 1) return item
+    const alternate = layoutShiftLabels[layout]?.[item.code]
+    const lower = item.label.toLowerCase()
+    const upper = item.label.toUpperCase()
+    const cased = lower !== upper && Array.from(upper).length === 1
+    const label = shift && alternate !== undefined ? alternate
+      : cased ? (shift !== capsLock ? upper : lower)
+      : shift ? usShiftLabels[item.code] ?? item.label : item.label
+    return { ...item, label }
+  }))
 }
 
 export const mobileModifierRow: VirtualKey[] = [

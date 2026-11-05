@@ -771,7 +771,7 @@ onBeforeUnmount(() => {
         />
 
         <AccountDrawer v-model:show="accountOpen" />
-        <VirtualKeyboard v-if="virtualKeyboardMounted" v-model:show="virtualKeyboardOpen" :layout="keyboardLayout" :blocked="keyboardBlocked" @focus-console="focusConsole" />
+        <VirtualKeyboard v-if="virtualKeyboardMounted" v-model:show="virtualKeyboardOpen" :layout="keyboardLayout" :blocked="keyboardBlocked" :caps-lock="status?.hid.caps_lock" :num-lock="status?.hid.num_lock" :scroll-lock="status?.hid.scroll_lock" @focus-console="focusConsole" />
         <KeyboardShortcutDrawer
           v-model:show="shortcutDialogOpen"
           :shortcuts="userShortcuts"

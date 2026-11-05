@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 
 import {
   applyKeyLabels,
+  applyKeyboardState,
   baseMainRows,
   desktopKeyboardRows,
   functionRow,
@@ -80,5 +81,44 @@ assert.equal(macMobile.find((item) => item.code === 'MetaLeft')?.label, 'Cmd')
 assert.equal(macMobile.find((item) => item.code === 'MetaLeft')?.modifier, 8)
 assert.equal(mobileKeyboardModifiers('win').find((item) => item.code === 'MetaLeft')?.label, 'Win')
 assert.equal(desktopKeyboardRows('win').at(-1)?.find((item) => item.code === 'MetaLeft')?.label, 'Win')
+
+function label(code: string, modifiers = 0, capsLock = false, layout: Parameters<typeof applyKeyboardState>[1] = 'us') {
+  return applyKeyboardState(baseMainRows, layout, modifiers, capsLock).flat().find(item => item.code === code)?.label
+}
+
+// Caps Lock changes letters, Shift changes the active level, and both invert letter case.
+assert.equal(label('KeyA'), 'a')
+assert.equal(label('KeyA', 2), 'A')
+assert.equal(label('KeyA', 32), 'A')
+assert.equal(label('KeyA', 0, true), 'A')
+assert.equal(label('KeyA', 2, true), 'a')
+assert.equal(label('KeyA', 32, true), 'a')
+assert.equal(label('KeyA', 1 | 4 | 8), 'a')
+assert.equal(label('Digit1', 0, true), '1')
+assert.equal(label('Digit1', 2), '!')
+assert.equal(label('Digit1', 32, true), '!')
+assert.equal(label('Quote', 2), '"')
+assert.equal(label('Slash', 2), '?')
+assert.equal(label('CapsLock', 2, true), 'Caps')
+assert.equal(label('KeyY', 0, false, 'de'), 'z')
+assert.equal(label('BracketLeft', 2, true, 'de'), 'ü')
+assert.equal(label('Digit7', 2, false, 'de'), '/')
+assert.equal(label('Quote', 2, false, 'uk'), '@')
+assert.equal(label('Digit3', 2, false, 'uk'), '£')
+assert.equal(label('Digit2', 0, false, 'fr'), 'é')
+assert.equal(label('Digit2', 2, false, 'fr'), '2')
+assert.equal(label('KeyM', 2, false, 'fr'), '?')
+assert.equal(label('Semicolon', 0, true, 'es'), 'Ñ')
+assert.equal(label('BracketLeft', 2, false, 'it'), 'é')
+assert.equal(label('Quote', 2, false, 'ru'), 'Э')
+assert.equal(label('Digit3', 2, false, 'ru'), '№')
+assert.equal(label('Quote', 2, false, 'jp'), '*')
+assert.equal(label('KeyQ', 0, true, 'ko'), 'ㅂ')
+assert.equal(label('KeyQ', 2, false, 'ko'), 'ㅃ')
+assert.equal(applyKeyboardState(mobileLayerRows('letters'), 'us', 2)[0][0].label, 'Q')
+assert.equal(applyKeyboardState(mobileLayerRows('numbers'), 'us', 2)[0][0].label, '!')
+assert.equal(applyKeyboardState(mobileLayerRows('letters'), 'us')[3][0].label, '123')
+assert.deepEqual(applyKeyboardState(baseMainRows, 'us', 2, true).flat().map(item => item.code), baseMainRows.flat().map(item => item.code))
+assert.equal(baseMainRows[1][1].label, 'Q', 'display state must not mutate shared layouts')
 
 console.log('virtual-keyboard tests passed')

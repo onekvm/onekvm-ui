@@ -244,6 +244,7 @@ const usbSettingsValid = ref(true)
 const audioSettingsValid = shallowRef(true)
 const savedAudio = shallowRef<AudioConfig | null>(null)
 const personalizationValid = ref(true)
+const personalizationLocalSettings = ref(false)
 const keyboardLayoutOptions = computed(() => [
 	{ value: 'us', label: t('keyboard.layouts.us', 'English (US)') },
 	{ value: 'uk', label: t('keyboard.layouts.uk', 'English (UK)') },
@@ -1910,8 +1911,9 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                   :device-model="deviceVariant"
                   :disabled="saving"
                   @validity="personalizationValid = $event"
+                  @local-settings="personalizationLocalSettings = $event"
                 />
-                <footer class="advanced-settings-actions">
+                <footer v-if="!personalizationLocalSettings" class="advanced-settings-actions">
                   <n-button :disabled="saving" @click="load">{{ t('common.refresh', 'Reload') }}</n-button>
                   <n-button type="primary" :loading="saving" :disabled="!personalizationValid" @click="savePersonalization">
                     <template #icon><Save /></template>

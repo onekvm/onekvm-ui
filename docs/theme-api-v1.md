@@ -12,8 +12,23 @@ A custom theme can combine the Win98 palette with its own icons by extending
 Built-in themes are `graphite` (dark), `paper` (light), and `win98` (light).
 Choose Win98 from **Account → Theme → Win98** for silver surfaces, navy actions,
 and a teal workspace. The selection is saved in this browser; the remote video
-keeps its dark surround. Choosing Light, Dark, or System restores the default
-palette for that appearance.
+keeps its dark surround. Choosing Light, Dark, or System uses the palette saved
+for that appearance's theme.
+
+**Settings → Personalization → Theme and colors** also lets users edit the
+accent, background, panel and text colors. Edits first appear in a local preview;
+**Apply colors** saves them in this browser. Each registered theme keeps its own
+overrides, including independent Graphite and Paper palettes when following the
+system appearance. **Restore default colors** removes the active theme's
+overrides. These browser preferences are independent of the device settings'
+Save action and do not change the remote video or semantic status colors.
+
+The `onekvm-ui-theme-colors` storage entry maps theme IDs to optional `primary`,
+`background`, `card` and `foreground` hex colors. Supporting surface/text tokens
+and button hover/press states are derived from these colors. The editor requires
+4.5:1 text contrast against the background and panels, and 3:1 accent contrast.
+Button text is selected automatically for readability. Invalid stored palettes
+fall back to the theme's defaults; registered theme definitions remain unchanged.
 
 Win98 also selects `skin: 'classic'`: square raised/pressed toolbar buttons,
 navy-to-blue gradient titlebars, an inset navigation tree, and rectangular host menus.
@@ -141,7 +156,7 @@ documented by `oneKVMThemeCSSVariables`; it should not hard-code Naive UI
 variables. Recovery UI has a separate boot-time bundle and is intentionally
 outside this runtime API.
 
-Themes should keep status colors semantic: blue for primary actions, green
-for healthy/connected states, amber for warning or paused states, and red for
-destructive/error states. Chart colors may be overridden independently from
-status colors.
+Themes should keep status colors semantic: green for healthy/connected states,
+amber for warning or paused states, and red for destructive/error states.
+The primary action color can be customized independently. Chart colors may also
+be overridden independently from status colors.

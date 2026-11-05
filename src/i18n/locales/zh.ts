@@ -701,7 +701,30 @@ const zh = {
         time: '区域和时间',
         update: '系统升级',
         personalizationPage: {
+          themeColors: {
+            title: '自定义配色',
+            scope: '应用后仅保存在当前浏览器，远程画面保持原样。',
+            perTheme: '每个主题分别记忆配色。',
+            colorCode: '{name}颜色代码',
+            presets: '常用强调色',
+            connected: '已连接',
+            primaryAction: '主要操作',
+            reset: '恢复默认配色',
+            apply: '应用配色',
+            fields: {
+              primary: '强调色',
+              background: '背景',
+              card: '面板',
+              foreground: '文字',
+            },
+            errors: {
+              format: '请输入 #RGB 或 #RRGGBB 格式的颜色。',
+              foreground: '文字与背景或面板的对比度不足，请调整颜色。',
+              primary: '强调色与背景或面板的对比度不足，请调整颜色。',
+            },
+          },
           tabs: {
+            theme: '主题与颜色',
             identity: '名称与标题',
             toolbar: '工具栏',
             interface: '界面与提示',

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref, useId, type HTMLAttributes } from 'vue'
+import { nextTick, ref, useId, watch, type HTMLAttributes } from 'vue'
 import { NTabs, NTab } from 'naive-ui'
 import { type PersonalizationConfig } from '@/api/client'
 import { t } from '@/i18n/runtime'
@@ -8,6 +8,7 @@ import PersonalizationToolbarSettings from './personalization/PersonalizationToo
 import PersonalizationInterfaceSettings from './personalization/PersonalizationInterfaceSettings.vue'
 import PersonalizationNoSignalSettings from './personalization/PersonalizationNoSignalSettings.vue'
 import PersonalizationPreview from './personalization/PersonalizationPreview.vue'
+import PersonalizationThemeSettings from './personalization/PersonalizationThemeSettings.vue'
 
 defineProps<{
   modelValue: PersonalizationConfig
@@ -19,11 +20,13 @@ defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [value: PersonalizationConfig]
   validity: [valid: boolean]
+  'local-settings': [active: boolean]
 }>()
 
-const tabNames = ['identity', 'toolbar', 'interface', 'noSignal'] as const
+const tabNames = ['identity', 'theme', 'toolbar', 'interface', 'noSignal'] as const
 type PersonalizationTab = typeof tabNames[number]
 const activeTab = ref<PersonalizationTab>('identity')
+watch(activeTab, tab => emit('local-settings', tab === 'theme'), { immediate: true })
 const idPrefix = useId()
 const tabID = (name: PersonalizationTab) => `${idPrefix}-tab-${name}`
 const panelID = (name: PersonalizationTab) => `${idPrefix}-panel-${name}`
@@ -79,6 +82,9 @@ function tabAttributes(name: PersonalizationTab): HTMLAttributes {
         @update:model-value="emit('update:modelValue', $event)"
         @validity="emit('validity', $event)"
       />
+    </div>
+    <div v-show="activeTab === 'theme'" :id="panelID('theme')" class="personalization-tab-panel" role="tabpanel" :aria-labelledby="tabID('theme')" tabindex="0">
+      <PersonalizationThemeSettings :disabled="disabled" />
     </div>
     <div v-show="activeTab === 'toolbar'" :id="panelID('toolbar')" class="personalization-tab-panel" role="tabpanel" :aria-labelledby="tabID('toolbar')" tabindex="0">
       <PersonalizationToolbarSettings :model-value="modelValue" :disabled="disabled" @update:model-value="emit('update:modelValue', $event)" />

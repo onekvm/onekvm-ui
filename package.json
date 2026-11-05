@@ -74,7 +74,7 @@
     "test:adaptive-jitter-buffer": "node --experimental-strip-types tests/adaptive-jitter-buffer.test.ts",
     "test:mouse-cursor": "node --experimental-strip-types tests/mouse-cursor.test.ts",
     "test:microphone-access": "node --experimental-strip-types tests/microphone-access.test.ts",
-    "test:theme": "node --experimental-strip-types tests/theme.test.ts",
+    "test:theme": "node --experimental-strip-types tests/theme.test.ts && node --experimental-strip-types tests/theme-colors.test.ts",
     "test:icons": "node --experimental-strip-types tests/icons.test.ts && node --experimental-strip-types tests/plugin-icons.test.ts",
     "test:web-manifest": "node --experimental-strip-types tests/web-manifest.test.ts",
     "test:file-editor": "node --experimental-strip-types tests/file-editor.test.ts",

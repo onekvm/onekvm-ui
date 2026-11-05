@@ -701,7 +701,30 @@ const zh_tw = {
         time: '區域和時間',
         update: '系統升級',
         personalizationPage: {
+          themeColors: {
+            title: '自訂配色',
+            scope: '套用後僅儲存在目前瀏覽器，遠端畫面維持原樣。',
+            perTheme: '每個主題分別記憶配色。',
+            colorCode: '{name}色彩代碼',
+            presets: '常用強調色',
+            connected: '已連線',
+            primaryAction: '主要操作',
+            reset: '還原預設配色',
+            apply: '套用配色',
+            fields: {
+              primary: '強調色',
+              background: '背景',
+              card: '面板',
+              foreground: '文字',
+            },
+            errors: {
+              format: '請輸入 #RGB 或 #RRGGBB 格式的顏色。',
+              foreground: '文字與背景或面板的對比度不足，請調整顏色。',
+              primary: '強調色與背景或面板的對比度不足，請調整顏色。',
+            },
+          },
           tabs: {
+            theme: '主題與顏色',
             identity: '名稱與標題',
             toolbar: '工具列',
             interface: '介面與提示',

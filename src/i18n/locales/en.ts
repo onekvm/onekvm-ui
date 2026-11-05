@@ -702,7 +702,30 @@ const en = {
         time: 'Region and time',
         update: 'System update',
         personalizationPage: {
+          themeColors: {
+            title: 'Custom colors',
+            scope: 'Applied colors are saved in this browser only. The remote video stays unchanged.',
+            perTheme: 'Each theme keeps its own colors.',
+            colorCode: '{name} color code',
+            presets: 'Accent color presets',
+            connected: 'Connected',
+            primaryAction: 'Primary action',
+            reset: 'Restore default colors',
+            apply: 'Apply colors',
+            fields: {
+              primary: 'Accent color',
+              background: 'Background',
+              card: 'Panels',
+              foreground: 'Text',
+            },
+            errors: {
+              format: 'Enter colors as #RGB or #RRGGBB.',
+              foreground: 'Text needs more contrast with the background or panels.',
+              primary: 'The accent color needs more contrast with the background or panels.',
+            },
+          },
           tabs: {
+            theme: 'Theme and colors',
             identity: 'Name and title',
             toolbar: 'Toolbar',
             interface: 'Interface and messages',

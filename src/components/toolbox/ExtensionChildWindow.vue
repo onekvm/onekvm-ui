@@ -26,6 +26,10 @@ let resolveClose: ((closed: boolean) => void) | null = null
 let closing: Promise<boolean> | null = null
 let returnFocus: HTMLElement | null = null
 const owner = inject<ToolChildWindow | null>(toolWindowOwnerKey, null)
+// Pages (e.g. an extension's settings page) have no toolbox window manager:
+// the window is then a standalone floating window above the page.
+const managed = computed(() => typeof props.host.registerChildWindow === 'function')
+const overlay = computed(() => props.host.overlayTarget?.value || 'body')
 const child: ToolChildWindow = { owner, get modal() { return props.modal }, focus, close }
 provide(toolWindowOwnerKey, child)
 
@@ -77,7 +81,7 @@ function close(force = false): Promise<boolean> {
 watch(() => props.open, async open => {
   if (!open) return
   returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
-  if (!registration.value) registration.value = props.host.registerChildWindow(child)
+  if (!registration.value && managed.value) registration.value = props.host.registerChildWindow(child)
   await nextTick()
   if (props.open) focus()
 }, { immediate: true })
@@ -98,15 +102,16 @@ defineExpose({
 </script>
 
 <template>
-  <Teleport :to="host.overlayTarget.value">
+  <Teleport :to="overlay">
     <div v-show="registration?.visible.value !== false" class="owned-window-host">
     <Transition name="win11-window" @after-leave="release">
       <ToolWindow v-if="open" ref="frame" class="extension-child-window" :class="{ 'window-attention': attention }"
         :title="title" presentation="window" :width="width || 440" :height="height || 430" :owned-modal="modal"
-        :resizable="resizable" :maximizable="maximizable" :minimizable="false" :layer="layer" :active="registration?.active.value || false" :sequence="layer"
+        :resizable="resizable" :maximizable="maximizable" :minimizable="false" :layer="layer" :active="managed ? registration?.active.value || false : true" :sequence="layer"
         :child-window-active="registration?.blocked.value || false" @child-attention="registration?.attention()" @focus="registration?.activate()"
         v-model:state="state" @close="close">
         <template #title-icon><ToolIcon :tool="iconTool" /></template>
+        <template v-if="$slots['header-extra']" #header-extra><slot name="header-extra" /></template>
         <slot />
       </ToolWindow>
     </Transition>

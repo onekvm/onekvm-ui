@@ -213,6 +213,13 @@ its immediate owner; attempts to activate that owner focus the deepest blocking
 dialog and flash its title bar. Other tools remain usable. Set `modal: false` for
 a modeless owned window whose owner remains interactive.
 
+A `header-extra` slot places small controls (buttons, switches) in the title
+bar before the window buttons; they do not start a window drag.
+
+An extension page (whose host has no `registerChildWindow`) can pass its page
+host: the window is then a standalone floating window above the page, with the
+same chrome, dragging and resizing but no owner or stacking with tool windows.
+
 Ordinary close awaits `beforeClose`, if supplied; false vetoes close. Descendants
 close before their owner, and each leave transition finishes before the owner is
 removed. Focus returns to the opener when it is still available. Forced extension

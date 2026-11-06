@@ -262,6 +262,9 @@ onBeforeUnmount(() => {
         </n-dropdown>
         <slot v-else name="title-icon" />
       </template>
+      <template v-if="slots['header-extra']" #header-extra>
+        <div class="tool-window-header-extra" @pointerdown.stop @dblclick.stop><slot name="header-extra" /></div>
+      </template>
       <template #actions>
         <n-button v-if="!fullLayout && minimizable && !ownedModal" quaternary circle size="tiny" :aria-label="t('toolbox.minimizeWindow')" @click="emit('update:state', 'minimized')"><template #icon><Minus /></template></n-button>
         <n-button v-if="!fullLayout && maximizable" quaternary circle size="tiny" :aria-label="t(maximized ? 'toolbox.restoreWindow' : 'toolbox.maximizeWindow')" @click="toggleMaximize()"><template #icon><Copy v-if="maximized" /><Square v-else /></template></n-button>
@@ -282,6 +285,7 @@ onBeforeUnmount(() => {
 .tool-window.maximized { border-radius: 0; }
 .tool-window:not(.active) :deep(.console-floating-title) { color: var(--onekvm-text-tertiary); }
 .tool-window-header { flex-shrink: 0; }
+.tool-window-header-extra { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 .tool-window-system-menu { width: 24px; height: 24px; padding: 0; }
 .drawer .tool-window-header, .fullscreen .tool-window-header { cursor: default; }
 .tool-window :focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }

@@ -7,8 +7,12 @@ import type { ConsoleFrame } from '@/lib/console-frame'
 import { normalizeExtensionView, type ExtensionViewDefinitionV1, type ExtensionViewRenderer } from './webComponentView'
 
 export type ToolPresentation = 'drawer' | 'window' | 'fullscreen'
+// A recording started from a tool window. HID macro recording reports
+// stats; other tools (screen recording) give their own title and detail.
 export interface HIDRecordingActivity {
-  readonly stats: Readonly<Ref<{ receivedReports: number; writtenActions: number }>>
+  readonly stats?: Readonly<Ref<{ receivedReports: number; writtenActions: number }>>
+  readonly title?: string
+  readonly detail?: Readonly<Ref<string>>
   readonly stop: () => void
 }
 export interface ChildWindowRegistration {

@@ -128,14 +128,17 @@ interface ExtensionToolHostV1 {
 keyboard and mouse reports sent from this browser to the controlled device,
 with a monotonic timestamp. The tool must unsubscribe when recording stops or
 unmounts. It does not expose incoming reports or reports from other clients.
-`showRecordingStatus` is reserved for `hid-macro`. Pass
-`{ stats: Ref<{ receivedReports, writtenActions }>, stop: () => void }` to hide
-the tool without unmounting it and show the same global banner used for playback.
+`showRecordingStatus` is reserved for `hid-macro` and for screen recording by
+tools whose extension declares the `video.encoded` capability. `hid-macro` passes
+`{ stats: Ref<{ receivedReports, writtenActions }>, stop: () => void }`; other
+tools pass `{ title: string, detail?: Ref<string>, stop: () => void }` with
+localized text. Either hides the tool without unmounting it and shows the same
+global banner used for playback.
 This releases manual console input on desktop and mobile. The returned cleanup
 removes that activity and restores the tool; call it when capture stops or the
 component unmounts. A second simultaneous recording is rejected. The older
 `showConsoleWhileRecording` API retains its narrow-screen return control for
-compatibility. Recording is browser-local; playback timing is device-owned.
+compatibility. Macro recording is browser-local; playback timing is device-owned.
 
 `invoke` and `assetURL` are scoped to the extension. Settings adapters follow
 [Vue Page API v1](extension-vue-page-v1.md). The host validates/saves settings

@@ -33,9 +33,10 @@ const ringOffset = computed(() => {
 })
 const lineText = computed(() => {
   if (!props.owner && props.recording) {
-    const stats = props.recording.stats.value
-    return t('toolbox.recordingCount', '{kept} actions recorded')
-      .replace('{kept}', String(stats.writtenActions))
+    if (props.recording.detail) return props.recording.detail.value
+    const stats = props.recording.stats?.value
+    return stats ? t('toolbox.recordingCount', '{kept} actions recorded')
+      .replace('{kept}', String(stats.writtenActions)) : ''
   }
   const status = progress.value
   const total = status?.total_lines || 0
@@ -66,7 +67,7 @@ async function stop() {
             <circle v-else class="macro-record-dot" cx="16" cy="16" r="6" />
           </svg>
           <div class="macro-run-copy">
-            <span>{{ t(owner ? 'toolbox.macroExclusive' : 'toolbox.macroRecording') }}</span>
+            <span>{{ owner ? t('toolbox.macroExclusive') : recording?.title || t('toolbox.macroRecording') }}</span>
             <small v-if="lineText">{{ lineText }}</small>
           </div>
           <NButton size="small" type="error" secondary :loading="pending" @click="stop">{{ t(owner ? 'toolbox.stopMacro' : 'toolbox.stopRecording') }}</NButton>

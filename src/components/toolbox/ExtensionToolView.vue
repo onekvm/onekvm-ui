@@ -125,7 +125,8 @@ const host = markRaw(Object.freeze<ExtensionToolHostV1>({
   },
   resizeWindow: (size: { width: number; height: number }) => toolbox.resizeWindow(props.instance.id, size),
   showRecordingStatus: activity => {
-    if (extension.value.id !== 'hid-macro') throw new Error(t('toolbox.invalidated'))
+    // HID macro recording, or screen recording by tools that read the encoded video.
+    if (extension.value.id !== 'hid-macro' && !extension.value.capabilities?.includes('video.encoded')) throw new Error(t('toolbox.invalidated'))
     return toolbox.showRecordingStatus(props.instance.id, activity)
   },
   registerChildWindow: child => toolbox.registerChildWindow(props.instance.id, child),

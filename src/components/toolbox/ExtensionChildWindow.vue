@@ -9,8 +9,10 @@ import ToolIcon from './ToolIcon.vue'
 const props = withDefaults(defineProps<{
   host: ExtensionToolHostV1; open: boolean; title: string; width?: number; height?: number
   modal?: boolean; resizable?: boolean; maximizable?: boolean
+  // edge-to-edge: no content padding (e.g. a video filling the window)
+  contentLayout?: 'padded' | 'edge-to-edge'
   beforeClose?: () => boolean | Promise<boolean>
-}>(), { modal: true, resizable: true, maximizable: true })
+}>(), { modal: true, resizable: true, maximizable: true, contentLayout: 'padded' })
 const emit = defineEmits<{ close: [] }>()
 const iconTool = computed(() => {
   const extension = props.host.extension.value
@@ -104,10 +106,11 @@ defineExpose({
 <template>
   <Teleport :to="overlay">
     <div v-show="registration?.visible.value !== false" class="owned-window-host">
-    <Transition name="win11-window" @after-leave="release">
+    <!-- The animation runs on the inner window, so Vue needs the duration. -->
+    <Transition name="win11-window" appear :duration="{ enter: 250, leave: 167 }" @after-leave="release">
       <ToolWindow v-if="open" ref="frame" class="extension-child-window" :class="{ 'window-attention': attention }"
         :title="title" presentation="window" :width="width || 440" :height="height || 430" :owned-modal="modal"
-        :resizable="resizable" :maximizable="maximizable" :minimizable="false" :layer="layer" :active="managed ? registration?.active.value || false : true" :sequence="layer"
+        :resizable="resizable" :maximizable="maximizable" :content-layout="contentLayout" :minimizable="false" :layer="layer" :active="managed ? registration?.active.value || false : true" :sequence="layer"
         :child-window-active="registration?.blocked.value || false" @child-attention="registration?.attention()" @focus="registration?.activate()"
         v-model:state="state" @close="close">
         <template #title-icon><ToolIcon :tool="iconTool" /></template>

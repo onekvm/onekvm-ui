@@ -213,6 +213,9 @@ its immediate owner; attempts to activate that owner focus the deepest blocking
 dialog and flash its title bar. Other tools remain usable. Set `modal: false` for
 a modeless owned window whose owner remains interactive.
 
+`contentLayout: 'edge-to-edge'` removes the content padding (the content is a
+flex column), e.g. for a video that fills the window.
+
 A `header-extra` slot places small controls (buttons, switches) in the title
 bar before the window buttons; they do not start a window drag.
 

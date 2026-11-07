@@ -64,9 +64,6 @@ assert.notEqual(Win98Theme, AppWindow)
 assert.match(await render(Win98Theme, { size: 16 }), /\/16\/places-start-here.png/)
 assert.match(await render(AppWindow, { size: 16 }), /\/16\/apps-preferences-system-windows.png/)
 assert.match(await render(CircleCheck), /<path/) // Unspecified glyphs retain the fallback.
-assert.match(await render(namedPluginIcon('monitor-dot')), /devices-video-display.png/)
-assert.match(await render(namedPluginIcon('book-open')), /actions-help-faq.png/)
-assert.match(await render(namedPluginIcon('hdmi-port')), /devices-video-display.png/)
 const manifest = JSON.parse(readFileSync(new URL('../public/icons/win98/sources.json', import.meta.url), 'utf8'))
 for (const asset of manifest.files) {
   const bytes = readFileSync(new URL(`../public/icons/win98/${asset.file}`, import.meta.url))

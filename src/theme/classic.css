@@ -316,6 +316,14 @@ html[data-onekvm-skin="classic"] .host-window-titlebar .console-floating-title-i
   width: 16px;
   height: 16px;
 }
+/* Naive buttons keep the black text color. On the blue title bar that hides
+   a plugin's outline icon. Follow the title, which is white. */
+html[data-onekvm-skin="classic"] .host-window-titlebar :is(.n-button, .n-icon, .tool-icon, svg) {
+  color: inherit;
+}
+html[data-onekvm-skin="classic"] .advanced-settings-sidebar button.active :is(svg, .n-icon) {
+  color: inherit;
+}
 html[data-onekvm-skin="classic"] .host-window-titlebar :is(strong, .console-floating-title) {
   color: inherit;
   font-size: 12px;
@@ -596,7 +604,8 @@ html[data-onekvm-skin="classic"] .settings-app-row:is(:hover, :focus-visible) {
   color: var(--primary-foreground);
   background: var(--primary);
 }
-html[data-onekvm-skin="classic"] .settings-app-row:is(:hover, :focus-visible) .settings-app-chevron {
+html[data-onekvm-skin="classic"] .settings-app-row:is(:hover, :focus-visible) .settings-app-chevron,
+html[data-onekvm-skin="classic"] .settings-app-row:is(:hover, :focus-visible) .settings-app-icon {
   color: inherit;
 }
 html[data-onekvm-skin="classic"] :is(.advanced-settings-sidebar nav, .advanced-settings-main, .toolbar-tray.is-centered, .control-sheet-body) {

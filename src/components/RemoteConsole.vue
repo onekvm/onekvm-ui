@@ -542,6 +542,7 @@ watch(
       autoplay
       playsinline
       muted
+      disablepictureinpicture
       :style="mediaStyle"
       tabindex="-1"
       @playing="onPlaying"

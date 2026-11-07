@@ -6034,7 +6034,20 @@ body {
 .latency-loss-key { flex: 0 0 12px; width: 12px; height: 8px; border-radius: 2px; background: color-mix(in srgb, var(--destructive) 24%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--destructive) 38%, transparent); }
 
 /* One row lets Shift-drag order built-in controls, folders and pinned tools together. */
-.toolbar-layout { display: flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+.toolbar-layout {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* Keep the narrow toolbar usable without Firefox reserving a visible
+     horizontal scrollbar below the controls when icons overflow. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.toolbar-layout::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .toolbar-layout > .device-controls,
 .toolbar-layout > .toolbar-actions,
 .toolbar-layout > .toolbar-pinned-tools,

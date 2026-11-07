@@ -1,16 +1,20 @@
 import type { ExtensionSettingValue, ExtensionStatus } from '../api/client'
 
 export function validateExtensionSettings(
-  extension: Pick<ExtensionStatus, 'settings_schema' | 'settings'>,
+  extension: Pick<ExtensionStatus, 'settings_schema' | 'settings'> & Partial<Pick<ExtensionStatus, 'secrets_configured'>>,
   update: Record<string, ExtensionSettingValue>,
 ): string | null {
   const schema = extension.settings_schema
   const merged = { ...extension.settings, ...update }
+  // Saved secrets are redacted from settings; an update leaves them out unless
+  // it replaces them, so a configured secret counts as present.
+  const secrets = new Set(extension.secrets_configured || [])
   for (const name of schema.required || []) {
     const value = merged[name]
     // Required fields must be present; empty strings are valid schema values
     // (for example, EasyTier's IPv4 address when automatic assignment is on).
-    if (value === undefined || value === null) return `${name} is required`
+    const savedSecret = !(name in update) && secrets.has(`/${name}`)
+    if ((value === undefined || value === null) && !savedSecret) return `${name} is required`
   }
   for (const [name, value] of Object.entries(update)) {
     const property = schema.properties[name]

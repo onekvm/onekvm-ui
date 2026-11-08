@@ -1758,6 +1758,11 @@ onMounted(() => {
   }
   settingsAppQuery.addEventListener('change', syncSettingsAppLayout)
 	ensureSectionData(paneSection.value)
+	// The extension catalog contributes pages to the sidebar. Load this small
+	// summary when the settings shell opens so the navigation is complete before
+	// the user enters the Plugins section; page-specific extension data remains
+	// lazy-loaded by ensureSectionData().
+	void loadExtensions()
 	clockTimer = window.setInterval(() => {
 		clockTick.value = Date.now()
 		if (networkApply.value?.pending &&

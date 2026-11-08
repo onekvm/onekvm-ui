@@ -226,6 +226,7 @@ const lastDetailSection = ref<Section>(isSettingsIndex(section.value) ? 'system'
 const settingsRoot = shallowRef<HTMLElement | null>(null)
 let settingsResizeObserver: ResizeObserver | null = null
 const mobileSettings = shallowRef(props.embedded ? false : window.matchMedia(SETTINGS_APP_QUERY).matches)
+const pageMounted = shallowRef(false)
 let settingsAppQuery: MediaQueryList | null = null
 const config = ref<OneKVMConfig | null>(null)
 const schema = ref<ConfigSchema | null>(null)
@@ -234,6 +235,7 @@ const canEditVideo = computed(() => props.canChangeVideo
 const extensions = ref<ExtensionSummary[]>([])
 const extensionDetails = ref<Record<string, ExtensionStatus>>({})
 const extensionsLoaded = ref(false)
+const schemaLoaded = shallowRef(false)
 const extensionsLoading = ref(false)
 const extensionLoading = ref(false)
 const extensionError = ref('')
@@ -548,8 +550,8 @@ const deviceUptime = computed(() => {
   return statusEvents.currentUptime() ?? props.status?.uptime_seconds ?? 0
 })
 const mobileDetail = computed(() => mobileSettings.value && !isSettingsIndex(section.value))
-const { status: storageStatus } = useStorageStatus(computed(() => paneSection.value === 'system' && (!mobileSettings.value || mobileDetail.value)))
-const updateMonitor = useSystemUpdateMonitor(computed(() => paneSection.value === 'update'), (error) => {
+const { status: storageStatus } = useStorageStatus(computed(() => pageMounted.value && paneSection.value === 'system' && (!mobileSettings.value || mobileDetail.value)))
+const updateMonitor = useSystemUpdateMonitor(computed(() => pageMounted.value && paneSection.value === 'update'), (error) => {
   if (error) message.error(systemUpdateErrorText(error, t))
   else message.success(t('settings.advancedSettings.systemPage.updateComplete', 'System update installed'))
 })
@@ -791,22 +793,17 @@ function onlineUpdateLabel(update: SystemOnlineUpdate) {
 }
 
 async function loadSystemDetails() {
-  if (section.value !== 'time' && section.value !== 'update') return
+  if (section.value !== 'time') return
   systemDetailsLoading.value = true
   systemDetailsError.value = ''
   systemUpdateUnavailable.value = false
   try {
-    if (section.value === 'time') {
-      const value = await api.getSystemTime()
-      systemTime.value = value
-      selectedTimezone.value = value.timezone
-      selectedNTP.value = value.ntp
-      selectedNTPServers.value = [...value.ntp_servers]
-      selectedDeviceLanguage.value = value.language
-    } else {
-      await updateMonitor.refresh()
-      void loadOnlineUpdate()
-    }
+    const value = await api.getSystemTime()
+    systemTime.value = value
+    selectedTimezone.value = value.timezone
+    selectedNTP.value = value.ntp
+    selectedNTPServers.value = [...value.ntp_servers]
+    selectedDeviceLanguage.value = value.language
   } catch (reason) {
     systemDetailsError.value = reason instanceof Error ? reason.message : String(reason)
   } finally {
@@ -997,16 +994,34 @@ function confirmSystemUpdate() {
   })
 }
 
-async function load() {
+let schemaRequest: Promise<void> | null = null
+let configRequest: Promise<void> | null = null
+let networkDNSRequest: Promise<void> | null = null
+let extensionsRequest: Promise<void> | null = null
+
+async function loadSchema() {
+  if (schemaLoaded.value && schema.value) return
+  if (schemaRequest) return schemaRequest
+  const request = (async () => {
+    try {
+      schema.value = await api.getConfigSchema(props.videoSessionId)
+      schemaLoaded.value = true
+    } catch (reason) {
+      error.value = reason instanceof Error ? reason.message : String(reason)
+    }
+  })()
+  schemaRequest = request
+  void request.finally(() => {
+    if (schemaRequest === request) schemaRequest = null
+  })
+  return request
+}
+
+async function loadConfigData() {
   loading.value = true
   error.value = ''
   try {
-    const [loadedConfig, loadedSchema, dnsStatus] = await Promise.all([
-      api.getConfig(),
-      api.getConfigSchema(props.videoSessionId),
-      api.getNetworkDNS().catch(() => null),
-    ])
-		automaticDNSServers.value = dnsStatus?.automatic_servers || []
+		const loadedConfig = await api.getConfig()
 		loadedConfig.network.static_routes ||= []
 		loadedConfig.network.interfaces ||= []
 		loadedConfig.network.discovery_url ??= DEFAULT_DISCOVERY_URL
@@ -1047,7 +1062,6 @@ async function load() {
     config.value = loadedConfig
     config.value.audio = normalizeAudioConfig(loadedConfig.audio)
     savedAudio.value = { ...config.value.audio }
-    schema.value = loadedSchema
     savedNetworkSnapshot.value = networkConfigSnapshot(loadedConfig.network)
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : String(reason)
@@ -1056,7 +1070,31 @@ async function load() {
   }
 }
 
-async function loadExtensions() {
+function load() {
+  if (configRequest) return configRequest
+  const request = loadConfigData()
+  configRequest = request
+  void request.finally(() => {
+    if (configRequest === request) configRequest = null
+  })
+  return request
+}
+
+function loadNetworkDNS() {
+  if (networkDNSRequest) return networkDNSRequest
+  const request = api.getNetworkDNS().then((status) => {
+    automaticDNSServers.value = status?.automatic_servers || []
+  }).catch(() => {
+    automaticDNSServers.value = []
+  })
+  networkDNSRequest = request
+  void request.finally(() => {
+    if (networkDNSRequest === request) networkDNSRequest = null
+  })
+  return request
+}
+
+async function loadExtensionsData() {
   extensionsLoading.value = true
   extensionError.value = ''
   try {
@@ -1069,7 +1107,46 @@ async function loadExtensions() {
   }
 }
 
+function loadExtensions() {
+  if (extensionsRequest) return extensionsRequest
+  const request = loadExtensionsData()
+  extensionsRequest = request
+  void request.finally(() => {
+    if (extensionsRequest === request) extensionsRequest = null
+  })
+  return request
+}
+
+function sectionNeedsConfig(value: Section) {
+  return ['display', 'personalization', 'keyboard', 'usb', 'audio', 'network'].includes(value)
+}
+
+function sectionNeedsSchema(value: Section) {
+  return ['display', 'audio', 'network', 'system'].includes(value)
+}
+
+function sectionNeedsExtensions(value: Section) {
+  return value === 'firewall' || value === 'cloud' || value === 'plugins' || value.startsWith('extension:')
+}
+
+function ensureSectionData(value: Section) {
+  if (!sectionNeedsConfig(value)) loading.value = false
+  if (sectionNeedsSchema(value)) void loadSchema()
+  if (sectionNeedsConfig(value)) void load()
+  if (value === 'network') {
+    void loadNetworkDNS()
+    void refreshNetworkApplyStatus()
+  }
+  if (sectionNeedsExtensions(value) && !extensionsLoaded.value) void loadExtensions()
+  if (value === 'time') void loadSystemDetails()
+  if (value === 'update') {
+    void updateMonitor.refresh()
+    void loadOnlineUpdate()
+  }
+}
+
 function onExtensionsChanged() {
+  if (!extensionsLoaded.value || !sectionNeedsExtensions(paneSection.value)) return
   void api.getExtensions().then(updateExtensions).catch((reason) => {
     extensionError.value = reason instanceof Error ? reason.message : String(reason)
   })
@@ -1670,6 +1747,7 @@ function syncSettingsAppLayout(event?: MediaQueryListEvent) {
 }
 
 onMounted(() => {
+  pageMounted.value = true
   window.addEventListener('onekvm:extensions-changed', onExtensionsChanged)
   window.addEventListener('onekvm-themechange', applyPluginFrameTheme)
   settingsAppQuery = window.matchMedia(SETTINGS_APP_QUERY)
@@ -1679,9 +1757,7 @@ onMounted(() => {
     settingsResizeObserver.observe(settingsRoot.value)
   }
   settingsAppQuery.addEventListener('change', syncSettingsAppLayout)
-  void load()
-  void loadExtensions()
-	void refreshNetworkApplyStatus()
+	ensureSectionData(paneSection.value)
 	clockTimer = window.setInterval(() => {
 		clockTick.value = Date.now()
 		if (networkApply.value?.pending &&
@@ -1739,7 +1815,8 @@ watch(activeExtensionURL, () => {
   pluginFrameHeight.value = null
 })
 watch(paneSection, (value) => {
-  if (value === 'time' || value === 'update') void loadSystemDetails()
+  if (!pageMounted.value) return
+  ensureSectionData(value)
 }, { immediate: true })
 
 watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.status?.audio.quality,

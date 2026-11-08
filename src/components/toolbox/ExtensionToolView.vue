@@ -10,6 +10,7 @@ import { t } from '@/i18n/runtime'
 import { onekvm, type HIDReportListener, type KeyboardTextListener } from '@/lib/onekvm'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { captureConsoleFrame, captureConsoleSelectionFrame } from '@/lib/console-frame'
+import { registerIndependentWindowHost } from '@/extensions/independentWindows'
 
 const props = defineProps<{ instance: ToolInstance; presentation: ToolPresentation }>()
 const toolbox = useToolboxContext()
@@ -140,6 +141,8 @@ const host = markRaw(Object.freeze<ExtensionToolHostV1>({
   },
 }))
 
+const unregisterWindowHost = registerIndependentWindowHost(host)
+
 async function load() {
   const current = ++generation
   component.value = null
@@ -163,7 +166,7 @@ async function load() {
   }
 }
 watch(() => props.instance.cacheKey, load, { immediate: true })
-onBeforeUnmount(() => { cancelClose?.(); generation++; unregister(); leavingRoot = root.value })
+onBeforeUnmount(() => { unregisterWindowHost(); cancelClose?.(); generation++; unregister(); leavingRoot = root.value })
 onUnmounted(() => {
   const resource = loaded
   const release = () => {

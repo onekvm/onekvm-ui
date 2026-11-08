@@ -280,3 +280,23 @@ when no minimized windows remain and reserves space above the remote picture;
 it follows fullscreen and safe-area changes. Temporary frame selection and HID
 recording visibility changes do not create minimized tasks. Transfer dialogs and
 the advanced settings window share the same taskbar.
+
+## Independent windows
+
+`toolbox.openWindow(host, id, { component, props?, styles? })` opens a window with
+its own lifetime. Use a registered page or tool host; `id` is local to the
+extension/version and reopening the same ID focuses/restores its existing window.
+IDs use lowercase letters, digits, `_` and `-`, start with a letter or digit, and
+are at most 128 characters long.
+Closing or minimizing the opener does not affect it. Its styles stay installed
+until it closes. Logout, permission loss, extension disable/removal or a version
+change force cleanup, including component unmount hooks.
+
+The component receives `host` and `open` props. Render `toolbox.Window` with
+`independent: true`, forward `open`, and forward its `close` and `closed` events.
+Expose `focus()` and forward it to the `Window` ref for reopening and restoring.
+`close` starts the leave transition; `closed` releases the component and styles.
+Independent windows have their own minimize/restore task and stacking order.
+The supplied host exposes `extension`, `overlayTarget`, `getStatus`, `assetURL`
+and `invoke`; it remains valid after the opener leaves. Check that `openWindow`
+exists before calling it when supporting older UIs.

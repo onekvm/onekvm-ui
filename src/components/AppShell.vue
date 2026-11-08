@@ -7,6 +7,7 @@ import ConsoleWindowTransition from './ConsoleWindowTransition.vue'
 
 import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type OneKVMStatus } from '@/api/client'
 import ToolboxWorkspace from './toolbox/ToolboxWorkspace.vue'
+import IndependentExtensionWindows from './toolbox/IndependentExtensionWindows.vue'
 import MacroRunBanner from './toolbox/MacroRunBanner.vue'
 import { useWindowTaskbarInset } from '@/composables/useWindowTaskbar'
 import { useToolbox } from '@/composables/useToolbox'
@@ -608,6 +609,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="app-shell" :data-dim-windows-on-kvm-focus="status?.identity?.dim_windows_on_kvm_focus !== false" :style="{ '--onekvm-taskbar-height': `${taskbarInset}px` }">
+    <IndependentExtensionWindows />
     <KeyboardLockOverlay :changes="keyboardLockChanges" />
     <ConsoleWindowTransition :show="settingsWindowOpen && canSettings && !advancedSettingsOpen" @after-leave="afterSettingsWindowLeave">
       <AdvancedSettingsWindow ref="settingsWindow"

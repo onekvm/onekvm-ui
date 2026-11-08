@@ -1273,7 +1273,24 @@ function changesExtensions(path: string, method: string | undefined) {
     'set_source', 'set_source_enabled', 'remove_source'].includes(decodeURIComponent(invoke[1]!))
 }
 
-export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+let extensionRequestQueue: Promise<void> = Promise.resolve()
+
+function isExtensionRequest(path: string) {
+  return path === '/api/extensions' || path.startsWith('/api/extensions/')
+}
+
+function queueExtensionRequest<T>(task: () => Promise<T>) {
+  const queued = extensionRequestQueue.then(task, task)
+  extensionRequestQueue = queued.then(() => undefined, () => undefined)
+  return queued
+}
+
+export function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const task = () => requestUnqueued<T>(path, options)
+  return isExtensionRequest(path) ? queueExtensionRequest(task) : task()
+}
+
+async function requestUnqueued<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(resolveServiceURL(serviceBaseUrl(), path), {
     credentials: import.meta.env.VITE_WITH_CREDENTIALS === 'false' ? 'omit' : 'include',
     ...options,
@@ -2034,7 +2051,8 @@ export const api = {
           : 'application/vnd.onekvm.ipk',
       },
     }),
-  stageLocalExtension,
+  stageLocalExtension: (file: File, onProgress: (percentage: number) => void) =>
+    queueExtensionRequest(() => stageLocalExtension(file, onProgress)),
   installStagedExtension: (token: string, enableAfterInstall?: boolean) =>
     request<{ status: string }>(`/api/extensions/uploads/${encodeURIComponent(token)}/install${enableAfterInstall === undefined ? '' : `?enable_after_install=${enableAfterInstall}`}`, { method: 'POST' }),
   discardStagedExtension: (token: string) =>

@@ -2057,6 +2057,10 @@ const zh_tw = {
             label: '沙箱內宿主 root',
             description: '以 root 身分執行，但保留標準外掛程式沙箱與資源限制。',
           },
+          'container-admin': {
+            label: '容器管理',
+            description: '以 root 身分拉取和管理容器，設定容器網路和主機目錄掛載。',
+          },
           'host-unrestricted': {
             label: '不受限制的宿主 root',
             description: '完整存取宿主檔案系統、裝置、網路、capability、命名空間與資源。',

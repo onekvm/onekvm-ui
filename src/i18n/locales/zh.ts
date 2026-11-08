@@ -2052,6 +2052,10 @@ const zh = {
             label: '沙箱内宿主 root',
             description: '以 root 身份运行，但保留标准插件沙箱与资源限制。',
           },
+          'container-admin': {
+            label: '容器管理',
+            description: '以 root 身份拉取和管理容器，配置容器网络和主机目录挂载。',
+          },
           'host-unrestricted': {
             label: '不受限制的宿主 root',
             description: '完整访问宿主文件系统、设备、网络、capability、命名空间与资源。',

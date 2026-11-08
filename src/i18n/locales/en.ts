@@ -2053,6 +2053,10 @@ const en = {
             label: 'Sandboxed host root',
             description: 'Run as root while retaining the standard plugin sandbox and resource limits.',
           },
+          'container-admin': {
+            label: 'Container management',
+            description: 'Pull and manage containers as root, configure container networking and mount host directories.',
+          },
           'host-unrestricted': {
             label: 'Unrestricted host root',
             description: 'Full root access to the host filesystem, devices, network, capabilities, namespaces and resources.',

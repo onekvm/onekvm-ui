@@ -1950,6 +1950,10 @@ const zh = {
             label: '神经网络加速',
             description: '为 OneKVM 提供设备端神经网络运算加速。',
           },
+          screen: {
+            label: '本地屏幕',
+            description: '在设备屏幕上显示主页、应用和设备状态。',
+          },
           unknownDescription: '此系统插件声明提供该设备能力，当前版本暂无对应说明。',
         },
         capabilityDetails: {

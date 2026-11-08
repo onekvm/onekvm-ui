@@ -1955,6 +1955,10 @@ const zh_tw = {
             label: '神經網路加速',
             description: '為 OneKVM 提供裝置端神經網路運算加速。',
           },
+          screen: {
+            label: '本機螢幕',
+            description: '在裝置螢幕上顯示主畫面、應用程式和裝置狀態。',
+          },
           unknownDescription: '此系統外掛程式宣告提供該裝置能力，目前版本暫無對應說明。',
         },
         capabilityDetails: {

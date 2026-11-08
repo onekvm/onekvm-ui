@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue'
-import { Cpu, Fingerprint, HardDrive, Keyboard, LayoutDashboard, PanelTop, PanelsTopLeft, Plug, Power, Puzzle, Server, Settings2, ShieldAlert, Toolbox, Video } from '@/icons'
+import { Cpu, Fingerprint, HardDrive, Keyboard, LayoutDashboard, Monitor, PanelTop, PanelsTopLeft, Plug, Power, Puzzle, Server, Settings2, ShieldAlert, Toolbox, Video } from '@/icons'
 import { extensionLocalizedText, extensionTranslation, type ExtensionStatus } from '@/api/client'
 import { currentLanguage, t } from '@/i18n/runtime'
 import IconDescriptionList from './IconDescriptionList.vue'
@@ -16,6 +16,7 @@ const deviceCapabilityMetadata: Readonly<Record<string, { key: string; icon: Com
   'atx.hdd-led': { key: 'diskLed', icon: HardDrive },
   msd: { key: 'virtualMedia', icon: HardDrive },
   npu: { key: 'npu', icon: Cpu },
+  screen: { key: 'screen', icon: Monitor },
 }
 
 const items = computed(() => {

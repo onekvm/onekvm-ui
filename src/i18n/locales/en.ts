@@ -1951,6 +1951,10 @@ const en = {
             label: 'Neural processing',
             description: 'Provides OneKVM with on-device acceleration for neural network workloads.',
           },
+          screen: {
+            label: 'Local screen',
+            description: 'Displays the home screen, apps and device status on the device screen.',
+          },
           unknownDescription: 'This system plugin declares this device capability. No description is available in this version.',
         },
         capabilityDetails: {

@@ -1462,18 +1462,6 @@ const zh_tw = {
           3600: '1小時'
         },
         wifi: {
-        apStandard: "無線標準",
-        apChannelWidth: "通道頻寬",
-        apTxPower: "發射功率",
-        apRadioAutoHint: "自動使用硬體支援的最新熱點標準、20 MHz 頻寬和自動發射功率。更寬頻寬需選擇固定通道。",
-        apPowerLimit: "目前通道報告的功率上限：{power} dBm。同一無線晶片上的介面可能共用功率限制。",
-        apOperatingRadio: "實際運行",
-        apReportedPower: "驅動回報功率",
-        apStandardInvalid: "所選頻段不支援此無線標準。",
-        apWidthInvalid: "所選無線標準或通道不支援此頻寬。",
-        apWideFixedChannel: "使用 40/80 MHz 頻寬時請選擇固定通道。",
-        apPowerInvalid: "發射功率必須在目前通道報告的上限以內。",
-
           title: 'Wi-Fi',
           description: '配置 Wi-Fi 資訊',
           setBtn: '設定'
@@ -1820,6 +1808,7 @@ const zh_tw = {
         manage: '管理外掛程式'
       },
       plugins: {
+        webRoutes: '網頁位址',
       installedDisabled: '{name} 已安裝，尚未啟用。',
       enableAfterInstall: '安裝後啟用',
         installLogDetails: '詳情',
@@ -2114,6 +2103,9 @@ const zh_tw = {
       }
     },
     common: {
+      retry: '重試',
+      later: '稍後',
+      error: '錯誤',
       requiresPrivilegedPassword: '需要 Sudo 密碼',
       privilegedVerification: 'Sudo 驗證',
       enterPrivilegedPassword: '請輸入 Sudo 密碼',
@@ -2158,6 +2150,18 @@ const zh_tw = {
       },
       wifi: {
         dnsHint: '每行一個 DNS 伺服器；自動 DNS 來自 DHCP 或 IPv6 RA。',
+        ssid: 'SSID',
+        apStandard: "無線標準",
+        apChannelWidth: "通道頻寬",
+        apTxPower: "發射功率",
+        apRadioAutoHint: "自動使用硬體支援的最新熱點標準、20 MHz 頻寬和自動發射功率。更寬頻寬需選擇固定通道。",
+        apPowerLimit: "目前通道報告的功率上限：{power} dBm。同一無線晶片上的介面可能共用功率限制。",
+        apOperatingRadio: "實際運行",
+        apReportedPower: "驅動回報功率",
+        apStandardInvalid: "所選頻段不支援此無線標準。",
+        apWidthInvalid: "所選無線標準或通道不支援此頻寬。",
+        apWideFixedChannel: "使用 40/80 MHz 頻寬時請選擇固定通道。",
+        apPowerInvalid: "發射功率必須在目前通道報告的上限以內。",
         savedNetworks: "已儲存網路",
         saved: "已儲存",
         addNetwork: "新增網路",
@@ -2734,6 +2738,8 @@ const zh_tw = {
       off: '關',
     },
     virtualMedia: {
+      renameSuccess: '已重新命名',
+      renameFailed: '重新命名失敗',
       networkShares: '網路共享',
       networkSourceHint: '直接掛載網路共享中的 ISO，無需先複製到 OneKVM。',
       networkReadOnly: '網路共享中的映像以唯讀方式掛載。',

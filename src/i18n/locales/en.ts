@@ -1450,18 +1450,6 @@ const en = {
           3600: '1 hour'
         },
         wifi: {
-        apStandard: "Wireless standard",
-        apChannelWidth: "Channel width",
-        apTxPower: "Transmit power",
-        apRadioAutoHint: "Auto uses the newest supported AP standard, 20 MHz bandwidth, and automatic transmit power. Wider channels require a fixed channel.",
-        apPowerLimit: "Reported limit for this channel: {power} dBm. Interfaces on the same radio may share the power limit.",
-        apOperatingRadio: "Operating",
-        apReportedPower: "Driver-reported power",
-        apStandardInvalid: "This Wi-Fi standard is unavailable in the selected band.",
-        apWidthInvalid: "This bandwidth is unavailable for the selected standard or channel.",
-        apWideFixedChannel: "Choose a fixed channel for 40/80 MHz operation.",
-        apPowerInvalid: "Transmit power must be within the reported channel limit.",
-
           title: 'Wi-Fi',
           description: 'Configure Wi-Fi',
           setBtn: 'Config'
@@ -1816,6 +1804,7 @@ const en = {
         manage: 'Manage plugin'
       },
       plugins: {
+        webRoutes: 'Web routes',
       installedDisabled: '{name} is installed and disabled.',
       enableAfterInstall: 'Enable after installation',
         installLogDetails: 'Details',
@@ -2110,6 +2099,9 @@ const en = {
       }
     },
     common: {
+      retry: 'Retry',
+      later: 'Later',
+      error: 'Error',
       requiresPrivilegedPassword: 'Requires sudo password',
       privilegedVerification: 'Sudo Verification',
       enterPrivilegedPassword: 'Please enter sudo password',
@@ -2154,6 +2146,18 @@ const en = {
       },
       wifi: {
         dnsHint: 'One DNS server per line; automatic DNS comes from DHCP or IPv6 RA.',
+        ssid: 'SSID',
+        apStandard: "Wireless standard",
+        apChannelWidth: "Channel width",
+        apTxPower: "Transmit power",
+        apRadioAutoHint: "Auto uses the newest supported AP standard, 20 MHz bandwidth, and automatic transmit power. Wider channels require a fixed channel.",
+        apPowerLimit: "Reported limit for this channel: {power} dBm. Interfaces on the same radio may share the power limit.",
+        apOperatingRadio: "Operating",
+        apReportedPower: "Driver-reported power",
+        apStandardInvalid: "This Wi-Fi standard is unavailable in the selected band.",
+        apWidthInvalid: "This bandwidth is unavailable for the selected standard or channel.",
+        apWideFixedChannel: "Choose a fixed channel for 40/80 MHz operation.",
+        apPowerInvalid: "Transmit power must be within the reported channel limit.",
         savedNetworks: "Saved networks",
         saved: "Saved",
         addNetwork: "Add network",
@@ -2730,6 +2734,8 @@ const en = {
       off: 'Off',
     },
     virtualMedia: {
+      renameSuccess: 'Renamed',
+      renameFailed: 'Rename failed',
       networkShares: 'Network shares',
       networkSourceHint: 'Mount ISO images directly from network shares without copying them to OneKVM.',
       networkReadOnly: 'Images on network shares are mounted read-only.',

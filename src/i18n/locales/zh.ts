@@ -1449,18 +1449,6 @@ const zh = {
           3600: '1小时'
         },
         wifi: {
-        apStandard: "无线标准",
-        apChannelWidth: "信道带宽",
-        apTxPower: "发射功率",
-        apRadioAutoHint: "自动使用硬件支持的最新热点标准、20 MHz 带宽和自动发射功率。更宽带宽需选择固定信道。",
-        apPowerLimit: "当前信道报告的功率上限：{power} dBm。同一无线芯片上的接口可能共享功率限制。",
-        apOperatingRadio: "实际运行",
-        apReportedPower: "驱动报告功率",
-        apStandardInvalid: "所选频段不支持此无线标准。",
-        apWidthInvalid: "所选无线标准或信道不支持此带宽。",
-        apWideFixedChannel: "使用 40/80 MHz 带宽时请选择固定信道。",
-        apPowerInvalid: "发射功率必须在当前信道报告的上限以内。",
-
           title: 'Wi-Fi',
           description: '配置 Wi-Fi 信息',
           setBtn: '设置'
@@ -1815,6 +1803,7 @@ const zh = {
         manage: '管理插件'
       },
       plugins: {
+        webRoutes: '网页地址',
       installedDisabled: '{name} 已安装，尚未启用。',
       enableAfterInstall: '安装后启用',
         installLogDetails: '详情',
@@ -2109,6 +2098,9 @@ const zh = {
       }
     },
     common: {
+      retry: '重试',
+      later: '稍后',
+      error: '错误',
       requiresPrivilegedPassword: '需要 Sudo 密码',
       privilegedVerification: 'Sudo 验证',
       enterPrivilegedPassword: '请输入 Sudo 密码',
@@ -2153,6 +2145,18 @@ const zh = {
       },
       wifi: {
         dnsHint: '每行一个 DNS 服务器；自动 DNS 来自 DHCP 或 IPv6 RA。',
+        ssid: 'SSID',
+        apStandard: "无线标准",
+        apChannelWidth: "信道带宽",
+        apTxPower: "发射功率",
+        apRadioAutoHint: "自动使用硬件支持的最新热点标准、20 MHz 带宽和自动发射功率。更宽带宽需选择固定信道。",
+        apPowerLimit: "当前信道报告的功率上限：{power} dBm。同一无线芯片上的接口可能共享功率限制。",
+        apOperatingRadio: "实际运行",
+        apReportedPower: "驱动报告功率",
+        apStandardInvalid: "所选频段不支持此无线标准。",
+        apWidthInvalid: "所选无线标准或信道不支持此带宽。",
+        apWideFixedChannel: "使用 40/80 MHz 带宽时请选择固定信道。",
+        apPowerInvalid: "发射功率必须在当前信道报告的上限以内。",
         savedNetworks: "已保存网络",
         saved: "已保存",
         addNetwork: "添加网络",
@@ -2729,6 +2733,8 @@ const zh = {
       off: '关',
     },
     virtualMedia: {
+      renameSuccess: '已重命名',
+      renameFailed: '重命名失败',
       networkShares: '网络共享',
       networkSourceHint: '直接挂载网络共享中的 ISO，无需先复制到 OneKVM。',
       networkReadOnly: '网络共享中的镜像以只读方式挂载。',

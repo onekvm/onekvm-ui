@@ -227,7 +227,7 @@ onBeforeUnmount(() => {
           <strong>{{ lockLabel(scrollLock) }}</strong>
         </span>
       </div>
-      <div class="keyboard-lock-sync-row">
+      <div v-if="keyboardLedsEnabled" class="keyboard-lock-sync-row">
         <div>
           <strong>{{ t('keyboard.syncLeds', 'Sync keyboard state') }}</strong>
           <small>{{ t('keyboard.syncLedsHint', 'Read Num Lock, Caps Lock, and Scroll Lock from the controlled device.') }}</small>
@@ -296,7 +296,7 @@ onBeforeUnmount(() => {
             <strong>{{ lockLabel(scrollLock) }}</strong>
           </span>
         </div>
-        <div class="keyboard-lock-sync-row">
+        <div v-if="keyboardLedsEnabled" class="keyboard-lock-sync-row">
           <div>
             <strong>{{ t('keyboard.syncLeds', 'Sync keyboard state') }}</strong>
             <small>{{ t('keyboard.syncLedsHint', 'Read Num Lock, Caps Lock, and Scroll Lock from the controlled device.') }}</small>

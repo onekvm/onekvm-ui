@@ -66,6 +66,7 @@ function layoutLabel(layout: KeyboardLayout) {
 
 function updateShow(show: boolean) {
   popoverOpen.value = show
+  if (show) void loadKeyboardLedsSetting()
   emit('update:show', show)
 }
 

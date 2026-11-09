@@ -4251,6 +4251,10 @@ html[data-onekvm-jelly] .host-window-frame {
 .storage-partition-tooltip { display: grid; gap: 3px; font-size: 11px; }
 .storage-partition-tooltip strong { font-size: 12px; font-weight: 650; }
 .storage-partition-tooltip span { color: var(--muted-foreground); }
+.storage-partition-device,
+.storage-partition-meta { display: flex; min-width: 0; align-items: center; gap: 5px; }
+.storage-partition-device-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.storage-partition-filesystem-badge { flex: 0 0 auto; font-family: var(--onekvm-font-mono); }
 .storage-partition-legend {
   --partition-color: #74808a;
   display: grid;
@@ -4290,11 +4294,9 @@ html[data-onekvm-jelly] .host-window-frame {
 .storage-partition-legend li > div { display: grid; min-width: 0; gap: 2px; }
 .storage-partition-legend li > div strong { color: var(--onekvm-text-secondary); font-size: 12px; font-weight: 600; }
 .storage-partition-legend li > div small {
-  overflow: hidden;
+  min-width: 0;
   color: var(--muted-foreground);
   font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .storage-partition-legend li > span { color: var(--muted-foreground); font-size: 11px; white-space: nowrap; }
 .storage-partition-legend li > span strong { color: var(--partition-color); font-weight: 650; }

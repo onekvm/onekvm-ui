@@ -2309,7 +2309,10 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                           </template>
                           <div class="storage-partition-tooltip">
                             <strong>{{ partitionRoleLabel(partition.role) }}</strong>
-                            <span>{{ partition.device }}<template v-if="partition.filesystem"> · {{ partition.filesystem }}</template></span>
+                            <span class="storage-partition-device">
+                              <span class="storage-partition-device-name">{{ partition.device }}</span>
+                              <n-tag v-if="partition.filesystem" size="tiny" round :bordered="false" class="storage-partition-filesystem-badge">{{ partition.filesystem }}</n-tag>
+                            </span>
                             <span>
                               {{ t('settings.advancedSettings.systemPage.partitionUsed', 'Used') }}:
                               {{ formatStorageBytes(partition.used_bytes) }} / {{ formatStorageBytes(partition.total_bytes) }}
@@ -2328,9 +2331,10 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                           <i />
                           <div>
                             <strong>{{ partitionRoleLabel(partition.role) }}</strong>
-                            <small>
-                              {{ partition.device }}<template v-if="partition.filesystem"> · {{ partition.filesystem }}</template>
-                              <template v-if="partition.active"> · {{ t('settings.advancedSettings.systemPage.activePartition', 'Active') }}</template>
+                            <small class="storage-partition-meta">
+                              <span class="storage-partition-device-name">{{ partition.device }}</span>
+                              <n-tag v-if="partition.filesystem" size="tiny" round :bordered="false" class="storage-partition-filesystem-badge">{{ partition.filesystem }}</n-tag>
+                              <span v-if="partition.active"> · {{ t('settings.advancedSettings.systemPage.activePartition', 'Active') }}</span>
                             </small>
                           </div>
                           <span>

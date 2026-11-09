@@ -308,7 +308,6 @@ const collectedIconsTarget = shallowRef<HTMLElement | null>(null)
 const mouseLed = ref<HTMLElement | null>(null)
 const keyboardLed = ref<HTMLElement | null>(null)
 const gamepadLed = ref<HTMLElement | null>(null)
-const keyboardControlPopover = useTemplateRef<InstanceType<typeof KeyboardControlPopover>>('keyboardControlPopover')
 const toolbarEl = ref<HTMLElement | null>(null)
 const performanceDock = usePerformanceDock()
 const performanceTarget = shallowRef<HTMLElement | null>(null)
@@ -512,14 +511,6 @@ function onKeyboardTextWindow(open: boolean) {
   if (open && keyboardTextWindowOpen.value) keyboardTextWindow.value?.focus()
   keyboardTextWindowOpen.value = open
   emitToolbarOverlay()
-}
-
-function openKeyboardPopover() {
-  if (toolbarLauncher.value) {
-    collectionMenuOpen.value = false
-    folderOpen.value = ''
-  }
-  keyboardControlPopover.value?.open()
 }
 
 function setLauncherMenuOpen(open: boolean) {
@@ -1948,7 +1939,6 @@ onBeforeUnmount(() => {
               :data-state="keyboardLockDeviceState(item.value)"
               :aria-label="`${item.label}: ${keyboardLockLabel(item.value)}`"
               :disabled="pipActive"
-              @click="openKeyboardPopover"
             >
               <template #icon><component :is="item.icon" /></template>
               <span class="device-led" />

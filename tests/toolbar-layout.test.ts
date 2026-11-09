@@ -4,7 +4,7 @@ import { groupToolbarItems, isToolbarSeparator, moveToolbarItem, normalizeToolba
 
 const initial: ToolbarLayout = { toolbar_icons: defaultToolbarIcons() }
 assert.deepEqual(normalizeToolbarFolders(undefined), [])
-assert.equal(toolbarLayoutOrder(initial).length, 20)
+assert.equal(toolbarLayoutOrder(initial).length, 22)
 assert.ok(toolbarLayoutOrder(initial).includes('separator:controls'))
 assert.equal(toolbarLayoutOrder(initial).at(-2), 'separator:account')
 assert.deepEqual(visibleToolbarSeparators(toolbarLayoutOrder(initial), new Set(['display', 'fullscreen', 'account'])), ['separator:controls', 'separator:account'])

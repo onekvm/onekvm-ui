@@ -8,10 +8,13 @@ import {
   CircleUserRound,
   Command,
   Disc3,
+  ArrowBigUpDash,
+  ArrowDownUp,
   FolderSync,
   HardDrive,
   GripVertical,
   Gamepad2,
+  Hash,
   Keyboard,
   Languages,
   Layers,
@@ -116,7 +119,6 @@ import GamepadPopover from './GamepadPopover.vue'
 import MouseSettingsPopover from './MouseSettingsPopover.vue'
 import PowerControlPopover from './PowerControlPopover.vue'
 import HddActivityIndicator from './HddActivityIndicator.vue'
-import KeyboardLedIndicator from './KeyboardLedIndicator.vue'
 import AudioPopover from './AudioPopover.vue'
 import MediaTransferIndicator from './MediaTransferIndicator.vue'
 import type { MediaTransferState } from '@/lib/media-transfer'
@@ -187,7 +189,7 @@ const emit = defineEmits<{
 }>()
 
 type DeviceState = 'ready' | 'waiting' | 'error'
-type MenuName = 'display' | 'mouse' | 'keyboard' | 'keyboard_leds' | 'gamepad' | 'power' | 'audio' | 'language' | 'account'
+type MenuName = 'display' | 'mouse' | 'keyboard' | 'gamepad' | 'power' | 'audio' | 'language' | 'account'
 const dialog = useAsyncDialog()
 const overlayTo = useOverlayMount()
 const message = useMessage()
@@ -1181,12 +1183,16 @@ function keyboardLockLabel(value: boolean | undefined) {
   if (value === undefined) return t('keyboard.lockUnknown', 'Unknown')
   return value ? t('keyboard.lockOn', 'On') : t('keyboard.lockOff', 'Off')
 }
-const keyboardLedsLabel = computed(() => [
-  t('keyboard.lights', 'Keyboard lights'),
-  `${t('keyboard.capsLock', 'Caps Lock')}: ${keyboardLockLabel(props.status?.hid?.caps_lock)}`,
-  `${t('keyboard.numLock', 'Num Lock')}: ${keyboardLockLabel(props.status?.hid?.num_lock)}`,
-  `${t('keyboard.scrollLock', 'Scroll Lock')}: ${keyboardLockLabel(props.status?.hid?.scroll_lock)}`,
-].join(' · '))
+function keyboardLockDeviceState(value: boolean | undefined): DeviceState | 'off' | 'unknown' {
+  if (value === true) return 'ready'
+  if (value === false) return 'off'
+  return 'unknown'
+}
+const keyboardLockToolbarItems = computed(() => [
+  { id: 'caps_lock' as const, label: t('keyboard.capsLock', 'Caps Lock'), value: props.status?.hid?.caps_lock, icon: ArrowBigUpDash },
+  { id: 'num_lock' as const, label: t('keyboard.numLock', 'Num Lock'), value: props.status?.hid?.num_lock, icon: Hash },
+  { id: 'scroll_lock' as const, label: t('keyboard.scrollLock', 'Scroll Lock'), value: props.status?.hid?.scroll_lock, icon: ArrowDownUp },
+])
 const deviceControlExtensions = toolbarItemsFor('device-controls')
 const actionStartExtensions = toolbarItemsFor('actions-start')
 const actionEndExtensions = toolbarItemsFor('actions-end')
@@ -1220,7 +1226,7 @@ watch(() => collectedIcons.value.length, count => {
 })
 const mediaTransferVisible = computed(() => props.mediaTransfer.uploading && props.mediaTransfer.minimized)
 const deviceClusterShown = computed(() => {
-  const builtin = (['display', 'mouse', 'keyboard', 'keyboard_leds', 'virtual_keyboard', 'keyboard_text', 'ctrl_alt_del', 'power', 'virtual_media'] as const).some(toolbarIconShown)
+  const builtin = (['display', 'mouse', 'keyboard', 'caps_lock', 'num_lock', 'scroll_lock', 'virtual_keyboard', 'keyboard_text', 'ctrl_alt_del', 'power', 'virtual_media'] as const).some(toolbarIconShown)
     || (USB_GAMEPAD_UI_ENABLED && Boolean(props.status?.hid?.gamepad) && toolbarIconShown('gamepad'))
     || (audioControlAvailable.value && toolbarIconShown('audio'))
     || (hddIndicatorVisible.value && toolbarIconShown('power'))
@@ -1925,33 +1931,31 @@ onBeforeUnmount(() => {
       </ToolbarIconSlot>
 
       <ToolbarIconSlot
-        :collected="!toolbarIconShown('keyboard_leds')"
-        data-toolbar-item="keyboard_leds"
-        :target="toolbarItemTarget('keyboard_leds')"
-        :order="toolbarItemOrder('keyboard_leds')"
-        @activate="onCollectedIconClick('keyboard_leds')"
+        v-for="item in keyboardLockToolbarItems"
+        :key="item.id"
+        :collected="!toolbarIconShown(item.id)"
+        :data-toolbar-item="item.id"
+        :target="toolbarItemTarget(item.id)"
+        :order="toolbarItemOrder(item.id)"
+        @activate="onCollectedIconClick(item.id)"
       >
-        <n-tooltip :disabled="!toolbarIconShown('keyboard_leds') || toolbarLauncher">
+        <n-tooltip :disabled="!toolbarIconShown(item.id) || toolbarLauncher">
           <template #trigger>
-            <n-button :role="toolbarIconShown('keyboard_leds') ? undefined : 'menuitem'"
+            <n-button :role="toolbarIconShown(item.id) ? undefined : 'menuitem'"
               quaternary
               size="small"
-              class="device-indicator keyboard-leds-indicator"
-              :aria-label="keyboardLedsLabel"
+              class="device-indicator"
+              :data-state="keyboardLockDeviceState(item.value)"
+              :aria-label="`${item.label}: ${keyboardLockLabel(item.value)}`"
               :disabled="pipActive"
               @click="openKeyboardPopover"
             >
-              <template #icon>
-                <KeyboardLedIndicator
-                  :caps-lock="status?.hid?.caps_lock"
-                  :num-lock="status?.hid?.num_lock"
-                  :scroll-lock="status?.hid?.scroll_lock"
-                />
-              </template>
-              <span class="toolbar-action-label">{{ t('keyboard.lights', 'Keyboard lights') }}</span>
+              <template #icon><component :is="item.icon" /></template>
+              <span class="device-led" />
+              <span class="toolbar-action-label">{{ item.label }}</span>
             </n-button>
           </template>
-          {{ keyboardLedsLabel }}
+          {{ item.label }}: {{ keyboardLockLabel(item.value) }}
         </n-tooltip>
       </ToolbarIconSlot>
 

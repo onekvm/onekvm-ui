@@ -4,7 +4,9 @@ export const TOOLBAR_ICON_IDS = [
   'display',
   'mouse',
   'keyboard',
-  'keyboard_leds',
+  'caps_lock',
+  'num_lock',
+  'scroll_lock',
   'virtual_keyboard',
   'keyboard_text',
   'ctrl_alt_del',
@@ -25,7 +27,9 @@ const DEVICE_TOOLBAR_ICONS = new Set<ToolbarIconId>([
   'display',
   'mouse',
   'keyboard',
-  'keyboard_leds',
+  'caps_lock',
+  'num_lock',
+  'scroll_lock',
   'virtual_keyboard',
   'keyboard_text',
   'ctrl_alt_del',
@@ -48,7 +52,7 @@ export function isKeyboardActionToolbarIcon(id: ToolbarIconId) {
 }
 
 function toolbarIconHiddenByDefault(id: ToolbarIconId) {
-  return id === 'keyboard_leds' || isKeyboardActionToolbarIcon(id)
+  return id === 'caps_lock' || id === 'num_lock' || id === 'scroll_lock' || isKeyboardActionToolbarIcon(id)
 }
 
 export function isRootOnlyToolbarIcon(id: string) {

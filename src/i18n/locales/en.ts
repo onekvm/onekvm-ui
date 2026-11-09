@@ -1872,6 +1872,10 @@ const en = {
         usedCapabilities: 'Core capabilities used',
         risk: 'Risk',
         featureDetails: {
+          mqttEntities: {
+            label: 'MQTT extension',
+            description: 'Home Assistant entities: {count}. Manage access in MQTT settings.',
+          },
           mcpTools: {
             label: 'MCP extension',
             description: 'Tools for MCP: {count}. Manage access in MCP settings.',

@@ -27,8 +27,10 @@ const items = computed(() => {
     result.push({ id, icon, label: text('label'), description: description || text('description') })
   }
   if (detail.page) add('page', 'page', PanelsTopLeft, extensionTranslation(detail, currentLanguage.value).name)
-  const mcpTools = detail.contributions?.filter(item => item.point === 'mcp.tool' && item.version === 1).length || 0
+  const mcpTools = new Set(detail.contributions?.filter(item => ['extend.mcp', 'mcp.tool'].includes(item.point) && item.version === 1).map(item => item.id)).size
   if (mcpTools) add('mcp-tools', 'mcpTools', Plug, '', t('settings.plugins.featureDetails.mcpTools.description').replace('{count}', String(mcpTools)))
+  const mqttEntities = detail.contributions?.filter(item => item.point === 'extend.mqtt' && item.version === 1).length || 0
+  if (mqttEntities) add('mqtt-entities', 'mqttEntities', Plug, '', t('settings.plugins.featureDetails.mqttEntities.description').replace('{count}', String(mqttEntities)))
   for (const tool of detail.toolbox?.items || []) {
     const title = extensionLocalizedText(Object.fromEntries(Object.entries(tool.i18n || {}).map(([locale, value]) => [locale, value.title])), currentLanguage.value, tool.title)
     add(`toolbox:${tool.id}`, tool.presentation === 'drawer' ? 'toolDrawer' : 'toolWindow', Toolbox, title)

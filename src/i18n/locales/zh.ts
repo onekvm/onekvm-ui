@@ -1871,6 +1871,10 @@ const zh = {
         usedCapabilities: '使用的核心能力',
         risk: '风险',
         featureDetails: {
+          mqttEntities: {
+            label: 'MQTT 扩展',
+            description: '提供 {count} 个 Home Assistant 实体，可在 MQTT 设置中管理接入。',
+          },
           mcpTools: {
             label: 'MCP 扩展',
             description: '提供 {count} 个工具，可在 MCP 设置中管理接入。',

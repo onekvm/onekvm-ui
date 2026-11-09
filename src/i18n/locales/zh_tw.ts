@@ -1876,6 +1876,10 @@ const zh_tw = {
         usedCapabilities: '使用的核心能力',
         risk: '風險',
         featureDetails: {
+          mqttEntities: {
+            label: 'MQTT 擴充',
+            description: '提供 {count} 個 Home Assistant 實體，可在 MQTT 設定中管理存取。',
+          },
           mcpTools: {
             label: 'MCP 擴充',
             description: '提供 {count} 個工具，可在 MCP 設定中管理存取。',

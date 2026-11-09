@@ -1943,8 +1943,7 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
           />
         </div>
         <main class="advanced-settings-main">
-        <Transition name="advanced-section" mode="out-in">
-          <div :key="paneSection" class="advanced-settings-view">
+        <div :key="paneSection" class="advanced-settings-view">
             <header class="advanced-settings-section-header">
               <n-button v-if="embedded && mobileDetail" quaternary size="small" :aria-label="settingsBackLabel" @click="onSettingsBack">
                 <template #icon><ArrowLeft /></template>
@@ -2706,8 +2705,7 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                 </template>
               </section>
             </n-spin>
-          </div>
-        </Transition>
+        </div>
       </main>
       </div>
     </div>

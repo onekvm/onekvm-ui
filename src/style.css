@@ -3767,15 +3767,6 @@ html[data-onekvm-jelly] .host-window-frame {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.advanced-settings-page.is-settings-app .advanced-section-enter-active,
-.advanced-settings-page.is-settings-app .advanced-section-leave-active {
-  transition: none;
-}
-.advanced-settings-page.is-settings-app .advanced-section-enter-from,
-.advanced-settings-page.is-settings-app .advanced-section-leave-to {
-  opacity: 1;
-  transform: none;
-}
 .advanced-settings-page.is-settings-app .advanced-settings-main {
   padding: 16px 16px calc(24px + env(safe-area-inset-bottom, 0px));
 }
@@ -3910,14 +3901,6 @@ html[data-onekvm-jelly] .host-window-frame {
 @media (prefers-reduced-motion: reduce) {
   .onekvm-html-loading-spinner { animation-duration: 1.8s; }
 }
-.advanced-section-enter-active {
-  transition: opacity 170ms ease, transform 170ms ease;
-}
-.advanced-section-leave-active {
-  transition: opacity 100ms ease, transform 100ms ease;
-}
-.advanced-section-enter-from { opacity: 0; transform: translateY(7px); }
-.advanced-section-leave-to { opacity: 0; transform: translateY(-4px); }
 .advanced-settings-section-header,
 .advanced-settings-section {
   width: min(1040px, 100%);
@@ -5497,8 +5480,6 @@ body .n-drawer.slide-in-from-right-transition-leave-active {
   .settings-page-enter-active,
   .settings-page-leave-active,
   .onekvm-page-loading-leave-active,
-  .advanced-section-enter-active,
-  .advanced-section-leave-active,
   .system-action-overlay-enter-active,
   .system-action-overlay-leave-active,
   .system-action-overlay-enter-active .system-action-modal-card,

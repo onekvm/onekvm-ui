@@ -2984,6 +2984,34 @@ html[data-onekvm-jelly] .host-window-frame {
 .keyboard-lock-indicator[data-state="on"] strong { color: var(--success); }
 .keyboard-lock-indicator[data-state="unknown"] { opacity: 0.72; }
 
+.keyboard-lock-sync-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.keyboard-lock-sync-row > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.keyboard-lock-sync-row strong {
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.keyboard-lock-sync-row small {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .mouse-status-values {
   font-family: inherit;
   font-size: 12px;

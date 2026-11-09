@@ -116,6 +116,7 @@ import GamepadPopover from './GamepadPopover.vue'
 import MouseSettingsPopover from './MouseSettingsPopover.vue'
 import PowerControlPopover from './PowerControlPopover.vue'
 import HddActivityIndicator from './HddActivityIndicator.vue'
+import KeyboardLedIndicator from './KeyboardLedIndicator.vue'
 import AudioPopover from './AudioPopover.vue'
 import MediaTransferIndicator from './MediaTransferIndicator.vue'
 import type { MediaTransferState } from '@/lib/media-transfer'
@@ -186,7 +187,7 @@ const emit = defineEmits<{
 }>()
 
 type DeviceState = 'ready' | 'waiting' | 'error'
-type MenuName = 'display' | 'mouse' | 'keyboard' | 'gamepad' | 'power' | 'audio' | 'language' | 'account'
+type MenuName = 'display' | 'mouse' | 'keyboard' | 'keyboard_leds' | 'gamepad' | 'power' | 'audio' | 'language' | 'account'
 const dialog = useAsyncDialog()
 const overlayTo = useOverlayMount()
 const message = useMessage()
@@ -305,6 +306,7 @@ const collectedIconsTarget = shallowRef<HTMLElement | null>(null)
 const mouseLed = ref<HTMLElement | null>(null)
 const keyboardLed = ref<HTMLElement | null>(null)
 const gamepadLed = ref<HTMLElement | null>(null)
+const keyboardControlPopover = useTemplateRef<InstanceType<typeof KeyboardControlPopover>>('keyboardControlPopover')
 const toolbarEl = ref<HTMLElement | null>(null)
 const performanceDock = usePerformanceDock()
 const performanceTarget = shallowRef<HTMLElement | null>(null)
@@ -508,6 +510,14 @@ function onKeyboardTextWindow(open: boolean) {
   if (open && keyboardTextWindowOpen.value) keyboardTextWindow.value?.focus()
   keyboardTextWindowOpen.value = open
   emitToolbarOverlay()
+}
+
+function openKeyboardPopover() {
+  if (toolbarLauncher.value) {
+    collectionMenuOpen.value = false
+    folderOpen.value = ''
+  }
+  keyboardControlPopover.value?.open()
 }
 
 function setLauncherMenuOpen(open: boolean) {
@@ -1167,6 +1177,16 @@ const screenState = computed<DeviceState>(() => {
 })
 
 const inputState = computed<DeviceState>(() => hidIndicatorState(props.status?.hid))
+function keyboardLockLabel(value: boolean | undefined) {
+  if (value === undefined) return t('keyboard.lockUnknown', 'Unknown')
+  return value ? t('keyboard.lockOn', 'On') : t('keyboard.lockOff', 'Off')
+}
+const keyboardLedsLabel = computed(() => [
+  t('keyboard.lights', 'Keyboard lights'),
+  `${t('keyboard.capsLock', 'Caps Lock')}: ${keyboardLockLabel(props.status?.hid?.caps_lock)}`,
+  `${t('keyboard.numLock', 'Num Lock')}: ${keyboardLockLabel(props.status?.hid?.num_lock)}`,
+  `${t('keyboard.scrollLock', 'Scroll Lock')}: ${keyboardLockLabel(props.status?.hid?.scroll_lock)}`,
+].join(' · '))
 const deviceControlExtensions = toolbarItemsFor('device-controls')
 const actionStartExtensions = toolbarItemsFor('actions-start')
 const actionEndExtensions = toolbarItemsFor('actions-end')
@@ -1200,7 +1220,7 @@ watch(() => collectedIcons.value.length, count => {
 })
 const mediaTransferVisible = computed(() => props.mediaTransfer.uploading && props.mediaTransfer.minimized)
 const deviceClusterShown = computed(() => {
-  const builtin = (['display', 'mouse', 'keyboard', 'virtual_keyboard', 'keyboard_text', 'ctrl_alt_del', 'power', 'virtual_media'] as const).some(toolbarIconShown)
+  const builtin = (['display', 'mouse', 'keyboard', 'keyboard_leds', 'virtual_keyboard', 'keyboard_text', 'ctrl_alt_del', 'power', 'virtual_media'] as const).some(toolbarIconShown)
     || (USB_GAMEPAD_UI_ENABLED && Boolean(props.status?.hid?.gamepad) && toolbarIconShown('gamepad'))
     || (audioControlAvailable.value && toolbarIconShown('audio'))
     || (hddIndicatorVisible.value && toolbarIconShown('power'))
@@ -1869,6 +1889,7 @@ onBeforeUnmount(() => {
         @activate="onCollectedIconClick('keyboard')"
       >
       <KeyboardControlPopover
+        ref="keyboardControlPopover"
         :options="keyboardOptions"
         :input-suspended="pipActive"
         :layout="keyboardLayout"
@@ -1876,6 +1897,7 @@ onBeforeUnmount(() => {
         :num-lock="status?.hid?.num_lock"
         :caps-lock="status?.hid?.caps_lock"
         :scroll-lock="status?.hid?.scroll_lock"
+        :can-manage-settings="canArrangeToolbar"
         :placement="menuPlacement"
         :sheet="toolbarLauncher"
         @select="selectKeyboard"
@@ -1900,6 +1922,37 @@ onBeforeUnmount(() => {
           {{ deviceStateLabel(t('keyboard.title', 'Keyboard'), inputState) }}
         </n-tooltip>
       </KeyboardControlPopover>
+      </ToolbarIconSlot>
+
+      <ToolbarIconSlot
+        :collected="!toolbarIconShown('keyboard_leds')"
+        data-toolbar-item="keyboard_leds"
+        :target="toolbarItemTarget('keyboard_leds')"
+        :order="toolbarItemOrder('keyboard_leds')"
+        @activate="onCollectedIconClick('keyboard_leds')"
+      >
+        <n-tooltip :disabled="!toolbarIconShown('keyboard_leds') || toolbarLauncher">
+          <template #trigger>
+            <n-button :role="toolbarIconShown('keyboard_leds') ? undefined : 'menuitem'"
+              quaternary
+              size="small"
+              class="device-indicator keyboard-leds-indicator"
+              :aria-label="keyboardLedsLabel"
+              :disabled="pipActive"
+              @click="openKeyboardPopover"
+            >
+              <template #icon>
+                <KeyboardLedIndicator
+                  :caps-lock="status?.hid?.caps_lock"
+                  :num-lock="status?.hid?.num_lock"
+                  :scroll-lock="status?.hid?.scroll_lock"
+                />
+              </template>
+              <span class="toolbar-action-label">{{ t('keyboard.lights', 'Keyboard lights') }}</span>
+            </n-button>
+          </template>
+          {{ keyboardLedsLabel }}
+        </n-tooltip>
       </ToolbarIconSlot>
 
       <ToolbarIconSlot

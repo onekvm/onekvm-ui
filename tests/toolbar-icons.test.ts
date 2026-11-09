@@ -11,11 +11,11 @@ import {
 } from '../src/lib/toolbar-icons.ts'
 
 const defaults = defaultToolbarIcons()
-assert.equal(defaults.length, 17)
+assert.equal(defaults.length, 18)
 assert.equal(defaults[0]?.id, 'display')
 assert.equal(defaults.at(-1)?.id, 'account')
 assert.deepEqual(defaults.filter(icon => icon.hidden).map(icon => icon.id), [
-  'virtual_keyboard', 'keyboard_text', 'ctrl_alt_del',
+  'keyboard_leds', 'virtual_keyboard', 'keyboard_text', 'ctrl_alt_del',
 ])
 
 assert.deepEqual(normalizeToolbarIcons(undefined).map(icon => icon.id), defaults.map(icon => icon.id))
@@ -30,7 +30,7 @@ const mixed = normalizeToolbarIcons([
   { id: 'language', hidden: false },
 ])
 assert.deepEqual(mixed.map(icon => icon.id), [
-  'mouse', 'display', 'keyboard', 'virtual_keyboard', 'keyboard_text', 'ctrl_alt_del',
+  'mouse', 'display', 'keyboard', 'keyboard_leds', 'virtual_keyboard', 'keyboard_text', 'ctrl_alt_del',
   'gamepad', 'power', 'audio', 'virtual_media',
   'account', 'collection', 'settings', 'language', 'performance', 'fullscreen', 'toolbox',
 ])

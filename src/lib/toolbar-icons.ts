@@ -4,6 +4,7 @@ export const TOOLBAR_ICON_IDS = [
   'display',
   'mouse',
   'keyboard',
+  'keyboard_leds',
   'virtual_keyboard',
   'keyboard_text',
   'ctrl_alt_del',
@@ -24,6 +25,7 @@ const DEVICE_TOOLBAR_ICONS = new Set<ToolbarIconId>([
   'display',
   'mouse',
   'keyboard',
+  'keyboard_leds',
   'virtual_keyboard',
   'keyboard_text',
   'ctrl_alt_del',
@@ -45,12 +47,16 @@ export function isKeyboardActionToolbarIcon(id: ToolbarIconId) {
   return id === 'virtual_keyboard' || id === 'keyboard_text' || id === 'ctrl_alt_del'
 }
 
+function toolbarIconHiddenByDefault(id: ToolbarIconId) {
+  return id === 'keyboard_leds' || isKeyboardActionToolbarIcon(id)
+}
+
 export function isRootOnlyToolbarIcon(id: string) {
   return id === 'settings' || id === 'collection'
 }
 
 export function defaultToolbarIcons(): ToolbarIconPreference[] {
-  return TOOLBAR_ICON_IDS.map(id => ({ id, hidden: isKeyboardActionToolbarIcon(id) }))
+  return TOOLBAR_ICON_IDS.map(id => ({ id, hidden: toolbarIconHiddenByDefault(id) }))
 }
 
 export function normalizeToolbarIcons(
@@ -68,7 +74,7 @@ export function normalizeToolbarIcons(
   }
   for (const id of TOOLBAR_ICON_IDS) {
     if (seen.has(id)) continue
-    const preference = { id, hidden: isKeyboardActionToolbarIcon(id) }
+    const preference = { id, hidden: toolbarIconHiddenByDefault(id) }
     if (isDeviceToolbarIcon(id)) device.push(preference)
     else if (id === 'collection') {
       const settingsIndex = action.findIndex(icon => icon.id === 'settings')

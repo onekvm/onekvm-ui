@@ -348,6 +348,7 @@ export type ToolbarIconId =
   | 'display'
   | 'mouse'
   | 'keyboard'
+  | 'keyboard_leds'
   | 'virtual_keyboard'
   | 'keyboard_text'
   | 'ctrl_alt_del'

@@ -509,7 +509,7 @@ async function connectVirtualMedia() {
     message.success(t('virtualMedia.connectSuccess', 'Virtual media connected'))
     await refresh()
   } catch (error) {
-    message.error(`${t('virtualMedia.connectionFailed', 'Connection failed:')} ${error instanceof Error ? error.message : String(error)}`)
+    message.error(`${t('virtualMedia.connectionFailed', 'Connection failed')}: ${error instanceof Error ? error.message : String(error)}`)
   } finally {
     connecting.value = false
   }
@@ -528,7 +528,7 @@ async function disconnectVirtualMedia() {
     message.success(t('virtualMedia.disconnectSuccess', 'Virtual media disconnected'))
     await refresh()
   } catch (error) {
-    message.error(`${t('virtualMedia.disconnectFailed', 'Disconnect failed:')} ${error instanceof Error ? error.message : String(error)}`)
+    message.error(`${t('virtualMedia.disconnectFailed', 'Disconnect failed')}: ${error instanceof Error ? error.message : String(error)}`)
     await refresh()
   } finally {
     disconnecting.value = false
@@ -551,7 +551,7 @@ async function mount(item: MSDMedia) {
     message.success(t('virtualMedia.mountSuccess', 'Media mounted'))
     await refresh()
   } catch (error) {
-    message.error(`${t('virtualMedia.mountFailed', 'Mount failed')}: ${error instanceof Error ? error.message : String(error)}`)
+    message.error(`${t('virtualMedia.mountFailed', 'Couldn’t mount the image')}: ${error instanceof Error ? error.message : String(error)}`)
   } finally {
     if (mountingID.value === item.id) mountingID.value = null
   }
@@ -616,7 +616,7 @@ async function mountBrowserISO(event: Event) {
       if (browserISO.value === session) browserISO.value = null
       session.destroy()
       browserProgress.value = null
-      message.error(`${t('virtualMedia.mountFailed', 'Mount failed')}: ${error instanceof Error ? error.message : String(error)}`)
+      message.error(`${t('virtualMedia.mountFailed', 'Couldn’t mount the image')}: ${error instanceof Error ? error.message : String(error)}`)
       await refresh()
     }
   } finally {

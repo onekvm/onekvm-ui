@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useMessage, type InputInst } from 'naive-ui'
 
-import { api, type KeyboardLayout, type KeyboardTextMode } from '@/api/client'
+import { api, type KeyboardLayout, type KeyboardTextMode, type KeyboardTextOS } from '@/api/client'
 import { onekvm } from '@/lib/onekvm'
 import { t } from '@/i18n/runtime'
 import { filterKeyboardText } from '@/input/keyboard-text'
@@ -32,6 +32,11 @@ const windowHeight = computed(() => viewportWidth.value <= 760 ? Math.max(240, v
 const compactWindow = computed(() => viewportWidth.value <= 760)
 const unicodeMode = ref(false)
 const mode = computed<KeyboardTextMode>(() => unicodeMode.value ? 'unicode' : 'layout')
+const inputMethodOS = ref<KeyboardTextOS>('linux')
+const inputMethodOSOptions = computed(() => [
+  { label: t('keyboard.osLinux', 'Linux'), value: 'linux' as KeyboardTextOS },
+  { label: t('keyboard.osWindows', 'Windows'), value: 'windows' as KeyboardTextOS },
+])
 let restoreState: 'normal' | 'maximized' = 'normal'
 let unsupportedWarningAt = 0
 
@@ -52,6 +57,7 @@ function updateText(value: string) {
 }
 
 function resumeConsole() {
+  onekvm.keyboardState.release('physical', 'virtual', 'virtual-chord', 'magic')
   onekvm.sendKeyboard([])
   document.querySelector<HTMLElement>('.console-hid-layer')?.focus({ preventScroll: true })
 }
@@ -114,10 +120,11 @@ async function sendText() {
   sendingText.value = true
   try {
     const sent = text.value
-    const result = await api.sendKeyboardText(sent, props.layout, undefined, mode.value)
+    const result = await api.sendKeyboardText(sent, props.layout, undefined, mode.value, inputMethodOS.value)
     text.value = ''
     onekvm.notifyKeyboardText(sent)
     show.value = false
+    resumeConsole()
     message.success(t('keyboard.textSent', 'Sent {count} characters').replace('{count}', String(result.characters)))
   } catch (error) {
     message.error(error instanceof Error ? error.message : String(error))
@@ -158,11 +165,23 @@ watch(unicodeMode, (enabled) => {
         <template #title-icon><TextCursorInput :size="18" /></template>
         <div class="keyboard-text-window-content">
           <n-checkbox v-model:checked="unicodeMode" class="keyboard-text-window-mode" :aria-label="t('keyboard.sendMode', 'Send mode')">
-            {{ t('keyboard.modeUnicode', 'Unicode input') }}
+            {{ t('keyboard.modeUnicode', 'Input method') }}
           </n-checkbox>
+          <div v-if="unicodeMode" class="keyboard-text-window-os">
+            <span class="keyboard-text-window-os-label">{{ t('keyboard.inputMethodOS', 'Operating system') }}</span>
+            <n-select
+              v-model:value="inputMethodOS"
+              size="small"
+              :options="inputMethodOSOptions"
+              :aria-label="t('keyboard.inputMethodOS', 'Operating system')"
+            />
+          </div>
           <p class="keyboard-text-window-hint">
-            <template v-if="mode === 'unicode'">
-              {{ t('keyboard.unicodeTips', 'Uses the Linux Unicode input method (Ctrl+Shift+U). The remote host must support it.') }}
+            <template v-if="unicodeMode && inputMethodOS === 'linux'">
+              {{ t('keyboard.inputMethodLinuxTips', 'Uses the Linux input method (Ctrl+Shift+U). The remote host must support it.') }}
+            </template>
+            <template v-else-if="unicodeMode">
+              {{ t('keyboard.inputMethodWindowsTips', 'Uses Windows Alt+numpad input. The remote host must support Unicode input through the numeric keypad.') }}
             </template>
             <template v-else>
               {{ t('keyboard.tips', 'Only characters available on the selected remote keyboard layout can be sent.') }}

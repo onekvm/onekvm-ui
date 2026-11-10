@@ -3067,6 +3067,23 @@ html[data-onekvm-jelly] .host-window-frame {
   min-width: 0;
 }
 
+.keyboard-text-window-os {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 0.8fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.keyboard-text-window-os-label {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.keyboard-text-window-os .n-base-selection {
+  min-width: 0;
+}
+
 .keyboard-text-window-hint {
   display: flex;
   flex-wrap: wrap;

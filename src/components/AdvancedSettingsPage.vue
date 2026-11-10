@@ -2308,10 +2308,15 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                             </div>
                           </template>
                           <div class="storage-partition-tooltip">
-                            <strong>{{ partitionRoleLabel(partition.role) }}</strong>
+                            <div class="storage-partition-title">
+                              <strong>{{ partitionRoleLabel(partition.role) }}</strong>
+                              <n-tag v-if="partition.filesystem" size="tiny" round :bordered="false" class="storage-partition-filesystem-badge">{{ partition.filesystem }}</n-tag>
+                              <n-tag v-if="partition.active" size="tiny" round type="success" :bordered="false" class="storage-partition-active-badge">
+                                {{ t('settings.advancedSettings.systemPage.activePartition', 'Active') }}
+                              </n-tag>
+                            </div>
                             <span class="storage-partition-device">
                               <span class="storage-partition-device-name">{{ partition.device }}</span>
-                              <n-tag v-if="partition.filesystem" size="tiny" round :bordered="false" class="storage-partition-filesystem-badge">{{ partition.filesystem }}</n-tag>
                             </span>
                             <span>
                               {{ t('settings.advancedSettings.systemPage.partitionUsed', 'Used') }}:
@@ -2330,11 +2335,15 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                         >
                           <i />
                           <div>
-                            <strong>{{ partitionRoleLabel(partition.role) }}</strong>
+                            <div class="storage-partition-title">
+                              <strong>{{ partitionRoleLabel(partition.role) }}</strong>
+                              <n-tag v-if="partition.filesystem" size="tiny" round :bordered="false" class="storage-partition-filesystem-badge">{{ partition.filesystem }}</n-tag>
+                              <n-tag v-if="partition.active" size="tiny" round type="success" :bordered="false" class="storage-partition-active-badge">
+                                {{ t('settings.advancedSettings.systemPage.activePartition', 'Active') }}
+                              </n-tag>
+                            </div>
                             <small class="storage-partition-meta">
                               <span class="storage-partition-device-name">{{ partition.device }}</span>
-                              <n-tag v-if="partition.filesystem" size="tiny" round :bordered="false" class="storage-partition-filesystem-badge">{{ partition.filesystem }}</n-tag>
-                              <span v-if="partition.active"> · {{ t('settings.advancedSettings.systemPage.activePartition', 'Active') }}</span>
                             </small>
                           </div>
                           <span>

@@ -3596,6 +3596,7 @@ html[data-onekvm-jelly] .host-window-frame {
   min-height: 0;
   height: 100%;
   grid-template-rows: minmax(0, 1fr);
+  container: advanced-settings / inline-size;
 }
 .advanced-settings-page {
   display: grid;
@@ -3882,6 +3883,40 @@ html[data-onekvm-jelly] .host-window-frame {
 .advanced-settings-page.is-settings-app .system-time-value .n-button {
   width: 100%;
 }
+.advanced-settings-page.is-settings-app .advanced-settings-header { padding-inline: 8px; }
+.advanced-settings-page.is-settings-app .system-device-overview { align-items: flex-start; flex-wrap: wrap; }
+.advanced-settings-page.is-settings-app .system-device-identity { min-width: calc(100% - 74px); }
+.advanced-settings-page.is-settings-app .system-online-state { margin-left: 74px; }
+.advanced-settings-page.is-settings-app .system-spec-list > div { grid-template-columns: 1fr; gap: 4px; }
+.advanced-settings-page.is-settings-app .system-spec-cards {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.advanced-settings-page.is-settings-app .system-spec-cards > div { min-height: 96px; padding: 14px; }
+.advanced-settings-page.is-settings-app .storage-partition-legend { grid-template-columns: 1fr; }
+.advanced-settings-page.is-settings-app .system-control-list > div { grid-template-columns: 1fr; gap: 10px; }
+.advanced-settings-page.is-settings-app .system-control-list .n-select,
+.advanced-settings-page.is-settings-app .timezone-map-shell,
+.advanced-settings-page.is-settings-app .ntp-server-editor { width: 100%; }
+.advanced-settings-page.is-settings-app .system-time-value { align-items: stretch; flex-direction: column; }
+.advanced-settings-page.is-settings-app .system-slot-list > li {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 14px 16px;
+}
+.advanced-settings-page.is-settings-app .system-slot-badges { justify-content: flex-start; }
+.advanced-settings-page.is-settings-app .system-slot-list .n-button { width: 100%; justify-self: stretch; }
+.advanced-settings-page.is-settings-app .system-update-status {
+  grid-template-columns: 24px minmax(0, 1fr);
+  padding: 14px 16px;
+}
+.advanced-settings-page.is-settings-app .system-update-status > span { grid-column: 2; }
+.advanced-settings-page.is-settings-app .system-update-upload {
+  grid-template-columns: 36px minmax(0, 1fr);
+  padding: 14px 16px;
+}
+.advanced-settings-page.is-settings-app .system-update-actions { grid-column: 1 / -1; justify-content: stretch; }
+.advanced-settings-page.is-settings-app .system-update-actions .n-button { flex: 1; }
+.advanced-settings-page.is-settings-app .resource-chart-grid { grid-template-columns: 1fr; gap: 14px; }
 .advanced-settings-page.is-settings-app .shortcut-row {
   gap: 10px;
   padding: 16px;
@@ -4288,10 +4323,14 @@ html[data-onekvm-jelly] .host-window-frame {
 .storage-partition-tooltip { display: grid; gap: 3px; font-size: 11px; }
 .storage-partition-tooltip strong { font-size: 12px; font-weight: 650; }
 .storage-partition-tooltip span { color: var(--muted-foreground); }
+.storage-partition-title { display: flex; min-width: 0; align-items: center; gap: 5px; }
+.storage-partition-title strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .storage-partition-device,
 .storage-partition-meta { display: flex; min-width: 0; align-items: center; gap: 5px; }
 .storage-partition-device-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.storage-partition-filesystem-badge { flex: 0 0 auto; font-family: var(--onekvm-font-mono); }
+.storage-partition-filesystem-badge,
+.storage-partition-active-badge { flex: 0 0 auto; font-family: var(--onekvm-font-mono); }
+.storage-partition-active-badge { font-family: inherit; }
 .storage-partition-legend {
   --partition-color: #74808a;
   display: grid;

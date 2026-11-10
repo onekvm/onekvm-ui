@@ -212,7 +212,7 @@ watch(() => status.value?.hid.macro_generation, async (generation, previous) => 
   macroInputReset.value = false
 })
 const keyboardBlocked = computed(
-  () => pipActive.value || macroInputReset.value || Boolean(status.value?.hid.macro_owner) || toolbox.inputBlocked || advancedSettingsOpen.value || accountOpen.value || shortcutDialogOpen.value || toolbarOverlayOpen.value || Boolean(state.value.fallbackPrompt),
+  () => pipActive.value || macroInputReset.value || Boolean(status.value?.hid.macro_owner) || toolbox.inputBlocked || advancedSettingsOpen.value || accountOpen.value || shortcutDialogOpen.value || toolbarOverlayOpen.value || videoFallbackShown.value,
 )
 watch(mouseMode, (value) => localStorage.setItem(MOUSE_MODE_KEY, value))
 watch(videoFit, (value) => localStorage.setItem(VIDEO_FIT_KEY, value))
@@ -222,6 +222,11 @@ watch(rightControlAsMeta, (value) => localStorage.setItem(RIGHT_CONTROL_AS_META_
 watch(swapCommandCtrl, (value) => localStorage.setItem(SWAP_COMMAND_CTRL_KEY, String(value)))
 watch(magicKey, (value) => localStorage.setItem(MAGIC_KEY_STORAGE, value))
 watch(performanceOpen, (value) => localStorage.setItem(PERFORMANCE_OVERLAY_KEY, String(value)))
+// Without a video backend, transport fallbacks cannot help; keep the console
+// status visible and leave keyboard and mouse input available.
+const videoFallbackShown = computed(
+  () => Boolean(state.value.fallbackPrompt) && status.value?.video.hdmi_error !== 'video_unavailable',
+)
 watch(
   () => state.value.fallbackPrompt,
   () => { fallbackActionError.value = '' },
@@ -782,7 +787,7 @@ onBeforeUnmount(() => {
         />
 
         <VideoFallbackModal
-          :show="Boolean(state.fallbackPrompt) && auth.authenticated"
+          :show="videoFallbackShown && auth.authenticated"
           :prompt="state.fallbackPrompt"
           :loading="switchingTransport"
           :error="fallbackActionError"

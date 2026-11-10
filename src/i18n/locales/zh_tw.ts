@@ -286,6 +286,8 @@ const zh_tw = {
       noSignal: '無信號',
       unsupportedResolution: '不支援的解析度',
       unsupportedResolutionHint: '請將被控裝置的 HDMI 輸出調整為目前機型支援的解析度和更新率。',
+      videoUnavailable: '視訊後端無法使用',
+      videoUnavailableHint: '其他功能仍可正常使用。',
       checkConnection: '請檢查 HDMI 連接',
       connectionLostTitle: '連線已中斷',
       connectionLostDetail: '瀏覽器目前無法連線 OneKVM，請檢查網路連線，或等待服務重新啟動。',

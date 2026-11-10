@@ -286,6 +286,8 @@ const en = {
       noSignal: 'No Signal',
       unsupportedResolution: 'Unsupported resolution',
       unsupportedResolutionHint: 'Set the controlled device\'s HDMI output to a resolution and refresh rate supported by this model.',
+      videoUnavailable: 'Video backend unavailable',
+      videoUnavailableHint: 'Other functions can still be used.',
       checkConnection: 'Please check HDMI connection',
       connectionLostTitle: 'Connection interrupted',
       connectionLostDetail: 'The browser can no longer reach OneKVM. Check the network connection or wait for the service to restart.',

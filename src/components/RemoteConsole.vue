@@ -100,6 +100,7 @@ function publishBrowserLatency() {
 
 const isMJPEG = computed(() => props.state.videoMode === 'mjpeg')
 const unsupportedInput = computed(() => props.hdmiError === 'out_of_range')
+const videoUnavailable = computed(() => props.hdmiError === 'video_unavailable')
 const unsupportedSize = computed(() => {
   const width = props.inputWidth ?? 0
   const height = props.inputHeight ?? 0
@@ -121,7 +122,7 @@ const transportFailed = computed(
   () => ['failed', 'disconnected'].includes(props.state.connection),
 )
 const connectionProblem = computed(
-  () => consoleConnectionProblem({
+  () => !videoUnavailable.value && consoleConnectionProblem({
     state: props.state,
     serverUnavailable: props.serverUnavailable,
     mediaError: mediaError.value,
@@ -155,7 +156,7 @@ useVideoFps(video, (fps) => {
 }, webrtcPresent, metadata => { if (webrtcPresent.value) onekvm.observeVideoFrame(metadata) })
 
 const loading = computed(
-  () => !unsupportedInput.value && !connectionProblem.value && !playing.value && ['idle', 'connecting', 'connected'].includes(props.state.connection),
+  () => !unsupportedInput.value && !videoUnavailable.value && !connectionProblem.value && !playing.value && ['idle', 'connecting', 'connected'].includes(props.state.connection),
 )
 const loadingMessage = computed(() => hasFrame.value
   ? t('screen.bufferingVideo', 'Buffering video…')
@@ -607,6 +608,16 @@ watch(
       <strong>{{ t('screen.unsupportedResolution', 'Unsupported resolution') }}</strong>
       <span v-if="unsupportedSize">{{ unsupportedSize }}</span>
       <p>{{ t('screen.unsupportedResolutionHint', 'Set the controlled device\'s HDMI output to a resolution and refresh rate supported by this model.') }}</p>
+    </div>
+
+    <div
+      v-if="videoUnavailable"
+      class="console-state console-oor"
+      role="status"
+      aria-live="polite"
+    >
+      <strong>{{ t('screen.videoUnavailable', 'Video backend unavailable') }}</strong>
+      <p>{{ t('screen.videoUnavailableHint', 'Other functions can still be used.') }}</p>
     </div>
 
     <Transition name="console-loading">

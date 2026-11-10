@@ -281,6 +281,8 @@ const zh = {
       noSignal: '无信号',
       unsupportedResolution: '不支持的分辨率',
       unsupportedResolutionHint: '请将被控设备的 HDMI 输出调整为当前机型支持的分辨率和刷新率。',
+      videoUnavailable: '视频后端不可用',
+      videoUnavailableHint: '其他功能仍可正常使用。',
       checkConnection: '请检查 HDMI 连接',
       connectionLostTitle: '连接已中断',
       connectionLostDetail: '浏览器当前无法连接 OneKVM，请检查网络连接，或等待服务重新启动。',

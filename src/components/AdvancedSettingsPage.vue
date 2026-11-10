@@ -224,6 +224,7 @@ const accountOpen = ref(false)
 const section = ref<Section>(sectionFromRoute(props.route))
 const lastDetailSection = ref<Section>(isSettingsIndex(section.value) ? 'system' : section.value)
 const settingsRoot = shallowRef<HTMLElement | null>(null)
+const settingsMain = shallowRef<HTMLElement | null>(null)
 let settingsResizeObserver: ResizeObserver | null = null
 const mobileSettings = shallowRef(props.embedded ? false : window.matchMedia(SETTINGS_APP_QUERY).matches)
 const pageMounted = shallowRef(false)
@@ -1018,7 +1019,6 @@ async function loadSchema() {
 }
 
 async function loadConfigData() {
-  loading.value = true
   error.value = ''
   try {
 		const loadedConfig = await api.getConfig()
@@ -1065,17 +1065,19 @@ async function loadConfigData() {
     savedNetworkSnapshot.value = networkConfigSnapshot(loadedConfig.network)
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : String(reason)
-  } finally {
-    loading.value = false
   }
 }
 
-function load() {
+function load(showLoading = true) {
+  if (showLoading) loading.value = true
   if (configRequest) return configRequest
   const request = loadConfigData()
   configRequest = request
   void request.finally(() => {
-    if (configRequest === request) configRequest = null
+    if (configRequest === request) {
+      configRequest = null
+      loading.value = false
+    }
   })
   return request
 }
@@ -1758,6 +1760,10 @@ onMounted(() => {
   }
   settingsAppQuery.addEventListener('change', syncSettingsAppLayout)
 	ensureSectionData(paneSection.value)
+	// Fetch the shared configuration without showing a spinner over an
+	// extension page. This keeps the first switch to a config-backed page from
+	// replacing the current page with an empty loading frame.
+	void load(false)
 	// The extension catalog contributes pages to the sidebar. Load this small
 	// summary when the settings shell opens so the navigation is complete before
 	// the user enters the Plugins section; page-specific extension data remains
@@ -1819,9 +1825,16 @@ watch(activeExtensionURL, () => {
   stopPluginFrameObserver()
   pluginFrameHeight.value = null
 })
-watch(paneSection, (value) => {
+watch(paneSection, (value, previous) => {
   if (!pageMounted.value) return
   ensureSectionData(value)
+  if (value === previous) return
+  void nextTick(() => {
+    // Every settings page owns its scroll position. Reset the shared scroll
+    // container after navigation so a tall plugin page cannot leave the next
+    // page clipped or make the browser clamp the scroll position mid-frame.
+    settingsMain.value?.scrollTo({ top: 0, behavior: 'auto' })
+  })
 }, { immediate: true })
 
 watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.status?.audio.quality,
@@ -1942,8 +1955,8 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
             @select="selectSettingsItem"
           />
         </div>
-        <main class="advanced-settings-main">
-        <div :key="paneSection" class="advanced-settings-view">
+        <main ref="settingsMain" class="advanced-settings-main">
+        <div class="advanced-settings-view">
             <header class="advanced-settings-section-header">
               <n-button v-if="embedded && mobileDetail" quaternary size="small" :aria-label="settingsBackLabel" @click="onSettingsBack">
                 <template #icon><ArrowLeft /></template>

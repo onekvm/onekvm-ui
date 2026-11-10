@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Keyboard, Pin, PinOff } from '@/icons'
-import { useMessage, type DropdownOption } from 'naive-ui'
+import type { DropdownOption } from 'naive-ui'
 
-import { api, type KeyboardLayout } from '@/api/client'
+import type { KeyboardLayout } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import ControlOverlay from './ControlOverlay.vue'
@@ -19,7 +19,6 @@ const props = defineProps<{
   numLock?: boolean
   capsLock?: boolean
   scrollLock?: boolean
-  canManageSettings?: boolean
   placement?: 'top-end' | 'bottom-end' | 'right-start' | 'left-start'
   sheet?: boolean
 }>()
@@ -31,9 +30,6 @@ const emit = defineEmits<{
 }>()
 
 const popoverOpen = ref(false)
-const keyboardLedsEnabled = shallowRef(true)
-const keyboardLedsSaving = shallowRef(false)
-const message = useMessage()
 const pinned = ref(false)
 const compactViewport = ref(window.innerWidth <= 520)
 const overlayTo = useOverlayMount()
@@ -66,31 +62,7 @@ function layoutLabel(layout: KeyboardLayout) {
 
 function updateShow(show: boolean) {
   popoverOpen.value = show
-  if (show) void loadKeyboardLedsSetting()
   emit('update:show', show)
-}
-
-async function loadKeyboardLedsSetting() {
-  if (props.canManageSettings === false) return
-  try {
-    const config = await api.getConfig()
-    keyboardLedsEnabled.value = !config.usb.keyboard_no_out
-  } catch {
-    // Keep the default enabled state when the setting cannot be read.
-  }
-}
-
-async function updateKeyboardLeds(value: boolean) {
-  if (value === keyboardLedsEnabled.value || keyboardLedsSaving.value) return
-  keyboardLedsSaving.value = true
-  try {
-    await api.patchConfig('usb.keyboard_no_out', String(!value))
-    keyboardLedsEnabled.value = value
-  } catch (error) {
-    message.error(error instanceof Error ? error.message : t('keyboard.syncLedsSaveFailed', 'Could not change keyboard state syncing.'))
-  } finally {
-    keyboardLedsSaving.value = false
-  }
 }
 
 function open() {
@@ -172,7 +144,6 @@ function handleResize() {
 onMounted(() => {
   handleResize()
   window.addEventListener('resize', handleResize)
-  void loadKeyboardLedsSetting()
 })
 
 onBeforeUnmount(() => {
@@ -227,19 +198,6 @@ onBeforeUnmount(() => {
           <span>{{ t('keyboard.scrollLock', 'Scroll Lock') }}</span>
           <strong>{{ lockLabel(scrollLock) }}</strong>
         </span>
-      </div>
-      <div v-if="keyboardLedsEnabled" class="keyboard-lock-sync-row">
-        <div>
-          <strong>{{ t('keyboard.syncLeds', 'Sync keyboard state') }}</strong>
-          <small>{{ t('keyboard.syncLedsHint', 'Read Num Lock, Caps Lock, and Scroll Lock from the controlled device.') }}</small>
-        </div>
-        <n-switch
-          :value="keyboardLedsEnabled"
-          :loading="keyboardLedsSaving"
-          :disabled="keyboardLedsSaving || props.canManageSettings === false"
-          :aria-label="t('keyboard.syncLeds', 'Sync keyboard state')"
-          @update:value="updateKeyboardLeds"
-        />
       </div>
       <div :inert="inputSuspended">
         <KeyboardQuickActions @select="selectOption" />
@@ -296,19 +254,6 @@ onBeforeUnmount(() => {
             <span>{{ t('keyboard.scrollLock', 'Scroll Lock') }}</span>
             <strong>{{ lockLabel(scrollLock) }}</strong>
           </span>
-        </div>
-        <div v-if="keyboardLedsEnabled" class="keyboard-lock-sync-row">
-          <div>
-            <strong>{{ t('keyboard.syncLeds', 'Sync keyboard state') }}</strong>
-            <small>{{ t('keyboard.syncLedsHint', 'Read Num Lock, Caps Lock, and Scroll Lock from the controlled device.') }}</small>
-          </div>
-          <n-switch
-            :value="keyboardLedsEnabled"
-            :loading="keyboardLedsSaving"
-            :disabled="keyboardLedsSaving || props.canManageSettings === false"
-            :aria-label="t('keyboard.syncLeds', 'Sync keyboard state')"
-            @update:value="updateKeyboardLeds"
-          />
         </div>
         <div :inert="inputSuspended">
           <KeyboardQuickActions @select="selectOption" />

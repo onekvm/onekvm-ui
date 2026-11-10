@@ -1894,7 +1894,6 @@ onBeforeUnmount(() => {
         :num-lock="status?.hid?.num_lock"
         :caps-lock="status?.hid?.caps_lock"
         :scroll-lock="status?.hid?.scroll_lock"
-        :can-manage-settings="canArrangeToolbar"
         :placement="menuPlacement"
         :sheet="toolbarLauncher"
         @select="selectKeyboard"

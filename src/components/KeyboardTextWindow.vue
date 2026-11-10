@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useMessage, type InputInst } from 'naive-ui'
 
-import { api, type KeyboardLayout } from '@/api/client'
+import { api, type KeyboardLayout, type KeyboardTextMode } from '@/api/client'
 import { onekvm } from '@/lib/onekvm'
 import { t } from '@/i18n/runtime'
 import { filterKeyboardText } from '@/input/keyboard-text'
@@ -26,7 +26,11 @@ const state = shallowRef<'normal' | 'maximized' | 'minimized'>('normal')
 const visible = computed(() => state.value !== 'minimized')
 const sequence = shallowRef(0)
 const viewportWidth = ref(window.innerWidth)
+const viewportHeight = ref(window.innerHeight)
 const windowWidth = computed(() => viewportWidth.value <= 760 ? Math.max(240, viewportWidth.value - 16) : 520)
+const windowHeight = computed(() => viewportWidth.value <= 760 ? Math.max(240, viewportHeight.value - 16) : 360)
+const compactWindow = computed(() => viewportWidth.value <= 760)
+const mode = ref<KeyboardTextMode>('layout')
 let restoreState: 'normal' | 'maximized' = 'normal'
 let unsupportedWarningAt = 0
 
@@ -35,6 +39,10 @@ function layoutLabel(layout: KeyboardLayout) {
 }
 
 function updateText(value: string) {
+  if (mode.value === 'unicode') {
+    text.value = value
+    return
+  }
   const filtered = filterKeyboardText(value, props.layout)
   text.value = filtered.value
   if (filtered.removed === 0 || Date.now() - unsupportedWarningAt < 1200) return
@@ -85,9 +93,12 @@ watch(show, (open, previous) => {
 
 onBeforeUnmount(() => group.value?.dispose())
 function syncViewportWidth() {
-  viewportWidth.value = window.visualViewport?.width || window.innerWidth
+  const visual = window.visualViewport
+  viewportWidth.value = visual?.width || window.innerWidth
+  viewportHeight.value = visual?.height || window.innerHeight
 }
 onMounted(() => {
+  syncViewportWidth()
   window.addEventListener('resize', syncViewportWidth)
   window.visualViewport?.addEventListener('resize', syncViewportWidth)
 })
@@ -102,7 +113,7 @@ async function sendText() {
   sendingText.value = true
   try {
     const sent = text.value
-    const result = await api.sendKeyboardText(sent, props.layout)
+    const result = await api.sendKeyboardText(sent, props.layout, undefined, mode.value)
     text.value = ''
     onekvm.notifyKeyboardText(sent)
     show.value = false
@@ -115,7 +126,11 @@ async function sendText() {
 }
 
 watch(() => props.layout, (layout) => {
+  if (mode.value === 'unicode') return
   text.value = filterKeyboardText(text.value, layout).value
+})
+watch(mode, (value) => {
+  if (value === 'layout') text.value = filterKeyboardText(text.value, props.layout).value
 })
 </script>
 
@@ -126,9 +141,10 @@ watch(() => props.layout, (layout) => {
         v-if="show && group"
         v-show="visible"
         class="keyboard-text-window"
+        :class="{ 'is-compact': compactWindow }"
         presentation="window"
         :width="windowWidth"
-        :height="360"
+        :height="windowHeight"
         :title="t('keyboard.paste', 'Send text')"
         :layer="group.layer.value"
         :active="group.active.value"
@@ -140,9 +156,18 @@ watch(() => props.layout, (layout) => {
       >
         <template #title-icon><TextCursorInput :size="18" /></template>
         <div class="keyboard-text-window-content">
+          <n-radio-group v-model:value="mode" class="keyboard-text-window-mode" size="small" :aria-label="t('keyboard.sendMode', 'Send mode')">
+            <n-radio-button value="layout">{{ t('keyboard.modeLayout', 'Keyboard layout') }}</n-radio-button>
+            <n-radio-button value="unicode">{{ t('keyboard.modeUnicode', 'Unicode input') }}</n-radio-button>
+          </n-radio-group>
           <p class="keyboard-text-window-hint">
-            {{ t('keyboard.tips', 'Only characters available on the selected remote keyboard layout can be sent.') }}
-            <strong>{{ layoutLabel(layout) }}</strong>
+            <template v-if="mode === 'unicode'">
+              {{ t('keyboard.unicodeTips', 'Uses the Linux Unicode input method (Ctrl+Shift+U). The remote host must support it.') }}
+            </template>
+            <template v-else>
+              {{ t('keyboard.tips', 'Only characters available on the selected remote keyboard layout can be sent.') }}
+              <strong>{{ layoutLabel(layout) }}</strong>
+            </template>
           </p>
           <n-input
             ref="textInput"

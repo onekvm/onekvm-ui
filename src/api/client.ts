@@ -431,6 +431,7 @@ export interface KeyboardShortcut {
 }
 
 export type KeyboardLayout = 'us' | 'uk' | 'de' | 'fr' | 'es' | 'it' | 'ru' | 'jp' | 'ko'
+export type KeyboardTextMode = 'layout' | 'unicode'
 
 export interface KeyboardConfig {
 	layout: KeyboardLayout
@@ -441,6 +442,7 @@ export interface KeyboardTextResponse {
   status: 'ok'
   characters: number
   layout: KeyboardLayout
+  mode: KeyboardTextMode
 }
 
 export interface SSHConfig {
@@ -1786,11 +1788,12 @@ export const api = {
   deleteDeviceFile: (path: string) => request<void>(`/api/files?path=${encodeURIComponent(path)}`, { method: 'DELETE' }),
   getDeviceFileURL: (path: string) => `${serviceBaseUrl()}/api/files/download?path=${encodeURIComponent(path)}`,
   getKeyboardConfig: () => request<KeyboardConfig>('/api/config/keyboard'),
-  sendKeyboardText: (text: string, layout?: KeyboardLayout, intervalMS?: number) =>
+  sendKeyboardText: (text: string, layout?: KeyboardLayout, intervalMS?: number, mode: KeyboardTextMode = 'layout') =>
     request<KeyboardTextResponse>('/api/hid/keyboard/text', {
       method: 'POST',
       body: JSON.stringify({
         text,
+        mode,
         ...(layout ? { layout } : {}),
         ...(intervalMS === undefined ? {} : { interval_ms: intervalMS }),
       }),

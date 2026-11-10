@@ -7,6 +7,7 @@ import { api, isUnauthorizedError } from '@/api/client'
 import {
   preferredWebRTCCodecs,
   selectEncodedVideoTransport,
+  websocketInitialVideoCodec,
   supportsWebRTCClient,
   detectH265WebRTCVideoSupport,
   VideoCodecUnsupportedError,
@@ -598,7 +599,7 @@ class OneKVMTransport {
     }
     if (transport.transport === 'websocket') {
       this.setState({ videoMode: 'websocket', websocketFallbackAvailable })
-      await this.startWebSocket(codec, generation, autoCodec)
+      await this.startWebSocket(websocketInitialVideoCodec(codec, automatic), generation, autoCodec)
       return
     }
 

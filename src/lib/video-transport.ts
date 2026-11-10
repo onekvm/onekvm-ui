@@ -51,6 +51,13 @@ export function connectionVideoCodec(video: { codec: string }, h265Supported = f
   return configured === 'auto' || configured === '' ? (h265Supported ? 'h265' : 'h264') : configured
 }
 
+export function websocketInitialVideoCodec(codec: string, automatic: boolean) {
+  // The server may ignore an Auto preference when another video session
+  // already owns the encoder. Start with the universally supported codec and
+  // let WebSocketVideo switch after it sees the first keyframe's codec.
+  return automatic ? 'h264' : codec
+}
+
 export function videoCodecLabel(video: { codec: string; actual_codec?: string }): string {
   const actual = effectiveVideoCodec(video).toUpperCase()
   return video.codec.toLowerCase() === 'auto' ? `Auto (${actual})` : actual

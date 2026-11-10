@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useMessage, type InputInst } from 'naive-ui'
 
 import { api, type KeyboardLayout } from '@/api/client'
@@ -25,6 +25,8 @@ const group = shallowRef<ReturnType<typeof registerConsoleWindowLayer> | null>(n
 const state = shallowRef<'normal' | 'maximized' | 'minimized'>('normal')
 const visible = computed(() => state.value !== 'minimized')
 const sequence = shallowRef(0)
+const viewportWidth = ref(window.innerWidth)
+const windowWidth = computed(() => viewportWidth.value <= 760 ? Math.max(240, viewportWidth.value - 16) : 520)
 let restoreState: 'normal' | 'maximized' = 'normal'
 let unsupportedWarningAt = 0
 
@@ -82,6 +84,17 @@ watch(show, (open, previous) => {
 }, { immediate: true })
 
 onBeforeUnmount(() => group.value?.dispose())
+function syncViewportWidth() {
+  viewportWidth.value = window.visualViewport?.width || window.innerWidth
+}
+onMounted(() => {
+  window.addEventListener('resize', syncViewportWidth)
+  window.visualViewport?.addEventListener('resize', syncViewportWidth)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', syncViewportWidth)
+  window.visualViewport?.removeEventListener('resize', syncViewportWidth)
+})
 defineExpose({ focus })
 
 async function sendText() {
@@ -114,7 +127,7 @@ watch(() => props.layout, (layout) => {
         v-show="visible"
         class="keyboard-text-window"
         presentation="window"
-        :width="520"
+        :width="windowWidth"
         :height="360"
         :title="t('keyboard.paste', 'Send text')"
         :layer="group.layer.value"

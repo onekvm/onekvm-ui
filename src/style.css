@@ -3050,8 +3050,12 @@ html[data-onekvm-jelly] .host-window-frame {
 
 .keyboard-text-window-content {
   display: grid;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   gap: 14px;
 }
+.keyboard-text-window-content :is(.n-input, .n-input-wrapper) { width: 100%; min-width: 0; }
 
 .keyboard-text-window-hint {
   display: flex;

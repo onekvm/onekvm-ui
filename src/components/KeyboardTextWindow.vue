@@ -30,7 +30,8 @@ const viewportHeight = ref(window.innerHeight)
 const windowWidth = computed(() => viewportWidth.value <= 760 ? Math.max(240, viewportWidth.value - 16) : 520)
 const windowHeight = computed(() => viewportWidth.value <= 760 ? Math.max(240, viewportHeight.value - 16) : 360)
 const compactWindow = computed(() => viewportWidth.value <= 760)
-const mode = ref<KeyboardTextMode>('layout')
+const unicodeMode = ref(false)
+const mode = computed<KeyboardTextMode>(() => unicodeMode.value ? 'unicode' : 'layout')
 let restoreState: 'normal' | 'maximized' = 'normal'
 let unsupportedWarningAt = 0
 
@@ -39,7 +40,7 @@ function layoutLabel(layout: KeyboardLayout) {
 }
 
 function updateText(value: string) {
-  if (mode.value === 'unicode') {
+  if (unicodeMode.value) {
     text.value = value
     return
   }
@@ -126,11 +127,11 @@ async function sendText() {
 }
 
 watch(() => props.layout, (layout) => {
-  if (mode.value === 'unicode') return
+  if (unicodeMode.value) return
   text.value = filterKeyboardText(text.value, layout).value
 })
-watch(mode, (value) => {
-  if (value === 'layout') text.value = filterKeyboardText(text.value, props.layout).value
+watch(unicodeMode, (enabled) => {
+  if (!enabled) text.value = filterKeyboardText(text.value, props.layout).value
 })
 </script>
 
@@ -156,10 +157,9 @@ watch(mode, (value) => {
       >
         <template #title-icon><TextCursorInput :size="18" /></template>
         <div class="keyboard-text-window-content">
-          <n-radio-group v-model:value="mode" class="keyboard-text-window-mode" size="small" :aria-label="t('keyboard.sendMode', 'Send mode')">
-            <n-radio-button value="layout">{{ t('keyboard.modeLayout', 'Keyboard layout') }}</n-radio-button>
-            <n-radio-button value="unicode">{{ t('keyboard.modeUnicode', 'Unicode input') }}</n-radio-button>
-          </n-radio-group>
+          <n-checkbox v-model:checked="unicodeMode" class="keyboard-text-window-mode" :aria-label="t('keyboard.sendMode', 'Send mode')">
+            {{ t('keyboard.modeUnicode', 'Unicode input') }}
+          </n-checkbox>
           <p class="keyboard-text-window-hint">
             <template v-if="mode === 'unicode'">
               {{ t('keyboard.unicodeTips', 'Uses the Linux Unicode input method (Ctrl+Shift+U). The remote host must support it.') }}

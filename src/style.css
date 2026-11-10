@@ -3058,20 +3058,13 @@ html[data-onekvm-jelly] .host-window-frame {
 .keyboard-text-window-content :is(.n-input, .n-input-wrapper) { width: 100%; min-width: 0; }
 
 .keyboard-text-window-mode {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  align-items: center;
   width: 100%;
 }
 
-.keyboard-text-window-mode .n-radio-button {
+.keyboard-text-window-mode.n-checkbox {
   min-width: 0;
-  text-align: center;
-}
-
-.keyboard-text-window-mode .n-radio-button__label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .keyboard-text-window-hint {

@@ -88,7 +88,7 @@ P50/P95，会漏掉旧画面持续停留的时间；接收统计也须取测试�
 
 ## 2026-09-04 低延迟修复
 
-107 的旧生产页面在 1920x1080 H.264 下观测到：
+NanoKVM PCIe 的旧生产页面在 1920x1080 H.264 下观测到：
 
 ```text
 capture                 23 ms
@@ -116,7 +116,7 @@ RTP jitter（局域网无丢包时也会短暂到约 20 ms）乘以 2.5，视频
 - 性能浮窗不再对实时视频执行 `backdrop-filter: blur(10px)`，消除每帧的背景
   重采样与额外合成 pass。
 
-最终生产 IPK 在 107 的 HTTPS 页面验证：
+最终生产 IPK 在 NanoKVM PCIe 的 HTTPS 页面验证：
 
 ```text
 video jitterBufferTarget       0 ms
@@ -150,7 +150,7 @@ Rust WebRTC answer 未注册任何视频 header extension，因此没有回显�
 offload 和 UDP batch，只为 sendonly 视频注册该扩展，并在每个 sample 上携带
 `min=0, max=0`。
 
-107 部署 `onekvm-core 0.1.0-r106.debug20260904055014` 后，answer 正确回显同一
+NanoKVM PCIe 部署 `onekvm-core 0.1.0-r106.debug20260904055014` 后，answer 正确回显同一
 `extmap:5`。1920x1080 H.264 60 FPS 连续 15 秒、902 帧 RTC stats 窗口为：
 
 ```text
@@ -177,15 +177,15 @@ NACK/PLI、0 丢帧。
 
 ## 与 HDMI latency clock 的口径差异
 
-性能面板不是 glass-to-glass 测量。`kvm-latency-clock` 的时间文本从 99 的 GTK/
+性能面板不是 glass-to-glass 测量。`kvm-latency-clock` 的时间文本从被控机的 GTK/
 Wayland 桌面经过 HDMI 扫描、LT6911/CSI、VI/VPSS/VENC、RTP、浏览器解码和最终
 呈现，覆盖整条链路；页面只能累加设备已暴露的 MMF 估算和浏览器收到完整帧后的
 统计。
 
 同一连接用浏览器 canvas 同步冻结当前视频帧和浏览器 `Date.now()`，OCR 读取画面
-内的 99 Unix 毫秒，连续 12 次原始差值为 `92–105 ms`，平均 `99.17 ms`、p50
+内的被控机 Unix 毫秒，连续 12 次原始差值为 `92–105 ms`，平均 `99.17 ms`、p50
 `100 ms`、p90 `104 ms`。通过已建立的 SSH control connection 采样两机时钟，
-99 约快 `7–9 ms`，因此校正后的 glass-to-glass 约为 `107 ms`。同一时段页面为：
+被控机约快 `7–9 ms`，因此校正后的 glass-to-glass 约为 `107 ms`。同一时段页面为：
 
 ```text
 capture estimate          23 ms
@@ -204,9 +204,9 @@ LT6911/VI/VPSS/VENC 间未带源时间戳的硬件排队；它不是 Chromium ji
 也不能通过把该 62 ms 常量加回 UI 得到对所有信号源都准确的总延迟。准确的
 glass-to-glass 验收仍以画面内嵌时钟或光电测试为准。
 
-## 2026-09-07 99 时钟对照
+## 2026-09-07 被控机时钟对照
 
-107 仍为 1920×1080 H.264 60 FPS WebRTC。99 Plasma Wayland 全屏
+NanoKVM PCIe 仍为 1920×1080 H.264 60 FPS WebRTC。被控机 Plasma Wayland 全屏
 `kvm-latency-clock`，HDMI-A-1 与 eDP-1 镜像 1080p60。浏览器
 `drawImage(video)` 与 `Date.now()` 同拍冻结 8 帧，读取画面 Unix 毫秒：
 
@@ -216,7 +216,7 @@ raw browser_now - clock_unix_ms
   p50 106.5 ms  mean 108.3 ms
 ```
 
-常驻 SSH 往返测量本机与 99 时钟偏差约 `-2 ms`（99 略慢），校正后
+常驻 SSH 往返测量本机与被控机时钟偏差约 `-2 ms`（被控机略慢），校正后
 glass-to-glass 约 `104–110 ms`。同期页面：
 
 ```text
@@ -248,7 +248,7 @@ Depth 计入排队场次，不再只加一场周期。源端 GTK/Wayland 合成�
 
 | 段 | 大约 | 页面是否计入 |
 | --- | ---: | --- |
-| 99 GTK/Wayland 合成 + KMS 扫描相位 | 8–17 ms | 否，无 HDMI 源 PTS |
+| 被控机 GTK/Wayland 合成 + KMS 扫描相位 | 8–17 ms | 否，无 HDMI 源 PTS |
 | LT6911 + CSI + VI 缓冲（约 1–2 场） | 17–33 ms | 否；活 1080 禁止读 `/proc/cvitek/vi` |
 | VPSS 排队（Depth=1 仍可能等一场） | 0–17 ms | 否，只计 CostTime |
 | 计入的一场输入 + VPSS CostTime | 23 ms | 采集估算 |

@@ -35,7 +35,7 @@ function recoveryDevMock(): Plugin {
         if (req.method === 'GET' && url === '/status') {
           res.setHeader('Content-Type', 'application/json; charset=utf-8')
           res.end(JSON.stringify({
-            addresses: ['10.100.99.107'],
+            addresses: ['192.168.1.21'],
             firmwareMax: 120 * 1024 * 1024,
             storageType: 'SD Card',
             storageBytes: 32010928128,

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 
 import { resolveServiceURL } from '../src/api/service-url.ts'
 
-const base = 'https://10.100.99.107'
+const base = 'https://192.0.2.10'
 const page = '/api/extension-pages/cloud/0.1.0/web/page.json'
 const absolute = `${base}${page}`
 

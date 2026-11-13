@@ -18,10 +18,10 @@ const identity = {
   connection_animation: true,
 } satisfies PersonalizationConfig
 
-assert.equal(resolveConsoleTitle(identity, 'onekvm-107'), 'Lab KVM')
-assert.equal(resolveConsoleTitle({ ...identity, console_title_source: 'hostname' }, 'onekvm-107'), 'onekvm-107')
-assert.equal(resolveConsoleTitle({ ...identity, console_title_source: 'custom' }, 'onekvm-107'), 'Rack 3')
-assert.equal(resolveConsoleTitle({ ...identity, console_title_source: 'custom', custom_console_title: '' }, 'onekvm-107'), 'onekvm-107')
+assert.equal(resolveConsoleTitle(identity, 'onekvm-pcie'), 'Lab KVM')
+assert.equal(resolveConsoleTitle({ ...identity, console_title_source: 'hostname' }, 'onekvm-pcie'), 'onekvm-pcie')
+assert.equal(resolveConsoleTitle({ ...identity, console_title_source: 'custom' }, 'onekvm-pcie'), 'Rack 3')
+assert.equal(resolveConsoleTitle({ ...identity, console_title_source: 'custom', custom_console_title: '' }, 'onekvm-pcie'), 'onekvm-pcie')
 assert.equal(resolveConsoleTitle(undefined, '', 'setup-host'), 'setup-host')
 assert.equal(resolveConsoleTitle(undefined, ''), 'OneKVM')
 
@@ -32,30 +32,30 @@ assert.deepEqual(
   ['hostname', 'custom'],
 )
 
-assert.equal(resolveConsoleSubtitle(undefined, 'onekvm-107', 'NanoKVM PCIe'), 'NanoKVM PCIe')
-assert.equal(resolveConsoleSubtitle({ ...identity, console_subtitle_parts: ['hostname'] }, 'onekvm-107', 'NanoKVM PCIe'), 'onekvm-107')
-assert.equal(resolveConsoleSubtitle({ ...identity, console_subtitle_parts: ['device_model'] }, 'onekvm-107', 'NanoKVM PCIe'), 'NanoKVM PCIe')
-assert.equal(resolveConsoleSubtitle({ ...identity, console_subtitle_parts: ['custom'] }, 'onekvm-107', 'NanoKVM PCIe'), 'Primary rack')
+assert.equal(resolveConsoleSubtitle(undefined, 'onekvm-pcie', 'NanoKVM PCIe'), 'NanoKVM PCIe')
+assert.equal(resolveConsoleSubtitle({ ...identity, console_subtitle_parts: ['hostname'] }, 'onekvm-pcie', 'NanoKVM PCIe'), 'onekvm-pcie')
+assert.equal(resolveConsoleSubtitle({ ...identity, console_subtitle_parts: ['device_model'] }, 'onekvm-pcie', 'NanoKVM PCIe'), 'NanoKVM PCIe')
+assert.equal(resolveConsoleSubtitle({ ...identity, console_subtitle_parts: ['custom'] }, 'onekvm-pcie', 'NanoKVM PCIe'), 'Primary rack')
 assert.equal(
   resolveConsoleSubtitle(
     { ...identity, console_subtitle_parts: ['custom', 'device_model', 'hostname'] },
-    'onekvm-107',
+    'onekvm-pcie',
     'NanoKVM PCIe',
   ),
-  'onekvm-107 · NanoKVM PCIe · Primary rack',
+  'onekvm-pcie · NanoKVM PCIe · Primary rack',
 )
-assert.equal(resolveConsoleSubtitle({ ...identity, console_subtitle_parts: [] }, 'onekvm-107', 'NanoKVM PCIe'), '')
-assert.equal(resolveConsoleSubtitle({ show_device_model: false }, 'onekvm-107', 'NanoKVM PCIe'), '')
+assert.equal(resolveConsoleSubtitle({ ...identity, console_subtitle_parts: [] }, 'onekvm-pcie', 'NanoKVM PCIe'), '')
+assert.equal(resolveConsoleSubtitle({ show_device_model: false }, 'onekvm-pcie', 'NanoKVM PCIe'), '')
 assert.equal(
   resolveConsoleSubtitle(
     { ...identity, console_subtitle_parts: ['hostname', 'custom'], custom_console_subtitle: '' },
-    'onekvm-107',
+    'onekvm-pcie',
     'NanoKVM PCIe',
   ),
-  'onekvm-107',
+  'onekvm-pcie',
 )
 
-assert.equal(validPersonalizationText('设备 107'), true)
+assert.equal(validPersonalizationText('设备 3'), true)
 assert.equal(validPersonalizationText(''), false)
 assert.equal(validPersonalizationText('', false), true)
 assert.equal(validPersonalizationText('bad\nname'), false)

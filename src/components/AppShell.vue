@@ -61,6 +61,8 @@ import RemoteConsole from './RemoteConsole.vue'
 import VideoPerformanceOverlay from './VideoPerformanceOverlay.vue'
 import AdvancedSettingsLoading from './AdvancedSettingsLoading.vue'
 import VideoFallbackModal from './VideoFallbackModal.vue'
+import ConsoleProblemWindow from './ConsoleProblemWindow.vue'
+import { CONSOLE_PROBLEMS } from '@/lib/console-problem-registry'
 import KeyboardLockOverlay from './KeyboardLockOverlay.vue'
 
 const AccountDrawer = defineAsyncComponent(() => import('./AccountDrawer.vue'))
@@ -654,6 +656,11 @@ onBeforeUnmount(() => {
       @pointerdown.capture="onekvm.unlockAudio()"
     >
         <div class="console-connection-overlays" />
+        <ConsoleProblemWindow
+          :problems="CONSOLE_PROBLEMS"
+          :status="status"
+          :enabled="auth.authenticated && !videoFallbackShown"
+        />
         <ControlToolbar
           ref="controlToolbar"
           :state="state"

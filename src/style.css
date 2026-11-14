@@ -192,6 +192,19 @@ select { font: inherit; }
 .console-workspace .toolbar { grid-area: top; }
 .console-workspace .console-stage,
 .console-workspace .video-performance-overlay { grid-area: stage; }
+.console-workspace .console-problem-window {
+  grid-area: stage;
+  position: absolute;
+  align-self: center;
+  justify-self: center;
+  width: min(420px, calc(100% - 16px));
+  max-height: calc(100% - 16px);
+  overflow: auto;
+  border-radius: 6px;
+  background: var(--onekvm-surface-overlay);
+  box-shadow: 0 14px 36px rgb(0 0 0 / 45%);
+  pointer-events: auto;
+}
 
 /* Keep connection masks within the video area, including in fullscreen. Layout
    containment makes this the containing block for Naive UI's fixed overlays. */

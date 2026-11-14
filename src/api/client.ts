@@ -638,6 +638,7 @@ export interface OneKVMStatus {
     gamepad?: boolean
     macro_generation?: number
     macro_owner?: string | null
+    write_stalled?: boolean
     num_lock?: boolean
     caps_lock?: boolean
     scroll_lock?: boolean

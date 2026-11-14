@@ -788,6 +788,7 @@ function updateOperationLabel(operation: string) {
 
 function onlineUpdateLabel(update: SystemOnlineUpdate) {
   if (update.available) return t('settings.advancedSettings.systemPage.onlineAvailable', 'A new system update is available')
+  if (update.reason === 'unsupported') return t('settings.advancedSettings.systemPage.updateErrors.unsupported', 'This device does not support system updates. To update, flash new firmware to its storage.')
   if (update.reason === 'source_not_configured') return t('settings.advancedSettings.systemPage.onlineNoSource', 'No online update source is configured for this model')
   if (update.reason === 'bundle_missing') return t('settings.advancedSettings.systemPage.onlineNoBundle', 'The latest release has no compatible .fwup update bundle')
   return t('settings.advancedSettings.systemPage.onlineUpToDate', 'No newer system update is available')
@@ -2587,15 +2588,18 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                 <SystemUpdateVersions
                   :current-version="status?.system?.os_version || onlineUpdate?.current_version || status?.version"
                   :current-build-id="status?.system?.build_id"
-                  :update="systemUpdate"
+                  :update="systemUpdate?.supported === false ? null : systemUpdate"
                   :switching-slot="slotSwitching"
                   @select-slot="confirmSlotSwitch"
                 />
+                <n-alert v-if="systemUpdate?.supported === false" type="info" :bordered="false">
+                  {{ t('settings.advancedSettings.systemPage.updateErrors.unsupported', 'This device does not support system updates. To update, flash new firmware to its storage.') }}
+                </n-alert>
                 <n-alert v-if="systemUpdateUnavailable || updateStatusError" type="warning" :bordered="false">
                   {{ t('settings.advancedSettings.systemPage.updateReconnecting', 'Update status is temporarily unavailable. Reconnecting…') }}
                   <n-button text @click="updateMonitor.refresh()">{{ t('common.retry', 'Retry') }}</n-button>
                 </n-alert>
-                <template v-if="systemUpdate">
+                <template v-if="systemUpdate && systemUpdate.supported !== false">
                   <section class="system-settings-group">
                     <h2>{{ t('settings.advancedSettings.systemPage.systemUpdate', 'System update') }}</h2>
                     <div class="system-update-panel">

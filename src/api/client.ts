@@ -769,6 +769,8 @@ export interface SystemUpdateSlot {
 }
 
 export interface SystemUpdateStatus {
+  /** false when the image cannot install system updates. */
+  supported?: boolean
   compatible: string
   booted_slot: string
   primary_slot: string
@@ -787,7 +789,7 @@ export interface SystemOnlineUpdate {
   current_version: string
   latest_version: string | null
   available: boolean
-  reason: 'source_not_configured' | 'up_to_date' | 'bundle_missing' | ''
+  reason: 'source_not_configured' | 'up_to_date' | 'bundle_missing' | 'unsupported' | ''
   asset_name?: string
   asset_size?: number
 }

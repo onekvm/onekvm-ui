@@ -1337,7 +1337,7 @@ const zh = {
           allowUntrustedFirmware: "本次升级允许不可信固件",
           untrustedFirmwareHint: "仅本次接受内置信任库以外的签名证书。仍校验 fwup 格式、签名有效性、数据完整性和机型。请确认固件来源可靠。",
           untrustedFirmwareConfirm: "将非内置信任证书签名的固件安装到非活动分区？仍须通过 fwup 格式、签名有效性、数据完整性和机型校验。",
-          updateErrors: {"details": "技术详情", "payloadCorrupted": "升级文件数据校验失败，文件可能损坏或传输不完整。请重新下载固件，对照发布的 SHA-256 校验值确认后再次上传。", "signatureInvalid": "升级文件签名校验失败。请使用适用于此设备的可信固件，并检查设备日期和时间。", "kernelMetadataMissing": "升级计划缺少目标内核兼容信息。请取消本次升级，重新上传最新完整固件；若仍失败，请导出诊断。此问题无法通过上传插件包解决。", "extractFailed": "无法校验或解包升级文件。请检查可用存储空间，并重新上传完整固件；若仍失败，请查看技术详情或导出诊断。"},
+          updateErrors: {"unsupported": "此设备不支持系统升级。如需升级，请将新固件烧录到设备存储。", "details": "技术详情", "payloadCorrupted": "升级文件数据校验失败，文件可能损坏或传输不完整。请重新下载固件，对照发布的 SHA-256 校验值确认后再次上传。", "signatureInvalid": "升级文件签名校验失败。请使用适用于此设备的可信固件，并检查设备日期和时间。", "kernelMetadataMissing": "升级计划缺少目标内核兼容信息。请取消本次升级，重新上传最新完整固件；若仍失败，请导出诊断。此问题无法通过上传插件包解决。", "extractFailed": "无法校验或解包升级文件。请检查可用存储空间，并重新上传完整固件；若仍失败，请查看技术详情或导出诊断。"},
           pluginUpdate: {
             title: "升级前检查",
             currentKernel: "当前内核版本",

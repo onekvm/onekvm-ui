@@ -3,7 +3,10 @@ export function systemUpdateErrorText(raw: string, translate: (key: string, fall
   const text = raw.toLowerCase()
   let kind: string
   let fallback: string
-  if (text.includes('[update_payload_corrupted]') || text.includes('bundle payload is corrupted') || text.includes('verification of data area failed')) {
+  if (text.includes('[update_unsupported]')) {
+    kind = 'unsupported'
+    fallback = 'This device does not support system updates. To update, flash new firmware to its storage.'
+  } else if (text.includes('[update_payload_corrupted]') || text.includes('bundle payload is corrupted') || text.includes('verification of data area failed')) {
     kind = 'payloadCorrupted'
     fallback = 'Update file data verification failed. Download the firmware again, compare its SHA-256 with the published checksum, then upload it again.'
   } else if (text.includes('[update_signature_invalid]') || text.includes('signature verification failed') || text.includes('failed to verify signature') || text.includes('no matching key found')) {

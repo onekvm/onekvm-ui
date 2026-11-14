@@ -2,6 +2,7 @@
 import { onBeforeUnmount, onMounted, shallowRef, useId } from 'vue'
 import { useMessage } from 'naive-ui'
 import { api, type USBADBDebugStatus } from '@/api/client'
+import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { t } from '@/i18n/runtime'
 
 const props = defineProps<{ disabled: boolean }>()
@@ -10,6 +11,7 @@ const loading = shallowRef(true)
 const busy = shallowRef(false)
 const error = shallowRef('')
 const message = useMessage()
+const dialog = useAsyncDialog()
 const labelId = useId()
 const hintId = useId()
 let refreshTimer: number | undefined
@@ -31,19 +33,43 @@ async function refresh() {
   }
 }
 
-async function toggle(enabled: boolean) {
-  if (props.disabled || busy.value || loading.value || !status.value?.available) return
+function canToggle() {
+  return !props.disabled && !busy.value && !loading.value && status.value?.available === true
+}
+
+async function apply(enabled: boolean) {
+  if (!canToggle()) return false
   busy.value = true
   ++statusRequest
   try {
     status.value = await api.setUSBADBDebug(enabled)
     error.value = ''
+    return true
   } catch (reason) {
     message.error(reason instanceof Error ? reason.message : String(reason))
     await refresh()
+    return false
   } finally {
     busy.value = false
   }
+}
+
+function toggle(enabled: boolean) {
+  if (!canToggle()) return
+  if (!enabled) {
+    void apply(false)
+    return
+  }
+  dialog.warning({
+    title: t('settings.advancedSettings.systemPage.usbAdbConfirmTitle', 'Enable USB ADB Debug Bridge'),
+    content: t('settings.advancedSettings.systemPage.usbAdbConfirm', 'The computer connected over USB will get a root shell on this device until it restarts or you turn this off. USB keyboard, mouse, audio and virtual media will briefly disconnect. Continue?'),
+    positiveText: t('settings.advancedSettings.systemPage.usbAdbEnable', 'Enable'),
+    negativeText: t('common.cancel', 'Cancel'),
+    positiveButtonProps: { type: 'warning' },
+    onPositiveClick: async () => {
+      if (!await apply(true)) return false
+    },
+  })
 }
 
 onMounted(() => {

@@ -4,6 +4,15 @@ import type { OneKVMIconSetDefinition } from '../icons/types.ts'
 
 import { naiveOverridesFor, naiveThemeFor } from './naive'
 import {
+  ONEKVM_THEME_COLORS_STORAGE_KEY,
+  customThemeColorIssue,
+  normalizeThemeColors,
+  parseThemeColorPreferences,
+  resolveCustomThemeColors,
+  type CustomThemeColors,
+  type ThemeColorPreferences,
+} from './colors'
+import {
   DEFAULT_APPEARANCE_PREFERENCE,
   DEFAULT_ONEKVM_THEME_ID,
   graphiteTheme,
@@ -44,12 +53,15 @@ const themes = new Map<string, ResolvedOneKVMTheme>([
   [win98Theme.id, win98Theme],
 ])
 const activeThemeState = shallowRef<ResolvedOneKVMTheme>(graphiteTheme)
+const themeColorPreferencesState = shallowRef<ThemeColorPreferences>({})
 const appearancePreferenceState = shallowRef<OneKVMAppearancePreference>(DEFAULT_APPEARANCE_PREFERENCE)
 let requestedThemeId = DEFAULT_ONEKVM_THEME_ID
 let initialized = false
 let systemAppearanceQuery: MediaQueryList | null = null
 
 export const activeTheme = readonly(activeThemeState)
+const baseTheme = computed(() => themes.get(activeThemeState.value.id) || graphiteTheme)
+const customColors = computed(() => themeColorPreferencesState.value[activeThemeState.value.id] || {})
 export const appearancePreference = readonly(appearancePreferenceState)
 export const activeNaiveTheme = computed(() => naiveThemeFor(activeThemeState.value))
 export const activeNaiveOverrides = computed(() => naiveOverridesFor(activeThemeState.value))
@@ -110,8 +122,28 @@ function applyResolvedTheme() {
   const appearance = resolveAppearance(appearancePreferenceState.value, systemIsLight())
   const themeId = themeIdForAppearance(appearance, themes, requestedThemeId)
   const theme = themes.get(themeId) || (appearance === 'light' ? paperTheme : graphiteTheme)
-  activeThemeState.value = theme
-  applyTheme(theme)
+  const customized = resolveCustomThemeColors(theme, themeColorPreferencesState.value[theme.id] || {})
+  const resolved = customThemeColorIssue(customized) ? theme : customized
+  activeThemeState.value = resolved
+  applyTheme(resolved)
+}
+
+function setThemeColors(value: CustomThemeColors | null) {
+  const colors = value === null ? {} : normalizeThemeColors(value)
+  if (!colors) return false
+  const preferences = { ...themeColorPreferencesState.value }
+  const id = activeThemeState.value.id
+  if (Object.keys(colors).length && customThemeColorIssue(resolveCustomThemeColors(baseTheme.value, colors))) return false
+  if (Object.keys(colors).length) preferences[id] = colors
+  else delete preferences[id]
+  themeColorPreferencesState.value = preferences
+  try {
+    localStorage.setItem(ONEKVM_THEME_COLORS_STORAGE_KEY, JSON.stringify(preferences))
+  } catch {
+    // Match the existing browser-local theme preference behavior.
+  }
+  applyResolvedTheme()
+  return true
 }
 
 function activateTheme(id: string, persist = true) {
@@ -158,6 +190,9 @@ export function currentOneKVMTheme() {
 export function useOneKVMTheme() {
   return {
     theme: activeTheme,
+    baseTheme: readonly(baseTheme),
+    customColors: readonly(customColors),
+    setColors: setThemeColors,
     appearance: appearancePreference,
     naiveTheme: activeNaiveTheme,
     naiveOverrides: activeNaiveOverrides,
@@ -177,6 +212,11 @@ export function initializeThemeRuntime(options: InitializeThemeOptions = {}) {
     : DEFAULT_ONEKVM_THEME_ID
   requestedThemeId = readStoredTheme() || fallbackThemeId
   appearancePreferenceState.value = readStoredAppearance()
+  try {
+    themeColorPreferencesState.value = parseThemeColorPreferences(localStorage.getItem(ONEKVM_THEME_COLORS_STORAGE_KEY))
+  } catch {
+    themeColorPreferencesState.value = {}
+  }
   systemAppearanceQuery = window.matchMedia('(prefers-color-scheme: light)')
   systemAppearanceQuery.addEventListener('change', onSystemAppearanceChange)
   if (!themes.has(requestedThemeId)) requestedThemeId = fallbackThemeId

@@ -19,9 +19,76 @@ max(0, presentUs - jitterBufferUs - decodeUs)
 是链路诊断指标，不作为单向延迟直接相加。各浏览器指标使用独立的一秒窗口，
 单点允许有少量偏差。该合计不是 glass-to-glass。
 
+## WebSocket 编码到收帧
+
+WebSocket 播放器复用 `VideoTimingSampler` 的四时间戳校准与误差估计。
+完整 OKVF 消息到达 JavaScript 时立即记录 `performance.now()`；仅当帧头明确
+标记了编码出包的单调时钟时间时才采样，不把旧版 PTS 或收包时刻当编码时间。
+Core 的时间戳从后端穿过媒体 fan-out，不能在 WebSocket 发送时重打戳。
+协议字段和旧版兼容见 Core 的 `docs/websocket-video-v1.md`。
+
+读数包含编码出包后的设备排队、WebSocket 传输和浏览器消息调度；它不是纯网络
+延迟，也不含 MSE 解码／显示。面板仍将不可测的解码、缓冲和显示段保留为未知，
+不能用同步 `muxer.feed` 耗时补值。没有校时、没有时间戳、样本过期或断线时清空
+编码到收帧统计；重连建立新样本。WebRTC 继续按 RTP 时间戳匹配帧回调。
+
+## 大面积变化与拖动反馈的诊断
+
+鼠标跟手性要分开测量「浏览器发送指令→被控机输入事件」和「源端绘制→浏览器
+预计呈现」；发送之后的 HID 延迟正常，不能证明用户浏览器在发送之前没有排队。
+接收／解码统计里的零丢帧也不能代替最终呈现统计或画面时钟。
+
+WebSocket 的 MSE 不能靠周期性跳到缓存末尾追帧。JMuxer 的旧配置
+`flushingTime=0`、`maxDelay=120` 每 **1000 ms** 检查一次，并 seek 到
+`buffered.end(0)-0.001`；120 ms 是触发阈值，不是播放或端到端延迟的硬上限。
+正常帧到达相位也可能让接近阈值的缓冲越线，不能据此认定网络拥塞。
+
+MSE seek 会重置解码器，从目标之前的随机访问点重新解码参考链。硬件解码也有
+这笔开销：长 GOP 尾部的跳转可重解数百帧，恢复期间新帧继续到达，反而堆出
+数百毫秒积压。不能把 `OnPipelineSeeked` 当成 HTML `seeked`／首帧呈现；内部
+定位完成后仍可能在解码前滚。增加几帧 seek 余量不能消除整段参考链的代价。
+
+播放器由 `MseLivePlayback` 接管追赶：关闭库内自动 seek；小积压超过 120 ms
+时用 1.1 倍播放速度消化，降到 90 ms 后恢复正常速度。积压超过 750 ms、播放
+时间停滞 1 秒或当前位置不在已缓冲范围时，请求新关键帧；每两秒最多请求一次。
+只在新随机访问点已追加、后面已有 40–250 ms 数据时向前 seek 到该点，避免
+回解长 GOP。这个余量不是端到端延迟保证。重建 MSE 时重置时间线，切换传输或
+销毁时停止控制器并恢复正常播放速度；不在这一层丢弃编码后的 P 帧。
+
+排查时同时保存缓冲领先量、实际 `currentTime` 写入前后的值、seeking/waiting、
+完整 AU 序号、出包时间戳和预计呈现时间，不能仅凭平均 FPS 判断跟手性。测量画面
+像素读回本身可能改变 GPU 调度，需保留相同采样负载的对照及不读回的控制组；
+不能把受控暂停实验称为用户自然故障复现。
+
+WebRTC 也出现拖动延迟时，应继续核对共同的源桌面合成、实际 HDMI 输入 FPS、
+编码出帧、传输和浏览器呈现；不能把两个协议的症状都归为 MSE。配置 FPS 是
+上限，必须按实际输入／输出 FPS 解释一帧的时长。具体设备实验留在忽略目录。
+
+### 回调时间与呈现反馈
+
+同时记录 rVFC 的时间参数、回调内部的 `performance.now()`、`presentationTime`
+与 `expectedDisplayTime`。时间参数可能早于回调实际执行；预计呈现也不表示该帧
+已经呈现。Chromium 156 的低延迟 MediaStream 路径会参考 `VideoFrameSubmitter`
+中合成器接收至呈现反馈的指数移动平均，再对齐 vsync。因此预计呈现与回调相差
+多帧时，要检查实际反馈，不能直接推断 WebRTC 抖动缓冲或解码器积压。
+
+对应版本的 `media` trace 可用 `VideoFrameSubmitter` 的开始／结束事件观察
+解码完成至呈现反馈，用 `Pre-submit buffering` 区分提交之前的等待。分析需按
+进程和 track ID 配对，区分丢弃／失败反馈、重复提交及窗口边界未闭合事件。
+虚拟显示的反馈仍不是物理屏幕发光时间；不同播放器的预计时刻也不能直接作为
+协议物理延迟的比较结果。
+
+有回调的帧延迟与冻结时长分别报告。停顿期间没有新 rVFC，若只统计成功回调的
+P50/P95，会漏掉旧画面持续停留的时间；接收统计也须取测试窗口前后的增量。
+
+需要确认采样帧身份时，可保留生产流的压缩 AU，离线识别时间戳，再按 JMuxer
+累计整数毫秒媒体时间，或 RTP 时间戳与编码时间注释连接到 rVFC。与同步像素读回
+交叉核对，并保留不读回控制组；额外的码流观察者须明确计入工作量，不能用于
+宣称单路 CPU 收益。
+
 ## 2026-09-04 低延迟修复
 
-107 的旧生产页面在 1920x1080 H.264 下观测到：
+NanoKVM PCIe 的旧生产页面在 1920x1080 H.264 下观测到：
 
 ```text
 capture                 23 ms
@@ -49,7 +116,7 @@ RTP jitter（局域网无丢包时也会短暂到约 20 ms）乘以 2.5，视频
 - 性能浮窗不再对实时视频执行 `backdrop-filter: blur(10px)`，消除每帧的背景
   重采样与额外合成 pass。
 
-最终生产 IPK 在 107 的 HTTPS 页面验证：
+最终生产 IPK 在 NanoKVM PCIe 的 HTTPS 页面验证：
 
 ```text
 video jitterBufferTarget       0 ms
@@ -83,7 +150,7 @@ Rust WebRTC answer 未注册任何视频 header extension，因此没有回显�
 offload 和 UDP batch，只为 sendonly 视频注册该扩展，并在每个 sample 上携带
 `min=0, max=0`。
 
-107 部署 `onekvm-core 0.1.0-r106.debug20260904055014` 后，answer 正确回显同一
+NanoKVM PCIe 部署 `onekvm-core 0.1.0-r106.debug20260904055014` 后，answer 正确回显同一
 `extmap:5`。1920x1080 H.264 60 FPS 连续 15 秒、902 帧 RTC stats 窗口为：
 
 ```text
@@ -110,15 +177,15 @@ NACK/PLI、0 丢帧。
 
 ## 与 HDMI latency clock 的口径差异
 
-性能面板不是 glass-to-glass 测量。`kvm-latency-clock` 的时间文本从 99 的 GTK/
+性能面板不是 glass-to-glass 测量。`kvm-latency-clock` 的时间文本从被控机的 GTK/
 Wayland 桌面经过 HDMI 扫描、LT6911/CSI、VI/VPSS/VENC、RTP、浏览器解码和最终
 呈现，覆盖整条链路；页面只能累加设备已暴露的 MMF 估算和浏览器收到完整帧后的
 统计。
 
 同一连接用浏览器 canvas 同步冻结当前视频帧和浏览器 `Date.now()`，OCR 读取画面
-内的 99 Unix 毫秒，连续 12 次原始差值为 `92–105 ms`，平均 `99.17 ms`、p50
+内的被控机 Unix 毫秒，连续 12 次原始差值为 `92–105 ms`，平均 `99.17 ms`、p50
 `100 ms`、p90 `104 ms`。通过已建立的 SSH control connection 采样两机时钟，
-99 约快 `7–9 ms`，因此校正后的 glass-to-glass 约为 `107 ms`。同一时段页面为：
+被控机约快 `7–9 ms`，因此校正后的 glass-to-glass 约为 `107 ms`。同一时段页面为：
 
 ```text
 capture estimate          23 ms
@@ -137,9 +204,9 @@ LT6911/VI/VPSS/VENC 间未带源时间戳的硬件排队；它不是 Chromium ji
 也不能通过把该 62 ms 常量加回 UI 得到对所有信号源都准确的总延迟。准确的
 glass-to-glass 验收仍以画面内嵌时钟或光电测试为准。
 
-## 2026-09-07 99 时钟对照
+## 2026-09-07 被控机时钟对照
 
-107 仍为 1920×1080 H.264 60 FPS WebRTC。99 Plasma Wayland 全屏
+NanoKVM PCIe 仍为 1920×1080 H.264 60 FPS WebRTC。被控机 Plasma Wayland 全屏
 `kvm-latency-clock`，HDMI-A-1 与 eDP-1 镜像 1080p60。浏览器
 `drawImage(video)` 与 `Date.now()` 同拍冻结 8 帧，读取画面 Unix 毫秒：
 
@@ -149,7 +216,7 @@ raw browser_now - clock_unix_ms
   p50 106.5 ms  mean 108.3 ms
 ```
 
-常驻 SSH 往返测量本机与 99 时钟偏差约 `-2 ms`（99 略慢），校正后
+常驻 SSH 往返测量本机与被控机时钟偏差约 `-2 ms`（被控机略慢），校正后
 glass-to-glass 约 `104–110 ms`。同期页面：
 
 ```text
@@ -181,7 +248,7 @@ Depth 计入排队场次，不再只加一场周期。源端 GTK/Wayland 合成�
 
 | 段 | 大约 | 页面是否计入 |
 | --- | ---: | --- |
-| 99 GTK/Wayland 合成 + KMS 扫描相位 | 8–17 ms | 否，无 HDMI 源 PTS |
+| 被控机 GTK/Wayland 合成 + KMS 扫描相位 | 8–17 ms | 否，无 HDMI 源 PTS |
 | LT6911 + CSI + VI 缓冲（约 1–2 场） | 17–33 ms | 否；活 1080 禁止读 `/proc/cvitek/vi` |
 | VPSS 排队（Depth=1 仍可能等一场） | 0–17 ms | 否，只计 CostTime |
 | 计入的一场输入 + VPSS CostTime | 23 ms | 采集估算 |

@@ -50,3 +50,16 @@ assert.equal(sampler.sample(920_000).transportUs, null)
 assert.equal(sampler.sample(30_000_000).transportUs, null)
 
 console.log('webrtc-video-timing tests passed')
+
+// A WebSocket message already pairs one encoder timestamp and receive event.
+const ws = new VideoTimingSampler()
+ws.received(offset + 200_000, 280_000)
+assert.equal(ws.sample(300_000).transportUs, null)
+const wp = ws.probe(100_000)
+ws.message(clock(wp, offset + 106_000, offset + 110_000), 116_000)
+assert.deepEqual(ws.sample(301_000), { transportUs: 80_000, transportErrorUs: 6000 })
+ws.received(0, 400_000)
+ws.received(Number.NaN, 400_000)
+ws.resetFrames()
+assert.equal(ws.sample(401_000).transportUs, null)
+assert.equal(ws.sample(30_000_000).transportUs, null)

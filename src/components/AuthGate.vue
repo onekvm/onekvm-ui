@@ -84,10 +84,10 @@ function factorLabel(factor: { type: string; name?: string }) {
 }
 const brandBadge = computed(() => uiProduct.badge(auth))
 const currentLanguageLabel = computed(
-  () => languageOptions.find((option) => option.value === currentLanguage.value)?.label || 'English',
+  () => languageOptions.value.find((option) => option.value === currentLanguage.value)?.label || 'English',
 )
 const languageMenuOptions = computed(() =>
-  languageOptions.map((option) => ({ label: option.label, key: option.value })),
+  languageOptions.value.map((option) => ({ label: option.label, key: option.value })),
 )
 const timezoneOptions = setupTimezones.map((timezone) => ({
   label: timezone.split('_').join(' '),

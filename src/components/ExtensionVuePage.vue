@@ -11,6 +11,7 @@ import {
 import { uninstallExtension } from '@/composables/useUninstallExtension'
 import { currentLanguage, t } from '@/i18n/runtime'
 import { extensionHostErrorText } from '@/lib/extension-host-error'
+import { registerIndependentWindowHost } from '@/extensions/independentWindows'
 import {
   loadVueExtensionPage,
   validateExtensionSettings,
@@ -52,6 +53,7 @@ const pageHost = markRaw<ExtensionPageHostV1>({
 })
 
 const dirty = computed(() => settingsAdapter.value?.dirty.value === true)
+const unregisterWindowHost = registerIndependentWindowHost(pageHost)
 const valid = computed(() => settingsAdapter.value?.valid.value !== false)
 
 async function loadPage() {
@@ -126,12 +128,13 @@ async function reload() {
 }
 
 watch(
-  [() => props.extension.id, () => props.extension.version, () => props.extension.page?.entrypoint],
+  [() => props.extension.id, () => props.extension.version, () => props.extension.page?.renderer, () => props.extension.page?.entrypoint],
   loadPage,
   { immediate: true },
 )
 
 onBeforeUnmount(() => {
+  unregisterWindowHost()
   loadGeneration += 1
   leavingPageRoot = pageRoot.value
 })

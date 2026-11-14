@@ -4,6 +4,9 @@ Requires `onekvm-extension-host >= 0.1.0-r35`, `onekvm-ui >= 0.1.0-r67`
 and `onekvm-core >= 0.1.0-r113`. The trusted Vue runtime is shared with
 extension pages; bundle your component as an IIFE with Vue and Naive UI external.
 
+Native custom-element and Lit tools use `renderer: "web-component"` and the
+[Web Components registration and host contract](extension-web-component-v1.md).
+
 ## Manifest
 
 `toolbox` is optional and independent of `page`, `toolbar` and `shell`.
@@ -45,7 +48,7 @@ example validator:
 | `presentation` | Required `drawer` or `window` |
 | `layout` | Optional `padded` (default) or `edge-to-edge`; the latter removes host content padding and scrolling |
 | `size` | Optional width/height, each 1–4096 CSS px; host clamps to viewport |
-| `view` | Required renderer `vue` and normalized `web/*.js` entrypoint |
+| `view` | Required renderer `vue` or `web-component` and normalized `web/*.js` entrypoint |
 
 Declared resources must be regular packaged files, without symlink traversal.
 Absolute paths, backslashes, empty path segments, `.` and `..` are forbidden.
@@ -77,6 +80,13 @@ registrations fail. Page and toolbox registration namespaces are separate.
 Definitions cache by extension/version/tool/entrypoint. Concurrent requests
 share a promise, queued scripts load serially, and loads time out after 15s.
 Errors provide a retry. Stale results cannot mount after close or invalidation.
+
+`onekvm:extensions-changed` invalidates the shared console and extension media
+catalogs before consumers use their next result. Queries already in flight
+follow the new catalog rather than publishing an obsolete snapshot. Asynchronous
+installers publish this event when the job finishes, including rollback after
+failure; accepting an install job is not its completion. New tools become
+available without closing the success dialog or reloading the page.
 
 Styles are reference counted. Closing unmounts the instance; reopening reuses
 the definition and reattaches styles. Retired versions release resources after
@@ -118,14 +128,17 @@ interface ExtensionToolHostV1 {
 keyboard and mouse reports sent from this browser to the controlled device,
 with a monotonic timestamp. The tool must unsubscribe when recording stops or
 unmounts. It does not expose incoming reports or reports from other clients.
-`showRecordingStatus` is reserved for `hid-macro`. Pass
-`{ stats: Ref<{ receivedReports, writtenActions }>, stop: () => void }` to hide
-the tool without unmounting it and show the same global banner used for playback.
+`showRecordingStatus` is reserved for `hid-macro` and for screen recording by
+tools whose extension declares the `video.encoded` capability. `hid-macro` passes
+`{ stats: Ref<{ receivedReports, writtenActions }>, stop: () => void }`; other
+tools pass `{ title: string, detail?: Ref<string>, stop: () => void }` with
+localized text. Either hides the tool without unmounting it and shows the same
+global banner used for playback.
 This releases manual console input on desktop and mobile. The returned cleanup
 removes that activity and restores the tool; call it when capture stops or the
 component unmounts. A second simultaneous recording is rejected. The older
 `showConsoleWhileRecording` API retains its narrow-screen return control for
-compatibility. Recording is browser-local; playback timing is device-owned.
+compatibility. Macro recording is browser-local; playback timing is device-owned.
 
 `invoke` and `assetURL` are scoped to the extension. Settings adapters follow
 [Vue Page API v1](extension-vue-page-v1.md). The host validates/saves settings
@@ -200,6 +213,16 @@ its immediate owner; attempts to activate that owner focus the deepest blocking
 dialog and flash its title bar. Other tools remain usable. Set `modal: false` for
 a modeless owned window whose owner remains interactive.
 
+`contentLayout: 'edge-to-edge'` removes the content padding (the content is a
+flex column), e.g. for a video that fills the window.
+
+A `header-extra` slot places small controls (buttons, switches) in the title
+bar before the window buttons; they do not start a window drag.
+
+An extension page (whose host has no `registerChildWindow`) can pass its page
+host: the window is then a standalone floating window above the page, with the
+same chrome, dragging and resizing but no owner or stacking with tool windows.
+
 Ordinary close awaits `beforeClose`, if supplied; false vetoes close. Descendants
 close before their owner, and each leave transition finishes before the owner is
 removed. Focus returns to the opener when it is still available. Forced extension
@@ -257,3 +280,23 @@ when no minimized windows remain and reserves space above the remote picture;
 it follows fullscreen and safe-area changes. Temporary frame selection and HID
 recording visibility changes do not create minimized tasks. Transfer dialogs and
 the advanced settings window share the same taskbar.
+
+## Independent windows
+
+`toolbox.openWindow(host, id, { component, props?, styles? })` opens a window with
+its own lifetime. Use a registered page or tool host; `id` is local to the
+extension/version and reopening the same ID focuses/restores its existing window.
+IDs use lowercase letters, digits, `_` and `-`, start with a letter or digit, and
+are at most 128 characters long.
+Closing or minimizing the opener does not affect it. Its styles stay installed
+until it closes. Logout, permission loss, extension disable/removal or a version
+change force cleanup, including component unmount hooks.
+
+The component receives `host` and `open` props. Render `toolbox.Window` with
+`independent: true`, forward `open`, and forward its `close` and `closed` events.
+Expose `focus()` and forward it to the `Window` ref for reopening and restoring.
+`close` starts the leave transition; `closed` releases the component and styles.
+Independent windows have their own minimize/restore task and stacking order.
+The supplied host exposes `extension`, `overlayTarget`, `getStatus`, `assetURL`
+and `invoke`; it remains valid after the opener leaves. Check that `openWindow`
+exists before calling it when supporting older UIs.

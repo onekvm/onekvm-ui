@@ -94,6 +94,14 @@ assert.equal(
 assert.equal(
   isNetworkConfigValid({
     ...base,
+    webrtc: { turn_servers: [{ url: 'turn:turn.example:3478', username: 'kvm', credential: '', credential_set: true }] },
+  }),
+  true,
+  'a stored TURN password can be omitted on reload',
+)
+assert.equal(
+  isNetworkConfigValid({
+    ...base,
     webrtc: {
       stun: 'stun:stun.l.google.com:19302',
       turn_servers: [{ url: 'turn:turn.example:3478', username: 'kvm', credential: 'secret' }],
@@ -231,3 +239,17 @@ assert.equal(renamed.interfaces.filter(link => link.name === 'eth1').length, 1)
 assert.equal(renamed.interfaces.find(link => link.kind === 'vlan')?.parent, 'eth1')
 assert.equal(isNetworkConfigValid(renamed), true)
 assert.equal(isNetworkConfigValid({ ...base, primary_interface: 'missing' }), false)
+
+// MTU overrides are per interface and enforce the IPv6 minimum.
+for (const mtu of [0, 1280, 1500, 9000, 65535]) {
+  const edited = updatePhysicalInterface(base, 'eth0', { ...physicalInterfaceConfig(base, 'eth0'), mtu })
+  assert.equal(isNetworkConfigValid(edited), true, `valid MTU ${mtu}`)
+  assert.equal(physicalInterfaceConfig(edited, 'eth0').mtu, mtu)
+}
+for (const mtu of [-1, 67, 1279, 65536, 1500.5, NaN]) {
+  const edited = updatePhysicalInterface(base, 'eth0', { ...physicalInterfaceConfig(base, 'eth0'), mtu })
+  assert.equal(isNetworkConfigValid(edited), false, `invalid MTU ${mtu}`)
+}
+assert.equal(isNetworkConfigValid(updatePhysicalInterface(base, 'eth0', {
+  ...physicalInterfaceConfig(base, 'eth0'), ipv6_mode: 'disabled', mtu: 68,
+})), true)

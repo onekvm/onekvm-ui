@@ -7,6 +7,7 @@ import { api, isUnauthorizedError } from '@/api/client'
 import {
   preferredWebRTCCodecs,
   selectEncodedVideoTransport,
+  websocketInitialVideoCodec,
   supportsWebRTCClient,
   detectH265WebRTCVideoSupport,
   VideoCodecUnsupportedError,
@@ -31,6 +32,7 @@ import { AdaptiveJitterBuffer, applyJitterBufferTargets } from '@/lib/adaptive-j
 import { activateBrowserMicrophone } from '@/lib/microphone-access'
 import { WebRTCAudio, AudioLatencyRecovery, type AudioRecoveryReason } from '@/lib/webrtc-audio'
 import { KeyboardReportState } from '@/lib/keyboard-report-state'
+import { audioPlaybackAvailable } from '@/lib/audio-settings'
 
 export type ConnectionState =
   | 'idle'
@@ -109,6 +111,7 @@ class OneKVMTransport {
   private peer: RTCPeerConnection | null = null
   private videoTiming: WebRTCVideoTiming | null = null
   private control: RTCDataChannel | null = null
+  private pointer: RTCDataChannel | null = null
   private stream: MediaStream | null = null
   private localAudio: MediaStream | null = null
   private webRTCAudio: WebRTCAudio | null = null
@@ -170,6 +173,7 @@ class OneKVMTransport {
     audioError: '',
   }
   private statsTimer = 0
+  private statsGeneration = 0
   private peerConnectTimer = 0
   private peerDisconnectTimer = 0
   private unlockAudioListener: (() => void) | null = null
@@ -541,7 +545,7 @@ class OneKVMTransport {
     // PATCH, so every new session must read the current pipeline directly.
     const status = await api.getStatus()
     if (generation !== this.connectionGeneration) return
-    this.deviceSpeakerEnabled = Boolean(status.audio.enabled)
+    this.deviceSpeakerEnabled = audioPlaybackAvailable(status.audio)
     this.audioPCM = status.audio.quality === 'pcm'
     const automatic = status.video.codec.toLowerCase() === 'auto'
     const [hevcWebRTC, hevcWebSocket] = automatic
@@ -595,7 +599,7 @@ class OneKVMTransport {
     }
     if (transport.transport === 'websocket') {
       this.setState({ videoMode: 'websocket', websocketFallbackAvailable })
-      await this.startWebSocket(codec, generation, autoCodec)
+      await this.startWebSocket(websocketInitialVideoCodec(codec, automatic), generation, autoCodec)
       return
     }
 
@@ -606,7 +610,7 @@ class OneKVMTransport {
     await this.startWebRTC(
       generation,
       codec,
-      Boolean(status.audio.enabled),
+      audioPlaybackAvailable(status.audio),
       this.wantMicrophone,
       status.audio.channels === 'stereo',
       autoCodec,
@@ -741,7 +745,7 @@ class OneKVMTransport {
 
   private async startWebRTC(generation: number, codec: string, _speaker: boolean, _microphone: boolean, stereo = false, autoCodec?: string) {
 
-    const ice = await api.getWebRTCIce().catch(() => ({ ice_servers: [], trickle: false }))
+    const ice = await api.getWebRTCIce().catch(() => ({ ice_servers: [], trickle: false, hid_pointer_channel: false }))
     const iceServers = ice.ice_servers || []
     if (generation !== this.connectionGeneration) return
     const peer = new RTCPeerConnection(iceServers.length ? { iceServers } : undefined)
@@ -810,6 +814,12 @@ class OneKVMTransport {
     }
     control.onclose = () => {
       if (this.control === control) this.setState({ controlReady: false })
+    }
+    // Separate ordered streams keep an unpolled mouse endpoint in firmware
+    // menus from delaying keyboard releases. Older Core keeps one stream.
+    if (ice.hid_pointer_channel) {
+      this.pointer = peer.createDataChannel('pointer')
+      this.pointer.binaryType = 'arraybuffer'
     }
 
     const video = peer.addTransceiver('video', { direction: 'recvonly' })
@@ -947,6 +957,9 @@ class OneKVMTransport {
       {
         bitrate: (kbps) => {
           if (this.websocketVideo === player) this.emitVideoBitrate(kbps)
+        },
+        latency: (latency) => {
+          if (this.websocketVideo === player) this.emitBrowserLatency(latency)
         },
         disconnected: (message, codecUnsupported) => {
           if (this.websocketVideo !== player) return
@@ -1104,8 +1117,9 @@ class OneKVMTransport {
 		return false
 	  }
 	}
-    if (this.control?.readyState !== 'open') return false
-    this.control.send(Uint8Array.from(report))
+    const channel = report[0] === 2 || report[0] === 3 ? this.pointer ?? this.control : this.control
+    if (channel?.readyState !== 'open') return false
+    channel.send(Uint8Array.from(report))
     this.emitHIDReport(report)
     return true
   }
@@ -1209,6 +1223,7 @@ class OneKVMTransport {
     const player = this.websocketVideo
     this.websocketVideo = null
     player?.destroy()
+    if (player) this.emitBrowserLatency(emptyBrowserVideoLatency())
   }
 
   private disposeWebSocketAudio(releaseMicrophone = false) {
@@ -1287,7 +1302,8 @@ class OneKVMTransport {
   private disposePeer() {
     this.videoTiming?.destroy()
     this.videoTiming = null
-    window.clearInterval(this.statsTimer)
+    window.clearTimeout(this.statsTimer)
+    this.statsGeneration++
     window.clearTimeout(this.peerConnectTimer)
     window.clearTimeout(this.peerDisconnectTimer)
     this.statsTimer = 0
@@ -1306,10 +1322,13 @@ class OneKVMTransport {
     this.audioOpening = null
     this.disposeLocalAudio()
     const control = this.control
+    const pointer = this.pointer
     const peer = this.peer
     this.control = null
+    this.pointer = null
     this.peer = null
     control?.close()
+    pointer?.close()
     peer?.close()
     this.stream = null
     if (this.video) this.video.srcObject = null
@@ -1341,29 +1360,34 @@ class OneKVMTransport {
   }
 
   private startVideoStats(peer: RTCPeerConnection) {
-    window.clearInterval(this.statsTimer)
+    window.clearTimeout(this.statsTimer)
+    const generation = ++this.statsGeneration
     this.playbackStats.reset()
     const initialTargets = this.adaptiveJitterBuffer.reset()
     applyJitterBufferTargets(peer.getReceivers(), initialTargets)
-    let sampling = false
     const sample = async () => {
-      if (sampling || this.peer !== peer) return
-      sampling = true
+      if (this.peer !== peer || generation !== this.statsGeneration) return
       const reports = await peer.getStats().catch(() => null)
-      sampling = false
-      if (!reports || this.peer !== peer) return
-      const connection = readWebRTCConnectionStats(reports, peer)
-      const route = connection.remote ? JSON.stringify([connection.local, connection.remote]) : null
-      this.browserBitrate?.sample(reports, connection.rttMs, route, document.visibilityState === 'visible')
-      this.emitWebRTCConnectionStats({ ...connection, autoBitrateKbps: this.autoBitrateKbps })
-      applyJitterBufferTargets(peer.getReceivers(), this.adaptiveJitterBuffer.sample(reports))
-      const { bitrateKbps, bitrateSampled, latency } = this.playbackStats.sample(reports)
-      if (bitrateSampled) this.emitVideoBitrate(bitrateKbps)
-      this.emitBrowserLatency({ ...latency, ...this.videoTiming?.sampler.sample(performance.now() * 1000) })
+      if (this.peer !== peer || generation !== this.statsGeneration) return
+      try {
+        if (reports) {
+          const connection = readWebRTCConnectionStats(reports, peer)
+          const route = connection.remote ? JSON.stringify([connection.local, connection.remote]) : null
+          this.browserBitrate?.sample(reports, connection.rttMs, route, document.visibilityState === 'visible')
+          this.emitWebRTCConnectionStats({ ...connection, autoBitrateKbps: this.autoBitrateKbps })
+          applyJitterBufferTargets(peer.getReceivers(), this.adaptiveJitterBuffer.sample(reports))
+          const { bitrateKbps, bitrateSampled, latency } = this.playbackStats.sample(reports)
+          if (bitrateSampled) this.emitVideoBitrate(bitrateKbps)
+          this.emitBrowserLatency({ ...latency, ...this.videoTiming?.sampler.sample(performance.now() * 1000) })
+        }
+      } finally {
+        if (this.peer === peer && generation === this.statsGeneration) {
+          this.statsTimer = window.setTimeout(sample, this.browserBitrate?.sampleIntervalMs ?? 1000)
+        }
+      }
     }
 
     void sample()
-    this.statsTimer = window.setInterval(sample, 1000)
   }
 
   private emitVideoBitrate(kbps: number) {

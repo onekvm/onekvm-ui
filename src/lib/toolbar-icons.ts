@@ -4,6 +4,12 @@ export const TOOLBAR_ICON_IDS = [
   'display',
   'mouse',
   'keyboard',
+  'caps_lock',
+  'num_lock',
+  'scroll_lock',
+  'virtual_keyboard',
+  'keyboard_text',
+  'ctrl_alt_del',
   'gamepad',
   'power',
   'audio',
@@ -11,6 +17,7 @@ export const TOOLBAR_ICON_IDS = [
   'performance',
   'fullscreen',
   'toolbox',
+  'collection',
   'settings',
   'language',
   'account',
@@ -20,6 +27,12 @@ const DEVICE_TOOLBAR_ICONS = new Set<ToolbarIconId>([
   'display',
   'mouse',
   'keyboard',
+  'caps_lock',
+  'num_lock',
+  'scroll_lock',
+  'virtual_keyboard',
+  'keyboard_text',
+  'ctrl_alt_del',
   'gamepad',
   'power',
   'audio',
@@ -34,8 +47,20 @@ export function isDeviceToolbarIcon(id: ToolbarIconId) {
   return DEVICE_TOOLBAR_ICONS.has(id)
 }
 
+export function isKeyboardActionToolbarIcon(id: ToolbarIconId) {
+  return id === 'virtual_keyboard' || id === 'keyboard_text' || id === 'ctrl_alt_del'
+}
+
+function toolbarIconHiddenByDefault(id: ToolbarIconId) {
+  return id === 'caps_lock' || id === 'num_lock' || id === 'scroll_lock' || isKeyboardActionToolbarIcon(id)
+}
+
+export function isRootOnlyToolbarIcon(id: string) {
+  return id === 'settings' || id === 'collection'
+}
+
 export function defaultToolbarIcons(): ToolbarIconPreference[] {
-  return TOOLBAR_ICON_IDS.map(id => ({ id, hidden: false }))
+  return TOOLBAR_ICON_IDS.map(id => ({ id, hidden: toolbarIconHiddenByDefault(id) }))
 }
 
 export function normalizeToolbarIcons(
@@ -47,14 +72,18 @@ export function normalizeToolbarIcons(
   for (const icon of icons ?? []) {
     if (!isToolbarIconId(icon?.id) || seen.has(icon.id)) continue
     seen.add(icon.id)
-    const preference = { id: icon.id, hidden: Boolean(icon.hidden) && icon.id !== 'settings' }
+    const preference = { id: icon.id, hidden: Boolean(icon.hidden) && !isRootOnlyToolbarIcon(icon.id) }
     if (isDeviceToolbarIcon(icon.id)) device.push(preference)
     else action.push(preference)
   }
   for (const id of TOOLBAR_ICON_IDS) {
     if (seen.has(id)) continue
-    const preference = { id, hidden: false }
+    const preference = { id, hidden: toolbarIconHiddenByDefault(id) }
     if (isDeviceToolbarIcon(id)) device.push(preference)
+    else if (id === 'collection') {
+      const settingsIndex = action.findIndex(icon => icon.id === 'settings')
+      action.splice(settingsIndex < 0 ? action.length : settingsIndex, 0, preference)
+    }
     else action.push(preference)
   }
   return [...device, ...action]
@@ -81,7 +110,7 @@ export function setToolbarIconHidden(
   hidden: boolean,
 ) {
   return normalizeToolbarIcons(icons).map(icon => (
-    icon.id === id ? { ...icon, hidden: hidden && id !== 'settings' } : icon
+    icon.id === id ? { ...icon, hidden: hidden && !isRootOnlyToolbarIcon(id) } : icon
   ))
 }
 

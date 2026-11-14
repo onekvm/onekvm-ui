@@ -323,12 +323,18 @@ export function validCIDR(value: string, family: 4 | 6) {
     : isIPv6(address) && length >= 0 && length <= 128
 }
 
+/** Zero/absent MTU leaves system policy unchanged. IPv6 needs at least 1280. */
+export function validMTU(mtu: number | undefined, ipv6 = false) {
+  return mtu === undefined || mtu === 0 || (Number.isInteger(mtu) && mtu >= (ipv6 ? 1280 : 68) && mtu <= 65535)
+}
+
 export function isNetworkConfigValid(config: NetworkConfig) {
   if (usesCustomDNS(config) && (!config.dns?.length || !config.dns.every(isDNSServer))) return false
   if (!config.interfaces.some(item => item.name === config.primary_interface && item.kind === 'physical')) return false
   if (config.discovery_enabled !== false && usesCustomDiscoveryURL(config) && !validDiscoveryURL(config.discovery_url ?? '')) return false
   const names = new Set<string>()
   for (const wireGuard of config.interfaces.filter(isWireGuardInterface)) {
+    if (!validMTU(wireGuard.mtu, wireGuard.addresses.some(address => address.includes(':')))) return false
     if (!/^[A-Za-z0-9_.:@-]+$/.test(wireGuard.name) || names.has(wireGuard.name)) return false
     names.add(wireGuard.name)
     if ((wireGuard.private_key && !validWireGuardKey(wireGuard.private_key)) || !validWireGuardKey(wireGuard.public_key) ||
@@ -342,6 +348,7 @@ export function isNetworkConfigValid(config: NetworkConfig) {
     }
   }
   for (const networkInterface of config.interfaces.filter(isManagedInterface)) {
+    if (!validMTU(networkInterface.mtu, networkInterface.ipv6_mode !== 'disabled')) return false
     if (!/^[A-Za-z0-9_.:@-]+$/.test(networkInterface.name) ||
         names.has(networkInterface.name)) return false
     names.add(networkInterface.name)
@@ -414,7 +421,8 @@ export function isNetworkConfigValid(config: NetworkConfig) {
   if (!validProxyURL(config.proxy?.http) || !validProxyURL(config.proxy?.https)) return false
   if (!validIceURL(config.webrtc?.stun, 'stun')) return false
   for (const server of config.webrtc?.turn_servers || []) {
-    if (!validIceURL(server.url, 'turn') || !server.url.trim() || !server.username.trim() || !server.credential.trim()) return false
+    if (!validIceURL(server.url, 'turn') || !server.url.trim() || !server.username.trim()) return false
+    if (!server.credential.trim() && !server.credential_set) return false
   }
   return true
 }

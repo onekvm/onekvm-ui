@@ -1,6 +1,10 @@
 import { forEachRtcStat } from './webrtc-playback-stats.ts'
 
 export const BITRATE_CHANNEL = 'onekvm.bitrate.v1'
+// UINT32_MAX releases a cap; the preceding value asks the server to clamp to
+// its eligible automatic maximum without requiring a query round trip.
+const REQUEST_MAXIMUM = 0xfffffffe
+const STARTUP_MS = 8000
 type Stat = RTCStats & Record<string, unknown>
 type Snapshot = {
   id: string; time: number; bytes: number; packets: number; lost: number
@@ -8,7 +12,7 @@ type Snapshot = {
 }
 const value = (stat: Stat, key: string) => typeof stat[key] === 'number' && Number.isFinite(stat[key]) ? stat[key] as number : 0
 
-/** One decision per existing getStats sample; no probe, packet history or extra timer. */
+/** Probe with real media, then retain the existing steady-state controller. */
 export class BrowserBitrate {
   private maximum = 0
   private accepted = 0
@@ -23,23 +27,38 @@ export class BrowserBitrate {
   private pacingClean = 0
   private decodeMs = 0
   private lowFrames = 0
+  private startup = true
+  private startupUntil: number | null = null
+  private pending: number | null = null
 
   private channel: Pick<RTCDataChannel, 'readyState' | 'bufferedAmount' | 'send'>
 
   constructor(channel: Pick<RTCDataChannel, 'readyState' | 'bufferedAmount' | 'send'>) { this.channel = channel }
 
   get cap(): number | null { return this.accepted || null }
+  get sampleIntervalMs(): number { return this.startup ? 500 : 1000 }
 
   status(data: unknown) {
     if (!(data instanceof ArrayBuffer) || data.byteLength !== 12) return
     const view = new DataView(data)
     if (view.getUint32(0) !== 0x4f4b4253) return // OKBS
+    const oldMaximum = this.maximum
+    const oldAccepted = this.accepted
     this.maximum = view.getUint32(4)
     this.accepted = Math.min(view.getUint32(8), this.maximum)
-    if (!this.maximum) { this.paced = false; this.resetSamples() }
+    // Once the first reduction is accepted, use normal congestion control;
+    // residual loss from the initial burst must not keep halving the estimate.
+    if (this.accepted > 0 && this.accepted < oldAccepted) this.startup = false
+    if (this.pending !== null && (this.pending === this.accepted
+      || (this.accepted < this.pending && this.accepted < oldAccepted))) this.pending = null
+    if (!this.maximum) {
+      this.paced = false; this.pending = null; this.startup = false; this.resetSamples()
+    } else if (!oldMaximum) {
+      this.startup = true; this.startupUntil = null
+    }
   }
 
-  start() { this.send(3000) }
+  start() { this.send(REQUEST_MAXIMUM) }
 
   query() { this.send(0) }
 
@@ -78,11 +97,13 @@ export class BrowserBitrate {
     // Avoid reacting to stale overlapping getStats calls or background throttling.
     if (next.time <= this.lastSample) return
     this.lastSample = next.time
-    if (route !== this.route) { this.resetSamples(); this.route = route }
+    if (this.startupUntil === null) this.startupUntil = next.time + STARTUP_MS
+    if (!visible || next.time >= this.startupUntil) this.startup = false
+    if (route !== this.route) { this.resetSamples(); this.pending = null; this.route = route }
     const previous = this.previous
     this.previous = visible ? next : null
     const elapsed = previous ? next.time - previous.time : 0
-    const reset = !visible || !previous || previous.id !== next.id || elapsed < 500 || elapsed > 3000
+    const reset = !visible || !previous || previous.id !== next.id || elapsed < 250 || elapsed > 3000
       || next.bytes < previous.bytes || next.packets < previous.packets || next.frames < previous.frames
       || next.decode < previous.decode || next.delay < previous.delay || next.emitted < previous.emitted
     if (reset) {
@@ -90,11 +111,18 @@ export class BrowserBitrate {
       this.clean = this.congested = this.pacingClean = 0
       this.decodeMs = 0
       this.lowFrames = 0
-      this.send(visible && this.maximum && !this.accepted ? Math.min(3000, this.maximum) : 0)
+      this.send(visible && this.maximum && !this.accepted ? this.maximum : 0)
       return
     }
     if (!this.maximum || !this.accepted) {
-      this.send(this.maximum ? Math.min(3000, this.maximum) : 0)
+      this.send(this.maximum)
+      return
+    }
+    // A throttled or lost command must be retried until acknowledged, rather
+    // than overwritten by the old accepted cap on the next stats sample.
+    if (this.pending !== null) {
+      this.pending = Math.min(this.pending, this.maximum)
+      this.send(this.pending)
       return
     }
     if (rttMs !== null && rttMs >= 0) this.minimumRtt = Math.min(this.minimumRtt, rttMs)
@@ -119,17 +147,20 @@ export class BrowserBitrate {
     this.lowFrames = frames * 1000 / elapsed < 10 ? this.lowFrames + 1 : 0
     const floor = Math.min(300, this.maximum)
     let target = this.accepted
-    if ((loss >= 0.08 || this.congested >= 2) && next.time - this.lastChange >= 2000) {
-      target = Math.max(floor, Math.floor(Math.min(this.accepted * 0.75, kbps > floor ? kbps * 0.85 : this.accepted * 0.75)))
+    if ((loss >= 0.08 || this.congested >= 2 || (this.startup && pressure))
+      && next.time - this.lastChange >= (this.startup ? 1000 : 2000)) {
+      const factor = this.startup ? 0.5 : 0.75
+      target = Math.max(floor, Math.floor(Math.min(this.accepted * factor, kbps > floor ? kbps * 0.85 : this.accepted * factor)))
     } else if (this.paced && this.accepted < Math.min(3000, this.maximum)
       && this.lowFrames >= 3 && this.clean >= 3 && next.time - this.lastChange >= 4000) {
       // A small sender budget can stall whole GOPs even on a recovered path.
       // Restore only the startup ceiling, with healthy feedback and decoder headroom.
       target = Math.min(3000, this.maximum, Math.ceil(this.accepted + Math.max(400, this.accepted * 0.25)))
-    } else if (this.clean >= 5 && kbps >= this.accepted * 0.7 && next.time - this.lastChange >= 4000) {
+    } else if (!this.startup && this.clean >= 5 && kbps >= this.accepted * 0.7 && next.time - this.lastChange >= 4000) {
       target = Math.min(this.maximum, Math.ceil(this.accepted + Math.max(200, this.accepted * 0.12)))
     }
     if (target !== this.accepted) {
+      this.pending = target
       this.lastChange = next.time
       this.clean = this.congested = 0
     }

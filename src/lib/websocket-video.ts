@@ -1,5 +1,10 @@
 import JMuxer from 'jmuxer'
 
+import { MseLivePlayback } from '@/lib/mse-live-playback'
+
+import { VideoTimingSampler } from '@/lib/webrtc-video-timing'
+import { emptyBrowserVideoLatency, type BrowserVideoLatencyUs } from '@/lib/webrtc-playback-stats'
+
 import { normalizeWebSocketVideoCodec, supportsWebSocketVideo, type WebSocketVideoCodec } from '@/lib/websocket-video-support'
 
 const HEADER_SIZE = 40
@@ -7,6 +12,7 @@ const MAGIC = [0x4f, 0x4b, 0x56, 0x46]
 
 interface WebSocketVideoCallbacks {
   bitrate: (kbps: number) => void
+  latency?: (value: BrowserVideoLatencyUs) => void
   disconnected: (message: string, codecUnsupported?: boolean) => void
 }
 
@@ -29,6 +35,7 @@ export class WebSocketVideo {
 
   private socket: WebSocket | null = null
   private muxer: JMuxer | null = null
+  private playback: MseLivePlayback | null = null
   private codec: WebSocketVideoCodec
   private closed = false
   private opened = false
@@ -39,6 +46,9 @@ export class WebSocketVideo {
   private sampleBytes = 0
   private durationRemainderUs = 0
   private startupTimer: ReturnType<typeof setTimeout> | undefined
+  private readonly timing = new VideoTimingSampler()
+  private timingTimer: ReturnType<typeof setTimeout> | undefined
+  private timingProbes = 0
   private decoded = false
   private playbackFailed = false
   private readonly onDecoded = () => {
@@ -84,12 +94,19 @@ export class WebSocketVideo {
         this.opened = true
         this.log('socket opened')
         socket.send('media_feedback_v1')
+        if (this.callbacks.latency) this.probeTiming()
         this.requestKeyframe()
         resolve()
       }
       socket.onmessage = (event) => {
         if (this.socket === socket && event.data instanceof ArrayBuffer) {
-          this.handleFrame(event.data)
+          const receivedUs = performance.now() * 1000
+          const bytes = new Uint8Array(event.data)
+          if (bytes.length === 21 && bytes[0] === 2) {
+            this.timing.message(bytes, receivedUs)
+          } else {
+            this.handleFrame(event.data, receivedUs)
+          }
         }
       }
       socket.onerror = () => {
@@ -109,6 +126,10 @@ export class WebSocketVideo {
 
   destroy() {
     this.closed = true
+    clearTimeout(this.timingTimer)
+    this.timingTimer = undefined
+    this.timing.resetFrames()
+    this.callbacks.latency?.(emptyBrowserVideoLatency())
     clearTimeout(this.startupTimer)
     this.startupTimer = undefined
     this.video.removeEventListener('loadeddata', this.onDecoded)
@@ -116,6 +137,8 @@ export class WebSocketVideo {
     const socket = this.socket
     this.socket = null
     if (socket && socket.readyState < WebSocket.CLOSING) socket.close()
+    this.playback?.stop()
+    this.playback = null
     this.muxer?.destroy()
     this.muxer = null
     this.video.pause()
@@ -124,15 +147,30 @@ export class WebSocketVideo {
     this.callbacks.bitrate(0)
   }
 
+  private probeTiming() {
+    if (this.closed || this.socket?.readyState !== WebSocket.OPEN) return
+    const nowUs = performance.now() * 1000
+    if (this.socket.bufferedAmount < 4096) {
+      try { this.socket.send(this.timing.probe(nowUs) as Uint8Array<ArrayBuffer>) } catch { /* optional telemetry */ }
+    }
+    this.callbacks.latency?.({ ...emptyBrowserVideoLatency(), ...this.timing.sample(nowUs) })
+    this.timingTimer = setTimeout(() => this.probeTiming(), ++this.timingProbes < 8 ? 100 : 1000)
+  }
+
   private createMuxer() {
+    this.playback?.stop()
     this.muxer?.destroy()
+    this.playback = new MseLivePlayback(this.video, () => this.requestKeyframe())
+    this.playback.start()
     const options: ExtendedJMuxerOptions = {
       node: this.video,
       mode: 'video',
       videoCodec: this.codec === 'h264' ? 'H264' : 'H265',
       live: true,
       flushingTime: 0,
-      maxDelay: 120,
+      // Own the live-playback policy: JMuxer otherwise seeks to the last
+      // millisecond of a GOP, resetting and replaying the decoder reference chain.
+      maxDelay: Infinity,
       clearBuffer: true,
       debug: false,
       onReady: () => {
@@ -141,6 +179,8 @@ export class WebSocketVideo {
       },
       onError: (data: { name?: string }) => {
         if (data.name === 'InvalidStateError' && !this.video.error) {
+          this.playback?.reset()
+          this.durationRemainderUs = 0
           this.waitingForKeyframe = true
           this.requestKeyframe()
         } else {
@@ -157,7 +197,7 @@ export class WebSocketVideo {
     this.muxer = new JMuxer(options)
   }
 
-  private handleFrame(buffer: ArrayBuffer) {
+  private handleFrame(buffer: ArrayBuffer, receivedUs: number) {
     if (this.closed || this.playbackFailed) return
     if (buffer.byteLength < HEADER_SIZE) return
     const bytes = new Uint8Array(buffer)
@@ -172,6 +212,7 @@ export class WebSocketVideo {
     if (!frameCodec || payloadLength !== buffer.byteLength - HEADER_SIZE) {
       return
     }
+    if (bytes[7] & 1) this.timing.received(Number(view.getBigUint64(16)), receivedUs)
     const now = performance.now()
     if (now - this.lastAckAt >= 200 && this.socket?.readyState === WebSocket.OPEN) {
       const ack = new ArrayBuffer(12)
@@ -220,6 +261,7 @@ export class WebSocketVideo {
       }, 5000)
     }
     try {
+      this.playback?.fed(frame.duration!, keyframe)
       this.muxer?.feed(frame)
     } catch {
       this.failPlayback(`Video decoder failed for ${this.codec.toUpperCase()} over WebSocket`, true)

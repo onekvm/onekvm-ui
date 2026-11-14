@@ -45,18 +45,18 @@ assert.equal(recoveryErrorMessage(500, ' cannot reset user\n'), 'cannot reset us
 assert.equal(recoveryErrorMessage(404, '   '), '404')
 assert.equal(errorMessage(new Error('firmware install failed')), 'firmware install failed')
 assert.equal(errorMessage('boom'), 'boom')
-assert.deepEqual(parseRecoveryStatus('{"addresses":["10.100.99.107","10.0.0.5"],"firmwareMax":8388608}'), {
-  addresses: ['10.100.99.107', '10.0.0.5'],
+assert.deepEqual(parseRecoveryStatus('{"addresses":["192.168.1.21","10.0.0.5"],"firmwareMax":8388608}'), {
+  addresses: ['192.168.1.21', '10.0.0.5'],
   firmwareMax: 8388608,
   storageType: '',
   storageBytes: 0,
 })
 assert.deepEqual(
   parseRecoveryStatus(
-    '{"addresses":["10.100.99.107"],"firmwareMax":1,"storageType":"SD Card","storageBytes":32010928128}',
+    '{"addresses":["192.168.1.21"],"firmwareMax":1,"storageType":"SD Card","storageBytes":32010928128}',
   ),
   {
-    addresses: ['10.100.99.107'],
+    addresses: ['192.168.1.21'],
     firmwareMax: 1,
     storageType: 'SD Card',
     storageBytes: 32010928128,

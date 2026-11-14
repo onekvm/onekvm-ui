@@ -5,6 +5,7 @@ import { t } from '@/i18n/runtime'
 import { useWindowMinimizeTransition } from '@/composables/useWindowMinimizeTransition'
 import { useMinimizedWindowTask, useWindowTaskbarInset } from '@/composables/useWindowTaskbar'
 import { readSafeAreaInsets } from '@/lib/fullscreen-inset'
+import { shadowTabStops } from '@/lib/shadow-focus'
 import { clampOverlayPosition, resizeAnchoredBox, type OverlayResizeHandle } from '@/lib/overlay-drag'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import ConsoleFloatingWindow from '../ConsoleFloatingWindow.vue'
@@ -122,11 +123,12 @@ function keydown(event: KeyboardEvent) {
   if (menuOpen.value && event.key === 'Escape') { menuOpen.value = false; event.preventDefault(); event.stopPropagation(); return }
   if (event.key === 'Escape' && !event.defaultPrevented) { event.preventDefault(); event.stopPropagation(); emit('close') }
   if (event.key !== 'Tab' || !modal.value || !root.value) return
-  const items = [...root.value.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"], a[href]')].filter(e => e.getClientRects().length)
+  const items = shadowTabStops(root.value)
   const first = items[0]
   const last = items.at(-1)
-  if (event.shiftKey && (document.activeElement === first || document.activeElement === root.value)) { last?.focus(); event.preventDefault() }
-  else if (!event.shiftKey && document.activeElement === last) { first?.focus(); event.preventDefault() }
+  const focused = event.composedPath()[0]
+  if (event.shiftKey && (focused === first || focused === root.value)) { last?.focus(); event.preventDefault() }
+  else if (!event.shiftKey && focused === last) { first?.focus(); event.preventDefault() }
 }
 function guardParent(event: Event) {
   if (!props.childWindowActive) return
@@ -260,6 +262,9 @@ onBeforeUnmount(() => {
         </n-dropdown>
         <slot v-else name="title-icon" />
       </template>
+      <template v-if="slots['header-extra']" #header-extra>
+        <div class="tool-window-header-extra" @pointerdown.stop @dblclick.stop><slot name="header-extra" /></div>
+      </template>
       <template #actions>
         <n-button v-if="!fullLayout && minimizable && !ownedModal" quaternary circle size="tiny" :aria-label="t('toolbox.minimizeWindow')" @click="emit('update:state', 'minimized')"><template #icon><Minus /></template></n-button>
         <n-button v-if="!fullLayout && maximizable" quaternary circle size="tiny" :aria-label="t(maximized ? 'toolbox.restoreWindow' : 'toolbox.maximizeWindow')" @click="toggleMaximize()"><template #icon><Copy v-if="maximized" /><Square v-else /></template></n-button>
@@ -280,10 +285,12 @@ onBeforeUnmount(() => {
 .tool-window.maximized { border-radius: 0; }
 .tool-window:not(.active) :deep(.console-floating-title) { color: var(--onekvm-text-tertiary); }
 .tool-window-header { flex-shrink: 0; }
+.tool-window-header-extra { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 .tool-window-system-menu { width: 24px; height: 24px; padding: 0; }
 .drawer .tool-window-header, .fullscreen .tool-window-header { cursor: default; }
 .tool-window :focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
-.tool-window :deep(.n-input :is(input, textarea):focus-visible) { outline: none; }
+.tool-window :deep(.n-input :is(input, textarea):focus-visible),
+.tool-window :deep(.n-base-selection :is(.n-base-selection-input, .n-base-selection-label):focus-visible) { outline: none; }
 .tool-window-content { flex: 1; min-height: 0; overflow: auto; padding: 16px; overscroll-behavior: contain; scroll-padding: 16px; isolation: isolate; }
 .tool-window-content.edge-to-edge { display: flex; flex-direction: column; overflow: hidden; padding: 0; scroll-padding: 0; }
 .tool-window-content.edge-to-edge > :deep(.extension-tool-view) { flex: 1 1 0; width: 100%; min-height: 0; }

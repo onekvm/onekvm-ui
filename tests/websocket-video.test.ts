@@ -5,6 +5,9 @@ import { createServer } from 'vite'
 class Video extends EventTarget {
   readyState = 0
   videoWidth = 0
+  playbackRate = 1
+  paused = true
+  buffered = { length: 0 }
   muted = false
   playsInline = false
   preload = ''
@@ -53,10 +56,12 @@ class Socket {
   static OPEN = 1
   static CLOSING = 2
   readyState = 0
+  bufferedAmount = 0
+  sent: unknown[] = []
   onopen: (() => void) | null = null
   onmessage: ((event: { data: ArrayBuffer }) => void) | null = null
   constructor() { sockets.push(this) }
-  send() {}
+  send(value: unknown) { this.sent.push(value) }
   close() { this.readyState = 3 }
   open() { this.readyState = 1; this.onopen?.() }
 }
@@ -171,6 +176,45 @@ try {
     assert.equal(muxerCodecs.at(-1), 'H264')
     assert.equal(video.readyState, 2)
     player.destroy()
+  }
+  {
+    const latency: { transportUs?: number | null; transportErrorUs?: number | null }[] = []
+    const player = new WebSocketVideo(new Video(), 'wss://example.test/video', 'h265', {
+      bitrate: () => {}, disconnected: () => assert.fail('Timing is optional telemetry'),
+      latency: (value: typeof latency[number]) => latency.push(value),
+    })
+    const connected = player.connect()
+    const socket = sockets.at(-1)!
+    socket.open()
+    await connected
+    assert.equal(latency.at(-1)?.transportUs, null, 'Unknown clocks do not produce a fabricated latency')
+    const probe = socket.sent.find((v): v is Uint8Array => v instanceof Uint8Array && v.length === 5)!
+    assert.ok(probe, 'The real player must request clock synchronization')
+    const deviceUs = Math.round(performance.now() * 1000) + 9_000_000
+    const reply = new Uint8Array(21)
+    reply[0] = 2
+    reply.set(probe.subarray(1), 1)
+    const rv = new DataView(reply.buffer)
+    rv.setBigUint64(5, BigInt(deviceUs) * 1000n)
+    rv.setBigUint64(13, BigInt(deviceUs) * 1000n)
+    socket.onmessage?.({ data: reply.buffer })
+    const legacy = frame.slice(0)
+    new DataView(legacy).setBigUint64(16, BigInt(deviceUs - 20_000))
+    socket.onmessage?.({ data: legacy })
+    await new Promise(resolve => realSetTimeout(resolve, 125))
+    assert.equal(latency.at(-1)?.transportUs, null, 'A legacy PTS without the monotonic flag is never a transport sample')
+    const timed = frame.slice(0)
+    new Uint8Array(timed)[7] = 1
+    new DataView(timed).setBigUint64(16, BigInt(deviceUs - 20_000))
+    socket.onmessage?.({ data: timed })
+    await new Promise(resolve => realSetTimeout(resolve, 125))
+    assert.ok((latency.at(-1)?.transportUs ?? 0) > 10_000, 'The real socket header reaches the panel callback')
+    assert.ok(latency.at(-1)?.transportErrorUs != null, 'Clock uncertainty accompanies the measurement')
+    player.destroy()
+    const count = latency.length
+    assert.equal(latency.at(-1)?.transportUs, undefined, 'Destroy clears the old connection value')
+    await new Promise(resolve => realSetTimeout(resolve, 125))
+    assert.equal(latency.length, count, 'A destroyed player cannot keep its telemetry timer alive')
   }
   for (const durationUs of [16667, 33333, 8333]) {
     const video = new Video()

@@ -48,4 +48,20 @@ keyboard.release('virtual', 'virtual-chord')
 assert.equal(reportsSent, previousReports + 1)
 assert.deepEqual(report, { keys: [], modifiers: 0 })
 
+// The keyboard display observes the same combined modifiers sent to the host,
+// including a Shift already held when the virtual keyboard opens.
+keyboard.set('physical', [], 32)
+const modifiers: number[] = []
+const unsubscribe = keyboard.subscribeModifiers(value => modifiers.push(value))
+assert.deepEqual(modifiers, [32])
+keyboard.set('virtual', [], 2)
+keyboard.set('physical', [4], 32)
+keyboard.release('virtual')
+keyboard.release('physical')
+assert.deepEqual(modifiers, [32, 34, 32, 0])
+unsubscribe()
+keyboard.set('virtual', [], 2)
+assert.deepEqual(modifiers, [32, 34, 32, 0])
+keyboard.release('virtual')
+
 console.log('keyboard-report-state tests passed')

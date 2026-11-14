@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { formatCandidateEndpoint, readWebRTCConnectionStats } from '../src/lib/webrtc-connection-stats.ts'
+import { formatCandidateEndpoint, readWebRTCConnectionStats, videoConnectionType } from '../src/lib/webrtc-connection-stats.ts'
 
 const peer = { connectionState: 'connected', iceConnectionState: 'completed' } as const
 function stat(id: string, type: string, values: Record<string, unknown> = {}): RTCStats {
@@ -15,6 +15,20 @@ const reports = [standby, transport, video, pair, local, remote]
 
 const actual = readWebRTCConnectionStats(new Map(reports.map(item => [item.id, item])) as RTCStatsReport, peer)
 assert.equal(actual.local?.type, 'relay')
+assert.equal(videoConnectionType('webrtc', actual), 'Relay')
+const p2p = { ...actual, local: { ...actual.local!, type: 'host' } }
+assert.equal(videoConnectionType('webrtc', p2p), 'Direct')
+for (const type of ['srflx', 'prflx']) {
+  assert.equal(videoConnectionType('webrtc', { ...p2p, local: { ...p2p.local, type } }), 'P2P')
+  assert.equal(videoConnectionType('webrtc', { ...p2p, remote: { ...p2p.remote!, type } }), 'P2P')
+}
+assert.equal(videoConnectionType('webrtc', { ...p2p, remote: { ...p2p.remote!, type: 'relay' } }), 'Relay')
+assert.equal(videoConnectionType('webrtc', { ...p2p, remote: null }), null)
+assert.equal(videoConnectionType('webrtc', { ...p2p, remote: { ...p2p.remote!, type: null } }), null)
+assert.equal(videoConnectionType('webrtc', { ...p2p, connectionState: 'disconnected' }), null)
+assert.equal(videoConnectionType('webrtc'), null)
+assert.equal(videoConnectionType('websocket', actual), 'Direct')
+assert.equal(videoConnectionType('mjpeg'), 'Direct')
 assert.equal(actual.local?.relayProtocol, 'tls')
 assert.equal(actual.remote?.address, '10.0.0.107')
 assert.equal(actual.connectionState, 'connected')
@@ -47,6 +61,39 @@ const redacted = readWebRTCConnectionStats([
 assert.equal(formatCandidateEndpoint(redacted.local), '—')
 assert.equal(redacted.jitterMs, null)
 assert.equal(redacted.packetsLost, 0)
+
+// Chromium redacts host IPs in getStats() but exposes the selected mDNS
+// candidate through the video receiver's ICE transport.
+const hiddenLocal = stat('local', 'local-candidate', {
+  address: '', ip: '', foundation: 'local-host', port: 5000, candidateType: 'host', protocol: 'udp',
+})
+const privacyReports = [video, transport, pair, hiddenLocal, remote]
+const nativePair = {
+  local: { address: 'browser.local', foundation: 'local-host', port: 5000, type: 'host', protocol: 'udp' },
+  remote: { address: '10.0.0.107', port: 6000, type: 'host', protocol: 'udp' },
+} as RTCIceCandidatePair
+function receiver(kind: string, getSelectedCandidatePair: () => RTCIceCandidatePair | null): RTCRtpReceiver {
+  return { track: { kind }, transport: { iceTransport: { getSelectedCandidatePair } } } as unknown as RTCRtpReceiver
+}
+const privacyPeer = { ...peer, getReceivers: () => [receiver('video', () => nativePair)] }
+const privateStats = readWebRTCConnectionStats(privacyReports, privacyPeer)
+assert.equal(formatCandidateEndpoint(privateStats.local), 'browser.local:5000')
+assert.equal(videoConnectionType('webrtc', privateStats), 'Direct')
+assert.equal(readWebRTCConnectionStats(privacyReports, peer).local?.address, null)
+
+// Do not fill a redacted endpoint from a route that changed after the sample,
+// a different media transport, or an unsupported browser API.
+const changedPair = { ...nativePair, remote: { ...nativePair.remote, port: 6001 } } as RTCIceCandidatePair
+assert.equal(readWebRTCConnectionStats(privacyReports, { ...peer, getReceivers: () => [receiver('video', () => changedPair)] }).local?.address, null)
+assert.equal(readWebRTCConnectionStats(privacyReports, { ...peer, getReceivers: () => [receiver('audio', () => nativePair)] }).local?.address, null)
+assert.equal(readWebRTCConnectionStats(privacyReports, { ...peer, getReceivers: () => [receiver('video', () => { throw new Error('unsupported') })] }).local?.address, null)
+assert.equal(readWebRTCConnectionStats([video, transport, hiddenLocal, remote], privacyPeer).local, null)
+const otherFoundation = stat('local', 'local-candidate', { ...hiddenLocal, foundation: 'another-interface' })
+assert.equal(readWebRTCConnectionStats([video, transport, pair, otherFoundation, remote], privacyPeer).local?.address, null)
+// A disclosed IP from getStats() remains authoritative over the mDNS alias.
+const disclosedLocal = stat('local', 'local-candidate', { ...hiddenLocal, address: '192.168.1.10' })
+assert.equal(readWebRTCConnectionStats([video, transport, pair, disclosedLocal, remote], privacyPeer).local?.address, '192.168.1.10')
+
 const zero = readWebRTCConnectionStats([
   stat('zero', 'candidate-pair', { selected: true, currentRoundTripTime: 0 }),
   stat('video', 'inbound-rtp', { mediaType: 'video', jitter: 0 }),

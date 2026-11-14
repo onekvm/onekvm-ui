@@ -5,7 +5,7 @@ import type { OneKVMConfig } from '@/api/client'
 import { useAudioSettings, type AudioFormat, type AudioQuality } from '@/composables/useAudioSettings'
 import { useAudioInputs } from '@/composables/useAudioInputs'
 import type { AudioInputSource } from '@/lib/audio-settings'
-import { usbFunctionsFit, type USBGadget } from '@/lib/usb-capacity'
+import type { USBGadget } from '@/lib/usb-capacity'
 import { t } from '@/i18n/runtime'
 import USBAudioDeviceSettings from './USBAudioDeviceSettings.vue'
 import AudioInputSelect from './AudioInputSelect.vue'
@@ -44,12 +44,7 @@ const source = computed({
   get: () => audio.value.source || 'usb',
   set: (value: AudioInputSource) => { audio.value.source = value },
 })
-const { sourceOptions: availableSources, sourceSelectionDisabled } = useAudioInputs(() => props.sources, () => source.value)
-const sourceOptions = computed(() => availableSources.value.map(option => ({
-  ...option,
-  disabled: option.disabled || (option.value === 'usb' && audio.value.enabled && source.value !== 'usb'
-    && !usbFunctionsFit(props.usb, audio.value, props.gadget, { audio: true })),
-})))
+const { sourceOptions, sourceSelectionDisabled } = useAudioInputs(() => props.sources, () => source.value)
 const usbAudioValid = shallowRef(true)
 watch(usbAudioValid, (value) => emit('validity', value), { immediate: true })
 

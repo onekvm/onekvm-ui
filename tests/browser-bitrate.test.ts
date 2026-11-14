@@ -16,7 +16,7 @@ function harness() {
   }
   function sample(kbps = 2800, loss = 0, rtt = 2, options: { gap?: number; hidden?: boolean; decodeMs?: number; frames?: number; route?: string } = {}) {
     time += options.gap ?? 1000
-    bytes += kbps * 125; packets += 300; lost += loss; frames += options.frames ?? 60
+    bytes += kbps * (options.gap ?? 1000) / 8; packets += 300; lost += loss; frames += options.frames ?? 60
     decode += (options.decodeMs ?? 1) * (options.frames ?? 60) / 1000; delay += 0.002 * 60
     controller.sample([{ id: 'video', type: 'inbound-rtp', kind: 'video', timestamp: time,
       bytesReceived: bytes, packetsReceived: packets, packetsLost: lost, framesDecoded: frames,
@@ -32,11 +32,12 @@ loss.sample()
 assert.ok(loss.sample(1800, 40) < 1800, 'severe loss should reduce below delivered throughput')
 assert.equal(loss.controller.cap, 3000, 'unacknowledged request is not displayed')
 assert.equal(loss.modes.at(-1), 0x4f4b4250, 'congestion requests a wire budget')
-loss.status(10000, 1530)
-assert.equal(loss.sample(1450), 1530, 'reassert unchanged cap after a lost command')
+const reduced = loss.commands.at(-1)!
+loss.status(10000, reduced)
+assert.equal(loss.sample(1450), reduced, 'reassert unchanged cap after a lost command')
 assert.equal(loss.modes.at(-1), 0x4f4b4250, 'reassert constrained-path mode')
 for (let i = 0; i < 8; i++) loss.sample(1450)
-assert.ok(loss.commands.some(cap => cap > 1530), 'clean busy traffic should recover')
+assert.ok(loss.commands.slice(2).some(cap => cap > reduced), 'clean busy traffic should recover')
 
 const staticDesktop = harness()
 for (let i = 0; i < 25; i++) staticDesktop.sample(150)
@@ -87,5 +88,35 @@ decoderBudget.sample(1800, 40, 2, { decodeMs: 40 })
 decoderBudget.status(10000, 300)
 for (let i = 0; i < 8; i++) decoderBudget.sample(50, 0, 2, { frames: 0 })
 assert.ok(decoderBudget.commands.slice(2).every(cap => cap === 0 || cap === 300), 'CPU-bound decoder must not trigger budget recovery')
+
+const startup = harness()
+startup.controller.start()
+assert.equal(startup.commands.at(-1), 0xfffffffe, 'start requests the server-clamped automatic maximum, not release')
+startup.status(20000, 20000)
+assert.equal(startup.controller.sampleIntervalMs, 500)
+startup.sample(19000, 0, 2, { gap: 500 })
+const firstBackoff = startup.sample(2000, 20, 120, { gap: 500 })
+assert.ok(firstBackoff <= 1700, 'the first congested startup interval backs off below delivery rate')
+assert.equal(startup.controller.cap, 20000, 'only acknowledgements update the displayed cap')
+startup.status(20000, 20000) // Server encoder throttle has not accepted it yet.
+assert.equal(startup.sample(2000, 20, 120, { gap: 500 }), firstBackoff, 'retry a throttled reduction until acknowledged')
+startup.status(20000, firstBackoff)
+assert.equal(startup.controller.sampleIntervalMs, 1000, 'the first confirmed reduction ends the fast probe')
+assert.equal(startup.sample(1000, 20, 120, { gap: 500 }), firstBackoff, 'residual startup loss uses normal congestion hysteresis')
+for (let i = 0; i < 16; i++) startup.sample(1000, 0, 2, { gap: 500 })
+assert.equal(startup.controller.sampleIntervalMs, 1000, 'fast sampling ends after the bounded startup window')
+
+const quietStartup = harness()
+quietStartup.status(10000, 10000)
+for (let i = 0; i < 20; i++) quietStartup.sample(80, 0, 2, { gap: 500 })
+assert.ok(quietStartup.commands.every(cap => cap === 0 || cap === 10000), 'static desktops keep the high ceiling without fake congestion')
+quietStartup.status(0, 0)
+assert.equal(quietStartup.controller.sampleIntervalMs, 1000, 'manual mode does not retain startup polling')
+assert.equal(quietStartup.sample(), 0)
+
+const probeQueue = harness()
+probeQueue.status(10000, 10000)
+probeQueue.sample(9000, 0, 2, { gap: 500 })
+assert.ok(probeQueue.sample(9000, 0, 100, { gap: 500 }) <= 5000, 'startup reacts to growing queues before packet loss')
 
 console.log('browser bitrate policy tests passed')

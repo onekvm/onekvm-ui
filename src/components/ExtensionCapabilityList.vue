@@ -7,12 +7,15 @@ import PluginDetailsSectionTitle from './PluginDetailsSectionTitle.vue'
 
 const props = defineProps<{ capabilities: readonly string[] }>()
 const capabilityMetadata: Readonly<Record<string, { key: string; icon: Component }>> = {
+  'extensions.contributions': { key: 'extensionContributions', icon: Plug },
   'video.webrtc': { key: 'webrtc', icon: Video },
   'video.encoded': { key: 'encodedVideo', icon: Film },
   'video.mjpeg': { key: 'mjpeg', icon: Film },
   'video.encode': { key: 'videoEncoding', icon: Film },
   'video.ocr': { key: 'ocr', icon: Captions },
   'video.display': { key: 'display', icon: Monitor },
+  'video.edid.read': { key: 'edidRead', icon: Monitor },
+  'video.edid.write': { key: 'edidWrite', icon: Monitor },
   'audio.encoded': { key: 'encodedAudio', icon: Volume2 },
   hid: { key: 'hid', icon: Keyboard },
   atx: { key: 'atx', icon: Power },

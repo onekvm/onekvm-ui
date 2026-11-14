@@ -114,6 +114,7 @@ import HostnameSettingsForm from './HostnameSettingsForm.vue'
 import DiscoverySettingsForm from './DiscoverySettingsForm.vue'
 import MarketplaceInstallDialog from './MarketplaceInstallDialog.vue'
 import NetworkInterfaceManager from './NetworkInterfaceManager.vue'
+import NetworkSharingSettings from './NetworkSharingSettings.vue'
 import FirewallSettingsPage from './FirewallSettingsPage.vue'
 import ProxySettingsForm from './ProxySettingsForm.vue'
 import WebRtcIceSettingsForm from './WebRtcIceSettingsForm.vue'
@@ -141,6 +142,7 @@ import FileManagerPage from './file-manager/FileManagerPage.vue'
 import SettingsAppList from './SettingsAppList.vue'
 import SystemMemorySpec from './SystemMemorySpec.vue'
 import SystemCertificateFingerprint from './SystemCertificateFingerprint.vue'
+import SystemUSBADBDebug from './SystemUSBADBDebug.vue'
 import SystemSpecBadge from './SystemSpecBadge.vue'
 
 type Section = string
@@ -222,8 +224,10 @@ const accountOpen = ref(false)
 const section = ref<Section>(sectionFromRoute(props.route))
 const lastDetailSection = ref<Section>(isSettingsIndex(section.value) ? 'system' : section.value)
 const settingsRoot = shallowRef<HTMLElement | null>(null)
+const settingsMain = shallowRef<HTMLElement | null>(null)
 let settingsResizeObserver: ResizeObserver | null = null
 const mobileSettings = shallowRef(props.embedded ? false : window.matchMedia(SETTINGS_APP_QUERY).matches)
+const pageMounted = shallowRef(false)
 let settingsAppQuery: MediaQueryList | null = null
 const config = ref<OneKVMConfig | null>(null)
 const schema = ref<ConfigSchema | null>(null)
@@ -232,6 +236,7 @@ const canEditVideo = computed(() => props.canChangeVideo
 const extensions = ref<ExtensionSummary[]>([])
 const extensionDetails = ref<Record<string, ExtensionStatus>>({})
 const extensionsLoaded = ref(false)
+const schemaLoaded = shallowRef(false)
 const extensionsLoading = ref(false)
 const extensionLoading = ref(false)
 const extensionError = ref('')
@@ -242,6 +247,7 @@ const usbSettingsValid = ref(true)
 const audioSettingsValid = shallowRef(true)
 const savedAudio = shallowRef<AudioConfig | null>(null)
 const personalizationValid = ref(true)
+const personalizationLocalSettings = ref(false)
 const keyboardLayoutOptions = computed(() => [
 	{ value: 'us', label: t('keyboard.layouts.us', 'English (US)') },
 	{ value: 'uk', label: t('keyboard.layouts.uk', 'English (UK)') },
@@ -545,8 +551,8 @@ const deviceUptime = computed(() => {
   return statusEvents.currentUptime() ?? props.status?.uptime_seconds ?? 0
 })
 const mobileDetail = computed(() => mobileSettings.value && !isSettingsIndex(section.value))
-const { status: storageStatus } = useStorageStatus(computed(() => paneSection.value === 'system' && (!mobileSettings.value || mobileDetail.value)))
-const updateMonitor = useSystemUpdateMonitor(computed(() => paneSection.value === 'update'), (error) => {
+const { status: storageStatus } = useStorageStatus(computed(() => pageMounted.value && paneSection.value === 'system' && (!mobileSettings.value || mobileDetail.value)))
+const updateMonitor = useSystemUpdateMonitor(computed(() => pageMounted.value && paneSection.value === 'update'), (error) => {
   if (error) message.error(systemUpdateErrorText(error, t))
   else message.success(t('settings.advancedSettings.systemPage.updateComplete', 'System update installed'))
 })
@@ -788,22 +794,17 @@ function onlineUpdateLabel(update: SystemOnlineUpdate) {
 }
 
 async function loadSystemDetails() {
-  if (section.value !== 'time' && section.value !== 'update') return
+  if (section.value !== 'time') return
   systemDetailsLoading.value = true
   systemDetailsError.value = ''
   systemUpdateUnavailable.value = false
   try {
-    if (section.value === 'time') {
-      const value = await api.getSystemTime()
-      systemTime.value = value
-      selectedTimezone.value = value.timezone
-      selectedNTP.value = value.ntp
-      selectedNTPServers.value = [...value.ntp_servers]
-      selectedDeviceLanguage.value = value.language
-    } else {
-      await updateMonitor.refresh()
-      void loadOnlineUpdate()
-    }
+    const value = await api.getSystemTime()
+    systemTime.value = value
+    selectedTimezone.value = value.timezone
+    selectedNTP.value = value.ntp
+    selectedNTPServers.value = [...value.ntp_servers]
+    selectedDeviceLanguage.value = value.language
   } catch (reason) {
     systemDetailsError.value = reason instanceof Error ? reason.message : String(reason)
   } finally {
@@ -994,16 +995,33 @@ function confirmSystemUpdate() {
   })
 }
 
-async function load() {
-  loading.value = true
+let schemaRequest: Promise<void> | null = null
+let configRequest: Promise<void> | null = null
+let networkDNSRequest: Promise<void> | null = null
+let extensionsRequest: Promise<void> | null = null
+
+async function loadSchema() {
+  if (schemaLoaded.value && schema.value) return
+  if (schemaRequest) return schemaRequest
+  const request = (async () => {
+    try {
+      schema.value = await api.getConfigSchema(props.videoSessionId)
+      schemaLoaded.value = true
+    } catch (reason) {
+      error.value = reason instanceof Error ? reason.message : String(reason)
+    }
+  })()
+  schemaRequest = request
+  void request.finally(() => {
+    if (schemaRequest === request) schemaRequest = null
+  })
+  return request
+}
+
+async function loadConfigData() {
   error.value = ''
   try {
-    const [loadedConfig, loadedSchema, dnsStatus] = await Promise.all([
-      api.getConfig(),
-      api.getConfigSchema(props.videoSessionId),
-      api.getNetworkDNS().catch(() => null),
-    ])
-		automaticDNSServers.value = dnsStatus?.automatic_servers || []
+		const loadedConfig = await api.getConfig()
 		loadedConfig.network.static_routes ||= []
 		loadedConfig.network.interfaces ||= []
 		loadedConfig.network.discovery_url ??= DEFAULT_DISCOVERY_URL
@@ -1022,6 +1040,7 @@ async function load() {
       console_subtitle_parts: ['device_model'],
       custom_console_subtitle: '',
       dim_windows_on_kvm_focus: true,
+      connection_animation: true,
     }
     const legacyPersonalization = loadedConfig.personalization as typeof loadedConfig.personalization & {
       show_device_model?: boolean
@@ -1029,6 +1048,7 @@ async function load() {
     loadedConfig.personalization.console_subtitle_parts = normalizeConsoleSubtitleParts(legacyPersonalization)
     loadedConfig.personalization.custom_console_subtitle ??= ''
     loadedConfig.personalization.dim_windows_on_kvm_focus ??= true
+    loadedConfig.personalization.connection_animation ??= true
     loadedConfig.personalization.toolbar_icons = normalizeToolbarIcons(loadedConfig.personalization.toolbar_icons)
     delete legacyPersonalization.show_device_model
     loadedConfig.video.mjpeg ??= { frame_detect: false }
@@ -1042,16 +1062,41 @@ async function load() {
     config.value = loadedConfig
     config.value.audio = normalizeAudioConfig(loadedConfig.audio)
     savedAudio.value = { ...config.value.audio }
-    schema.value = loadedSchema
     savedNetworkSnapshot.value = networkConfigSnapshot(loadedConfig.network)
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : String(reason)
-  } finally {
-    loading.value = false
   }
 }
 
-async function loadExtensions() {
+function load(showLoading = true) {
+  if (showLoading) loading.value = true
+  if (configRequest) return configRequest
+  const request = loadConfigData()
+  configRequest = request
+  void request.finally(() => {
+    if (configRequest === request) {
+      configRequest = null
+      loading.value = false
+    }
+  })
+  return request
+}
+
+function loadNetworkDNS() {
+  if (networkDNSRequest) return networkDNSRequest
+  const request = api.getNetworkDNS().then((status) => {
+    automaticDNSServers.value = status?.automatic_servers || []
+  }).catch(() => {
+    automaticDNSServers.value = []
+  })
+  networkDNSRequest = request
+  void request.finally(() => {
+    if (networkDNSRequest === request) networkDNSRequest = null
+  })
+  return request
+}
+
+async function loadExtensionsData() {
   extensionsLoading.value = true
   extensionError.value = ''
   try {
@@ -1064,7 +1109,46 @@ async function loadExtensions() {
   }
 }
 
+function loadExtensions() {
+  if (extensionsRequest) return extensionsRequest
+  const request = loadExtensionsData()
+  extensionsRequest = request
+  void request.finally(() => {
+    if (extensionsRequest === request) extensionsRequest = null
+  })
+  return request
+}
+
+function sectionNeedsConfig(value: Section) {
+  return ['display', 'personalization', 'keyboard', 'usb', 'audio', 'network'].includes(value)
+}
+
+function sectionNeedsSchema(value: Section) {
+  return ['display', 'audio', 'network', 'system'].includes(value)
+}
+
+function sectionNeedsExtensions(value: Section) {
+  return value === 'firewall' || value === 'cloud' || value === 'plugins' || value.startsWith('extension:')
+}
+
+function ensureSectionData(value: Section) {
+  if (!sectionNeedsConfig(value)) loading.value = false
+  if (sectionNeedsSchema(value)) void loadSchema()
+  if (sectionNeedsConfig(value)) void load()
+  if (value === 'network') {
+    void loadNetworkDNS()
+    void refreshNetworkApplyStatus()
+  }
+  if (sectionNeedsExtensions(value) && !extensionsLoaded.value) void loadExtensions()
+  if (value === 'time') void loadSystemDetails()
+  if (value === 'update') {
+    void updateMonitor.refresh()
+    void loadOnlineUpdate()
+  }
+}
+
 function onExtensionsChanged() {
+  if (!extensionsLoaded.value || !sectionNeedsExtensions(paneSection.value)) return
   void api.getExtensions().then(updateExtensions).catch((reason) => {
     extensionError.value = reason instanceof Error ? reason.message : String(reason)
   })
@@ -1338,7 +1422,7 @@ async function usbSaveConfig() {
   const current = await api.getConfig()
   const patch = savedAudio.value && config.value
     ? audioConfigPatch(savedAudio.value, config.value.audio) : {}
-  return { ...current, usb: config.value!.usb, audio: { ...current.audio, ...patch } }
+  return { ...current, usb: { ...config.value!.usb, network_sharing: Boolean(config.value!.usb.network_adapter && current.usb.network_sharing) }, audio: { ...current.audio, ...patch } }
 }
 
 async function save() {
@@ -1665,6 +1749,7 @@ function syncSettingsAppLayout(event?: MediaQueryListEvent) {
 }
 
 onMounted(() => {
+  pageMounted.value = true
   window.addEventListener('onekvm:extensions-changed', onExtensionsChanged)
   window.addEventListener('onekvm-themechange', applyPluginFrameTheme)
   settingsAppQuery = window.matchMedia(SETTINGS_APP_QUERY)
@@ -1674,9 +1759,16 @@ onMounted(() => {
     settingsResizeObserver.observe(settingsRoot.value)
   }
   settingsAppQuery.addEventListener('change', syncSettingsAppLayout)
-  void load()
-  void loadExtensions()
-	void refreshNetworkApplyStatus()
+	ensureSectionData(paneSection.value)
+	// Fetch the shared configuration without showing a spinner over an
+	// extension page. This keeps the first switch to a config-backed page from
+	// replacing the current page with an empty loading frame.
+	void load(false)
+	// The extension catalog contributes pages to the sidebar. Load this small
+	// summary when the settings shell opens so the navigation is complete before
+	// the user enters the Plugins section; page-specific extension data remains
+	// lazy-loaded by ensureSectionData().
+	void loadExtensions()
 	clockTimer = window.setInterval(() => {
 		clockTick.value = Date.now()
 		if (networkApply.value?.pending &&
@@ -1733,8 +1825,16 @@ watch(activeExtensionURL, () => {
   stopPluginFrameObserver()
   pluginFrameHeight.value = null
 })
-watch(paneSection, (value) => {
-  if (value === 'time' || value === 'update') void loadSystemDetails()
+watch(paneSection, (value, previous) => {
+  if (!pageMounted.value) return
+  ensureSectionData(value)
+  if (value === previous) return
+  void nextTick(() => {
+    // Every settings page owns its scroll position. Reset the shared scroll
+    // container after navigation so a tall plugin page cannot leave the next
+    // page clipped or make the browser clamp the scroll position mid-frame.
+    settingsMain.value?.scrollTo({ top: 0, behavior: 'auto' })
+  })
 }, { immediate: true })
 
 watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.status?.audio.quality,
@@ -1763,6 +1863,22 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
   <div ref="settingsRoot" class="advanced-settings-root">
   <section class="advanced-settings-page" :class="settingsPageClass">
     <header v-if="!embedded" class="advanced-settings-header">
+      <div v-if="fileTransfer.uploading || mediaTransfer.uploading" class="toolbar-temporary-actions" data-toolbar-temporary-tasks>
+        <MediaTransferIndicator
+          :state="fileTransfer"
+          task-id="files"
+          :tooltip-disabled="mobileSettings"
+          always-visible
+          @restore="fileManagerPage?.restoreUploadDialog()"
+        />
+        <MediaTransferIndicator
+          :state="mediaTransfer"
+          :tooltip-disabled="mobileSettings"
+          always-visible
+          @restore="emit('restore-media-transfer')"
+        />
+      </div>
+      <div v-if="fileTransfer.uploading || mediaTransfer.uploading" class="toolbar-separator toolbar-temporary-separator" role="separator" aria-orientation="vertical" />
       <n-button
         quaternary
         size="small"
@@ -1779,19 +1895,6 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
         <span v-if="!mobileDetail" class="advanced-settings-device">{{ deviceVariant }}</span>
       </div>
       <div class="advanced-settings-account">
-        <MediaTransferIndicator
-          :state="fileTransfer"
-          task-id="files"
-          :tooltip-disabled="mobileSettings"
-          always-visible
-          @restore="fileManagerPage?.restoreUploadDialog()"
-        />
-        <MediaTransferIndicator
-          :state="mediaTransfer"
-          :tooltip-disabled="mobileSettings"
-          always-visible
-          @restore="emit('restore-media-transfer')"
-        />
         <n-dropdown trigger="click" placement="bottom-end" :options="accountOptions" :menu-props="themeMenuProps" @select="selectAccount">
           <n-tooltip>
             <template #trigger>
@@ -1852,9 +1955,8 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
             @select="selectSettingsItem"
           />
         </div>
-        <main class="advanced-settings-main">
-        <Transition name="advanced-section" mode="out-in">
-          <div :key="paneSection" class="advanced-settings-view">
+        <main ref="settingsMain" class="advanced-settings-main">
+        <div class="advanced-settings-view">
             <header class="advanced-settings-section-header">
               <n-button v-if="embedded && mobileDetail" quaternary size="small" :aria-label="settingsBackLabel" @click="onSettingsBack">
                 <template #icon><ArrowLeft /></template>
@@ -1878,7 +1980,7 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
             <n-spin class="advanced-settings-content" :show="loading || systemDetailsLoading">
               <section v-if="paneSection === 'display' && config" class="advanced-settings-section">
                 <n-alert v-if="!canEditVideo" type="info" :bordered="false">
-                  {{ t('settings.advancedSettings.displaySecondary', 'Video settings are controlled by the primary WebRTC client. This client shares its stream.') }}
+                  {{ t('settings.advancedSettings.displaySecondary', 'Another connection controls the video settings. They cannot be changed here.') }}
                 </n-alert>
                 <DisplaySettingsForm
                   v-model="config.video"
@@ -1903,8 +2005,9 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                   :device-model="deviceVariant"
                   :disabled="saving"
                   @validity="personalizationValid = $event"
+                  @local-settings="personalizationLocalSettings = $event"
                 />
-                <footer class="advanced-settings-actions">
+                <footer v-if="!personalizationLocalSettings" class="advanced-settings-actions">
                   <n-button :disabled="saving" @click="load">{{ t('common.refresh', 'Reload') }}</n-button>
                   <n-button type="primary" :loading="saving" :disabled="!personalizationValid" @click="savePersonalization">
                     <template #icon><Save /></template>
@@ -2029,6 +2132,7 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
 				  @update:custom-dns-enabled="systemCustomDNS = $event"
 				  @update:dnssec="config.network.dnssec = $event"
 				/>
+                <NetworkSharingSettings :config="config" :status="status" :video-session-id="videoSessionId" :disabled="saving || Boolean(networkApply?.pending)" @update:usb="config.usb = $event" />
 				<ActiveRoutesPanel />
 				<StaticRoutesForm
 				  v-model="config.network.static_routes"
@@ -2076,7 +2180,7 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
               <section v-else-if="activeExtension" class="advanced-settings-section plugin-page-section">
                 <ExtensionServiceRecovery :extension="activeExtension" @updated="updateExtensionDetail" />
                 <ExtensionVuePage
-                  v-if="activeExtension.page?.renderer === 'vue'"
+                  v-if="activeExtension.page?.renderer === 'vue' || activeExtension.page?.renderer === 'web-component'"
                   :extension="activeExtension"
                   @updated="updateExtensionDetail"
                 />
@@ -2217,8 +2321,16 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                             </div>
                           </template>
                           <div class="storage-partition-tooltip">
-                            <strong>{{ partitionRoleLabel(partition.role) }}</strong>
-                            <span>{{ partition.device }}<template v-if="partition.filesystem"> · {{ partition.filesystem }}</template></span>
+                            <div class="storage-partition-title">
+                              <strong>{{ partitionRoleLabel(partition.role) }}</strong>
+                              <n-tag v-if="partition.filesystem" size="tiny" round :bordered="false" class="storage-partition-filesystem-badge">{{ partition.filesystem }}</n-tag>
+                              <n-tag v-if="partition.active" size="tiny" round type="success" :bordered="false" class="storage-partition-active-badge">
+                                {{ t('settings.advancedSettings.systemPage.activePartition', 'Active') }}
+                              </n-tag>
+                            </div>
+                            <span class="storage-partition-device">
+                              <span class="storage-partition-device-name">{{ partition.device }}</span>
+                            </span>
                             <span>
                               {{ t('settings.advancedSettings.systemPage.partitionUsed', 'Used') }}:
                               {{ formatStorageBytes(partition.used_bytes) }} / {{ formatStorageBytes(partition.total_bytes) }}
@@ -2236,10 +2348,15 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                         >
                           <i />
                           <div>
-                            <strong>{{ partitionRoleLabel(partition.role) }}</strong>
-                            <small>
-                              {{ partition.device }}<template v-if="partition.filesystem"> · {{ partition.filesystem }}</template>
-                              <template v-if="partition.active"> · {{ t('settings.advancedSettings.systemPage.activePartition', 'Active') }}</template>
+                            <div class="storage-partition-title">
+                              <strong>{{ partitionRoleLabel(partition.role) }}</strong>
+                              <n-tag v-if="partition.filesystem" size="tiny" round :bordered="false" class="storage-partition-filesystem-badge">{{ partition.filesystem }}</n-tag>
+                              <n-tag v-if="partition.active" size="tiny" round type="success" :bordered="false" class="storage-partition-active-badge">
+                                {{ t('settings.advancedSettings.systemPage.activePartition', 'Active') }}
+                              </n-tag>
+                            </div>
+                            <small class="storage-partition-meta">
+                              <span class="storage-partition-device-name">{{ partition.device }}</span>
                             </small>
                           </div>
                           <span>
@@ -2351,20 +2468,27 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                         {{ t('settings.factoryReset.action', 'Restore') }}
                       </n-button>
                     </div>
-                    <div v-if="schema?.capabilities?.recovery === true" class="system-recovery-row">
-                      <strong>{{ t('settings.recoveryMode.title', 'Recovery') }}</strong>
-                      <n-button type="warning" secondary :loading="enteringRecovery" :disabled="systemAction !== null" @click="confirmEnterRecovery">
-                        <template #icon><LifeBuoy /></template>
-                        {{ t('settings.recoveryMode.action', 'Enter') }}
-                      </n-button>
-                    </div>
-                    <div class="system-recovery-row">
-                      <strong>{{ t('settings.diagnostics.title', 'Download diagnostic data') }}</strong>
-                      <n-button secondary :disabled="systemAction !== null" @click="diagnosticsOpen = true">
-                        <template #icon><Download /></template>
-                        {{ t('settings.diagnostics.action', 'Download') }}
-                      </n-button>
-                    </div>
+                    <n-collapse class="system-recovery-tools" :default-expanded-names="[]">
+                      <n-collapse-item name="tools" :title="t('settings.advancedSettings.systemPage.recoveryTools', 'Debug and recovery tools')" display-directive="if">
+                        <div class="system-settings-group">
+                          <SystemUSBADBDebug :disabled="systemAction !== null || !canManageSettings" />
+                          <div v-if="schema?.capabilities?.recovery === true" class="system-recovery-row">
+                            <strong>{{ t('settings.recoveryMode.title', 'Recovery') }}</strong>
+                            <n-button type="warning" secondary :loading="enteringRecovery" :disabled="systemAction !== null" @click="confirmEnterRecovery">
+                              <template #icon><LifeBuoy /></template>
+                              {{ t('settings.recoveryMode.action', 'Enter') }}
+                            </n-button>
+                          </div>
+                          <div class="system-recovery-row">
+                            <strong>{{ t('settings.diagnostics.title', 'Download diagnostic data') }}</strong>
+                            <n-button secondary :disabled="systemAction !== null" @click="diagnosticsOpen = true">
+                              <template #icon><Download /></template>
+                              {{ t('settings.diagnostics.action', 'Download') }}
+                            </n-button>
+                          </div>
+                        </div>
+                      </n-collapse-item>
+                    </n-collapse>
                   </section>
                 </template>
               </section>
@@ -2607,8 +2731,7 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                 </template>
               </section>
             </n-spin>
-          </div>
-        </Transition>
+        </div>
       </main>
       </div>
     </div>

@@ -4,6 +4,8 @@ Trusted OneKVM extensions can render a compiled Vue component inside the main
 OneKVM UI instead of using an iframe. The component shares the host's Vue and
 Naive UI instances, including theme, message, and dialog providers.
 
+Native JavaScript and Lit views can use the [Web Components API](extension-web-component-v1.md).
+
 ## Manifest
 
 ```json

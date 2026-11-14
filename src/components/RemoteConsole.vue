@@ -13,6 +13,7 @@ import { canvasDeviceSize, mapAbsoluteMouse, originalCssSize, paintedCssSize, ro
 import { MOUSE_BUTTON_LEFT, sendRelativeMotion } from '@/lib/hid-mouse'
 import { cursorToScreen, viewOverflows } from '@/lib/viewport-zoom'
 import { useKeyboard } from '@/composables/useKeyboard'
+import KeyboardMagicHint from './KeyboardMagicHint.vue'
 import ConnectionTrace from './ConnectionTrace.vue'
 import TrackpadOverlay from './TrackpadOverlay.vue'
 import { useVideoFps } from '@/composables/useVideoFps'
@@ -40,8 +41,11 @@ const props = defineProps<{
   keyboardBlocked: boolean
   inputSuspended: boolean
   rightControlAsMeta: boolean
+  swapCommandCtrl: boolean
+  magicKey: string
   trackpad?: boolean
   usbConnected?: boolean
+  connectionAnimation?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -96,6 +100,7 @@ function publishBrowserLatency() {
 
 const isMJPEG = computed(() => props.state.videoMode === 'mjpeg')
 const unsupportedInput = computed(() => props.hdmiError === 'out_of_range')
+const videoUnavailable = computed(() => props.hdmiError === 'video_unavailable')
 const unsupportedSize = computed(() => {
   const width = props.inputWidth ?? 0
   const height = props.inputHeight ?? 0
@@ -117,7 +122,7 @@ const transportFailed = computed(
   () => ['failed', 'disconnected'].includes(props.state.connection),
 )
 const connectionProblem = computed(
-  () => consoleConnectionProblem({
+  () => !videoUnavailable.value && consoleConnectionProblem({
     state: props.state,
     serverUnavailable: props.serverUnavailable,
     mediaError: mediaError.value,
@@ -135,7 +140,13 @@ const {
   zoomToOneToOne,
 } = useViewportZoom(inputSurface, stage, trackpadOn)
 const { shown: zoomBadgeShown } = useZoomBadge(() => zoomView.scale, zooming)
-useKeyboard(toRef(props, 'keyboardBlocked'), inputSurface, toRef(props, 'rightControlAsMeta'))
+useKeyboard(
+  toRef(props, 'keyboardBlocked'),
+  inputSurface,
+  toRef(props, 'rightControlAsMeta'),
+  toRef(props, 'swapCommandCtrl'),
+  toRef(props, 'magicKey'),
+)
 const webrtcPresent = computed(() => props.state.videoMode === 'webrtc')
 useVideoFps(video, (fps) => {
   if (!isMJPEG.value) emit('fps', fps)
@@ -145,7 +156,7 @@ useVideoFps(video, (fps) => {
 }, webrtcPresent, metadata => { if (webrtcPresent.value) onekvm.observeVideoFrame(metadata) })
 
 const loading = computed(
-  () => !unsupportedInput.value && !connectionProblem.value && !playing.value && ['idle', 'connecting', 'connected'].includes(props.state.connection),
+  () => !unsupportedInput.value && !videoUnavailable.value && !connectionProblem.value && !playing.value && ['idle', 'connecting', 'connected'].includes(props.state.connection),
 )
 const loadingMessage = computed(() => hasFrame.value
   ? t('screen.bufferingVideo', 'Buffering video…')
@@ -516,7 +527,7 @@ watch(
     :style="stageStyle"
     @pointerdown="onekvm.unlockAudio()"
   >
-    <ConnectionTrace :usb-connected="Boolean(usbConnected)" :video-connected="playing" />
+    <ConnectionTrace v-if="connectionAnimation !== false" :usb-connected="Boolean(usbConnected)" :video-connected="playing" />
     <audio ref="remoteAudio" class="console-remote-audio" autoplay playsinline />
     <div class="console-viewport" :style="viewportStyle">
     <div class="console-picture" :style="pictureStyle">
@@ -532,6 +543,7 @@ watch(
       autoplay
       playsinline
       muted
+      disablepictureinpicture
       :style="mediaStyle"
       tabindex="-1"
       @playing="onPlaying"
@@ -555,6 +567,7 @@ watch(
     />
     </div>
     </div>
+    <KeyboardMagicHint />
     <div
       ref="inputSurface"
       class="console-hid-layer"
@@ -595,6 +608,16 @@ watch(
       <strong>{{ t('screen.unsupportedResolution', 'Unsupported resolution') }}</strong>
       <span v-if="unsupportedSize">{{ unsupportedSize }}</span>
       <p>{{ t('screen.unsupportedResolutionHint', 'Set the controlled device\'s HDMI output to a resolution and refresh rate supported by this model.') }}</p>
+    </div>
+
+    <div
+      v-if="videoUnavailable"
+      class="console-state console-oor"
+      role="status"
+      aria-live="polite"
+    >
+      <strong>{{ t('screen.videoUnavailable', 'Video backend unavailable') }}</strong>
+      <p>{{ t('screen.videoUnavailableHint', 'Other functions can still be used.') }}</p>
     </div>
 
     <Transition name="console-loading">

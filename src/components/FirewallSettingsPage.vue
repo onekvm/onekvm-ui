@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { GripVertical, Plus, Trash2 } from '@/icons'
-import { useMessage } from 'naive-ui'
+import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
+import { GripVertical, Pencil, Plus, Trash2 } from '@/icons'
+import { NButtonGroup, useMessage } from 'naive-ui'
 
-import { api, type ExtensionSummary, type FirewallStatus } from '@/api/client'
+import { api, type ExtensionSummary, type FirewallMatch, type FirewallStatus } from '@/api/client'
 import FirewallInstallCard from './FirewallInstallCard.vue'
+import FirewallRuleSection from './FirewallRuleSection.vue'
+import FirewallMatchTable from './FirewallMatchTable.vue'
+import { legacyMatchFields, ruleMatches, simpleMatches, validMatches } from '@/lib/firewall-matches'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { t } from '@/i18n/runtime'
 import {
@@ -12,16 +15,22 @@ import {
   collapseDraft,
   draftFromStatus,
   draftsEqual,
+  duplicateServicePort,
   enableProtection,
   expandDraft,
   isAnywhere,
   managementServices,
   protocolPort,
   reorderVisible,
+  reorderDirectionRules,
+  rulesForDirection,
+  saveFirewallRule,
+  saveServicePort,
   servicePortRules,
   serviceEnabled,
   setService,
   type FirewallDraft,
+  type FirewallDirection,
   type FirewallRuleDraft,
   type ServiceDef,
 } from '@/lib/firewall-draft'
@@ -46,6 +55,7 @@ const expiresAt = ref(0)
 const now = ref(Date.now())
 const ruleModal = ref(false)
 const ruleModalSimple = ref(true)
+const editingRuleId = shallowRef<number | null>(null)
 const sourceModal = ref(false)
 const sourceAddress = ref('')
 const dragId = ref<number | null>(null)
@@ -54,10 +64,8 @@ const ruleAction = ref('allow')
 const ruleDirection = ref('in')
 const ruleProtocol = ref('tcp')
 const rulePort = ref('')
-const ruleSourceMode = ref<'any' | 'address'>('any')
-const ruleSource = ref('')
+const matches = ref<FirewallMatch[]>([])
 const ruleComment = ref('')
-let nextId = -1
 let pollTimer: number | null = null
 let clockTimer: number | null = null
 
@@ -66,10 +74,16 @@ const dirty = computed(() => Boolean(saved.value && draft.value && !draftsEqual(
 const pending = computed(() => Boolean(status.value?.confirmation?.pending))
 const seconds = computed(() => pending.value ? Math.max(0, Math.ceil((expiresAt.value - now.value) / 1000)) : 0)
 const busy = computed(() => saving.value || pending.value)
+const advancedOnlyCount = computed(() => draft.value?.rules.filter(rule => rule.matches !== undefined).length ?? 0)
 const servicePortsList = computed(() => draft.value ? servicePortRules(draft.value.rules) : [])
+const directionSections = computed(() => ([
+  { direction: 'in', policyKey: 'defaultIncoming' },
+  { direction: 'out', policyKey: 'defaultOutgoing' },
+] as const).map(section => ({ ...section, rules: rulesForDirection(draft.value?.rules ?? [], section.direction) })))
 const summary = computed(() => {
   if (!draft.value) return ''
   if (!draft.value.enabled) return t('settings.firewall.openHint', 'The firewall is off, so every incoming connection is accepted. The choices below take effect after you turn it on.')
+  if (mode.value === 'advanced' || advancedOnlyCount.value) return t('settings.firewall.advancedActiveHint', 'Traffic that matches no rule follows the default action for its direction.')
   if (draft.value.defaultIncoming === 'allow') return t('settings.firewall.allowAllHint', 'The firewall is on, but incoming connections that match no rule are still accepted.')
   return t('settings.firewall.protectedHint', 'Only the services switched on below can connect in. Other incoming connections are blocked.')
 })
@@ -78,7 +92,6 @@ const actionOptions = computed(() => [
   { value: 'allow', label: t('settings.firewall.allow', 'Allow') },
   { value: 'deny', label: t('settings.firewall.deny', 'Block') },
   { value: 'reject', label: t('settings.firewall.reject', 'Reject') },
-  { value: 'limit', label: t('settings.firewall.limit', 'Limit rate') },
 ])
 const directionOptions = computed(() => [
   { value: 'in', label: t('settings.firewall.in', 'incoming') },
@@ -99,17 +112,8 @@ function endpoint(rule: Pick<FirewallRuleDraft, 'protocol' | 'port'>) {
   return protocolPort(rule.protocol, rule.port)
 }
 
-function sentence(rule: FirewallRuleDraft) {
-  return t('settings.firewall.sentence', '{action} {direction} {endpoint} from {source}')
-    .replace('{action}', t(`settings.firewall.${rule.action}`, rule.action))
-    .replace('{direction}', t(rule.direction === 'out' ? 'settings.firewall.out' : 'settings.firewall.in', rule.direction))
-    .replace('{endpoint}', endpoint(rule))
-    .replace('{source}', isAnywhere(rule.source) ? t('settings.firewall.anywhere', 'Anywhere') : rule.source)
-}
-
 function ruleDetail(rule: FirewallRuleDraft) {
   const parts: string[] = []
-  if (!(rule.action === 'allow' && rule.direction === 'in')) parts.push(`${t(`settings.firewall.${rule.action}`, rule.action)}${t(rule.direction === 'out' ? 'settings.firewall.out' : 'settings.firewall.in', rule.direction)}`)
   if (!isAnywhere(rule.source)) parts.push(rule.source)
   if (rule.comment) parts.push(rule.comment)
   return parts.join(' · ')
@@ -186,74 +190,70 @@ function validPort(port: string) {
   return /^[0-9]{1,5}(?::[0-9]{1,5})?$/.test(port.trim())
 }
 
-function duplicateAllow(port: string, protocol: string, direction: string, source: string) {
-  return Boolean(draft.value?.rules.some((rule) => rule.action === 'allow' && rule.direction === direction && rule.port === port && (rule.protocol === protocol || rule.protocol === 'any' || protocol === 'any') && isAnywhere(rule.source) === isAnywhere(source) && (isAnywhere(source) || rule.source === source)))
-}
-
-function openRuleModal(simple: boolean) {
+function openRuleModal(simple: boolean, direction: FirewallDirection = 'in') {
+  if (busy.value) return
+  editingRuleId.value = null
   ruleModalSimple.value = simple
   ruleAction.value = 'allow'
-  ruleDirection.value = 'in'
+  ruleDirection.value = direction
   ruleProtocol.value = 'tcp'
   rulePort.value = ''
-  ruleSourceMode.value = 'any'
-  ruleSource.value = ''
+  matches.value = [{ field: 'protocol', operator: 'eq', value: 'tcp' }, { field: 'destination-port', operator: 'eq', value: '' }]
   ruleComment.value = ''
   ruleModal.value = true
 }
 
-function addSimplePort() {
+function editRule(rule: FirewallRuleDraft, simple = false) {
+  if (busy.value) return
+  editingRuleId.value = rule.id
+  ruleModalSimple.value = simple
+  ruleAction.value = rule.action
+  ruleDirection.value = rule.direction
+  ruleProtocol.value = rule.protocol || 'any'
+  rulePort.value = rule.port
+  matches.value = ruleMatches(rule)
+  ruleComment.value = rule.comment
+  ruleModal.value = true
+}
+
+function saveSimplePort() {
   const port = rulePort.value.trim()
   if (!validPort(port)) {
     message.warning(t('settings.firewall.portRequired', 'Enter a port, such as 22, 443, or 8000:8010'))
     return false
   }
-  if (duplicateAllow(port, ruleProtocol.value, 'in', '')) {
+  if (duplicateServicePort(draft.value?.rules ?? [], { port, protocol: ruleProtocol.value }, editingRuleId.value)) {
     message.warning(t('settings.firewall.duplicate', 'That port is already allowed'))
     return false
   }
   updateDraft((current) => ({
     ...current,
-    rules: [...current.rules, { id: nextId--, action: 'allow', direction: 'in', protocol: ruleProtocol.value, port, source: '', comment: ruleComment.value.trim() }],
+    rules: saveServicePort(current.rules, { protocol: ruleProtocol.value, port, comment: ruleComment.value.trim() }, editingRuleId.value),
   }))
   return true
 }
 
-function addAdvancedRule() {
-  const port = rulePort.value.trim()
-  const source = ruleSourceMode.value === 'address' ? ruleSource.value.trim() : ''
-  if (!validPort(port)) {
-    message.warning(t('settings.firewall.portRequired', 'Enter a port, such as 22, 443, or 8000:8010'))
+function saveAdvancedRule() {
+  const next = matches.value.map(item => ({ ...item, value: item.value.trim() }))
+  if (!validMatches(next, ruleDirection.value)) {
+    message.warning(t('settings.firewall.matchesInvalid', 'Check the match values, protocol, address family, and interface direction.'))
     return false
   }
-  if (ruleSourceMode.value === 'address' && !source) {
-    message.warning(t('settings.firewall.sourceRequired', 'Enter an address or network'))
-    return false
-  }
-  if (ruleAction.value === 'allow' && duplicateAllow(port, ruleProtocol.value, ruleDirection.value, source)) {
-    message.warning(t('settings.firewall.duplicate', 'That port is already allowed'))
-    return false
-  }
-  updateDraft((current) => ({
+  const fields = legacyMatchFields(next)
+  updateDraft(current => ({
     ...current,
-    rules: [...current.rules, {
-      id: nextId--,
-      action: ruleAction.value,
-      direction: ruleDirection.value,
-      protocol: ruleProtocol.value,
-      port,
-      source,
+    rules: saveFirewallRule(current.rules, {
+      action: ruleAction.value, direction: ruleDirection.value,
+      ...fields, matches: simpleMatches(next) ? undefined : next,
       comment: ruleComment.value.trim(),
-    }],
+    }, editingRuleId.value),
   }))
-  rulePort.value = ''
-  ruleSource.value = ''
-  ruleComment.value = ''
   return true
 }
 
 function submitRule() {
-  const added = ruleModalSimple.value ? addSimplePort() : addAdvancedRule()
+  if (busy.value) return
+  const added = ruleModalSimple.value ? saveSimplePort() : saveAdvancedRule()
   if (added) ruleModal.value = false
 }
 
@@ -301,6 +301,10 @@ function visibleRuleIds() {
 
 function reorder(fromId: number, toId: number) {
   updateDraft((current) => ({ ...current, rules: reorderVisible(current.rules, visibleRuleIds(), fromId, toId) }))
+}
+
+function reorderAdvanced(fromId: number, toId: number) {
+  updateDraft(current => ({ ...current, rules: reorderDirectionRules(current.rules, fromId, toId) }))
 }
 
 function startDrag(event: PointerEvent, id: number) {
@@ -410,10 +414,9 @@ const preview = computed(() => {
     direction: ruleDirection.value,
     protocol: ruleProtocol.value,
     port: rulePort.value.trim() || '…',
-    source: ruleSourceMode.value === 'address' ? ruleSource.value.trim() : '',
+    source: '',
     comment: ruleComment.value,
   }
-  if (!ruleModalSimple.value) return sentence(rule)
   return t('settings.firewall.portSentence', '{action} {direction} {endpoint}')
     .replace('{action}', t(`settings.firewall.${rule.action}`, rule.action))
     .replace('{direction}', t(rule.direction === 'out' ? 'settings.firewall.out' : 'settings.firewall.in', rule.direction))
@@ -445,23 +448,21 @@ onUnmounted(() => {
       <div class="firewall-toolbar-actions">
         <n-tag :type="draft.enabled ? 'success' : 'default'" round>{{ draft.enabled ? t('settings.firewall.active', 'On') : t('settings.firewall.inactive', 'Off') }}</n-tag>
         <n-button-group>
-          <n-button :type="mode === 'simple' ? 'primary' : 'default'" @click="setMode('simple')">{{ t('settings.firewall.simple', 'Simple') }}</n-button>
-          <n-button :type="mode === 'advanced' ? 'primary' : 'default'" @click="setMode('advanced')">{{ t('settings.firewall.advanced', 'Advanced') }}</n-button>
+          <n-button :type="mode === 'simple' ? 'primary' : 'default'" :aria-pressed="mode === 'simple'" @click="setMode('simple')">{{ t('settings.firewall.simple', 'Simple') }}</n-button>
+          <n-button :type="mode === 'advanced' ? 'primary' : 'default'" :aria-pressed="mode === 'advanced'" @click="setMode('advanced')">{{ t('settings.firewall.advanced', 'Advanced') }}</n-button>
         </n-button-group>
       </div>
     </div>
 
     <n-spin :show="loading && !draft">
       <div v-if="draft && status?.available" class="firewall-stack">
-        <section class="firewall-card">
-          <header>
+        <section class="firewall-card firewall-enable">
+          <div class="firewall-enable-copy">
             <h2>{{ t('settings.firewall.enabled', 'Turn on the firewall') }}</h2>
-            <p>{{ t('settings.firewall.enabledHint', 'Only the services below can connect in. Connections started by this device are unchanged. Turning the firewall off does not delete those allows.') }}</p>
-          </header>
-          <div class="firewall-switch-row">
+            <p>{{ mode === 'advanced' || advancedOnlyCount ? t('settings.firewall.advancedEnabledHint', 'Established connections and loopback traffic are always allowed.') : t('settings.firewall.enabledHint', 'Only the services below can connect in. Connections started by this device are unchanged. Turning the firewall off does not delete those allows.') }}</p>
             <p>{{ summary }}</p>
-            <n-switch :value="draft.enabled" :disabled="busy" @update:value="(enabled: boolean) => mode === 'simple' ? toggleEnabled(enabled) : updateDraft((current) => ({ ...current, enabled }))" />
           </div>
+          <n-switch :value="draft.enabled" :disabled="busy" @update:value="(enabled: boolean) => mode === 'simple' ? toggleEnabled(enabled) : updateDraft((current) => ({ ...current, enabled }))" />
         </section>
 
         <section v-if="mode === 'simple'" class="firewall-card">
@@ -492,7 +493,7 @@ onUnmounted(() => {
             </n-button>
           </header>
           <p v-if="!servicePortsList.length" class="firewall-empty">{{ t('settings.firewall.servicePortsEmpty', 'No ports are allowed yet. Turn on Web or SSH above, or add a port.') }}</p>
-          <ul v-else class="firewall-list">
+          <TransitionGroup v-else tag="ul" name="firewall-rule" class="firewall-list">
             <li v-for="rule in servicePortsList" :key="rule.id" class="firewall-rule" :class="{ 'is-dragging': dragId === rule.id, 'is-over': overId === rule.id && dragId !== rule.id }" :data-rule-id="rule.id">
               <button type="button" class="firewall-drag" :disabled="busy" :aria-label="t('settings.firewall.drag', 'Drag to reorder')" @pointerdown="startDrag($event, rule.id)" @pointermove="moveDrag" @pointerup="endDrag" @pointercancel="endDrag">
                 <GripVertical :size="16" />
@@ -501,11 +502,14 @@ onUnmounted(() => {
                 <strong>{{ endpoint(rule) }}</strong>
                 <small v-if="ruleDetail(rule)">{{ ruleDetail(rule) }}</small>
               </div>
+              <n-button quaternary circle :disabled="busy" :aria-label="`${t('settings.firewall.editPort', 'Edit port')}: ${endpoint(rule)}`" @click="editRule(rule, true)">
+                <template #icon><Pencil :size="15" /></template>
+              </n-button>
               <n-button quaternary circle :disabled="busy" :aria-label="t('settings.firewall.remove', 'Remove')" @click="removeRule(rule.id)">
                 <template #icon><Trash2 :size="15" /></template>
               </n-button>
             </li>
-          </ul>
+          </TransitionGroup>
         </section>
 
         <section v-if="mode === 'simple'" class="firewall-card">
@@ -532,35 +536,29 @@ onUnmounted(() => {
           </ul>
         </section>
 
-        <section v-if="mode === 'advanced'" class="firewall-card">
-          <header class="firewall-card-heading">
-            <div>
-              <h2>{{ t('settings.firewall.rules', 'Rules') }}</h2>
-              <p>{{ t('settings.firewall.orderHint', 'Rules higher in the list match first. Drag the handle to change the order. Nothing changes until you apply.') }}</p>
-            </div>
-            <n-button :disabled="busy" @click="openRuleModal(false)">
-              <template #icon><Plus :size="15" /></template>
-              {{ t('settings.firewall.addRule', 'Add a rule') }}
-            </n-button>
-          </header>
-          <p v-if="!draft.rules.length" class="firewall-empty">{{ t('settings.firewall.noRules', 'No rules yet.') }}</p>
-          <ul v-else class="firewall-list">
-            <li v-for="rule in draft.rules" :key="rule.id" class="firewall-rule" :class="{ 'is-dragging': dragId === rule.id, 'is-over': overId === rule.id && dragId !== rule.id }" :data-rule-id="rule.id">
-              <button type="button" class="firewall-drag" :disabled="busy" :aria-label="t('settings.firewall.drag', 'Drag to reorder')" @pointerdown="startDrag($event, rule.id)" @pointermove="moveDrag" @pointerup="endDrag" @pointercancel="endDrag">
-                <GripVertical :size="16" />
-              </button>
-              <div class="firewall-rule-main">
-                <strong>{{ endpoint(rule) }}</strong>
-                <small v-if="ruleDetail(rule)">{{ ruleDetail(rule) }}</small>
-              </div>
-              <n-button quaternary circle :disabled="busy" :aria-label="t('settings.firewall.remove', 'Remove')" @click="removeRule(rule.id)">
-                <template #icon><Trash2 :size="15" /></template>
-              </n-button>
-            </li>
-          </ul>
+        <section v-if="mode === 'simple' && advancedOnlyCount" class="firewall-card">
+          <p>{{ t('settings.firewall.advancedRulesPresent', '{count} rules have additional matches.').replace('{count}', String(advancedOnlyCount)) }}</p>
+          <n-button :disabled="busy" @click="setMode('advanced')">{{ t('settings.firewall.editAdvancedRules', 'Edit advanced rules') }}</n-button>
         </section>
 
-        <section class="firewall-card">
+        <template v-if="mode === 'advanced'">
+          <p class="firewall-order-hint">{{ t('settings.firewall.orderHint', 'Rules higher in the list match first. Drag the handle to change the order. Nothing changes until you apply.') }}</p>
+          <FirewallRuleSection
+            v-for="section in directionSections"
+            :key="section.direction"
+            :direction="section.direction"
+            :rules="section.rules"
+            :policy="draft[section.policyKey]"
+            :busy="busy"
+            @add="openRuleModal(false, section.direction)"
+            @edit="editRule($event)"
+            @remove="removeRule"
+            @reorder="reorderAdvanced"
+            @update:policy="(value: string) => updateDraft(current => ({ ...current, [section.policyKey]: value }))"
+          />
+        </template>
+
+        <section v-if="mode === 'simple'" class="firewall-card">
           <header>
             <h2>{{ t('settings.firewall.defaultsTitle', 'Default rules') }}</h2>
             <p>{{ t('settings.firewall.defaultsHint', 'Connections that match none of the ports above are handled here.') }}</p>
@@ -599,35 +597,30 @@ onUnmounted(() => {
       preset="card"
       :to="overlayTo"
       :z-index="4600"
-      :style="{ width: 'min(480px, calc(100vw - 32px))' }"
-      :title="ruleModalSimple ? t('settings.firewall.addPort', 'Add port') : t('settings.firewall.addRule', 'Add a rule')"
+      :style="{ width: `min(${ruleModalSimple ? 480 : 760}px, calc(100vw - 32px))` }"
+      :title="editingRuleId !== null ? ruleModalSimple ? t('settings.firewall.editPort', 'Edit port') : t('settings.firewall.editRule', 'Edit rule') : ruleModalSimple ? t('settings.firewall.addPort', 'Add port') : t('settings.firewall.addRule', 'Add a rule')"
       :mask-closable="!busy"
       :closable="!busy"
       :close-on-esc="!busy"
     >
       <form class="firewall-modal" @submit.prevent="submitRule">
-        <p>{{ ruleModalSimple ? t('settings.firewall.portOnlyHint', 'Enter a protocol and port, such as TCP/5900. An IP address is not needed.') : t('settings.firewall.addRuleHint', 'It is added to the list first. Nothing changes until you apply.') }}</p>
+        <p>{{ editingRuleId !== null ? t('settings.firewall.editRuleHint', 'Changes take effect after you apply.') : ruleModalSimple ? t('settings.firewall.portOnlyHint', 'Enter a protocol and port, such as TCP/5900. An IP address is not needed.') : t('settings.firewall.addRuleHint', 'It is added to the list first. Nothing changes until you apply.') }}</p>
         <template v-if="!ruleModalSimple">
           <label>{{ t('settings.firewall.action', 'What to do') }}<n-select v-model:value="ruleAction" :options="actionOptions" /></label>
           <label>{{ t('settings.firewall.direction', 'Direction') }}<n-select v-model:value="ruleDirection" :options="directionOptions" /></label>
         </template>
-        <label>{{ t('settings.firewall.protocol', 'Protocol') }}<n-select v-model:value="ruleProtocol" :options="protocolOptions" /></label>
-        <label>{{ t('settings.firewall.port', 'Port') }}<n-input v-model:value="rulePort" autofocus :placeholder="t('settings.firewall.portPlaceholder', 'For example 5900 or 8000:8010')" /></label>
-        <template v-if="!ruleModalSimple">
-          <label>{{ t('settings.firewall.source', 'From') }}
-            <n-select v-model:value="ruleSourceMode" :options="[{ value: 'any', label: t('settings.firewall.anywhere', 'Anywhere') }, { value: 'address', label: t('settings.firewall.specificSource', 'Only this address') }]" />
-          </label>
-          <label v-if="ruleSourceMode === 'address'">{{ t('settings.firewall.specificSource', 'Only this address') }}
-            <n-input v-model:value="ruleSource" :placeholder="t('settings.firewall.sourcePlaceholder', 'For example 10.0.0.0/24')" />
-          </label>
+        <template v-if="ruleModalSimple">
+          <label>{{ t('settings.firewall.protocol', 'Protocol') }}<n-select v-model:value="ruleProtocol" :options="protocolOptions" /></label>
+          <label>{{ t('settings.firewall.port', 'Port') }}<n-input v-model:value="rulePort" autofocus :placeholder="t('settings.firewall.portPlaceholder', 'For example 5900 or 8000:8010')" /></label>
         </template>
+        <FirewallMatchTable v-else v-model="matches" :direction="ruleDirection" :disabled="busy" />
         <label>{{ t('settings.firewall.comment', 'Note') }}
           <n-input v-model:value="ruleComment" :placeholder="t('settings.firewall.commentPlaceholder', 'Optional, so you can recognize it later')" />
         </label>
-        <p class="firewall-preview"><span>{{ t('settings.firewall.preview', 'This will add') }}</span>{{ preview }}</p>
+        <p v-if="ruleModalSimple" class="firewall-preview"><span>{{ editingRuleId !== null ? t('settings.firewall.updatedRule', 'Updated rule') : t('settings.firewall.preview', 'This will add') }}</span>{{ preview }}</p>
         <div class="firewall-modal-actions">
           <n-button @click="ruleModal = false">{{ t('auth.cancel', 'Cancel') }}</n-button>
-          <n-button attr-type="submit" type="primary">{{ t('settings.firewall.addToList', 'Add to list') }}</n-button>
+          <n-button attr-type="submit" type="primary" :disabled="busy">{{ editingRuleId !== null ? ruleModalSimple ? t('settings.firewall.savePort', 'Save port') : t('settings.firewall.saveRule', 'Save rule') : t('settings.firewall.addToList', 'Add to list') }}</n-button>
         </div>
       </form>
     </n-modal>
@@ -681,21 +674,28 @@ onUnmounted(() => {
 <style scoped>
 .firewall-page { display: grid; gap: 16px; container-type: inline-size; }
 .firewall-toolbar { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.firewall-order-hint { margin: 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
 .firewall-toolbar p { margin: 0; color: var(--muted-foreground); line-height: 1.5; }
 .firewall-toolbar-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .firewall-stack { display: grid; gap: 16px; }
 .firewall-card { display: grid; gap: 14px; padding: 16px; border: 1px solid var(--border); border-radius: 7px; background: var(--card); }
-.firewall-card header h2, .firewall-policy span, .firewall-modal label { font-size: 14px; font-weight: 600; }
-.firewall-card header h2 { margin: 0; }
+.firewall-card header h2, .firewall-enable h2, .firewall-policy span, .firewall-modal label { font-size: 14px; font-weight: 600; }
+.firewall-card header h2, .firewall-enable h2 { margin: 0; }
 .firewall-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.firewall-card header p, .firewall-policy p, .firewall-empty, .firewall-preview, .firewall-modal p { margin: 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
-.firewall-switch-row, .firewall-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.firewall-switch-row p, .firewall-switch-row small, .firewall-list small { display: block; margin: 4px 0 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.45; }
+.firewall-card header p, .firewall-enable p, .firewall-policy p, .firewall-empty, .firewall-preview, .firewall-modal p { margin: 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
+.firewall-enable { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.firewall-enable :deep(.n-switch) { align-self: center; }
+.firewall-enable p + p { margin-top: 14px; }
+.firewall-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.firewall-list small { display: block; margin: 4px 0 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.45; }
 .firewall-list { display: grid; margin: 0; padding: 0; list-style: none; }
 .firewall-list li { padding: 8px 0; border-top: 1px solid var(--border); }
 .firewall-list li:first-child { border-top: 0; padding-top: 0; }
 .firewall-list strong { font-size: 13px; }
 .firewall-rule-main { flex: 1; min-width: 0; }
+.firewall-rule-main small { overflow-wrap: anywhere; }
+.firewall-rule { transition: opacity 160ms ease, background-color 160ms ease; }
+.firewall-rule-move { transition: transform 200ms ease, opacity 160ms ease, background-color 160ms ease; }
 .firewall-rule.is-dragging { opacity: 0.45; }
 .firewall-rule.is-over { background: color-mix(in srgb, var(--primary) 12%, transparent); }
 .firewall-drag { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--muted-foreground); cursor: grab; touch-action: none; }
@@ -704,25 +704,31 @@ onUnmounted(() => {
 .firewall-defaults { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px 24px; }
 .firewall-policy { display: grid; gap: 8px; align-content: start; min-width: 0; }
 .firewall-policy :deep(.n-radio-group) { display: flex; flex-wrap: wrap; width: 100%; }
-.firewall-policy :deep(.n-radio-button) { flex: 1 1 0; justify-content: center; min-width: 4.5rem; }
+.firewall-policy :deep(.n-radio-group .n-radio-button) { display: flex; flex: 1 1 0; align-items: center; justify-content: center; min-width: 4.5rem; }
+.firewall-policy :deep(.n-radio-button .n-radio__label) { width: 100%; text-align: center; }
 .firewall-preview span { display: block; margin-bottom: 2px; }
 .firewall-modal { display: grid; gap: 12px; }
 .firewall-modal label { display: grid; gap: 6px; }
 .firewall-modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .firewall-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (prefers-reduced-motion: reduce) {
+  .firewall-rule, .firewall-rule-move { transition: none; }
+}
 @container (max-width: 640px) {
-  .firewall-toolbar, .firewall-switch-row, .firewall-card-heading { align-items: stretch; flex-direction: column; }
+  .firewall-toolbar, .firewall-card-heading { align-items: stretch; flex-direction: column; }
   .firewall-defaults { grid-template-columns: 1fr; }
-  .firewall-toolbar-actions, .firewall-toolbar-actions :deep(.n-button-group) { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+  .firewall-toolbar-actions { display: grid; grid-template-columns: auto minmax(0, 1fr); width: 100%; }
+  .firewall-toolbar-actions :deep(.n-button-group) { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
   .firewall-add-port, .firewall-card-heading :deep(.n-button) { width: 100%; }
   .firewall-drag { width: 44px; height: 44px; }
   .firewall-list li { min-height: 48px; }
   .firewall-actions { position: sticky; bottom: 0; padding-top: 8px; background: var(--background); }
 }
 @media (max-width: 760px) {
-  .firewall-toolbar, .firewall-switch-row, .firewall-card-heading { align-items: stretch; flex-direction: column; }
+  .firewall-toolbar, .firewall-card-heading { align-items: stretch; flex-direction: column; }
   .firewall-defaults { grid-template-columns: 1fr; }
-  .firewall-toolbar-actions, .firewall-toolbar-actions :deep(.n-button-group) { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+  .firewall-toolbar-actions { display: grid; grid-template-columns: auto minmax(0, 1fr); width: 100%; }
+  .firewall-toolbar-actions :deep(.n-button-group) { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
   .firewall-add-port, .firewall-card-heading :deep(.n-button) { width: 100%; }
   .firewall-drag { width: 44px; height: 44px; }
   .firewall-list li { min-height: 48px; }

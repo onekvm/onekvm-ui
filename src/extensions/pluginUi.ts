@@ -76,6 +76,11 @@ import { assertToolbarRegistrationId, isToolbarSlot, sortToolbarItems, type Tool
 import { assertShellMethods, assertShellRegistrationId } from '@/lib/extension-shell'
 import XpStorageDirectoryPicker from '@/components/XpStorageDirectoryPicker.vue'
 import { registerTool } from './toolboxRuntime'
+import { openIndependentWindow } from './independentWindows'
+import type { ExtensionViewDefinitionV1 } from './webComponentView'
+import { registerPage as register } from './pageRuntime'
+import { registerConsole, type ExtensionConsoleDefinitionV1 } from './consoleRuntime'
+export { loadVueExtensionPage, type LoadedVueExtensionPage } from './pageRuntime'
 
 export { validateExtensionSettings } from '@/lib/extension-settings'
 
@@ -155,10 +160,11 @@ interface PluginUIRuntimeV1 {
   xterm: { load: () => Promise<PluginUIXtermV1> }
   dialogs: { StorageDirectoryPicker: Component; ExtensionDetails: typeof ExtensionDetailsDialog }
   components: { InstallLogDetails: typeof InstallLogDetails }
-  register: (id: string, definition: VueExtensionPageDefinitionV1) => void
+  register: (id: string, definition: ExtensionViewDefinitionV1) => void
   toolbar: { register: (id: string, definition: ToolbarRegistrationV1) => void }
   shell: { register: (id: string, definition: ExtensionShellRegistrationV1) => void }
-  toolbox: { register: (extensionId: string, toolId: string, definition: VueExtensionPageDefinitionV1) => void; Window: typeof ExtensionChildWindow }
+  console: { register: (id: string, definition: ExtensionConsoleDefinitionV1) => void }
+  toolbox: { register: (extensionId: string, toolId: string, definition: ExtensionViewDefinitionV1) => void; Window: typeof ExtensionChildWindow; openWindow: typeof openIndependentWindow }
 }
 
 type PluginMessageValuesV1 = Record<string, string | number>
@@ -175,15 +181,12 @@ declare global {
   }
 }
 
-const registrations = new Map<string, VueExtensionPageDefinitionV1>()
 const toolbarRegistrations = new Map<string, ToolbarRegistrationV1>()
 const shellRegistrations = new Map<string, ExtensionShellRegistrationV1>()
 const shellExtensions = new Map<string, ConsoleExtension>()
 const toolbarItemsState = shallowRef<LoadedToolbarItem[]>([])
 let loadingToolbarId: string | null = null
-let loadingPageId: string | null = null
 let loadingShellId: string | null = null
-let pageLoadQueue: Promise<void> = Promise.resolve()
 
 function publishToolbarItems() {
   const items: LoadedToolbarItem[] = []
@@ -271,19 +274,6 @@ function createMessages(messages: PluginMessagesV1) {
   }))
 }
 
-function register(id: string, definition: VueExtensionPageDefinitionV1) {
-  if (!/^[a-z0-9][a-z0-9-]{1,62}$/.test(id)) throw new Error('Invalid extension page ID')
-  if (!loadingPageId) {
-    throw new Error('Extension page registration is only allowed while the host is loading that extension')
-  }
-  if (id !== loadingPageId) {
-    throw new Error(`Extension page ID ${id} does not match ${loadingPageId}`)
-  }
-  if (definition?.apiVersion !== 1 || !definition.component) {
-    throw new Error(`Extension ${id} does not provide a compatible Vue page`)
-  }
-  registrations.set(id, markRaw(definition))
-}
 
 let xtermLoader: Promise<PluginUIXtermV1> | null = null
 
@@ -377,13 +367,9 @@ window.OneKVMPluginUI = {
     register,
     toolbar: Object.freeze({ register: registerToolbar }),
     shell: Object.freeze({ register: registerShell }),
-    toolbox: Object.freeze({ register: registerTool, Window: markRaw(ExtensionChildWindow) }),
+    console: Object.freeze({ register: registerConsole }),
+    toolbox: Object.freeze({ register: registerTool, Window: markRaw(ExtensionChildWindow), openWindow: openIndependentWindow }),
   }),
-}
-
-export interface LoadedVueExtensionPage {
-  component: Component
-  dispose: () => void
 }
 
 const loadedToolbarScripts = new Map<string, HTMLScriptElement>()
@@ -503,57 +489,4 @@ export async function loadExtensionToolbars(extensions: ConsoleExtension[]) {
     if (!wantedIds.has(id)) toolbarRegistrations.delete(id)
   }
   publishToolbarItems()
-}
-
-async function loadVueExtensionPageNow(extension: ExtensionStatus): Promise<LoadedVueExtensionPage> {
-  if (!extension.version || !extension.page || extension.page.renderer !== 'vue') {
-    throw new Error('Extension does not register a Vue page')
-  }
-
-  registrations.delete(extension.id)
-  const script = document.createElement('script')
-  script.async = true
-  script.src = extensionAssetURL(extension, extension.page.entrypoint)
-  const loaded = new Promise<void>((resolve, reject) => {
-    script.addEventListener('load', () => resolve(), { once: true })
-    script.addEventListener('error', () => reject(new Error(`Failed to load ${extension.name} page`)), { once: true })
-  })
-  loadingPageId = extension.id
-  document.head.append(script)
-
-  try {
-    await loaded
-    const definition = registrations.get(extension.id)
-    if (!definition) throw new Error(`Extension ${extension.id} did not register its Vue page`)
-    const styles = (definition.styles || []).map((content) => {
-      const style = document.createElement('style')
-      style.dataset.onekvmExtension = extension.id
-      style.textContent = content
-      document.head.append(style)
-      return style
-    })
-    return {
-      component: markRaw(definition.component),
-      dispose: () => {
-        script.remove()
-        styles.forEach((style) => style.remove())
-        if (registrations.get(extension.id) === definition) registrations.delete(extension.id)
-      },
-    }
-  } catch (reason) {
-    script.remove()
-    registrations.delete(extension.id)
-    throw reason
-  } finally {
-    loadingPageId = null
-  }
-}
-
-export function loadVueExtensionPage(extension: ExtensionStatus): Promise<LoadedVueExtensionPage> {
-  // Extension bundles register through one shared runtime hook, so their script
-  // evaluation must not overlap. Fast settings navigation otherwise lets a
-  // later page replace loadingPageId before the earlier script registers.
-  const load = pageLoadQueue.then(() => loadVueExtensionPageNow(extension))
-  pageLoadQueue = load.then(() => undefined, () => undefined)
-  return load
 }

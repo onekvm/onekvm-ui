@@ -5,9 +5,17 @@ type KeyboardState = { keys: number[]; modifiers: number }
 export class KeyboardReportState {
   private sources = new Map<string, KeyboardState>()
   private send: (keys: number[], modifiers: number) => void
+  private modifiers = 0
+  private modifierListeners = new Set<(modifiers: number) => void>()
 
   constructor(send: (keys: number[], modifiers: number) => void) {
     this.send = send
+  }
+
+  subscribeModifiers(listener: (modifiers: number) => void) {
+    this.modifierListeners.add(listener)
+    listener(this.modifiers)
+    return () => this.modifierListeners.delete(listener)
   }
 
   set(source: string, keys: number[], modifiers = 0) {
@@ -29,5 +37,9 @@ export class KeyboardReportState {
       modifiers |= state.modifiers
     }
     this.send([...keys], modifiers)
+    if (modifiers !== this.modifiers) {
+      this.modifiers = modifiers
+      this.modifierListeners.forEach(listener => listener(modifiers))
+    }
   }
 }

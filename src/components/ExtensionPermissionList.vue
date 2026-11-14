@@ -18,6 +18,7 @@ const permissionIcons: Readonly<Record<string, Component>> = {
   'device-fb': Monitor,
   gpio: ScanLine,
   'opkg-admin': Package,
+  'container-admin': Package,
   'host-root': ShieldCheck,
   'host-unrestricted': ShieldAlert,
 }

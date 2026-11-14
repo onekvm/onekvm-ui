@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import PerformanceBitrateMetric from './PerformanceBitrateMetric.vue'
+import PerformanceConnectionBadge from './PerformanceConnectionBadge.vue'
 import type { WebRTCConnectionStats } from '@/lib/webrtc-connection-stats'
 import { computed } from 'vue'
 
@@ -138,6 +139,7 @@ const audioLatencyTotal = computed(() => formatLatencyUs(sumLatencyUs(
       <h2>
         <span>{{ t('screen.streamColumn', 'Stream') }}</span>
         <span class="display-status-format">
+          <PerformanceConnectionBadge :transport="transport" :stats="webrtcConnection" />
           <n-tag class="display-status-format-badge" size="small" round :bordered="false" :title="`${t('screen.bitDepth')}: ${t('screen.bitDepthHint')}`">
             <span class="display-status-format-label">{{ t('screen.bitDepth') }}</span>
             <span class="display-status-format-value">{{ bitDepth }}</span>
@@ -268,7 +270,9 @@ const audioLatencyTotal = computed(() => formatLatencyUs(sumLatencyUs(
 
 .display-status-format {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
   margin-left: auto;
   padding-left: 12px;

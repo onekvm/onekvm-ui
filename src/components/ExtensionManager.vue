@@ -19,6 +19,7 @@ import { currentLanguage, t } from '@/i18n/runtime'
 import { extensionHostErrorText } from '@/lib/extension-host-error'
 import { pluginIcon } from '@/lib/plugin-icons'
 import ExtensionDetailsModal from './ExtensionDetailsModal.vue'
+import InstallEnableOption from './InstallEnableOption.vue'
 
 const props = defineProps<{ active: boolean; catalog?: ExtensionSummary[]; catalogLoading?: boolean }>()
 const emit = defineEmits<{ catalog: [value: ExtensionSummary[]] }>()
@@ -51,6 +52,11 @@ const stagedUpload = ref<ExtensionUpload | null>(null)
 const uploadProgress = ref(0)
 const installError = ref('')
 const packageDragging = ref(false)
+const enableAfterInstall = shallowRef(true)
+const canEnableAfterInstall = computed(() => {
+  const entry = stagedUpload.value?.package
+  return entry && !entry.installed && !['environment', 'cloud-provider'].includes(entry.kind)
+})
 
 const memoryBudget = computed(() => {
 	const status = extensions.value.find((extension) => (extension.memory_budget_total_bytes || 0) > 0)
@@ -203,6 +209,7 @@ function openInstaller() {
 }
 
 function resetInstaller() {
+  enableAfterInstall.value = true
   installPhase.value = 'select'
   installFile.value = null
   stagedUpload.value = null
@@ -290,7 +297,7 @@ async function installStagedPackage() {
   installError.value = ''
   installPhase.value = 'installing'
   try {
-    await api.installStagedExtension(upload.token)
+    await api.installStagedExtension(upload.token, canEnableAfterInstall.value ? enableAfterInstall.value : undefined)
     installPhase.value = 'success'
     message.success(t('settings.plugins.installed', 'Plugin installed'))
     await load(false)
@@ -539,8 +546,7 @@ watch(() => props.active, (active) => {
                   {{ t('settings.plugins.systemPlugin', 'System') }}
                 </n-tag>
               </div>
-              <p>{{ extensionDescription(status) }}</p>
-              <p v-if="status.kind === 'environment'" class="extension-environment-hint">{{ t('settings.plugins.environmentHint', 'Use this environment in Network settings after installation. No enabling is needed.') }}</p>
+              <p :title="extensionDescription(status)">{{ extensionDescription(status) }}</p>
             </div>
             <n-tag size="small" :type="statusType(status)" :bordered="false">
               {{ statusText(status) }}
@@ -658,7 +664,7 @@ watch(() => props.active, (active) => {
       </template>
       <template #actions>
         <n-button
-          v-if="selected?.installed && !selected.system"
+          v-if="selected?.installed && !selected.system && selected.removable !== false"
           class="extension-uninstall"
           size="small"
           type="error"
@@ -704,7 +710,7 @@ watch(() => props.active, (active) => {
             <span class="installer-hero-icon"><FileUp :size="31" /></span>
             <div>
               <strong>{{ t('settings.plugins.choosePackageTitle', 'Choose a plugin package') }}</strong>
-              <p>{{ t('settings.plugins.choosePackageDescription', 'Upload a signed OneKVM IPK or IPKS package to inspect it before installation.') }}</p>
+              <p>{{ t('settings.plugins.choosePackageDescription', 'Select a signed OneKVM IPK or IPKS package.') }}</p>
             </div>
           </div>
           <n-alert v-if="installError" type="error" :show-icon="false">{{ installError }}</n-alert>
@@ -778,6 +784,7 @@ watch(() => props.active, (active) => {
             </ul>
           </section>
           <n-alert v-if="installError" type="error" :show-icon="false">{{ installError }}</n-alert>
+          <InstallEnableOption v-if="canEnableAfterInstall" v-model="enableAfterInstall" />
           <p class="installer-confirm-copy">
             {{ uploadedPackage()!.installed
               ? t('settings.plugins.updateConfirmation', 'The installed plugin will be updated with this package.')
@@ -797,7 +804,9 @@ watch(() => props.active, (active) => {
         <div v-else-if="installPhase === 'success' && uploadedPackage()" class="installer-stage installer-centered">
           <span class="installer-hero-icon installer-success"><CheckCircle2 :size="34" /></span>
           <strong>{{ t('settings.plugins.installComplete', 'Plugin installed') }}</strong>
-          <span>{{ replace(t('settings.plugins.installCompleteDescription', '{name} is ready to use.'), { name: extensionName(uploadedPackage()!) }) }}</span>
+          <span>{{ replace(canEnableAfterInstall && !enableAfterInstall
+            ? t('settings.plugins.installedDisabled', '{name} is installed and disabled.')
+            : t('settings.plugins.installCompleteDescription', '{name} is ready to use.'), { name: extensionName(uploadedPackage()!) }) }}</span>
         </div>
 
         <template #footer>
@@ -936,7 +945,7 @@ watch(() => props.active, (active) => {
 .extension-identity { display: grid; min-width: 0; flex: 1; gap: 2px; }
 .extension-identity > div { display: flex; min-width: 0; align-items: center; gap: 7px; }
 .extension-identity strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.extension-identity p { margin: 0; color: var(--muted-foreground); font-size: 11px; line-height: 1.35; }
+.extension-identity p { margin: 0; overflow: hidden; color: var(--muted-foreground); font-size: 11px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 .extension-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 3px; }
 .extension-error { padding: 0 14px 14px; background: var(--card); }
 .extension-settings { display: grid; gap: 12px; padding-top: 16px; border-top: 1px solid var(--border); }

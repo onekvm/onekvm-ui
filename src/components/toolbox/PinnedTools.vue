@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import { type DropdownOption } from 'naive-ui'
-import { Ellipsis, Pin, PinOff } from '@/icons'
+import { Ellipsis, PinOff } from '@/icons'
 import { useToolboxContext } from '@/composables/useToolbox'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { useToolbarPinCapacity } from '@/composables/useToolbarPinCapacity'
 import { DISMISS_CONTROL_OVERLAY_EVENT } from '@/lib/overlay-target'
 import { t } from '@/i18n/runtime'
 import ToolIcon from './ToolIcon.vue'
+import ToolbarIconSlot from '../ToolbarIconSlot.vue'
+import { toolbarFolderFor, normalizeToolbarFolders, type ToolbarLayout } from '@/lib/toolbar-layout'
 
-const props = defineProps<{ mobile?: boolean; vertical?: boolean; placement?: 'top-end' | 'bottom-end' | 'bottom-start' | 'right-start' | 'left-start' }>()
-const emit = defineEmits<{ overlay: [open: boolean] }>()
+const props = defineProps<{ layout?: ToolbarLayout; order?: string[]; folderTargets?: Record<string, HTMLElement | null>; showLabels?: boolean; mobile?: boolean; vertical?: boolean; placement?: 'top-end' | 'bottom-end' | 'bottom-start' | 'right-start' | 'left-start' }>()
+const emit = defineEmits<{ overlay: [open: boolean]; activate: [] }>()
 const toolbox = useToolboxContext()
 const mountTo = useOverlayMount()
 const overflowOpen = ref(false)
@@ -21,10 +23,19 @@ const contextTool = computed(() => toolbox.pinned.find(({ tool }) => tool.id ===
 const contextOptions = computed<DropdownOption[]>(() => [{
   key: 'unpin', label: t('toolbox.unpin'), icon: () => h(PinOff, { size: 16 }),
 }])
+const folders = computed(() => normalizeToolbarFolders(props.layout?.toolbar_folders))
+const folderFor = (id: string) => toolbarFolderFor(folders.value, `tool:${id}`)
+const rootPins = computed(() => toolbox.pinned.filter(({ tool }) => !folderFor(tool.id)))
+const groupedPins = computed(() => toolbox.pinned.filter(({ tool }) => folderFor(tool.id)))
+function itemOrder(id: string) {
+  const folder = folderFor(id)
+  return folder ? (folder.items.indexOf(`tool:${id}`) + 1) * 2 : ((props.order ?? []).indexOf(`tool:${id}`) + 1) * 2 + 10
+}
+const overflowOrder = computed(() => Math.max(10, ...rootPins.value.map(({ tool }) => itemOrder(tool.id))) + 1)
 const root = useTemplateRef<HTMLElement>('root')
-const capacity = useToolbarPinCapacity(root, () => toolbox.pinned.length, () => Boolean(props.mobile), () => Boolean(props.vertical))
-const visible = computed(() => toolbox.pinned.slice(0, capacity.value))
-const overflow = computed(() => toolbox.pinned.slice(visible.value.length))
+const capacity = useToolbarPinCapacity(root, () => rootPins.value.length, () => Boolean(props.mobile), () => Boolean(props.vertical), () => Boolean(props.showLabels))
+const visible = computed(() => rootPins.value.slice(0, capacity.value))
+const overflow = computed(() => rootPins.value.slice(visible.value.length))
 const menuProps = () => ({ class: 'host-menu', style: { maxHeight: 'calc(100dvh - 24px)' }, 'data-toolbox-local': '' })
 const overflowOptions = computed<DropdownOption[]>(() => overflow.value.map(({ tool }) => ({ key: tool.id, label: tool.title, icon: () => h(ToolIcon, { tool, loading: toolbox.openingIds.includes(tool.id) }) })))
 function openContextMenu(event: MouseEvent, id: string) {
@@ -79,19 +90,20 @@ onBeforeUnmount(() => { window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT
 </script>
 <template>
   <div v-if="toolbox.pinned.length" ref="root" class="toolbar-pinned-tools" :class="{ 'is-mobile': mobile, 'is-vertical': vertical }" role="group" :aria-label="t('toolbox.pinned')" data-toolbox-local>
-    <span v-if="mobile" class="toolbar-pinned-heading"><Pin :size="14" />{{ t('toolbox.pinned') }}</span>
     <div class="toolbar-pinned-buttons">
-      <n-tooltip v-for="{ tool } in visible" :key="tool.id" :to="mountTo" :disabled="mobile || contextToolId === tool.id" :placement="placement?.startsWith('left') ? 'left' : placement?.startsWith('right') ? 'right' : placement?.startsWith('top') ? 'top' : 'bottom'" style="pointer-events: none">
+      <ToolbarIconSlot v-for="{ tool } in [...visible, ...groupedPins]" :key="tool.id" :collected="Boolean(folderFor(tool.id))" :target="props.folderTargets?.[folderFor(tool.id)?.id ?? ''] ?? null" :order="itemOrder(tool.id)" :data-toolbar-item="`tool:${tool.id}`" class="toolbar-pin-slot" @activate="emit('activate')">
+      <n-tooltip :to="mountTo" :disabled="mobile || Boolean(folderFor(tool.id)) || contextToolId === tool.id" :placement="placement?.startsWith('left') ? 'left' : placement?.startsWith('right') ? 'right' : placement?.startsWith('top') ? 'top' : 'bottom'" style="pointer-events: none">
         <template #trigger>
           <n-button quaternary size="small" class="toolbar-pin-button" :class="{ 'is-open': toolbox.instances.some(instance => instance.id === tool.id) }" :aria-label="tool.title" :aria-pressed="toolbox.instances.some(instance => instance.id === tool.id)" :aria-busy="toolbox.openingIds.includes(tool.id)" :data-tool-id="tool.id" @click="toolbox.open(tool.id, $event.currentTarget as HTMLElement)" @contextmenu.prevent.stop="openContextMenu($event, tool.id)" @keydown="contextKeydown($event, tool.id)">
             <template #icon><ToolIcon :tool="tool" :loading="toolbox.openingIds.includes(tool.id)" /></template>
-            <span v-if="mobile">{{ tool.title }}</span>
+            <span class="toolbar-action-label">{{ tool.title }}</span>
           </n-button>
         </template>
         {{ tool.title }}
       </n-tooltip>
+      </ToolbarIconSlot>
       <n-dropdown v-if="overflow.length" trigger="click" :show="overflowOpen" :options="overflowOptions" :to="mountTo" :placement="placement || 'bottom-end'" scrollable :menu-props="menuProps" @update:show="overflowOpen = $event" @select="toolbox.open(String($event)); overflowOpen = false">
-        <n-button quaternary size="small" :aria-label="`${t('toolbox.morePins')} (${overflow.length})`"><template #icon><Ellipsis :size="16" /></template><span v-if="mobile">{{ t('toolbox.morePins') }}</span></n-button>
+        <n-button quaternary size="small" :style="{ order: overflowOrder }" :aria-label="`${t('toolbox.morePins')} (${overflow.length})`"><template #icon><Ellipsis :size="16" /></template><span class="toolbar-action-label">{{ t('toolbox.morePins') }}</span></n-button>
       </n-dropdown>
     </div>
   </div>

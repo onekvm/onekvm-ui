@@ -8,12 +8,16 @@ import { useOverlayMount } from '@/composables/useOverlayMount'
 
 const overlayTo = useOverlayMount()
 const CHECK_INTERVAL_MS = 60_000
+const AUTO_RELOAD_MARKER = 'onekvm-ui-auto-reload'
+const AUTO_RELOAD_COOLDOWN_MS = 30_000
 const ENTRY_ASSET_PATTERN = /\/assets\/index-[^/?#]+\.js$/
 
 const updateAvailable = ref(false)
 let loadedEntry = ''
 let checking: Promise<void> | null = null
 let checkTimer = 0
+let reloadTimer = 0
+let autoReloading = false
 
 function entryAsset(documentValue: Document, baseURL: string) {
   for (const script of Array.from(documentValue.scripts)) {
@@ -26,10 +30,56 @@ function entryAsset(documentValue: Document, baseURL: string) {
 }
 
 function latestIndexURL() {
-  const url = new URL(window.location.href)
+  // Resolve the manifest beside the loaded entry chunk instead of checking
+  // the current SPA route, which may intentionally return a 404 fallback.
+  const url = new URL('../index.html', loadedEntry)
   url.hash = ''
   url.searchParams.set('_onekvm_ui_check', String(Date.now()))
   return url
+}
+
+function clearReloadMarkerForCurrentEntry() {
+  try {
+    const raw = window.sessionStorage.getItem(AUTO_RELOAD_MARKER)
+    if (!raw) return
+    const marker = JSON.parse(raw) as { entry?: unknown }
+    if (marker.entry !== loadedEntry) window.sessionStorage.removeItem(AUTO_RELOAD_MARKER)
+  } catch {
+    // Storage can be unavailable in private browsing or a restricted origin.
+  }
+}
+
+function canAutoReload() {
+  try {
+    const raw = window.sessionStorage.getItem(AUTO_RELOAD_MARKER)
+    if (raw) {
+      const marker = JSON.parse(raw) as { entry?: unknown; at?: unknown }
+      if (
+        marker.entry === loadedEntry &&
+        typeof marker.at === 'number' &&
+        Date.now() - marker.at < AUTO_RELOAD_COOLDOWN_MS
+      ) {
+        return false
+      }
+    }
+    window.sessionStorage.setItem(
+      AUTO_RELOAD_MARKER,
+      JSON.stringify({ entry: loadedEntry, at: Date.now() }),
+    )
+  } catch {
+    // A reload is still safe when sessionStorage is unavailable.
+  }
+  return true
+}
+
+function handleUpdateDetected() {
+  if (updateAvailable.value || autoReloading) return
+  if (!canAutoReload()) {
+    updateAvailable.value = true
+    return
+  }
+  autoReloading = true
+  reloadTimer = window.setTimeout(reloadLatestUI, 0)
 }
 
 async function performCheck() {
@@ -44,7 +94,7 @@ async function performCheck() {
     if (!response.ok) return
     const latestDocument = new DOMParser().parseFromString(await response.text(), 'text/html')
     const latestEntry = entryAsset(latestDocument, url.href)
-    if (latestEntry && latestEntry !== loadedEntry) updateAvailable.value = true
+    if (latestEntry && latestEntry !== loadedEntry) handleUpdateDetected()
   } catch {
     // Connection errors are handled by the console. Check again after focus or the next interval.
   }
@@ -83,6 +133,7 @@ function reloadLatestUI() {
 
 onMounted(() => {
   loadedEntry = entryAsset(document, window.location.href)
+  clearReloadMarkerForCurrentEntry()
   void checkForUpdate()
   checkTimer = window.setInterval(checkWhenVisible, CHECK_INTERVAL_MS)
   document.addEventListener('visibilitychange', checkWhenVisible)
@@ -94,6 +145,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.clearInterval(checkTimer)
+  window.clearTimeout(reloadTimer)
   document.removeEventListener('visibilitychange', checkWhenVisible)
   window.removeEventListener('focus', checkWhenVisible)
   window.removeEventListener('pageshow', checkWhenVisible)
@@ -114,7 +166,7 @@ onBeforeUnmount(() => {
     :close-on-esc="false"
     :auto-focus="false"
   >
-    <p>{{ t('settings.uiUpdate.description', 'A newer web interface is installed. Reload before continuing to avoid mixing old and new UI resources.') }}</p>
+    <p>{{ t('settings.uiUpdate.description', 'The web interface was updated. Reload before continuing.') }}</p>
     <template #footer>
       <n-button type="primary" block @click="reloadLatestUI">
         <template #icon><RefreshCw /></template>

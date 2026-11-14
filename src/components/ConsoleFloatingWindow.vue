@@ -77,6 +77,8 @@ defineExpose({ element })
 .console-floating-title-icon:empty { display: none; }
 .console-floating-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .console-floating-window :focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.console-floating-window :deep(.n-input :is(input, textarea):focus-visible),
+.console-floating-window :deep(.n-base-selection :is(.n-base-selection-input, .n-base-selection-label):focus-visible) { outline: none; }
 @media (pointer: coarse), (max-width: 760px), (max-height: 500px) and (max-width: 1100px) {
   .console-window-button, .performance-window-actions :deep(.n-button) { width: 44px; height: 44px; }
   .display-status-titlebar { min-height: 44px; height: auto; padding-top: env(safe-area-inset-top); }

@@ -15,8 +15,8 @@ assert.deepEqual(parseToolboxPins(JSON.stringify({ schemaVersion: 2, items: [
   { toolId: 'example-toolbox/settings', order: 1.5 },
   { toolId: 'example-toolbox/settings', order: Number.MAX_SAFE_INTEGER + 1 },
 ] })), items)
-assert.notEqual(toolboxPinStorageKey('https://107', 'alice'), toolboxPinStorageKey('https://137', 'alice'))
-assert.notEqual(toolboxPinStorageKey('https://107', 'alice'), toolboxPinStorageKey('https://107', 'bob'))
+assert.notEqual(toolboxPinStorageKey('https://192.0.2.10', 'alice'), toolboxPinStorageKey('https://192.0.2.11', 'alice'))
+assert.notEqual(toolboxPinStorageKey('https://192.0.2.10', 'alice'), toolboxPinStorageKey('https://192.0.2.10', 'bob'))
 assert.notEqual(toolboxPinStorageKey('a:b', 'c'), toolboxPinStorageKey('a', 'b:c'))
 const ordered = [
   { toolId: 'example-toolbox/first', order: 1 },

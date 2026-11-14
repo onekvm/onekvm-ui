@@ -10,6 +10,7 @@ import { t } from '@/i18n/runtime'
 import { onekvm, type HIDReportListener, type KeyboardTextListener } from '@/lib/onekvm'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { captureConsoleFrame, captureConsoleSelectionFrame } from '@/lib/console-frame'
+import { registerIndependentWindowHost } from '@/extensions/independentWindows'
 
 const props = defineProps<{ instance: ToolInstance; presentation: ToolPresentation }>()
 const toolbox = useToolboxContext()
@@ -125,7 +126,8 @@ const host = markRaw(Object.freeze<ExtensionToolHostV1>({
   },
   resizeWindow: (size: { width: number; height: number }) => toolbox.resizeWindow(props.instance.id, size),
   showRecordingStatus: activity => {
-    if (extension.value.id !== 'hid-macro') throw new Error(t('toolbox.invalidated'))
+    // HID macro recording, or screen recording by tools that read the encoded video.
+    if (extension.value.id !== 'hid-macro' && !extension.value.capabilities?.includes('video.encoded')) throw new Error(t('toolbox.invalidated'))
     return toolbox.showRecordingStatus(props.instance.id, activity)
   },
   registerChildWindow: child => toolbox.registerChildWindow(props.instance.id, child),
@@ -138,6 +140,8 @@ const host = markRaw(Object.freeze<ExtensionToolHostV1>({
     return () => { if (adapter.value === value) adapter.value = null }
   },
 }))
+
+const unregisterWindowHost = registerIndependentWindowHost(host)
 
 async function load() {
   const current = ++generation
@@ -162,7 +166,7 @@ async function load() {
   }
 }
 watch(() => props.instance.cacheKey, load, { immediate: true })
-onBeforeUnmount(() => { cancelClose?.(); generation++; unregister(); leavingRoot = root.value })
+onBeforeUnmount(() => { unregisterWindowHost(); cancelClose?.(); generation++; unregister(); leavingRoot = root.value })
 onUnmounted(() => {
   const resource = loaded
   const release = () => {

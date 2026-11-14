@@ -158,10 +158,6 @@ function dropFiles(event: DragEvent) {
 
 <template>
   <section class="file-manager-page">
-    <p class="file-manager-intro">
-      {{ t('settings.advancedSettings.fileManager.description', 'Manage user data files.') }}
-    </p>
-
     <FileManagerToolbar
       :root="manager.rootPath.value"
       :path="manager.currentPath.value"
@@ -271,15 +267,6 @@ function dropFiles(event: DragEvent) {
 
 <style scoped>
 .file-manager-page { display: grid; gap: 12px; }
-
-.file-manager-intro {
-  max-width: 680px;
-  margin: -6px 0 4px;
-  color: var(--muted-foreground);
-  font-size: 13px;
-  line-height: 1.5;
-  text-wrap: pretty;
-}
 
 .file-drop-region { position: relative; min-width: 0; }
 .file-drop-region.dragging { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: var(--radius-large); }

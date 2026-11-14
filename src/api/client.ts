@@ -1,9 +1,9 @@
-import { createPersistentQuery } from '../lib/persistent-query.ts'
+import { createExtensionQuery } from '../lib/extension-query.ts'
 import type { WifiApNetwork } from '../lib/wifi-ap-network'
 import { resolveServiceURL, serviceBaseUrl, serviceURL, serviceWebSocketURL } from './service-url.ts'
 export type IPv4Mode = 'disabled' | 'dhcp' | 'dhcp-static' | 'static'
 export type IPv6Mode = 'disabled' | 'slaac' | 'dhcp' | 'static'
-export type DeviceLanguage = 'en' | 'zh' | 'zh_tw'
+export type DeviceLanguage = string
 
 export interface NetworkConfig {
   primary_interface: string
@@ -27,15 +27,22 @@ export interface NetworkConfig {
   webrtc?: WebRtcIceConfig
 }
 
+export interface FirewallMatch {
+  field: string
+  operator: 'eq' | 'neq'
+  value: string
+}
+
 export interface FirewallRule {
   id: number
-  action: 'allow' | 'deny' | 'reject' | 'limit' | string
+  action: 'allow' | 'deny' | 'reject' | string
   direction: 'in' | 'out' | string
   protocol: 'tcp' | 'udp' | 'any' | string
   port: string
   source: string
   comment: string
   enabled: boolean
+  matches?: FirewallMatch[]
 }
 
 export interface FirewallConfirmation {
@@ -64,6 +71,7 @@ export interface FirewallRuleInput {
   port: string
   source?: string
   comment?: string
+  matches?: FirewallMatch[]
 }
 
 export interface FirewallUpdate {
@@ -164,6 +172,8 @@ export interface WebRtcTurnServerConfig {
   url: string
   username: string
   credential: string
+  /** Set on reads when a password is stored and omitted from the response. */
+  credential_set?: boolean
 }
 
 export interface IceServer {
@@ -190,6 +200,7 @@ export interface VpnClientConfig {
 export interface ManagedNetworkInterface {
   kind: 'physical' | 'vlan' | 'gre' | 'ipip' | 'sit' | 'vxlan' | 'geneve' | 'fou' | 'bareudp' | 'gretap'
   name: string
+  mtu?: number
   disabled?: boolean
   mac_address?: string
   dns?: string[]
@@ -215,6 +226,7 @@ export interface ManagedNetworkInterface {
 
 export interface WireGuardConfig {
   name: string
+  mtu?: number
   private_key: string
   public_key: string
   addresses: string[]
@@ -258,6 +270,7 @@ export interface WireGuardPeer {
 export interface NetworkInterfaceStatus {
   wifi_role?: '' | 'ap' | 'station'
   name: string
+  mtu?: number
   up: boolean
   configured: boolean
   mac: string
@@ -335,6 +348,12 @@ export type ToolbarIconId =
   | 'display'
   | 'mouse'
   | 'keyboard'
+  | 'caps_lock'
+  | 'num_lock'
+  | 'scroll_lock'
+  | 'virtual_keyboard'
+  | 'keyboard_text'
+  | 'ctrl_alt_del'
   | 'gamepad'
   | 'power'
   | 'audio'
@@ -342,9 +361,17 @@ export type ToolbarIconId =
   | 'performance'
   | 'fullscreen'
   | 'toolbox'
+  | 'collection'
   | 'settings'
   | 'language'
   | 'account'
+
+export interface ToolbarFolder {
+  id: string
+  name: string
+  icon: string
+  items: string[]
+}
 
 export interface ToolbarIconPreference {
   id: ToolbarIconId
@@ -352,6 +379,7 @@ export interface ToolbarIconPreference {
 }
 
 export type MessagePlacement = 'top-left' | 'top' | 'top-right' | 'bottom-left' | 'bottom' | 'bottom-right'
+export type ToolbarLabelPosition = 'top' | 'bottom' | 'left' | 'right'
 
 export interface PersonalizationConfig {
   device_name: string
@@ -360,8 +388,13 @@ export interface PersonalizationConfig {
   console_subtitle_parts: ConsoleSubtitlePart[]
   custom_console_subtitle: string
   dim_windows_on_kvm_focus: boolean
+  connection_animation: boolean
   message_placement?: MessagePlacement
   toolbar_icons?: ToolbarIconPreference[]
+  toolbar_folders?: ToolbarFolder[]
+  toolbar_order?: string[]
+  toolbar_show_labels?: boolean
+  toolbar_label_position?: ToolbarLabelPosition
 }
 
 export interface InputConfig {
@@ -370,6 +403,7 @@ export interface InputConfig {
 }
 
 export interface USBConfig {
+  network_adapter?: boolean
   network_sharing?: boolean
   remote_wakeup?: boolean
 	vendor_id: string
@@ -397,6 +431,8 @@ export interface KeyboardShortcut {
 }
 
 export type KeyboardLayout = 'us' | 'uk' | 'de' | 'fr' | 'es' | 'it' | 'ru' | 'jp' | 'ko'
+export type KeyboardTextMode = 'layout' | 'unicode'
+export type KeyboardTextOS = 'linux' | 'windows'
 
 export interface KeyboardConfig {
 	layout: KeyboardLayout
@@ -407,6 +443,8 @@ export interface KeyboardTextResponse {
   status: 'ok'
   characters: number
   layout: KeyboardLayout
+  mode: KeyboardTextMode
+  input_method_os?: KeyboardTextOS
 }
 
 export interface SSHConfig {
@@ -610,6 +648,7 @@ export interface OneKVMStatus {
       mass_storage: boolean
       mtp_available?: boolean
       mtp: boolean
+      network_adapter?: boolean
       network_sharing?: boolean
     }
   }
@@ -893,11 +932,11 @@ export interface ExtensionToolboxItem {
   presentation: 'drawer' | 'window'
   layout?: 'padded' | 'edge-to-edge'
   size?: { width?: number; height?: number }
-  view: { renderer: 'vue'; entrypoint: string }
+  view: { renderer: 'vue' | 'web-component'; entrypoint: string }
 }
 
 export type ConsoleExtension = Pick<ExtensionSummary,
-  'id' | 'name' | 'i18n' | 'version' | 'installed' | 'enabled' | 'error' | 'toolbox' | 'toolbar' | 'shell' | 'icon'>
+  'id' | 'name' | 'i18n' | 'version' | 'installed' | 'enabled' | 'error' | 'toolbox' | 'toolbar' | 'shell' | 'console' | 'icon'>
 
 export interface ExtensionSummary {
   id: string
@@ -912,6 +951,7 @@ export interface ExtensionSummary {
   enabled: boolean
   running: boolean
   system?: boolean
+  removable?: boolean
   error?: string
   icon?:
     | { source: 'lucide'; name: string }
@@ -923,6 +963,7 @@ export interface ExtensionSummary {
     entrypoint: string
   }
   has_shell?: boolean
+  console?: { entrypoint: string }
   shell?: {
     entrypoint: string
   }
@@ -1084,6 +1125,11 @@ export interface ExtensionRoute {
   auth: string
 }
 
+export interface USBADBDebugStatus {
+  available: boolean
+  enabled: boolean
+}
+
 export interface ManagedService {
   id: string
   name: string
@@ -1103,6 +1149,7 @@ export interface ExtensionStatus extends ExtensionSummary {
   package_dependencies?: string[] | null
   versions?: string[]
   capabilities?: string[]
+  contributions?: Array<{ id: string; point: string; version: number }>
   video?: {
     settings: 'all'
     mode_select: Array<'h264' | 'h265' | 'mjpeg'>
@@ -1111,7 +1158,7 @@ export interface ExtensionStatus extends ExtensionSummary {
   activation_conflicts?: Array<{ extension: string; machines?: string[] }>
   page?: {
     title: string
-    renderer: 'html' | 'layout' | 'vue'
+    renderer: 'html' | 'layout' | 'vue' | 'web-component'
     entrypoint: string
     icon?:
       | { source: 'lucide'; name: string }
@@ -1120,6 +1167,7 @@ export interface ExtensionStatus extends ExtensionSummary {
   toolbar?: {
     entrypoint: string
   }
+  console?: { entrypoint: string }
   shell?: {
     entrypoint: string
   }
@@ -1216,8 +1264,9 @@ export function isUnauthorizedError(error: unknown): boolean {
   return error instanceof APIError && error.status === 401
 }
 
-const consoleExtensions = createPersistentQuery<ConsoleExtension[]>()
-const msdSources = createPersistentQuery<MSDSource[]>()
+const extensionEvents = typeof window !== 'undefined' && typeof window.addEventListener === 'function' ? window : undefined
+const consoleExtensions = createExtensionQuery<ConsoleExtension[]>(extensionEvents)
+const msdSources = createExtensionQuery<MSDSource[]>(extensionEvents)
 
 export function invalidateExtensionCaches() {
   consoleExtensions.invalidate()
@@ -1231,7 +1280,24 @@ function changesExtensions(path: string, method: string | undefined) {
     'set_source', 'set_source_enabled', 'remove_source'].includes(decodeURIComponent(invoke[1]!))
 }
 
-export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+let extensionRequestQueue: Promise<void> = Promise.resolve()
+
+function isExtensionRequest(path: string) {
+  return path === '/api/extensions' || path.startsWith('/api/extensions/')
+}
+
+function queueExtensionRequest<T>(task: () => Promise<T>) {
+  const queued = extensionRequestQueue.then(task, task)
+  extensionRequestQueue = queued.then(() => undefined, () => undefined)
+  return queued
+}
+
+export function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const task = () => requestUnqueued<T>(path, options)
+  return isExtensionRequest(path) ? queueExtensionRequest(task) : task()
+}
+
+async function requestUnqueued<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(resolveServiceURL(serviceBaseUrl(), path), {
     credentials: import.meta.env.VITE_WITH_CREDENTIALS === 'false' ? 'omit' : 'include',
     ...options,
@@ -1253,7 +1319,6 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
   }
 
   if (changesExtensions(path, options.method)) {
-    invalidateExtensionCaches()
     window.dispatchEvent(new Event('onekvm:extensions-changed'))
   }
   if (response.status === 204) return undefined as T
@@ -1725,11 +1790,13 @@ export const api = {
   deleteDeviceFile: (path: string) => request<void>(`/api/files?path=${encodeURIComponent(path)}`, { method: 'DELETE' }),
   getDeviceFileURL: (path: string) => `${serviceBaseUrl()}/api/files/download?path=${encodeURIComponent(path)}`,
   getKeyboardConfig: () => request<KeyboardConfig>('/api/config/keyboard'),
-  sendKeyboardText: (text: string, layout?: KeyboardLayout, intervalMS?: number) =>
+  sendKeyboardText: (text: string, layout?: KeyboardLayout, intervalMS?: number, mode: KeyboardTextMode = 'layout', inputMethodOS: KeyboardTextOS = 'linux') =>
     request<KeyboardTextResponse>('/api/hid/keyboard/text', {
       method: 'POST',
       body: JSON.stringify({
         text,
+        mode,
+        input_method_os: inputMethodOS,
         ...(layout ? { layout } : {}),
         ...(intervalMS === undefined ? {} : { interval_ms: intervalMS }),
       }),
@@ -1744,6 +1811,12 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(personalization),
     }),
+  uploadNoSignalImage: (file: Blob) => request<Record<string, never>>('/api/personalization/no-signal', {
+    method: 'POST',
+    body: file,
+    headers: { 'Content-Type': file.type || 'application/octet-stream' },
+  }),
+  clearNoSignalImage: () => request<void>('/api/personalization/no-signal', { method: 'DELETE' }),
   getInputConfig: () => request<InputConfig>('/api/config/input', { cache: 'no-store' }),
   saveInputConfig: (input: InputConfig) =>
     request<InputConfig>('/api/config/input', {
@@ -1848,6 +1921,10 @@ export const api = {
   getLogs: async (lines = 250) =>
     (await request<LogResponse>(`/api/logs?lines=${encodeURIComponent(lines)}`)).lines,
   getServices: () => request<ManagedService[]>('/api/services'),
+  getUSBADBDebug: () => request<USBADBDebugStatus>('/api/system/usb-adb', { cache: 'no-store' }),
+  setUSBADBDebug: (enabled: boolean) => request<USBADBDebugStatus>('/api/system/usb-adb', {
+    method: 'PUT', body: JSON.stringify({ enabled }),
+  }),
   serviceAction: (id: string, action: 'start' | 'stop' | 'restart' | 'enable' | 'disable') =>
     request<{ status: string }>(`/api/services/${encodeURIComponent(id)}/${action}`, { method: 'POST' }),
 	getOneKVMServiceSettings: () => request<OneKVMServiceSettings>('/api/services/onekvm'),
@@ -1966,15 +2043,15 @@ export const api = {
     }
     return request<ExtensionLayout>(extensionPagePath(extension, extension.page.entrypoint))
   },
-  installExtension: (id: string) =>
+  installExtension: (id: string, enableAfterInstall?: boolean) =>
     request<{ status: string }>('/api/extensions', {
       method: 'POST',
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({ id, enable_after_install: enableAfterInstall }),
     }),
   refreshExtensions: () =>
     request<{ status: string }>('/api/extensions/refresh', { method: 'POST' }),
-  installLocalExtension: (file: File) =>
-    request<{ status: string }>('/api/extensions/upload', {
+  installLocalExtension: (file: File, enableAfterInstall?: boolean) =>
+    request<{ status: string }>(`/api/extensions/upload${enableAfterInstall === undefined ? '' : `?enable_after_install=${enableAfterInstall}`}`, {
       method: 'POST',
       body: file,
       headers: {
@@ -1983,9 +2060,10 @@ export const api = {
           : 'application/vnd.onekvm.ipk',
       },
     }),
-  stageLocalExtension,
-  installStagedExtension: (token: string) =>
-    request<{ status: string }>(`/api/extensions/uploads/${encodeURIComponent(token)}/install`, { method: 'POST' }),
+  stageLocalExtension: (file: File, onProgress: (percentage: number) => void) =>
+    queueExtensionRequest(() => stageLocalExtension(file, onProgress)),
+  installStagedExtension: (token: string, enableAfterInstall?: boolean) =>
+    request<{ status: string }>(`/api/extensions/uploads/${encodeURIComponent(token)}/install${enableAfterInstall === undefined ? '' : `?enable_after_install=${enableAfterInstall}`}`, { method: 'POST' }),
   discardStagedExtension: (token: string) =>
     request<void>(`/api/extensions/uploads/${encodeURIComponent(token)}`, { method: 'DELETE' }),
   updateExtension: (id: string, update: { enabled?: boolean; settings?: Record<string, ExtensionSettingValue> }) =>
@@ -2005,7 +2083,7 @@ export const api = {
       method: 'DELETE',
       body: JSON.stringify({ delete_data: Boolean(options?.deleteData) }),
     }),
-  getWebRTCIce: () => request<{ ice_servers: IceServer[]; trickle?: boolean }>('/api/webrtc/ice', { cache: 'no-store' }),
+  getWebRTCIce: () => request<{ ice_servers: IceServer[]; trickle?: boolean; hid_pointer_channel?: boolean }>('/api/webrtc/ice', { cache: 'no-store' }),
   createWebRTCSession: (sdp: string, microphone = false, media: 'audio_video' | 'video' | 'audio' = 'audio_video', videoCodec?: string, trickle = false) =>
     request<WebRTCAnswer>('/api/webrtc/offer', {
       method: 'POST',

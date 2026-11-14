@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue'
-import { Ellipsis } from '@/icons'
+import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue'
+import { Ellipsis, iconComponent } from '@/icons'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { t } from '@/i18n/runtime'
 import { DISMISS_CONTROL_OVERLAY_EVENT, dismissControlOverlays } from '@/lib/overlay-target'
 
 const props = defineProps<{
   show: boolean
+  title?: string
+  icon?: string
+  folderId?: string
   count: number
   mobile: boolean
   childOpen: boolean
@@ -17,6 +20,8 @@ const emit = defineEmits<{
   target: [target: HTMLElement | null]
 }>()
 const overlayTo = useOverlayMount()
+const heading = computed(() => props.title || t('toolbar.collectedIcons'))
+const glyph = computed(() => (props.icon && iconComponent(props.icon)) || Ellipsis)
 const trigger = shallowRef<{ $el: HTMLButtonElement } | null>(null)
 const list = shallowRef<HTMLElement | null>(null)
 
@@ -123,36 +128,38 @@ onBeforeUnmount(() => {
             ref="trigger"
             quaternary
             size="small"
-            :aria-label="`${t('toolbar.collectedIcons')} (${count})`"
+            :aria-label="`${heading} (${count})`"
             :aria-expanded="show"
             aria-haspopup="menu"
             data-toolbar-collection-trigger
             @click="show ? close() : emit('update:show', true)"
             @keydown="triggerKeydown"
           >
-            <template #icon><Ellipsis /></template>
+            <template #icon><component :is="glyph" aria-hidden="true" /></template>
+            <span class="toolbar-action-label">{{ heading }}</span>
           </n-button>
         </template>
-        {{ t('toolbar.collectedIcons') }} ({{ count }})
+        {{ heading }} ({{ count }})
       </n-tooltip>
     </template>
-    <div class="toolbar-collection-heading">{{ t('toolbar.collectedIcons') }}<span>{{ count }}</span></div>
-    <div ref="list" class="toolbar-collected-list" role="menu" :aria-label="t('toolbar.collectedIcons')" @keydown="listKeydown" />
+    <div class="toolbar-collection-heading">{{ heading }}<span>{{ count }}</span></div>
+    <div ref="list" class="toolbar-collected-list" role="menu" :aria-label="heading" :data-toolbar-folder-list="folderId" data-toolbar-surface @keydown="listKeydown"><p v-if="!count" class="toolbar-folder-empty">{{ t('toolbar.folders.empty', 'No icons in this folder') }}</p></div>
+    <slot name="footer" />
   </n-popover>
   <template v-else>
     <n-button
       ref="trigger"
       quaternary
       size="small"
-      :aria-label="`${t('toolbar.collectedIcons')} (${count})`"
+      :aria-label="`${heading} (${count})`"
       :aria-expanded="show"
       aria-haspopup="dialog"
       data-toolbar-collection-trigger
       @click="show ? close() : emit('update:show', true)"
       @keydown="triggerKeydown"
     >
-      <template #icon><Ellipsis /></template>
-      <span class="toolbar-action-label">{{ t('toolbar.collectedIcons') }}</span>
+      <template #icon><component :is="glyph" aria-hidden="true" /></template>
+      <span class="toolbar-action-label">{{ heading }}</span>
     </n-button>
     <n-modal
       :show="show"
@@ -161,20 +168,22 @@ onBeforeUnmount(() => {
       class="toolbar-collection-sheet n-modal"
       role="dialog"
       aria-modal="true"
-      :aria-label="t('toolbar.collectedIcons')"
-      :title="`${t('toolbar.collectedIcons')} (${count})`"
+      :aria-label="heading"
+      :title="`${heading} (${count})`"
       :style="{ width: 'min(380px, calc(100vw - 24px))' }"
       :mask-closable="!childOpen"
       :close-on-esc="false"
       display-directive="show"
       @update:show="!$event && close(true)"
     >
-      <div ref="list" class="toolbar-collected-list" role="menu" :aria-label="t('toolbar.collectedIcons')" @keydown="listKeydown" />
+      <div ref="list" class="toolbar-collected-list" role="menu" :aria-label="heading" :data-toolbar-folder-list="folderId" data-toolbar-surface @keydown="listKeydown"><p v-if="!count" class="toolbar-folder-empty">{{ t('toolbar.folders.empty', 'No icons in this folder') }}</p></div>
+    <slot name="footer" />
     </n-modal>
   </template>
 </template>
 
 <style scoped>
+.toolbar-folder-empty { padding: 16px 10px; margin: 0; color: var(--muted-foreground); font-size: 13px; }
 .toolbar-collection-heading { display: flex; justify-content: space-between; padding: 8px 10px; color: var(--muted-foreground); font-size: 12px; }
 .toolbar-collected-list { display: flex; flex-direction: column; gap: 2px; max-height: calc(100dvh - 120px); overflow-y: auto; }
 .toolbar-collection-sheet .toolbar-collected-list { max-height: calc(100dvh - 180px); }

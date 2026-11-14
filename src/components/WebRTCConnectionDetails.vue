@@ -9,12 +9,17 @@ const focused = shallowRef(false)
 const dismissed = shallowRef(false)
 const detailsId = useId()
 const show = computed(() => !dismissed.value && (hovered.value || focused.value))
+const localAddressHidden = computed(() => props.stats?.local?.type === 'host'
+  && (!props.stats.local.address || props.stats.local.address.toLowerCase().endsWith('.local')))
 const rows = computed(() => {
   const stats = props.stats
   const candidateDetails = (side: 'local' | 'remote') => {
     const value = stats?.[side] ?? null
     const meta = [value?.type, value?.protocol?.toUpperCase(), value?.relayProtocol?.toUpperCase()].filter(Boolean)
-    return [formatCandidateEndpoint(value), ...meta].join(' · ')
+    const endpoint = side === 'local' && value?.type === 'host' && !value.address
+      ? t('screen.webrtcDetails.addressHidden')
+      : formatCandidateEndpoint(value)
+    return [endpoint, ...meta].join(' · ')
   }
   const ms = (value: number | null | undefined) => value == null ? '—' : `${Number(value.toFixed(2))} ms`
   return [
@@ -72,6 +77,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', dismiss))
           <dd>{{ value }}</dd>
         </template>
       </dl>
+      <span v-if="localAddressHidden" class="webrtc-details-address-hint">{{ t('screen.webrtcDetails.localAddressHiddenHint') }}</span>
     </div>
   </n-tooltip>
 </template>
@@ -82,6 +88,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', dismiss))
 .webrtc-details { font-size: 12px; line-height: 1.5; user-select: text; }
 .webrtc-details > strong { display: block; margin-bottom: 8px; }
 .webrtc-details-waiting { display: block; }
+.webrtc-details-address-hint { display: block; margin-top: 8px; opacity: 0.7; }
 .webrtc-details dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 5px 16px; margin: 0; }
 .webrtc-details dt { opacity: 0.7; }
 .webrtc-details dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }

@@ -10,8 +10,8 @@ const previousTitle = document.title
 const languageMenuOpen = shallowRef(false)
 const languageBusy = shallowRef(false)
 const languageError = shallowRef(false)
-const languageMenuOptions = languageOptions.map(({ label, value }) => ({ label, key: value }))
-const languageLabel = computed(() => languageOptions.find(({ value }) => value === currentLanguage.value)?.label || 'English')
+const languageMenuOptions = computed(() => languageOptions.value.map(({ label, value }) => ({ label, key: value })))
+const languageLabel = computed(() => languageOptions.value.find(({ value }) => value === currentLanguage.value)?.label || 'English')
 
 async function selectLanguage(key: string | number) {
   if (languageBusy.value) return

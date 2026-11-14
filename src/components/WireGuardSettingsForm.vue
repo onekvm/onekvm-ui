@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import NetworkAdvancedSettings from './NetworkAdvancedSettings.vue'
 import { Plus, RefreshCw, Trash2 } from '@/icons'
 import { useMessage } from 'naive-ui'
 
@@ -219,6 +220,15 @@ onMounted(() => {
         />
       </n-form-item>
     </div>
+
+    <NetworkAdvancedSettings
+      v-if="editorMode === 'form'"
+      :mtu="modelValue.mtu"
+      :ipv6="modelValue.addresses.some(address => address.includes(':'))"
+      :disabled="disabled"
+      :show-route-metric="false"
+      @update:mtu="update('mtu', $event)"
+    />
 
     <section v-if="editorMode === 'form'" class="peer-section">
       <header>

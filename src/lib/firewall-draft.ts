@@ -1,4 +1,6 @@
-import type { FirewallRule, FirewallStatus, FirewallUpdate } from '@/api/client'
+import type { FirewallMatch, FirewallRule, FirewallStatus, FirewallUpdate } from '@/api/client'
+
+import { legacyMatchFields, simpleMatches } from './firewall-matches.ts'
 
 export interface FirewallRuleDraft {
   id: number
@@ -8,6 +10,21 @@ export interface FirewallRuleDraft {
   port: string
   source: string
   comment: string
+  matches?: FirewallMatch[]
+}
+
+export type FirewallDirection = 'in' | 'out'
+
+export function rulesForDirection(rules: FirewallRuleDraft[], direction: FirewallDirection) {
+  return rules.filter(rule => rule.direction === direction)
+}
+
+export function reorderDirectionRules(rules: FirewallRuleDraft[], fromId: number, toId: number) {
+  const from = rules.find(rule => rule.id === fromId)
+  const to = rules.find(rule => rule.id === toId)
+  if (!from || !to || from.direction !== to.direction || !['in', 'out'].includes(from.direction)) return rules
+  const ids = rulesForDirection(rules, from.direction as FirewallDirection).map(rule => rule.id)
+  return reorderVisible(rules, ids, fromId, toId)
 }
 
 export interface FirewallDraft {
@@ -36,8 +53,39 @@ export function protocolPort(protocol: string, port: string) {
   return `${name}/${port}`
 }
 
+export function duplicateAllow(rules: FirewallRuleDraft[], candidate: Pick<FirewallRuleDraft, 'port' | 'protocol' | 'direction' | 'source'>, excludeId?: number) {
+  return rules.some(rule => rule.id !== excludeId && rule.action === 'allow'
+    && rule.direction === candidate.direction && rule.port === candidate.port
+    && (rule.protocol === candidate.protocol || rule.protocol === 'any' || candidate.protocol === 'any')
+    && isAnywhere(rule.source) === isAnywhere(candidate.source)
+    && (isAnywhere(candidate.source) || rule.source === candidate.source))
+}
+
+export function saveFirewallRule(rules: FirewallRuleDraft[], values: Omit<FirewallRuleDraft, 'id'>, id: number | null) {
+  if (id !== null) return rules.map(rule => rule.id === id ? { ...values, id } : rule)
+  const nextId = Math.min(0, ...rules.map(rule => rule.id)) - 1
+  return [...rules, { ...values, id: nextId }]
+}
+
+function servicePortGroupIds(rules: FirewallRuleDraft[], id: number | null) {
+  const original = whitelistRules(rules).find(rule => rule.id === id)
+  return new Set(original ? whitelistRules(rules).filter(rule => portKey(rule) === portKey(original)).map(rule => rule.id) : [])
+}
+
+export function duplicateServicePort(rules: FirewallRuleDraft[], candidate: Pick<FirewallRuleDraft, 'port' | 'protocol'>, id: number | null) {
+  const excluded = servicePortGroupIds(rules, id)
+  return whitelistRules(rules).some(rule => !excluded.has(rule.id) && rule.port === candidate.port
+    && (rule.protocol === candidate.protocol || rule.protocol === 'any' || candidate.protocol === 'any'))
+}
+
+export function saveServicePort(rules: FirewallRuleDraft[], values: Pick<FirewallRuleDraft, 'protocol' | 'port' | 'comment'>, id: number | null) {
+  if (id === null) return saveFirewallRule(rules, { ...values, action: 'allow', direction: 'in', source: '' }, null)
+  const group = servicePortGroupIds(rules, id)
+  return rules.map(rule => group.has(rule.id) ? { ...rule, ...values } : rule)
+}
+
 export function whitelistRules(rules: FirewallRuleDraft[]) {
-  return rules.filter((rule) => rule.action === 'allow' && rule.direction === 'in')
+  return rules.filter((rule) => rule.matches === undefined && rule.action === 'allow' && rule.direction === 'in')
 }
 
 export function servicePortRules(rules: FirewallRuleDraft[]) {
@@ -83,6 +131,7 @@ export function applyPayload(draft: FirewallDraft): FirewallUpdate {
       port: rule.port.trim(),
       source: isAnywhere(rule.source) ? undefined : rule.source.trim(),
       comment: rule.comment.trim() || undefined,
+      ...(rule.matches !== undefined ? { matches: rule.matches.map(item => ({ ...item })) } : {}),
     })),
   }
 }
@@ -92,7 +141,7 @@ export function expandDraft(draft: FirewallDraft): FirewallDraft {
   let nextId = Math.min(0, ...draft.rules.map((rule) => rule.id)) - 1
   const rules: FirewallRuleDraft[] = []
   for (const rule of draft.rules) {
-    if (!(rule.action === 'allow' && rule.direction === 'in' && isAnywhere(rule.source))) {
+    if (!(rule.matches === undefined && rule.action === 'allow' && rule.direction === 'in' && isAnywhere(rule.source))) {
       rules.push(rule)
       continue
     }
@@ -166,7 +215,7 @@ export function reorderVisible(rules: FirewallRuleDraft[], visibleIds: number[],
 }
 
 export function matchesServicePort(rule: FirewallRuleDraft, service: ServiceDef, port: number) {
-  return rule.action === 'allow'
+  return rule.matches === undefined && rule.action === 'allow'
     && rule.direction === 'in'
     && rule.port.trim() === String(port)
     && (rule.protocol === service.protocol || rule.protocol === 'any' || rule.protocol === '')
@@ -174,14 +223,14 @@ export function matchesServicePort(rule: FirewallRuleDraft, service: ServiceDef,
 }
 
 function normalizeRule(rule: FirewallRule): FirewallRuleDraft {
+  const simple = rule.matches !== undefined && simpleMatches(rule.matches)
+  const fields = simple ? legacyMatchFields(rule.matches!) : {
+    protocol: rule.protocol || 'any', port: rule.port, source: isAnywhere(rule.source) ? '' : rule.source,
+  }
   return {
-    id: rule.id,
-    action: rule.action,
-    direction: rule.direction,
-    protocol: rule.protocol || 'any',
-    port: rule.port,
-    source: isAnywhere(rule.source) ? '' : rule.source,
-    comment: rule.comment || '',
+    id: rule.id, action: rule.action, direction: rule.direction,
+    ...fields, comment: rule.comment || '',
+    ...(rule.matches !== undefined && !simple ? { matches: rule.matches.map(item => ({ ...item })) } : {}),
   }
 }
 
@@ -194,7 +243,7 @@ function expandAllowSources(rules: FirewallRuleDraft[], sources: string[]) {
   if (!allowSources.length) return rules
   const expanded: FirewallRuleDraft[] = []
   for (const rule of rules) {
-    if (!(rule.action === 'allow' && rule.direction === 'in' && isAnywhere(rule.source))) {
+    if (!(rule.matches === undefined && rule.action === 'allow' && rule.direction === 'in' && isAnywhere(rule.source))) {
       expanded.push(rule)
       continue
     }
@@ -221,7 +270,7 @@ function collapseAllowSources(rules: FirewallRuleDraft[]) {
   const seen = new Set<string>()
   const collapsed: FirewallRuleDraft[] = []
   for (const rule of rules) {
-    if (!(rule.action === 'allow' && rule.direction === 'in')) {
+    if (!(rule.matches === undefined && rule.action === 'allow' && rule.direction === 'in')) {
       collapsed.push(rule)
       continue
     }
@@ -245,6 +294,7 @@ function signature(draft: FirewallDraft) {
       port: rule.port.trim(),
       source: isAnywhere(rule.source) ? '' : rule.source.trim(),
       comment: rule.comment.trim(),
+      ...(rule.matches !== undefined ? { matches: rule.matches } : {}),
     })),
   }
 }

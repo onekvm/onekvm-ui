@@ -7,6 +7,7 @@ import ConsoleWindowTransition from './ConsoleWindowTransition.vue'
 
 import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type OneKVMStatus } from '@/api/client'
 import ToolboxWorkspace from './toolbox/ToolboxWorkspace.vue'
+import IndependentExtensionWindows from './toolbox/IndependentExtensionWindows.vue'
 import MacroRunBanner from './toolbox/MacroRunBanner.vue'
 import { useWindowTaskbarInset } from '@/composables/useWindowTaskbar'
 import { useToolbox } from '@/composables/useToolbox'
@@ -34,18 +35,22 @@ import {
   settingsAppActive,
 } from '@/lib/settings-nav'
 import { storedHideLocalCursor } from '@/lib/console-pointer'
+import { sanitizeMagicKey } from '@/lib/keyboard-magic'
 import { resolveConsoleTitle } from '@/lib/console-title'
 import { consumeConsoleBack, lockConsoleHistory } from '@/lib/history-lock'
+import { consoleFullscreenOptions, scheduleConsoleKeyboardLock, type ConsoleKeyboardLock } from '@/lib/console-keyboard-lock'
 import { fullscreenTopInsetPx, isIpadLikeUserAgent, readSafeAreaTop } from '@/lib/fullscreen-inset'
 import { useTransport } from '@/composables/useTransport'
 import { usePictureInPicture } from '@/composables/usePictureInPicture'
 import type { WebRTCConnectionStats } from '@/lib/webrtc-connection-stats'
 import { onekvm, type BrowserAudioStats, type BrowserVideoLatencyUs } from '@/lib/onekvm'
+import { audioPlaybackAvailable } from '@/lib/audio-settings'
 import { effectiveVideoCodec } from '@/lib/video-transport'
 import { loadLocalShortcuts, saveLocalShortcuts } from '@/lib/keyboard-shortcuts'
 import { statusEvents } from '@/lib/status-events'
 import { t } from '@/i18n/runtime'
 import { loadExtensionShells, loadExtensionToolbars } from '@/extensions/pluginUi'
+import { clearExtensionConsoles, syncExtensionConsoles } from '@/extensions/consoleRuntime'
 import { uiProduct } from '@/product'
 
 import ControlToolbar from './ControlToolbar.vue'
@@ -70,6 +75,8 @@ const VirtualKeyboard = defineAsyncComponent(() => import('./VirtualKeyboard.vue
 const MOUSE_MODE_KEY = 'nano-kvm-mouse-mode'
 const HIDE_LOCAL_CURSOR_KEY = 'onekvm-hide-local-cursor'
 const RIGHT_CONTROL_AS_META_KEY = 'onekvm-right-control-as-meta'
+const SWAP_COMMAND_CTRL_KEY = 'onekvm-swap-command-ctrl'
+const MAGIC_KEY_STORAGE = 'onekvm-keyboard-magic'
 const PERFORMANCE_OVERLAY_KEY = 'onekvm-performance-overlay'
 
 function isAdvancedSettingsRoute(hash: string) {
@@ -137,6 +144,8 @@ const fullscreen = ref(false)
 const performanceOpen = ref(localStorage.getItem(PERFORMANCE_OVERLAY_KEY) !== 'false')
 const performanceOrigin = ref<{ x: number, y: number } | null>(null)
 const rightControlAsMeta = ref(localStorage.getItem(RIGHT_CONTROL_AS_META_KEY) === 'true')
+const swapCommandCtrl = ref(localStorage.getItem(SWAP_COMMAND_CTRL_KEY) === 'true')
+const magicKey = ref(sanitizeMagicKey(localStorage.getItem(MAGIC_KEY_STORAGE)))
 const userShortcuts = ref<KeyboardShortcut[]>(loadLocalShortcuts())
 const deviceShortcuts = ref<KeyboardShortcut[]>([])
 const keyboardLayout = ref<KeyboardLayout>('us')
@@ -203,14 +212,21 @@ watch(() => status.value?.hid.macro_generation, async (generation, previous) => 
   macroInputReset.value = false
 })
 const keyboardBlocked = computed(
-  () => pipActive.value || macroInputReset.value || Boolean(status.value?.hid.macro_owner) || toolbox.inputBlocked || advancedSettingsOpen.value || accountOpen.value || shortcutDialogOpen.value || toolbarOverlayOpen.value || Boolean(state.value.fallbackPrompt),
+  () => pipActive.value || macroInputReset.value || Boolean(status.value?.hid.macro_owner) || toolbox.inputBlocked || advancedSettingsOpen.value || accountOpen.value || shortcutDialogOpen.value || toolbarOverlayOpen.value || videoFallbackShown.value,
 )
 watch(mouseMode, (value) => localStorage.setItem(MOUSE_MODE_KEY, value))
 watch(videoFit, (value) => localStorage.setItem(VIDEO_FIT_KEY, value))
 watch(videoRotation, (value) => localStorage.setItem(VIDEO_ROTATION_KEY, String(value)))
 watch(hideLocalCursor, (value) => localStorage.setItem(HIDE_LOCAL_CURSOR_KEY, String(value)))
 watch(rightControlAsMeta, (value) => localStorage.setItem(RIGHT_CONTROL_AS_META_KEY, String(value)))
+watch(swapCommandCtrl, (value) => localStorage.setItem(SWAP_COMMAND_CTRL_KEY, String(value)))
+watch(magicKey, (value) => localStorage.setItem(MAGIC_KEY_STORAGE, value))
 watch(performanceOpen, (value) => localStorage.setItem(PERFORMANCE_OVERLAY_KEY, String(value)))
+// Without a video backend, transport fallbacks cannot help; keep the console
+// status visible and leave keyboard and mouse input available.
+const videoFallbackShown = computed(
+  () => Boolean(state.value.fallbackPrompt) && status.value?.video.hdmi_error !== 'video_unavailable',
+)
 watch(
   () => state.value.fallbackPrompt,
   () => { fallbackActionError.value = '' },
@@ -244,9 +260,11 @@ watch(
 )
 
 let contributionGeneration = 0
+let consoleDocumentActive = true
 async function refreshExtensionContributions() {
   const generation = ++contributionGeneration
-  if (!auth.authenticated || !hasPermission(auth, 'settings.view')) {
+  if (!consoleDocumentActive || !auth.authenticated || !hasPermission(auth, 'settings.view')) {
+    clearExtensionConsoles()
     await Promise.all([loadExtensionToolbars([]), loadExtensionShells([])])
     return
   }
@@ -254,9 +272,10 @@ async function refreshExtensionContributions() {
     const extensions = await api.getConsoleExtensions()
     if (generation !== contributionGeneration) return
     toolbox.acceptCatalog(extensions)
-    await Promise.all([loadExtensionToolbars(extensions), loadExtensionShells(extensions)])
+    await Promise.all([loadExtensionToolbars(extensions), loadExtensionShells(extensions), syncExtensionConsoles(advancedSettingsOpen.value ? [] : extensions)])
   } catch {
     if (generation !== contributionGeneration) return
+    clearExtensionConsoles()
     await Promise.all([loadExtensionToolbars([]), loadExtensionShells([])])
   }
 }
@@ -283,7 +302,18 @@ function updateUserShortcuts(shortcuts: KeyboardShortcut[]) {
 }
 
 function closeSession() {
+  contributionGeneration += 1
+  clearExtensionConsoles()
   return onekvm.close()
+}
+
+function onPageHide() {
+  consoleDocumentActive = false
+  void closeSession()
+}
+function onPageShow() {
+  consoleDocumentActive = true
+  void refreshExtensionContributions()
 }
 
 function setMetadata(width: number, height: number) {
@@ -352,31 +382,31 @@ async function switchToH264() {
   }
 }
 
-type KeyboardLock = {
-  lock: (keyCodes?: string[]) => Promise<void>
-  unlock: () => void
+function browserKeyboard(): ConsoleKeyboardLock | undefined {
+  const keyboard = (navigator as Navigator & { keyboard?: ConsoleKeyboardLock }).keyboard
+  return keyboard?.lock ? keyboard : undefined
 }
 
-function browserKeyboard() {
-  return (navigator as Navigator & { keyboard?: KeyboardLock }).keyboard
+let stopKeyboardLock: (() => void) | undefined
+
+function consoleKeyboardLockActive() {
+  const workspace = consoleWorkspace.value
+  return Boolean(workspace && document.fullscreenElement === workspace)
 }
 
 async function toggleFullscreen() {
   if (document.fullscreenElement) {
-    browserKeyboard()?.unlock()
     await document.exitFullscreen().catch(() => undefined)
     return
   }
 
-  if (!consoleWorkspace.value || !document.fullscreenEnabled) return
-  const fullscreenRequest = consoleWorkspace.value.requestFullscreen({ navigationUI: 'hide' })
-  const keyboardLockRequest = browserKeyboard()?.lock().catch(() => undefined)
+  const workspace = consoleWorkspace.value
+  if (!workspace || !document.fullscreenEnabled) return
   try {
-    await fullscreenRequest
+    await workspace.requestFullscreen(consoleFullscreenOptions())
   } catch {
     return
   }
-  await keyboardLockRequest
   await nextTick()
   applyFullscreenInset()
   remoteConsole.value?.focusVideo()
@@ -395,8 +425,11 @@ function applyFullscreenInset() {
 }
 
 function syncFullscreen() {
-  fullscreen.value = document.fullscreenElement === consoleWorkspace.value
-  if (!fullscreen.value) browserKeyboard()?.unlock()
+  fullscreen.value = consoleKeyboardLockActive()
+  stopKeyboardLock?.()
+  stopKeyboardLock = fullscreen.value
+    ? scheduleConsoleKeyboardLock(consoleKeyboardLockActive, browserKeyboard())
+    : undefined
   applyFullscreenInset()
 }
 
@@ -511,10 +544,12 @@ function navigateAdvancedSettings(route: string) {
 
 watch(advancedSettingsOpen, (open) => {
   if (open) {
+    clearExtensionConsoles()
     settingsWindowOpen.value = false
     toolbox.closeAll()
     return
   }
+  void refreshExtensionContributions()
   void nextTick(applyFullscreenInset)
 })
 
@@ -523,7 +558,7 @@ onMounted(() => {
 	unsubscribeStatus = statusEvents.subscribe(
 		(next) => {
 			status.value = { ...next, hid: keyboardLockOverlay.applyStatus(next.hid) }
-			onekvm.setDeviceSpeakerEnabled(Boolean(next.audio.enabled))
+			onekvm.setDeviceSpeakerEnabled(audioPlaybackAvailable(next.audio))
 			serverUnavailable.value = false
 		},
 		() => {
@@ -546,7 +581,8 @@ onMounted(() => {
   void refreshDeviceShortcuts()
   void refreshExtensionContributions()
   window.addEventListener('onekvm:extensions-changed', refreshExtensionContributions)
-  window.addEventListener('pagehide', closeSession)
+  window.addEventListener('pagehide', onPageHide)
+  window.addEventListener('pageshow', onPageShow)
   window.addEventListener('hashchange', syncRoute)
   window.addEventListener('popstate', onPopState)
   document.addEventListener('fullscreenchange', syncFullscreen)
@@ -563,19 +599,22 @@ onBeforeUnmount(() => {
 	unsubscribeStatus?.()
 	unsubscribeKeyboardLED?.()
   window.removeEventListener('onekvm:extensions-changed', refreshExtensionContributions)
-  window.removeEventListener('pagehide', closeSession)
+  window.removeEventListener('pagehide', onPageHide)
+  window.removeEventListener('pageshow', onPageShow)
   window.removeEventListener('hashchange', syncRoute)
   window.removeEventListener('popstate', onPopState)
   document.removeEventListener('fullscreenchange', syncFullscreen)
   window.visualViewport?.removeEventListener('resize', applyFullscreenInset)
   window.visualViewport?.removeEventListener('scroll', applyFullscreenInset)
-  browserKeyboard()?.unlock()
+  stopKeyboardLock?.()
+  stopKeyboardLock = undefined
   closeSession()
 })
 </script>
 
 <template>
   <div class="app-shell" :data-dim-windows-on-kvm-focus="status?.identity?.dim_windows_on_kvm_focus !== false" :style="{ '--onekvm-taskbar-height': `${taskbarInset}px` }">
+    <IndependentExtensionWindows />
     <KeyboardLockOverlay :changes="keyboardLockChanges" />
     <ConsoleWindowTransition :show="settingsWindowOpen && canSettings && !advancedSettingsOpen" @after-leave="afterSettingsWindowLeave">
       <AdvancedSettingsWindow ref="settingsWindow"
@@ -645,6 +684,8 @@ onBeforeUnmount(() => {
           :fullscreen="fullscreen"
           :performance-open="performanceOpen"
           :right-control-as-meta="rightControlAsMeta"
+          :swap-command-ctrl="swapCommandCtrl"
+          :magic-key="magicKey"
           :keyboard-layout="keyboardLayout"
           :user-shortcuts="userShortcuts"
           :device-shortcuts="deviceShortcuts"
@@ -660,6 +701,8 @@ onBeforeUnmount(() => {
           @picture-in-picture="togglePictureInPicture"
           @update:performance-open="setPerformanceOpen"
           @update:right-control-as-meta="rightControlAsMeta = $event"
+          @update:swap-command-ctrl="swapCommandCtrl = $event"
+          @update:magic-key="magicKey = $event"
           @overlay="toolbarOverlayOpen = $event"
           @dock="toolbarDock = $event"
           @update:video-fit="videoFit = $event"
@@ -691,8 +734,11 @@ onBeforeUnmount(() => {
           :keyboard-blocked="keyboardBlocked"
           :input-suspended="pipActive"
           :right-control-as-meta="rightControlAsMeta"
+          :swap-command-ctrl="swapCommandCtrl"
+          :magic-key="magicKey"
           :trackpad="trackpadOpen"
           :usb-connected="Boolean(status?.hid.connected)"
+          :connection-animation="Boolean(status) && status?.identity?.connection_animation !== false"
           @metadata="setMetadata"
           @canvas-size="setCanvasSize"
           @fps="videoFps = $event"
@@ -727,7 +773,7 @@ onBeforeUnmount(() => {
           :present-us="presentUs"
           :transport-us="transportUs"
           :transport-error-us="transportErrorUs"
-          :audio-enabled="status?.audio.enabled ?? false"
+          :audio-enabled="audioPlaybackAvailable(status?.audio ?? {})"
           :audio-encoder="browserAudioCodec ?? status?.audio.encoder ?? ''"
           :audio-quality="status?.audio.quality ?? ''"
           :audio-sample-rate="status?.audio.sample_rate ?? 0"
@@ -741,7 +787,7 @@ onBeforeUnmount(() => {
         />
 
         <VideoFallbackModal
-          :show="Boolean(state.fallbackPrompt) && auth.authenticated"
+          :show="videoFallbackShown && auth.authenticated"
           :prompt="state.fallbackPrompt"
           :loading="switchingTransport"
           :error="fallbackActionError"
@@ -751,7 +797,7 @@ onBeforeUnmount(() => {
         />
 
         <AccountDrawer v-model:show="accountOpen" />
-        <VirtualKeyboard v-if="virtualKeyboardMounted" v-model:show="virtualKeyboardOpen" :layout="keyboardLayout" :blocked="keyboardBlocked" @focus-console="focusConsole" />
+        <VirtualKeyboard v-if="virtualKeyboardMounted" v-model:show="virtualKeyboardOpen" :layout="keyboardLayout" :blocked="keyboardBlocked" :caps-lock="status?.hid.caps_lock" :num-lock="status?.hid.num_lock" :scroll-lock="status?.hid.scroll_lock" @focus-console="focusConsole" />
         <KeyboardShortcutDrawer
           v-model:show="shortcutDialogOpen"
           :shortcuts="userShortcuts"

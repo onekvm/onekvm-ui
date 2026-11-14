@@ -575,7 +575,7 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
           />
         </div>
         <n-alert v-if="!canChangeVideo" type="info" :bordered="false" :show-icon="false">
-          {{ t('screen.sharedStream', 'Shared from the primary WebRTC client') }}
+          {{ t('screen.sharedStream', 'Another connection controls the video settings. They cannot be changed here.') }}
         </n-alert>
       </DisplaySettingsGroup>
       <DisplaySettingsGroup

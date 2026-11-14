@@ -32,8 +32,12 @@ export function usePictureInPicture(videoMode: () => string) {
     const video = sourceVideo()
     const pip = document.pictureInPictureElement
     const canvasInPiP = (canvasVideo as PiPVideo | null)?.webkitPresentationMode === 'picture-in-picture'
-    active.value = Boolean((pip && (pip === video || pip === canvasVideo)) || video?.webkitPresentationMode === 'picture-in-picture' || canvasInPiP)
+    const screenInPiP = Boolean((pip && pip === video) || video?.webkitPresentationMode === 'picture-in-picture')
+    active.value = Boolean(screenInPiP || (pip && pip === canvasVideo) || canvasInPiP)
     if (canvasVideo && pip !== canvasVideo && !canvasInPiP && !busy.value) releaseCanvas()
+    // Chrome rejects requestPictureInPicture while this is set, and closes an
+    // open window if it is set again. Keep it set only while this element is out.
+    if (video && !screenInPiP) video.disablePictureInPicture = true
   }
 
   async function exit() {
@@ -79,6 +83,7 @@ export function usePictureInPicture(videoMode: () => string) {
         return
       }
       if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !video.videoWidth) throw new Error('Video is not ready')
+      video.disablePictureInPicture = false
       if (document.pictureInPictureEnabled && video.requestPictureInPicture) {
         await video.requestPictureInPicture()
       } else if (video.webkitSupportsPresentationMode?.('picture-in-picture')) {

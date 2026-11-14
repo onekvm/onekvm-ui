@@ -12,6 +12,7 @@ import {
   parseVideoTransport,
   probeWebRTCVideoSupport,
   h265SupportForTransport,
+  websocketInitialVideoCodec,
 } from '../src/lib/video-transport.ts'
 
 assert.equal(parseVideoTransport(null), 'webrtc')
@@ -37,6 +38,9 @@ assert.equal(connectionVideoCodec({ ...staleH265Telemetry, codec: 'auto' }), 'h2
 assert.equal(connectionVideoCodec({ codec: 'auto', ...{ actual_codec: 'h264' } }, true), 'h265')
 assert.equal(connectionVideoCodec({ codec: 'auto', ...{ actual_codec: 'h265' } }, false), 'h264')
 assert.equal(connectionVideoCodec({ codec: 'h264' }, true), 'h264', 'An explicit H.264 choice must not be upgraded')
+assert.equal(websocketInitialVideoCodec('h265', true), 'h264')
+assert.equal(websocketInitialVideoCodec('h264', true), 'h264')
+assert.equal(websocketInitialVideoCodec('h265', false), 'h265')
 assert.equal(videoCodecLabel({ codec: 'auto', actual_codec: 'h264' }), 'Auto (H264)')
 assert.equal(videoCodecLabel({ codec: 'h265' }), 'H265')
 

@@ -242,7 +242,7 @@ onBeforeUnmount(() => {
           : t('gamepad.disabledHint', 'USB gamepad is off. Enable it in Advanced settings → USB. The controlled device will re-enumerate USB.') }}
       </p>
       <p v-if="gadgetEnabled && !hidSupported" class="gamepad-hint">
-        {{ t('gamepad.fallbackHint', 'WebHID is unavailable in this browser. Standard Gamepad API devices are forwarded while this page stays focused.') }}
+        {{ t('gamepad.fallbackHint', 'Only standard gamepads are supported in this browser. Keep this page focused to forward input.') }}
       </p>
       <div class="gamepad-actions">
         <n-button

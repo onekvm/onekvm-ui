@@ -1,6 +1,6 @@
 import type { WireGuardConfig, WireGuardPeer } from '@/api/client'
-import { validCIDR, validEndpoint, validWireGuardKey } from '@/lib/network'
-import { generateWireGuardKeyPair, wireGuardPublicKeyFromBase64 } from '@/lib/wireguard'
+import { validCIDR, validEndpoint, validWireGuardKey, validMTU } from './network.ts'
+import { generateWireGuardKeyPair, wireGuardPublicKeyFromBase64 } from './wireguard.ts'
 
 export const DEFAULT_WIREGUARD_ADDRESS = '10.10.0.1/24'
 export const DEFAULT_WIREGUARD_PORT = 51820
@@ -45,6 +45,8 @@ function integer(value: string, field: string) {
 }
 
 function validate(config: WireGuardConfig) {
+  const ipv6 = config.addresses.some(address => address.includes(':'))
+  if (!validMTU(config.mtu, ipv6)) fail('mtuInvalid', { min: ipv6 ? 1280 : 68 }, 'MTU is outside the valid range')
   if (config.private_key && !validWireGuardKey(config.private_key)) {
     fail('privateKeyInvalid', {}, 'PrivateKey must be a 32-byte base64 WireGuard key')
   }
@@ -71,6 +73,7 @@ export function serializeWireGuardConfig(config: WireGuardConfig) {
   else if (config.public_key) output.push('# PrivateKey is configured and hidden; add PrivateKey to replace it.')
   if (config.addresses.length) output.push(`Address = ${config.addresses.join(', ')}`)
   if (config.listen_port) output.push(`ListenPort = ${config.listen_port}`)
+  if (config.mtu) output.push(`MTU = ${config.mtu}`)
   for (const peer of config.peers) {
     output.push('', '[Peer]', `PublicKey = ${peer.public_key}`)
     if (peer.preshared_key) output.push(`PresharedKey = ${peer.preshared_key}`)
@@ -122,6 +125,7 @@ export function parseWireGuardConfig(source: string, current: WireGuardConfig): 
       if (key === 'privatekey') config.private_key = value
       else if (key === 'address') config.addresses.push(...list(value))
       else if (key === 'listenport') config.listen_port = integer(value, 'ListenPort')
+      else if (key === 'mtu') config.mtu = integer(value, 'MTU')
       else fail('unsupportedInterfaceKey', { line: lineIndex + 1 }, `Line ${lineIndex + 1}: unsupported [Interface] key`)
     } else if (peer) {
       if (key === 'publickey') peer.public_key = value

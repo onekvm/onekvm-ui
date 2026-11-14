@@ -52,14 +52,26 @@ function wouldFit(options: USBFunctionOverrides) {
   return usbFunctionsFit(usb.value, audio.value, gadget.value, options)
 }
 
+const networkAdapterOn = computed({
+  get: () => Boolean(usb.value.network_adapter),
+  set: (value: boolean) => {
+    usb.value = { ...usb.value, network_adapter: value, network_sharing: value && Boolean(usb.value.network_sharing) }
+  },
+})
+const networkBlocked = computed(() => !usb.value.network_adapter && !wouldFit({ network: true }))
 const gamepadBlocked = computed(() => !usb.value.gamepad && !wouldFit({ gamepad: true }))
 const storageBlocked = computed(() => usb.value.mass_storage === false && !wouldFit({ storage: true }))
 const mtpBlocked = computed(() => usb.value.mtp === false && !wouldFit({ mtp: true }))
-const networkBlocked = computed(() => !usb.value.network_sharing && !wouldFit({ network: true }))
-const networkSharing = computed({
-  get: () => Boolean(usb.value.network_sharing),
-  set: (value: boolean) => { usb.value.network_sharing = value },
+const speakerOn = computed({
+  get: () => Boolean(audio.value.enabled),
+  set: (value: boolean) => { audio.value = { ...audio.value, enabled: value } },
 })
+const speakerBlocked = computed(() => !audio.value.enabled && !wouldFit({ audio: true }))
+const microphoneOn = computed({
+  get: () => Boolean(audio.value.microphone),
+  set: (value: boolean) => { audio.value = { ...audio.value, microphone: value } },
+})
+const microphoneBlocked = computed(() => !audio.value.microphone && !wouldFit({ microphone: true }))
 const massStorageOn = computed({
   get: () => usb.value.mass_storage !== false,
   set: (value: boolean) => { usb.value.mass_storage = value },
@@ -143,23 +155,6 @@ const remoteWakeup = computed({
         <p>{{ t('settings.advancedSettings.usbPage.functionsHint', 'Choose what the controlled device can use. Keyboard and mouse stay on. Turn something off and that device will not see it.') }}</p>
       </header>
       <ul class="usb-function-list">
-        <li v-if="gadget?.network_sharing != null">
-          <div>
-            <strong>{{ t('settings.advancedSettings.usbPage.networkSharing', 'USB network sharing') }}</strong>
-            <small>{{ t('settings.advancedSettings.usbPage.networkSharingHint', 'Share OneKVM’s internet connection with the controlled device over USB. Supports Linux and macOS with automatic IP configuration.') }}</small>
-          </div>
-          <div class="usb-function-controls">
-            <USBCapacityBadge :endpoints="endpointCosts.network" />
-            <n-tooltip :disabled="!networkBlocked" placement="left">
-              <template #trigger>
-                <span class="usb-function-switch">
-                  <n-switch v-model:value="networkSharing" :disabled="props.disabled || networkBlocked" :aria-disabled="Boolean(props.disabled || networkBlocked)" :aria-label="t('settings.advancedSettings.usbPage.networkSharing', 'USB network sharing')" />
-                </span>
-              </template>
-              {{ t('settings.advancedSettings.usbPage.networkSharingBlocked', 'Not enough USB capacity. Turn off unused USB functions first.') }}
-            </n-tooltip>
-          </div>
-        </li>
         <li>
           <div>
             <strong>{{ t('settings.advancedSettings.usbPage.remoteWakeup', 'USB remote wakeup') }}</strong>
@@ -199,6 +194,50 @@ const remoteWakeup = computed({
             <n-switch v-model:value="keyboardLeds" :disabled="props.disabled" />
           </div>
         </li>
+        <li>
+          <div>
+            <strong>{{ t('settings.advancedSettings.audioPage.enable', 'USB speaker') }}</strong>
+            <small>{{ t('settings.advancedSettings.usbPage.speakerHint', 'The controlled device sees OneKVM as a speaker. If this device also supports HDMI audio, turning this off leaves audio available.') }}</small>
+          </div>
+          <div class="usb-function-controls">
+            <USBCapacityBadge :endpoints="endpointCosts.audio" />
+            <n-tooltip :disabled="!speakerBlocked" placement="left">
+              <template #trigger>
+                <span class="usb-function-switch">
+                  <n-switch
+                    v-model:value="speakerOn"
+                    :disabled="props.disabled || speakerBlocked"
+                    :aria-disabled="Boolean(props.disabled || speakerBlocked)"
+                    :aria-label="t('settings.advancedSettings.audioPage.enable', 'USB speaker')"
+                  />
+                </span>
+              </template>
+              {{ t('settings.advancedSettings.usbPage.audioBlocked', 'Not enough USB capacity. Turn off the microphone, virtual storage, or file transfer first.') }}
+            </n-tooltip>
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>{{ t('settings.advancedSettings.usbPage.microphone', 'USB microphone') }}</strong>
+            <small>{{ t('settings.advancedSettings.usbPage.microphoneHint', 'Forwards this browser’s microphone to the controlled device. Turn it off and that device will not see a microphone.') }}</small>
+          </div>
+          <div class="usb-function-controls">
+            <USBCapacityBadge :endpoints="endpointCosts.microphone" />
+            <n-tooltip :disabled="!microphoneBlocked" placement="left">
+              <template #trigger>
+                <span class="usb-function-switch">
+                  <n-switch
+                    v-model:value="microphoneOn"
+                    :disabled="props.disabled || microphoneBlocked"
+                    :aria-disabled="Boolean(props.disabled || microphoneBlocked)"
+                    :aria-label="t('settings.advancedSettings.usbPage.microphone', 'USB microphone')"
+                  />
+                </span>
+              </template>
+              {{ t('settings.advancedSettings.usbPage.microphoneBlocked', 'Not enough USB capacity. Turn off the speaker, virtual storage, or file transfer first.') }}
+            </n-tooltip>
+          </div>
+        </li>
         <li v-if="USB_GAMEPAD_UI_ENABLED">
           <div>
             <strong>{{ t('settings.advancedSettings.usbPage.gamepad', 'Gamepad') }}</strong>
@@ -230,6 +269,23 @@ const remoteWakeup = computed({
                 </span>
               </template>
               {{ t('settings.advancedSettings.usbPage.storageBlocked', 'Not enough USB capacity. Turn off audio, the microphone, or file transfer first.') }}
+            </n-tooltip>
+          </div>
+        </li>
+        <li v-if="gadget?.network_adapter != null">
+          <div>
+            <strong>{{ t('settings.advancedSettings.usbPage.networkAdapter', 'USB network adapter') }}</strong>
+            <small>{{ t('settings.advancedSettings.usbPage.networkAdapterHint', 'Access OneKVM over USB from Linux or macOS. For internet access, also enable sharing in Network settings.') }}</small>
+          </div>
+          <div class="usb-function-controls">
+            <USBCapacityBadge :endpoints="endpointCosts.network" />
+            <n-tooltip :disabled="!networkBlocked" placement="left">
+              <template #trigger>
+                <span class="usb-function-switch">
+                  <n-switch v-model:value="networkAdapterOn" :disabled="props.disabled || networkBlocked" :aria-label="t('settings.advancedSettings.usbPage.networkAdapter', 'USB network adapter')" />
+                </span>
+              </template>
+              {{ t('settings.advancedSettings.usbPage.networkSharingBlocked', 'Not enough USB capacity. Turn off unused USB functions first.') }}
             </n-tooltip>
           </div>
         </li>

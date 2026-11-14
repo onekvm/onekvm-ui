@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url'
 import vue from '@vitejs/plugin-vue'
 import { defineConfig, type Plugin } from 'vite'
 
+import { l10nDevPlugin } from './scripts/l10n-dev.mjs'
+
 const rootDir = fileURLToPath(new URL('.', import.meta.url))
 const outDir = path.join(rootDir, 'dist-recovery')
 
@@ -33,7 +35,7 @@ function recoveryDevMock(): Plugin {
         if (req.method === 'GET' && url === '/status') {
           res.setHeader('Content-Type', 'application/json; charset=utf-8')
           res.end(JSON.stringify({
-            addresses: ['10.100.99.107'],
+            addresses: ['192.168.1.21'],
             firmwareMax: 120 * 1024 * 1024,
             storageType: 'SD Card',
             storageBytes: 32010928128,
@@ -114,7 +116,7 @@ function inlineRecoveryHtml(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [vue(), recoveryDevMock(), inlineRecoveryHtml()],
+  plugins: [vue(), l10nDevPlugin(rootDir), recoveryDevMock(), inlineRecoveryHtml()],
   publicDir: false,
   resolve: {
     alias: {

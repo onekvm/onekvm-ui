@@ -5,6 +5,7 @@ import type { ManagedNetworkInterface } from '@/api/client'
 import { t } from '@/i18n/runtime'
 
 import NetworkAddressSettingsForm from './NetworkAddressSettingsForm.vue'
+import NetworkAdvancedSettings from './NetworkAdvancedSettings.vue'
 
 const props = defineProps<{ modelValue: ManagedNetworkInterface; disabled?: boolean }>()
 const emit = defineEmits<{
@@ -47,7 +48,16 @@ function update<K extends keyof ManagedNetworkInterface>(key: K, value: ManagedN
     <NetworkAddressSettingsForm
       :model-value="modelValue"
       :disabled="disabled"
+      hide-route-metric
       @update:model-value="emit('update:modelValue', { ...modelValue, ...$event })"
+    />
+    <NetworkAdvancedSettings
+      :mtu="modelValue.mtu"
+      :route-metric="modelValue.route_metric"
+      :ipv6="modelValue.ipv6_mode !== 'disabled'"
+      :disabled="disabled"
+      @update:mtu="update('mtu', $event)"
+      @update:route-metric="update('route_metric', $event)"
     />
     <footer>
 	  <n-popconfirm :positive-text="t('network.interfaces.removeInterface', 'Remove interface')" :negative-text="t('common.cancel', 'Cancel')" @positive-click="emit('remove')">

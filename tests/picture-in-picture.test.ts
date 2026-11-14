@@ -24,10 +24,12 @@ class FakeVideo {
   hidden = false
   muted = false
   playsInline = false
+  disablePictureInPicture = false
   srcObject: unknown = null
   async play() { await playGate }
   async requestPictureInPicture() {
     requests++
+    if (this.disablePictureInPicture) throw new Error('disablePictureInPicture attribute is present')
     if (failRequest) throw new Error('PiP denied')
     documentMock.pictureInPictureElement = this
     emit('enterpictureinpicture')
@@ -128,8 +130,10 @@ try {
   assert.deepEqual(keyboardReports.at(-1), { keys: [4], modifiers: 0 })
   assert.equal(mouseReports.at(-1)?.buttons, 1)
   surface.requestPointerLock()
+  assert.equal(video.disablePictureInPicture, true, 'The console video blocks the browser picture-in-picture prompt')
   await pip!.toggle()
   await nextTick()
+  assert.equal(video.disablePictureInPicture, false, 'Manual picture-in-picture clears the attribute for the open window')
   assert.equal(documentMock.pictureInPictureElement, video)
   assert.equal(video.srcObject, stream, 'Native PiP must reuse the current stream')
   assert.equal(tracks.length, 0, 'Native PiP must not create a second captured stream')
@@ -147,6 +151,7 @@ try {
   await pip!.toggle()
   await nextTick()
   assert.equal(pip!.active.value, false)
+  assert.equal(video.disablePictureInPicture, true, 'Leaving picture-in-picture blocks the browser prompt again')
   dispatchKey('keydown', 'KeyB')
   dispatchPointer('pointerdown')
   assert.deepEqual(keyboardReports.at(-1), { keys: [5], modifiers: 0 }, 'Leaving PiP must restore keyboard input')

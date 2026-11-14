@@ -30,9 +30,10 @@ const apRadio = shallowRef(defaultWifiApRadio())
 const apBand = shallowRef<'2.4' | '5'>('2.4')
 const apAddress = shallowRef(defaultWifiApNetwork.address)
 const apDhcpEnabled = shallowRef(true)
+const apNetworkSharing = shallowRef(false)
 const apDhcpStart = shallowRef(defaultWifiApNetwork.dhcp_start)
 const apDhcpEnd = shallowRef(defaultWifiApNetwork.dhcp_end)
-const apNetwork = computed(() => ({ address: apAddress.value, dhcp_enabled: apDhcpEnabled.value, dhcp_start: apDhcpStart.value, dhcp_end: apDhcpEnd.value }))
+const apNetwork = computed(() => ({ address: apAddress.value, dhcp_enabled: apDhcpEnabled.value, network_sharing: apNetworkSharing.value, dhcp_start: apDhcpStart.value, dhcp_end: apDhcpEnd.value }))
 const apDirty = shallowRef(false)
 const loading = shallowRef(false)
 const initialLoading = shallowRef(true)
@@ -117,6 +118,7 @@ async function refresh() {
   try {
     const recovering = status.value === null
     status.value = await api.getWifiStatus(stationInterface.value)
+    apNetworkSharing.value = status.value.ap_network?.network_sharing === true
     if (recovering) error.value = ''
     if (!apDirty.value) {
       apSsid.value = status.value.ap_ssid
@@ -223,7 +225,9 @@ async function saveApConfig() {
   loading.value = true
   error.value = ''
   try {
-    status.value = await api.setWifiApConfig(apSsid.value, apPassword.value, apChannel.value, apBand.value, apNetwork.value, apRadio.value)
+    const latest = await api.getWifiStatus()
+    const network = { ...apNetwork.value, network_sharing: latest.ap_network?.network_sharing === true }
+    status.value = await api.setWifiApConfig(apSsid.value, apPassword.value, apChannel.value, apBand.value, network, apRadio.value)
     apDirty.value = false
     emit('changed')
   } catch (reason) {

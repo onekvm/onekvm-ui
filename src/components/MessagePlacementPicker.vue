@@ -42,7 +42,7 @@ const options = computed(() => messagePlacements.map(value => ({
 </template>
 
 <style scoped>
-.message-placement-picker { width: 100%; max-width: 580px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.message-placement-picker { width: min(100%, 580px); min-width: 0; margin: 0 auto; padding: 0; border: 0; justify-self: center; }
 .placement-legend { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .placement-screen { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, 1fr); gap: 20px 12px; aspect-ratio: 16 / 9; min-height: 190px; padding: clamp(12px, 3vw, 22px); border: 2px solid var(--border-strong); border-radius: var(--radius); background: var(--onekvm-surface-inset); }
 .placement-choice { position: relative; align-self: start; min-width: 0; cursor: pointer; }

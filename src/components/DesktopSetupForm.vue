@@ -37,9 +37,9 @@ const ntp = defineModel<boolean>('ntp', { required: true })
 const ntpServer = defineModel<string>('ntpServer', { required: true })
 
 const languageLabel = computed(() =>
-  languageOptions.find((option) => option.value === currentLanguage.value)?.label || 'English',
+  languageOptions.value.find((option) => option.value === currentLanguage.value)?.label || 'English',
 )
-const languageMenu = computed(() => languageOptions.map((option) => ({ label: option.label, key: option.value })))
+const languageMenu = computed(() => languageOptions.value.map((option) => ({ label: option.label, key: option.value })))
 const canAdvance = computed(() => step.value === 1 ? props.accountValid : props.networkValid)
 
 function selectLanguage(value: string | number) {

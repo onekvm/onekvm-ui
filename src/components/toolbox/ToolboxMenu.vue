@@ -88,7 +88,7 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
       <template #trigger>
         <n-button quaternary size="small" :role="menuItem ? 'menuitem' : undefined" :aria-label="t('toolbox.title')" :aria-expanded="toolbox.menuOpen" aria-haspopup="menu" data-toolbox-local data-toolbox-trigger @keydown="triggerKeydown">
           <template #icon><Toolbox /></template>
-          <span v-if="mobile" class="toolbar-action-label">{{ t('toolbox.title') }}</span>
+          <span class="toolbar-action-label">{{ t('toolbox.title') }}</span>
         </n-button>
       </template>
       {{ t('toolbox.title') }}

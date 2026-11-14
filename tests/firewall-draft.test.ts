@@ -1,15 +1,23 @@
 import assert from 'node:assert/strict'
+import { ruleMatches, simpleMatches, validMatches } from '../src/lib/firewall-matches.ts'
 
 import {
   applyPayload,
   collapseDraft,
   draftFromStatus,
   draftsEqual,
+  duplicateAllow,
+  duplicateServicePort,
   enableProtection,
+  expandDraft,
   extraRules,
   managementServices,
   protocolPort,
   reorderVisible,
+  reorderDirectionRules,
+  rulesForDirection,
+  saveFirewallRule,
+  saveServicePort,
   serviceEnabled,
   servicePortRules,
   setService,
@@ -110,3 +118,97 @@ const mixed = collapseDraft(draft([
 ]))
 assert.deepEqual(mixed.allowSources, [])
 assert.equal(mixed.rules.length, 2)
+
+// Editing replaces the original row in place, including its action, while
+// allowing a note-only edit of an allow rule without treating it as a duplicate.
+const originalRules = [allow('22', { id: 1 }), allow('443', { id: 2 }), allow('53', { id: 3, protocol: 'udp', action: 'deny' })]
+assert.equal(duplicateAllow(originalRules, originalRules[1], 2), false)
+assert.equal(duplicateAllow(originalRules, { ...originalRules[1], port: '22' }, 2), true)
+assert.equal(duplicateAllow(originalRules, { ...originalRules[1], port: '22', protocol: 'any' }, 2), true)
+assert.equal(duplicateAllow(originalRules, { ...originalRules[1], source: '10.0.0.0/24' }, 2), false)
+const editedValues = { action: 'reject', direction: 'out', protocol: 'udp', port: '8443', source: '10.0.0.0/24', comment: 'Edited' }
+const editedRules = saveFirewallRule(originalRules, editedValues, 2)
+assert.deepEqual(editedRules.map(rule => rule.id), [1, 2, 3])
+assert.deepEqual(editedRules[1], { ...editedValues, id: 2 })
+assert.equal(editedRules[0], originalRules[0])
+assert.equal(editedRules[2], originalRules[2])
+assert.equal(originalRules[1].port, '443')
+assert.deepEqual(applyPayload(draft(editedRules)).rules?.[1], editedValues)
+assert.deepEqual(saveFirewallRule(originalRules, editedValues, 99), originalRules)
+// Expanded whitelist rows already use negative IDs; newly added rules must
+// get their own IDs so later edits target only the intended row.
+const expandedRows = [allow('22', { id: -1 }), allow('443', { id: -2 })]
+const addedRows = saveFirewallRule(expandedRows, editedValues, null)
+assert.deepEqual(addedRows.map(rule => rule.id), [-1, -2, -3])
+assert.deepEqual(saveFirewallRule(addedRows, { ...editedValues, port: '9443' }, -3).map(rule => rule.port), ['22', '443', '9443'])
+// A simple-mode port may represent several source-specific rules. Editing it
+// must update the whole group without widening its access or moving rules.
+const groupedPorts = [
+  allow('5900', { id: 1, source: '10.0.0.0/8', comment: 'VNC' }),
+  allow('5900', { id: 2, source: '192.168.1.10', comment: 'VNC' }),
+  allow('22', { id: 3 }),
+  allow('5900', { id: 4, action: 'deny' }),
+  allow('5900', { id: 5, direction: 'out' }),
+]
+assert.equal(duplicateServicePort(groupedPorts, groupedPorts[0], 1), false)
+assert.equal(duplicateServicePort(groupedPorts, { port: '22', protocol: 'any' }, 1), true)
+assert.equal(duplicateServicePort(groupedPorts, { port: '5900', protocol: 'tcp' }, null), true)
+assert.equal(duplicateServicePort(groupedPorts, { port: '22', protocol: 'udp' }, 1), false)
+const portValues = { port: '5901', protocol: 'udp', comment: 'Updated VNC' }
+const editedPorts = saveServicePort(groupedPorts, portValues, 1)
+assert.deepEqual(editedPorts.slice(0, 2), groupedPorts.slice(0, 2).map(rule => ({ ...rule, ...portValues })))
+assert.deepEqual(editedPorts.slice(2), groupedPorts.slice(2))
+assert.deepEqual(editedPorts.map(rule => rule.id), [1, 2, 3, 4, 5])
+assert.deepEqual(applyPayload(draft(editedPorts)).rules?.slice(0, 2).map(rule => rule.source), ['10.0.0.0/8', '192.168.1.10'])
+assert.equal(groupedPorts[0].port, '5900')
+assert.deepEqual(saveServicePort(groupedPorts, portValues, 99), groupedPorts)
+const editedCollapsed = { ...collapsed, rules: saveServicePort(collapsed.rules, portValues, collapsed.rules[0].id) }
+assert.deepEqual(applyPayload(editedCollapsed).rules?.slice(0, 2).map(rule => `${rule.port}@${rule.source}`), ['5901@10.0.0.0/8', '5901@192.168.1.10'])
+assert.deepEqual(saveServicePort([], portValues, null), [{ ...portValues, action: 'allow', direction: 'in', source: '', id: -1 }])
+// Direction lists are independent, even when the persisted rules interleave.
+const directional = [
+  allow('22', { id: 1 }),
+  allow('53', { id: 2, direction: 'out', protocol: 'udp' }),
+  allow('443', { id: 3 }),
+  allow('123', { id: 4, direction: 'out', protocol: 'udp' }),
+]
+assert.deepEqual(rulesForDirection(directional, 'in').map(rule => rule.id), [1, 3])
+assert.deepEqual(rulesForDirection(directional, 'out').map(rule => rule.id), [2, 4])
+assert.deepEqual(reorderDirectionRules(directional, 3, 1).map(rule => rule.id), [3, 2, 1, 4])
+assert.deepEqual(reorderDirectionRules(directional, 4, 2).map(rule => rule.id), [1, 4, 3, 2])
+assert.equal(reorderDirectionRules(directional, 1, 2), directional)
+assert.equal(reorderDirectionRules(directional, 1, 99), directional)
+assert.deepEqual(directional.map(rule => rule.id), [1, 2, 3, 4])
+const movedDirection = saveFirewallRule(directional, { ...directional[0], direction: 'out' }, 1)
+assert.deepEqual(rulesForDirection(movedDirection, 'in').map(rule => rule.id), [3])
+assert.deepEqual(rulesForDirection(movedDirection, 'out').map(rule => rule.id), [1, 2, 4])
+assert.deepEqual(applyPayload(draft(reorderDirectionRules(directional, 4, 2))).rules?.map(rule => `${rule.direction}/${rule.port}`), ['in/22', 'out/123', 'in/443', 'out/53'])
+console.log('firewall draft tests passed')
+
+const predicates = [
+  { field: 'protocol', operator: 'eq' as const, value: 'udp' },
+  { field: 'destination-address', operator: 'neq' as const, value: '192.0.2.1' },
+  { field: 'destination-port', operator: 'eq' as const, value: '53' },
+  { field: 'out-interface', operator: 'eq' as const, value: 'eth0' },
+]
+const complex = allow('53', { id: 8, direction: 'out', protocol: 'udp', matches: predicates })
+assert.equal(validMatches(predicates, 'out'), true)
+assert.equal(validMatches(predicates, 'in'), false)
+assert.equal(validMatches([...predicates, { field: 'source-address', operator: 'eq', value: 'fd00::/8' }], 'out'), false)
+assert.equal(validMatches([{ field: 'protocol', operator: 'eq', value: 'icmp' }, predicates[2]], 'in'), false)
+assert.equal(validMatches([{ field: 'source-port', operator: 'eq', value: '65536' }], 'out'), false)
+assert.equal(validMatches([{ field: 'source-port', operator: 'eq', value: '90:80' }], 'out'), false)
+assert.equal(simpleMatches([{ field: 'source-address', operator: 'eq', value: '::/0' }, predicates[2]]), false)
+assert.equal(validMatches([], 'in'), true)
+const withAdvanced = draft([allow('22'), complex], ['10.0.0.0/8'])
+const roundTrip = collapseDraft(expandDraft(withAdvanced))
+assert.deepEqual(applyPayload(roundTrip).rules?.find(rule => rule.direction === 'out')?.matches, predicates)
+assert.deepEqual(ruleMatches(complex), predicates)
+const copied = ruleMatches(complex)
+copied[0].value = 'tcp'
+assert.equal(predicates[0].value, 'udp')
+assert.equal(draftsEqual(draft([complex]), draft([{ ...complex, matches: copied }])), false)
+const addressOnly = allow('', { matches: [{ field: 'source-address', operator: 'eq', value: '10.0.0.0/8' }] })
+assert.deepEqual(servicePortRules([addressOnly]), [])
+assert.deepEqual(applyPayload(collapseDraft(draft([addressOnly], ['192.0.2.1']))).rules?.[0].matches, addressOnly.matches)
+console.log('independent match validation and advanced/simple round trips passed')

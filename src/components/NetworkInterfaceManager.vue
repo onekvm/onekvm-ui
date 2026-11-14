@@ -132,6 +132,7 @@ const visibleInterfaces = computed(() => {
       kind: 'wireguard' as const,
       port_type: 'virtual' as const,
       link_speed_mbps: 0,
+      mtu: status?.mtu || 0,
       configuration,
       wireGuardIndex,
     }
@@ -149,6 +150,7 @@ const visibleInterfaces = computed(() => {
       kind: configuration.kind === 'physical' && props.wifiAvailable && status?.wifi_role === 'station' ? 'wifi_station' as const : configuration.kind,
       port_type: configuration.kind === 'physical' ? 'physical' as const : 'virtual' as const,
       link_speed_mbps: status?.link_speed_mbps || 0,
+      mtu: status?.mtu || 0,
       configuration,
       managedIndex,
     }
@@ -166,6 +168,7 @@ const visibleInterfaces = computed(() => {
       kind: configuration.kind,
       port_type: 'virtual' as const,
       link_speed_mbps: 0,
+      mtu: status?.mtu || 0,
       configuration,
       vpnIndex,
     }
@@ -192,6 +195,44 @@ function isManagedTunnel(iface: VisibleInterface): iface is ManagedVisibleInterf
 function isVpnInterface(iface: VisibleInterface): iface is VpnVisibleInterface & { kind: VpnKind } {
   return 'vpnIndex' in iface && isVpnKind(iface.kind)
 }
+
+const INTERFACE_GROUP_ORDER = ['ethernet', 'wifi', 'virtual', 'overlay', 'tunnel', 'vpn'] as const
+type InterfaceGroupId = (typeof INTERFACE_GROUP_ORDER)[number]
+
+function interfaceGroupId(networkInterface: VisibleInterface): InterfaceGroupId {
+  if (networkInterface.kind === 'wifi_ap' || networkInterface.kind === 'wifi_station') return 'wifi'
+  if (networkInterface.kind === 'vlan') return 'virtual'
+  if (networkInterface.kind === 'vxlan' || networkInterface.kind === 'geneve') return 'overlay'
+  if (isTunnelKind(networkInterface.kind)) return 'tunnel'
+  if (networkInterface.kind === 'wireguard' || isVpnKind(networkInterface.kind)) return 'vpn'
+  if (networkInterface.port_type === 'virtual') return 'virtual'
+  return 'ethernet'
+}
+
+function interfaceGroupLabel(id: InterfaceGroupId) {
+  switch (id) {
+    case 'ethernet': return t('network.interfaces.groupEthernet', 'Ethernet')
+    case 'wifi': return t('network.interfaces.groupWifi', 'Wi-Fi')
+    case 'virtual': return t('network.interfaces.addGroupVirtual', 'Virtual')
+    case 'overlay': return t('network.interfaces.addGroupOverlay', 'Overlay')
+    case 'tunnel': return t('network.interfaces.addGroupTunnels', 'Tunnels')
+    case 'vpn': return t('network.interfaces.addGroupVpn', 'VPN')
+  }
+}
+
+const interfaceGroups = computed(() => {
+  const buckets = new Map<InterfaceGroupId, VisibleInterface[]>()
+  for (const networkInterface of visibleInterfaces.value) {
+    const id = interfaceGroupId(networkInterface)
+    const items = buckets.get(id)
+    if (items) items.push(networkInterface)
+    else buckets.set(id, [networkInterface])
+  }
+  return INTERFACE_GROUP_ORDER.flatMap((id) => {
+    const items = buckets.get(id)
+    return items?.length ? [{ id, label: interfaceGroupLabel(id), items }] : []
+  })
+})
 
 async function load() {
   loading.value = true
@@ -471,135 +512,146 @@ watch(() => props.disabled, (disabled, previous) => {
     <n-alert v-if="loadError" type="error" :show-icon="false">{{ loadError }}</n-alert>
     <n-spin :show="loading">
       <n-empty v-if="!loading && visibleInterfaces.length === 0" :description="t('network.interfaces.empty', 'No network interfaces')" />
-      <ul v-else class="settings-list">
-        <li v-for="networkInterface in visibleInterfaces" :key="networkInterface.name" class="settings-list-item">
-          <div
-            class="settings-list-row"
-            role="button"
-            tabindex="0"
-            :aria-expanded="expanded === networkInterface.name"
-            @click="toggle(networkInterface.name)"
-            @keydown.enter="toggle(networkInterface.name)"
-            @keydown.space.prevent="toggle(networkInterface.name)"
-          >
-            <ChevronRight
-              :size="16"
-              class="settings-list-chevron"
-              :class="{ expanded: expanded === networkInterface.name }"
-            />
-            <Shield v-if="networkInterface.kind === 'wireguard' || isVpnKind(networkInterface.kind)" :size="16" class="interface-kind-icon" />
-            <Layers3 v-else-if="networkInterface.kind === 'vlan'" :size="16" class="interface-kind-icon" />
-            <Wifi v-else-if="networkInterface.kind === 'wifi_ap' || networkInterface.kind === 'wifi_station'" :size="16" class="interface-kind-icon" />
-            <Network v-else :size="16" class="interface-kind-icon" />
-            <div class="settings-list-identity">
-              <strong>{{ networkInterface.name }}</strong>
-              <span>{{ networkInterface.addresses[0] || t('network.interfaces.noAddress', 'No address') }}</span>
-            </div>
-            <div class="settings-list-tags">
-              <n-tag
-                v-if="networkInterface.configured"
-                class="configured-tag"
-                size="small"
-                type="info"
-                :bordered="false"
+      <div v-else class="interface-groups">
+        <section v-for="group in interfaceGroups" :key="group.id" class="interface-group">
+          <h2>{{ group.label }}</h2>
+          <ul class="settings-list">
+            <li v-for="networkInterface in group.items" :key="networkInterface.name" class="settings-list-item">
+              <div
+                class="settings-list-row"
+                role="button"
+                tabindex="0"
+                :aria-expanded="expanded === networkInterface.name"
+                @click="toggle(networkInterface.name)"
+                @keydown.enter="toggle(networkInterface.name)"
+                @keydown.space.prevent="toggle(networkInterface.name)"
               >
-                {{ t('network.interfaces.configured', 'Configured') }}
-              </n-tag>
-              <n-tag class="port-type-tag" size="small" :bordered="false">
-                {{ networkInterface.kind === 'wifi_ap'
-                  ? t('network.wifi.apInterface', 'Wireless access point')
-                  : networkInterface.port_type === 'physical'
-                  ? t('network.interfaces.physicalPort', 'Physical')
-                  : t('network.interfaces.virtualPort', 'Virtual') }}
-              </n-tag>
-              <n-tag size="small" :type="networkInterface.up ? 'success' : 'default'" :bordered="false">
-                {{ networkInterface.up ? t('network.interfaces.up', 'Up') : t('network.interfaces.down', 'Down') }}
-              </n-tag>
-            </div>
-          </div>
-
-          <ExpandablePanel :show="expanded === networkInterface.name">
-            <div class="settings-list-detail">
-              <dl v-if="networkInterface.kind === 'physical'" class="interface-facts">
-                <div>
-                  <dt>{{ t('network.interfaces.currentMAC', 'Current MAC address') }}</dt>
-                  <dd>{{ networkInterface.mac || '-' }}</dd>
+                <ChevronRight
+                  :size="16"
+                  class="settings-list-chevron"
+                  :class="{ expanded: expanded === networkInterface.name }"
+                />
+                <Shield v-if="networkInterface.kind === 'wireguard' || isVpnKind(networkInterface.kind)" :size="16" class="interface-kind-icon" />
+                <Layers3 v-else-if="networkInterface.kind === 'vlan'" :size="16" class="interface-kind-icon" />
+                <Wifi v-else-if="networkInterface.kind === 'wifi_ap' || networkInterface.kind === 'wifi_station'" :size="16" class="interface-kind-icon" />
+                <Network v-else :size="16" class="interface-kind-icon" />
+                <div class="settings-list-identity">
+                  <strong>{{ networkInterface.name }}</strong>
+                  <span>{{ networkInterface.addresses[0] || t('network.interfaces.noAddress', 'No address') }}</span>
                 </div>
-                <div v-if="networkInterface.port_type === 'physical'">
-                  <dt>{{ t('network.interfaces.linkSpeed', 'Link speed') }}</dt>
-                  <dd>{{ networkInterface.link_speed_mbps > 0
-                    ? `${networkInterface.link_speed_mbps} Mbps`
-                    : t('network.interfaces.speedUnavailable', 'Unavailable') }}</dd>
+                <div class="settings-list-tags">
+                  <n-tag
+                    v-if="networkInterface.configured"
+                    class="configured-tag"
+                    size="small"
+                    type="info"
+                    :bordered="false"
+                  >
+                    {{ t('network.interfaces.configured', 'Configured') }}
+                  </n-tag>
+                  <n-tag class="port-type-tag" size="small" :bordered="false">
+                    {{ networkInterface.kind === 'wifi_ap'
+                      ? t('network.wifi.apInterface', 'Wireless access point')
+                      : networkInterface.port_type === 'physical'
+                      ? t('network.interfaces.physicalPort', 'Physical')
+                      : t('network.interfaces.virtualPort', 'Virtual') }}
+                  </n-tag>
+                  <n-tag size="small" :type="networkInterface.up ? 'success' : 'default'" :bordered="false">
+                    {{ networkInterface.up ? t('network.interfaces.up', 'Up') : t('network.interfaces.down', 'Down') }}
+                  </n-tag>
                 </div>
-                <div>
-                  <dt>{{ t('network.interfaces.addresses', 'Addresses') }}</dt>
-                  <dd class="interface-addresses">
-                    <span v-for="address in networkInterface.addresses" :key="address">{{ address }}</span>
-                    <span v-if="networkInterface.addresses.length === 0">-</span>
-                  </dd>
-                </div>
-              </dl>
-
-              <WifiOnboarding v-if="networkInterface.kind === 'wifi_ap'" :interface-name="networkInterface.name" role="ap" :active="expanded === networkInterface.name" @changed="load" />
-              <div v-else-if="networkInterface.kind === 'wifi_station'" class="wifi-interface-settings">
-                <n-form label-placement="top" :show-feedback="false">
-                  <NetworkSettingsForm :model-value="physicalInterfaceConfig(modelValue, networkInterface.name)" :disabled="disabled" :show-device="false" :show-address="false" @update:model-value="updateConfig(networkInterface.name, $event)" />
-                </n-form>
-                <WifiOnboarding role="station" :interface-name="networkInterface.name" :active="expanded === networkInterface.name" :disabled="disabled" @changed="load" />
               </div>
 
-              <n-form v-else-if="networkInterface.kind === 'wireguard'" label-placement="top" :show-feedback="false">
-                <WireGuardSettingsForm
-                  :model-value="networkInterface.configuration"
-                  :disabled="disabled"
-                  @update:model-value="updateWireGuard(networkInterface.wireGuardIndex, $event)"
-                  @validity="setWireGuardValidity(networkInterface.configuration.name, $event)"
-                  @remove="removeWireGuard(networkInterface.wireGuardIndex)"
-                />
-              </n-form>
-              <n-form v-else-if="networkInterface.kind === 'vlan'" label-placement="top" :show-feedback="false">
-                <VLANSettingsForm
-                  :model-value="networkInterface.configuration"
-                  :disabled="disabled"
-                  @update:model-value="updateManagedInterface(networkInterface.managedIndex, $event)"
-                  @remove="removeManagedInterface(networkInterface.managedIndex)"
-                />
-              </n-form>
-              <n-form v-else-if="isManagedTunnel(networkInterface)" label-placement="top" :show-feedback="false">
-                <TunnelSettingsForm
-                  :model-value="networkInterface.configuration"
-                  :disabled="disabled"
-                  @update:model-value="updateManagedInterface(networkInterface.managedIndex, $event)"
-                  @remove="removeManagedInterface(networkInterface.managedIndex)"
-                />
-              </n-form>
-              <n-form v-else-if="isVpnInterface(networkInterface)" label-placement="top" :show-feedback="false">
-                <VpnSettingsForm
-                  :model-value="networkInterface.configuration"
-                  :disabled="disabled"
-                  :parent-device="modelValue.primary_interface"
-                  @update:model-value="updateVpn(networkInterface.vpnIndex, $event)"
-                  @validity="setWireGuardValidity(networkInterface.configuration.name, $event)"
-                  @remove="removeVpn(networkInterface.vpnIndex)"
-                />
-              </n-form>
-              <n-form v-else-if="networkInterface.configured" label-placement="top" :show-feedback="false">
-                <NetworkSettingsForm
-                  :model-value="physicalInterfaceConfig(modelValue, networkInterface.name)"
-                  :disabled="disabled"
-                  :show-device="false"
-                  @update:model-value="updateConfig(networkInterface.name, $event)"
-                />
-              </n-form>
-              <div v-else class="interface-select-action">
-                <n-button type="primary" secondary :disabled="disabled" @click.stop="selectInterface(networkInterface.name)">
-                  {{ t('network.interfaces.configure', 'Configure this interface') }}
-                </n-button>
-              </div>
-            </div>
-          </ExpandablePanel>
-        </li>
-      </ul>
+              <ExpandablePanel :show="expanded === networkInterface.name">
+                <div class="settings-list-detail">
+                  <dl class="interface-facts">
+                    <div class="interface-status">
+                      <div v-if="networkInterface.kind === 'physical'">
+                        <dt>{{ t('network.interfaces.currentMAC', 'Current MAC address') }}</dt>
+                        <dd>{{ networkInterface.mac || '-' }}</dd>
+                      </div>
+                      <div v-if="networkInterface.port_type === 'physical'">
+                        <dt>{{ t('network.interfaces.linkSpeed', 'Link speed') }}</dt>
+                        <dd>{{ networkInterface.link_speed_mbps > 0
+                          ? `${networkInterface.link_speed_mbps} Mbps`
+                          : t('network.interfaces.speedUnavailable', 'Unavailable') }}</dd>
+                      </div>
+                      <div>
+                        <dt>{{ t('network.interfaces.currentMTU', 'Current MTU') }}</dt>
+                        <dd>{{ networkInterface.mtu || '-' }}</dd>
+                      </div>
+                    </div>
+                    <div class="interface-address-fact">
+                      <dt>{{ t('network.interfaces.addresses', 'Addresses') }}</dt>
+                      <dd class="interface-addresses">
+                        <span v-for="address in networkInterface.addresses" :key="address">{{ address }}</span>
+                        <span v-if="networkInterface.addresses.length === 0">-</span>
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <WifiOnboarding v-if="networkInterface.kind === 'wifi_ap'" :interface-name="networkInterface.name" role="ap" :active="expanded === networkInterface.name" @changed="load" />
+                  <div v-else-if="networkInterface.kind === 'wifi_station'" class="wifi-interface-settings">
+                    <n-form label-placement="top" :show-feedback="false">
+                      <NetworkSettingsForm :model-value="physicalInterfaceConfig(modelValue, networkInterface.name)" :disabled="disabled" :show-device="false" :show-address="false" @update:model-value="updateConfig(networkInterface.name, $event)" />
+                    </n-form>
+                    <WifiOnboarding role="station" :interface-name="networkInterface.name" :active="expanded === networkInterface.name" :disabled="disabled" @changed="load" />
+                  </div>
+
+                  <n-form v-else-if="networkInterface.kind === 'wireguard'" label-placement="top" :show-feedback="false">
+                    <WireGuardSettingsForm
+                      :model-value="networkInterface.configuration"
+                      :disabled="disabled"
+                      @update:model-value="updateWireGuard(networkInterface.wireGuardIndex, $event)"
+                      @validity="setWireGuardValidity(networkInterface.configuration.name, $event)"
+                      @remove="removeWireGuard(networkInterface.wireGuardIndex)"
+                    />
+                  </n-form>
+                  <n-form v-else-if="networkInterface.kind === 'vlan'" label-placement="top" :show-feedback="false">
+                    <VLANSettingsForm
+                      :model-value="networkInterface.configuration"
+                      :disabled="disabled"
+                      @update:model-value="updateManagedInterface(networkInterface.managedIndex, $event)"
+                      @remove="removeManagedInterface(networkInterface.managedIndex)"
+                    />
+                  </n-form>
+                  <n-form v-else-if="isManagedTunnel(networkInterface)" label-placement="top" :show-feedback="false">
+                    <TunnelSettingsForm
+                      :model-value="networkInterface.configuration"
+                      :disabled="disabled"
+                      @update:model-value="updateManagedInterface(networkInterface.managedIndex, $event)"
+                      @remove="removeManagedInterface(networkInterface.managedIndex)"
+                    />
+                  </n-form>
+                  <n-form v-else-if="isVpnInterface(networkInterface)" label-placement="top" :show-feedback="false">
+                    <VpnSettingsForm
+                      :model-value="networkInterface.configuration"
+                      :disabled="disabled"
+                      :parent-device="modelValue.primary_interface"
+                      @update:model-value="updateVpn(networkInterface.vpnIndex, $event)"
+                      @validity="setWireGuardValidity(networkInterface.configuration.name, $event)"
+                      @remove="removeVpn(networkInterface.vpnIndex)"
+                    />
+                  </n-form>
+                  <n-form v-else-if="networkInterface.configured" label-placement="top" :show-feedback="false">
+                    <NetworkSettingsForm
+                      :model-value="physicalInterfaceConfig(modelValue, networkInterface.name)"
+                      :disabled="disabled"
+                      :show-device="false"
+                      @update:model-value="updateConfig(networkInterface.name, $event)"
+                    />
+                  </n-form>
+                  <div v-else class="interface-select-action">
+                    <n-button type="primary" secondary :disabled="disabled" @click.stop="selectInterface(networkInterface.name)">
+                      {{ t('network.interfaces.configure', 'Configure this interface') }}
+                    </n-button>
+                  </div>
+                </div>
+              </ExpandablePanel>
+            </li>
+          </ul>
+        </section>
+      </div>
     </n-spin>
   </section>
 </template>
@@ -616,13 +668,22 @@ watch(() => props.disabled, (disabled, previous) => {
   font-size: 12px;
 }
 .list-toolbar > div { display: flex; align-items: center; gap: 4px; }
+.interface-groups { display: grid; gap: 22px; }
+.interface-group { display: grid; gap: 8px; }
+.interface-group h2 {
+  margin: 0 4px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.2;
+}
 .settings-list {
   margin: 0;
   padding: 0;
   list-style: none;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 10px;
-  overflow: hidden;
   background: var(--card);
 }
 .settings-list-item + .settings-list-item { border-top: 1px solid var(--border); }
@@ -651,16 +712,28 @@ watch(() => props.disabled, (disabled, previous) => {
   justify-content: flex-end;
   gap: 6px;
 }
-.settings-list-detail { display: grid; gap: 18px; padding: 14px 16px 18px 37px; background: var(--onekvm-surface-inset); }
+.settings-list-detail {
+  display: grid;
+  gap: 18px;
+  padding: 14px 16px 18px 37px;
+  border-top: 1px solid var(--border);
+  background: var(--onekvm-surface-inset);
+}
 .interface-kind-icon { color: var(--muted-foreground); }
 .interface-facts {
   display: grid;
   gap: 10px;
   margin: 0;
 }
-.interface-facts > div { display: grid; gap: 2px; }
+.interface-status {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 16px;
+}
+.interface-status > div,
+.interface-address-fact { display: grid; gap: 2px; min-width: 0; }
 .interface-facts dt { color: var(--muted-foreground); font-size: 11px; }
-.interface-facts dd { margin: 0; font-size: 13px; }
+.interface-facts dd { margin: 0; overflow-wrap: anywhere; font-size: 13px; }
 .interface-addresses {
   display: grid;
   gap: 2px;
@@ -683,6 +756,7 @@ watch(() => props.disabled, (disabled, previous) => {
   }
   .settings-list-detail { padding: 14px 12px 18px 38px; }
   .settings-list-row :deep(.port-type-tag) { display: none; }
+  .interface-status { grid-template-columns: minmax(0, 1fr); }
 }
 </style>
 
@@ -691,4 +765,5 @@ watch(() => props.disabled, (disabled, previous) => {
   max-height: min(24rem, calc(100vh - 12rem));
 }
 .network-add-warning-option { display: inline-flex; align-items: center; gap: 7px; color: var(--warning); }
+.advanced-settings-page.is-settings-app .interface-status { grid-template-columns: minmax(0, 1fr); }
 </style>

@@ -38,4 +38,21 @@ assert.equal(validateExtensionSettings(extension, { listen_port: 1.5 }), 'listen
 assert.equal(validateExtensionSettings(extension, { status: 'ready' }), 'status is read-only')
 assert.equal(validateExtensionSettings(extension, { other: '' }), 'Unknown setting other')
 
+// A saved secret is redacted from settings and left out of updates that keep it.
+const withSecret = {
+  settings_schema: {
+    type: 'object' as const,
+    additionalProperties: false,
+    required: ['api_key', 'model'],
+    properties: {
+      api_key: { type: 'string' as const, title: 'API key', format: 'password' },
+      model: { type: 'string' as const, title: 'Model' },
+    },
+  },
+  settings: { model: 'm' },
+}
+assert.equal(validateExtensionSettings(withSecret, { model: 'n' }), 'api_key is required')
+assert.equal(validateExtensionSettings({ ...withSecret, secrets_configured: ['/api_key'] }, { model: 'n' }), null)
+assert.equal(validateExtensionSettings({ ...withSecret, secrets_configured: ['/api_key'] }, { api_key: null }), 'api_key is required')
+
 console.log('extension-settings tests passed')

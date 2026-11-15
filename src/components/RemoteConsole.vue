@@ -636,6 +636,7 @@ watch(
       to=".console-connection-overlays"
       preset="card"
       class="connection-problem-modal"
+      :show-mask="false"
       :title="t('screen.connectionLostTitle', 'Connection interrupted')"
       :closable="false"
       :mask-closable="false"

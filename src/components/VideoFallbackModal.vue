@@ -130,6 +130,7 @@ onBeforeUnmount(stopCountdown)
     to=".console-connection-overlays"
     preset="card"
     class="connection-problem-modal"
+    :show-mask="false"
     :title="title"
     :closable="false"
     :mask-closable="false"

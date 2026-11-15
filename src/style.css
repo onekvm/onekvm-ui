@@ -206,8 +206,9 @@ select { font: inherit; }
   pointer-events: auto;
 }
 
-/* Keep connection masks within the video area, including in fullscreen. Layout
-   containment makes this the containing block for Naive UI's fixed overlays. */
+/* Keep connection prompts within the video area, including in fullscreen. Layout
+   containment makes this the containing block for Naive UI's fixed overlays.
+   The prompts have no mask: only the card takes pointer input. */
 .console-connection-overlays {
   grid-area: stage;
   min-width: 0;
@@ -217,11 +218,9 @@ select { font: inherit; }
   pointer-events: none;
 }
 
-.console-connection-overlays .n-modal-container { pointer-events: auto; }
-
 /* Floating and launcher toolbars share the video area. Keep them available
    during connection errors, below their menus and control sheets (1700+). */
-.console-workspace:has(.console-connection-overlays .n-modal-mask) .toolbar:not(.is-launcher-open) {
+.console-workspace:has(.console-connection-overlays .n-modal) .toolbar:not(.is-launcher-open) {
   z-index: 1600;
 }
 

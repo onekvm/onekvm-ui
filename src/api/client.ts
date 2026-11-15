@@ -1,4 +1,4 @@
-import { createExtensionQuery } from '../lib/extension-query.ts'
+import { createExtensionQuery, extensionRequestChange } from '../lib/extension-query.ts'
 import type { WifiApNetwork } from '../lib/wifi-ap-network'
 import { resolveServiceURL, serviceBaseUrl, serviceURL, serviceWebSocketURL } from './service-url.ts'
 export type IPv4Mode = 'disabled' | 'dhcp' | 'dhcp-static' | 'static'
@@ -1277,13 +1277,6 @@ export function invalidateExtensionCaches() {
   msdSources.invalidate()
 }
 
-function changesExtensions(path: string, method: string | undefined) {
-  if (!path.startsWith('/api/extensions') || !method || method.toUpperCase() === 'GET') return false
-  const invoke = path.match(/\/invoke\/([^/?]+)/)
-  return !invoke || !['status', 'assistance_info', 'list_packages', 'list_sources', 'install_progress',
-    'set_source', 'set_source_enabled', 'remove_source'].includes(decodeURIComponent(invoke[1]!))
-}
-
 let extensionRequestQueue: Promise<void> = Promise.resolve()
 
 function isExtensionRequest(path: string) {
@@ -1322,9 +1315,9 @@ async function requestUnqueued<T>(path: string, options: RequestInit = {}): Prom
     throw new APIError(body?.error || `HTTP ${response.status}`, response.status)
   }
 
-  if (changesExtensions(path, options.method)) {
-    window.dispatchEvent(new Event('onekvm:extensions-changed'))
-  }
+  const change = extensionRequestChange(path, options.method)
+  if (change === 'catalog') window.dispatchEvent(new Event('onekvm:extensions-changed'))
+  else if (change === 'media') msdSources.invalidate()
   if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
 }

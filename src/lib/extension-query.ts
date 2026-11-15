@@ -26,3 +26,19 @@ export function createExtensionQuery<T>(events?: Pick<EventTarget, 'addEventList
   }
   return { get, invalidate }
 }
+
+// Extension methods cannot install, enable or configure extensions; only the
+// plugin market's package installs and removals change the catalog.
+const catalogMethods = new Set(['install_package', 'remove_package'])
+
+/**
+ * What a successful request can change: the extension catalog, only the
+ * published virtual-media directories, or nothing.
+ */
+export function extensionRequestChange(path: string, method: string | undefined): 'catalog' | 'media' | 'none' {
+  if (!path.startsWith('/api/extensions') || !method || method.toUpperCase() === 'GET') return 'none'
+  const invoke = path.match(/\/invoke\/([^/?]+)/)
+  if (!invoke || catalogMethods.has(decodeURIComponent(invoke[1]!))) return 'catalog'
+  // A method can publish or withdraw media directories, as Samba gateways do.
+  return 'media'
+}

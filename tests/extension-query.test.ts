@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { createExtensionQuery } from '../src/lib/extension-query.ts'
+import { createExtensionQuery, extensionRequestChange } from '../src/lib/extension-query.ts'
 
 const events = new EventTarget()
 const catalog = createExtensionQuery<string[]>(events)
@@ -47,3 +47,14 @@ assert.equal(attempts, 2)
 assert.deepEqual(await catalog.get('device', fetchTools, true), tools)
 await assert.rejects(catalog.get('failure', async () => { throw new Error('current failure') }), /current failure/)
 console.log('Extension queries refresh installed tools and media, including in-flight and rollback queries')
+
+// Pages that refresh through their own methods must not reload the catalog.
+for (const method of ['list', 'list_images', 'progress', 'logs', 'status', 'gateway_update'])
+  assert.equal(extensionRequestChange(`/api/extensions/demo/invoke/${method}`, 'POST'), 'media', method)
+for (const method of ['install_package', 'remove_package'])
+  assert.equal(extensionRequestChange(`/api/extensions/plugin-market/invoke/${method}`, 'POST'), 'catalog', method)
+assert.equal(extensionRequestChange('/api/extensions/container/enable', 'POST'), 'catalog')
+assert.equal(extensionRequestChange('/api/extensions/container/settings', 'PUT'), 'catalog')
+assert.equal(extensionRequestChange('/api/extensions/container', 'DELETE'), 'catalog')
+assert.equal(extensionRequestChange('/api/extensions/console', 'GET'), 'none')
+assert.equal(extensionRequestChange('/api/msd/sources', 'POST'), 'none')

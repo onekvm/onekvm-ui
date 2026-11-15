@@ -530,7 +530,6 @@ const zh = {
       ledOn: '亮',
       ledOff: '灭',
       status: '电源状态',
-      atxStatus: 'ATX 状态',
       pwrLed: '电源指示灯',
       hddLed: '硬盘指示灯',
       showHddIndicator: '独立显示硬盘指示灯',
@@ -1941,7 +1940,7 @@ const zh = {
             label: '键盘与鼠标控制',
             description: '为 OneKVM 提供向被控主机发送键盘和鼠标输入的能力。',
           },
-          atx: {
+          power: {
             label: '电源与重置控制',
             description: '为 OneKVM 提供被控主机电源和重置按钮的控制能力。',
           },
@@ -2012,7 +2011,7 @@ const zh = {
             label: '发送键盘和鼠标输入',
             description: '通过 OneKVM 向被控主机发送键盘和鼠标输入。',
           },
-          atx: {
+          power: {
             label: '电源与重置操作',
             description: '通过 OneKVM 操作被控主机的电源与重置按钮。',
           },

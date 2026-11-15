@@ -654,7 +654,7 @@ export interface OneKVMStatus {
       network_sharing?: boolean
     }
   }
-  atx: {
+  power: {
     available: boolean
     pwr_led?: boolean
     hdd_led?: boolean

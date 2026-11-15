@@ -530,7 +530,6 @@ const zh_tw = {
       ledOn: '亮',
       ledOff: '滅',
       status: '電源狀態',
-      atxStatus: 'ATX 狀態',
       pwrLed: '電源指示燈',
       hddLed: '硬碟指示燈',
       showHddIndicator: '獨立顯示硬碟指示燈',
@@ -1946,7 +1945,7 @@ const zh_tw = {
             label: '鍵盤與滑鼠控制',
             description: '為 OneKVM 提供向被控主機傳送鍵盤和滑鼠輸入的能力。',
           },
-          atx: {
+          power: {
             label: '電源與重置控制',
             description: '為 OneKVM 提供被控主機電源和重置按鈕的控制能力。',
           },
@@ -2017,7 +2016,7 @@ const zh_tw = {
             label: '傳送鍵盤和滑鼠輸入',
             description: '透過 OneKVM 向被控主機傳送鍵盤和滑鼠輸入。',
           },
-          atx: {
+          power: {
             label: '電源與重置操作',
             description: '透過 OneKVM 操作被控主機的電源與重置按鈕。',
           },

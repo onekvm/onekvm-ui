@@ -198,8 +198,8 @@ const powerAction = ref<PowerAction | null>(null)
 const HDD_INDICATOR_KEY = 'onekvm.hddIndicator'
 const showHddIndicator = shallowRef(readHddIndicatorPreference())
 const hddIndicatorVisible = computed(() => showHddIndicator.value
-  && Boolean(props.status?.atx?.available)
-  && typeof props.status?.atx?.hdd_led === 'boolean')
+  && Boolean(props.status?.power?.available)
+  && typeof props.status?.power?.hdd_led === 'boolean')
 
 function readHddIndicatorPreference() {
   try { return localStorage.getItem(HDD_INDICATOR_KEY) === '1' } catch { return false }
@@ -1250,13 +1250,13 @@ const gamepadState = computed<DeviceState>(() => {
 
 const powerState = computed<DeviceState>(() => {
   if (!props.status) return 'waiting'
-  if (!props.status.atx?.available) return 'error'
-  if (props.status.atx.pwr_led === true) return 'ready'
+  if (!props.status.power?.available) return 'error'
+  if (props.status.power.pwr_led === true) return 'ready'
   return 'waiting'
 })
 
 const powerStateLabel = computed(() => {
-  const led = props.status?.atx?.pwr_led
+  const led = props.status?.power?.pwr_led
   if (led === true) return t('power.on', 'Host is On')
   if (led === false) return t('power.off', 'Host is Off')
   return t('power.title', 'Power')
@@ -2015,10 +2015,10 @@ onBeforeUnmount(() => {
         @activate="onCollectedIconClick('power')"
       >
       <PowerControlPopover
-        :available="Boolean(status?.atx?.available)"
-        :can-power="canPower && Boolean(status?.atx?.available)"
-        :pwr-led="status?.atx?.pwr_led"
-        :hdd-led="status?.atx?.hdd_led"
+        :available="Boolean(status?.power?.available)"
+        :can-power="canPower && Boolean(status?.power?.available)"
+        :pwr-led="status?.power?.pwr_led"
+        :hdd-led="status?.power?.hdd_led"
         :show-hdd-indicator="showHddIndicator"
         :loading-action="powerAction"
         :placement="menuPlacement"
@@ -2053,8 +2053,8 @@ onBeforeUnmount(() => {
         :style="{ order: toolbarIconStyle('power').order + 1 }"
       >
       <HddActivityIndicator
-        :available="Boolean(status?.atx?.available)"
-        :led="status?.atx?.hdd_led"
+        :available="Boolean(status?.power?.available)"
+        :led="status?.power?.hdd_led"
         :expanded="toolbarLauncher"
       />
       </div>

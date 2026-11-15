@@ -18,7 +18,7 @@ const capabilityMetadata: Readonly<Record<string, { key: string; icon: Component
   'video.edid.write': { key: 'edidWrite', icon: Monitor },
   'audio.encoded': { key: 'encodedAudio', icon: Volume2 },
   hid: { key: 'hid', icon: Keyboard },
-  atx: { key: 'atx', icon: Power },
+  power: { key: 'power', icon: Power },
   auth: { key: 'auth', icon: Fingerprint },
 }
 

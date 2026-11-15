@@ -531,7 +531,6 @@ const en = {
       ledOn: 'On',
       ledOff: 'Off',
       status: 'Power Status',
-      atxStatus: 'ATX status',
       pwrLed: 'PWR LED',
       hddLed: 'HDD LED',
       showHddIndicator: 'Show HDD LED separately',
@@ -1942,7 +1941,7 @@ const en = {
             label: 'Keyboard and mouse control',
             description: 'Provides OneKVM with keyboard and mouse input to the connected host.',
           },
-          atx: {
+          power: {
             label: 'Power and reset control',
             description: 'Provides OneKVM with control of the connected host power and reset buttons.',
           },
@@ -2013,7 +2012,7 @@ const en = {
             label: 'Send keyboard and mouse input',
             description: 'Sends keyboard and mouse input to the connected host through OneKVM.',
           },
-          atx: {
+          power: {
             label: 'Power and reset actions',
             description: 'Operates the connected host power and reset buttons through OneKVM.',
           },

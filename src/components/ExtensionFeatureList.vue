@@ -11,9 +11,9 @@ type Feature = { id: string; icon: Component; label: string; description: string
 const deviceCapabilityMetadata: Readonly<Record<string, { key: string; icon: Component }>> = {
   video: { key: 'video', icon: Video },
   hid: { key: 'hid', icon: Keyboard },
-  atx: { key: 'atx', icon: Power },
-  'atx.pwr-led': { key: 'powerLed', icon: Power },
-  'atx.hdd-led': { key: 'diskLed', icon: HardDrive },
+  power: { key: 'power', icon: Power },
+  'power.pwr-led': { key: 'powerLed', icon: Power },
+  'power.hdd-led': { key: 'diskLed', icon: HardDrive },
   msd: { key: 'virtualMedia', icon: HardDrive },
   npu: { key: 'npu', icon: Cpu },
   screen: { key: 'screen', icon: Monitor },

@@ -485,7 +485,7 @@ onUnmounted(() => {
           <CircleCheck v-if="setupNetworkValid" class="ios-state done" />
           <Circle v-else class="ios-state" />
           <span>{{ t('auth.networkStep', 'Network') }}</span>
-          <em>{{ setupNetwork.primary_interface || 'eth0' }}</em>
+          <em>{{ setupNetwork.primary_interface || t('wifi.title', 'Wi-Fi') }}</em>
           <ChevronRight />
         </button>
         <button type="button" class="ios-menu" @click="openSetupPage('region')">

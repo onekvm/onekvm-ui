@@ -1989,6 +1989,7 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                   :read-only="schema?.read_only"
                   :video-codecs="schema?.video_codecs"
                   :video-bitrate-range="schema?.video_bitrate_kbps"
+                  :color-range="schema?.capabilities?.video_color_range === true"
                 />
                 <footer class="advanced-settings-actions display-settings-actions">
                   <n-button :disabled="saving" @click="load">{{ t('common.refresh', 'Reload') }}</n-button>

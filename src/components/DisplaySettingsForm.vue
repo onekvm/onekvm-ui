@@ -26,6 +26,7 @@ const props = defineProps<{
   readOnly?: string[]
   videoCodecs?: string[]
   videoBitrateRange?: { minimum: number; maximum: number; step: number; default: number }
+  colorRange?: boolean
 }>()
 
 const video = defineModel<OneKVMConfig['video']>({ required: true })
@@ -50,6 +51,15 @@ function updateCodec(value: string | number | null) {
   const option = codecOptions.value.find((option) => option.value === value)
   if (props.disabled || !option || option.disabled) return
   video.value.codec = option.value
+}
+const colorRangeOptions = computed(() => [
+  { label: t('screen.auto', 'Automatic'), value: 'auto' },
+  { label: t('settings.advancedSettings.displayPage.colorRangeLimited', 'Limited range'), value: 'limited' },
+  { label: t('settings.advancedSettings.displayPage.colorRangeFull', 'Full range'), value: 'full' },
+])
+
+function updateColorRange(value: string | number | null) {
+  if (value === 'auto' || value === 'limited' || value === 'full') video.value.color_range = value
 }
 const fpsOptions = computed(() => [
   { label: t('screen.auto', 'Automatic'), value: 0 },
@@ -268,6 +278,17 @@ function setBitrateBudget(value: number) {
                   <template #suffix>{{ video.h26x.gop === 0 ? t('screen.auto', 'Automatic') : t('settings.advancedSettings.displayPage.frames', 'frames') }}</template>
                 </n-input-number>
                 <span class="display-setting-field-hint">{{ t('settings.advancedSettings.displayPage.gopHint', 'Use 0 for a 5 second interval at the target frame rate.') }}</span>
+              </div>
+            </n-form-item>
+            <n-form-item v-if="colorRange && video.codec !== 'mjpeg'" :label="t('settings.advancedSettings.displayPage.colorRange', 'Color range')">
+              <div class="display-setting-stack">
+                <n-select
+                  :value="video.color_range ?? 'auto'"
+                  :options="colorRangeOptions"
+                  :disabled="disabled || fieldReadOnly('video.color_range')"
+                  @update:value="updateColorRange"
+                />
+                <span class="display-setting-field-hint">{{ t('settings.advancedSettings.displayPage.colorRangeHint', 'Automatic matches the capture hardware. Choose Full range if the picture looks washed out, or Limited range if colors look too strong and dark or bright detail is lost. Applies to all viewers and recordings; the picture pauses briefly when saved.') }}</span>
               </div>
             </n-form-item>
             <n-form-item :label="t('settings.advancedSettings.displayPage.sourceDevice', 'Capture device')">

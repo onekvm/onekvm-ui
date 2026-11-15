@@ -320,6 +320,7 @@ export interface OneKVMConfig {
     resolution: number
     mjpeg: { frame_detect: boolean }
     source_device: string
+    color_range?: 'auto' | 'limited' | 'full'
   }
   audio: {
     enabled: boolean

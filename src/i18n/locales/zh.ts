@@ -986,7 +986,7 @@ const zh = {
           colorRange: '色彩范围',
           colorRangeLimited: '有限范围',
           colorRangeFull: '全范围',
-          colorRangeHint: '自动与采集硬件一致。画面发灰时选全范围；颜色过艳、暗部或亮部细节丢失时选有限范围。对所有连接和录像生效，保存时画面会短暂中断。',
+          colorRangeHint: '自动与采集硬件一致。画面发灰时选全范围；颜色过艳、暗部或亮部细节丢失时选有限范围。对所有连接和录像生效，更改后画面会短暂中断。',
           edid: 'HDMI EDID',
           edidCurrent: '当前 EDID',
           edidManufacturer: '厂商',

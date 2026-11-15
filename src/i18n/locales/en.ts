@@ -987,7 +987,7 @@ const en = {
           colorRange: 'Color range',
           colorRangeLimited: 'Limited range',
           colorRangeFull: 'Full range',
-          colorRangeHint: 'Automatic matches the capture hardware. Choose Full range if the picture looks washed out, or Limited range if colors look too strong and dark or bright detail is lost. Applies to all viewers and recordings; the picture pauses briefly when saved.',
+          colorRangeHint: 'Automatic matches the capture hardware. Choose Full range if the picture looks washed out, or Limited range if colors look too strong and dark or bright detail is lost. Applies to all viewers and recordings; the picture pauses briefly after a change.',
           edid: 'HDMI EDID',
           edidCurrent: 'Current EDID',
           edidManufacturer: 'Manufacturer',

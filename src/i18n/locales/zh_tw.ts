@@ -986,7 +986,7 @@ const zh_tw = {
           colorRange: '色彩範圍',
           colorRangeLimited: '有限範圍',
           colorRangeFull: '全範圍',
-          colorRangeHint: '自動與擷取硬體一致。畫面發灰時選全範圍；顏色過豔、暗部或亮部細節遺失時選有限範圍。對所有連線和錄影生效，儲存時畫面會短暫中斷。',
+          colorRangeHint: '自動與擷取硬體一致。畫面發灰時選全範圍；顏色過豔、暗部或亮部細節遺失時選有限範圍。對所有連線和錄影生效，變更後畫面會短暫中斷。',
           edid: 'HDMI EDID',
           edidCurrent: '目前 EDID',
           edidManufacturer: '廠商',

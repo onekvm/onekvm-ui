@@ -224,6 +224,15 @@ const qpPresetHelp = computed(() => {
   return `${overview}\n\n${description}`
 })
 
+const colorRangeLabel = computed(() => t('settings.advancedSettings.displayPage.colorRange', 'Color range'))
+const colorRangeOptions = computed(() => [
+  { label: t('screen.auto', 'Automatic'), value: 'auto' },
+  { label: t('settings.advancedSettings.displayPage.colorRangeLimited', 'Limited range'), value: 'limited' },
+  { label: t('settings.advancedSettings.displayPage.colorRangeFull', 'Full range'), value: 'full' },
+])
+const showColorRange = computed(() =>
+  schema.value?.capabilities?.video_color_range === true && !!video.value && video.value.codec !== 'mjpeg')
+
 const selectProps = computed(() => ({
   class: 'display-status-select',
   size: (props.sheet ? 'medium' : 'tiny') as 'medium' | 'tiny',
@@ -466,6 +475,14 @@ function updateQpPreset(value: string | number | null) {
   ])
 }
 
+function updateColorRange(value: string | number | null) {
+  if (!video.value || (value !== 'auto' && value !== 'limited' && value !== 'full')) return
+  if (value === (video.value.color_range ?? 'auto')) return
+  video.value.color_range = value
+  // Reconnect so the player picks up the new range from a fresh decoder.
+  void patchVideo('video.color_range', value, true)
+}
+
 function updateFrameDetect(value: boolean) {
   if (!video.value || video.value.mjpeg.frame_detect === value) return
   video.value.mjpeg.frame_detect = value
@@ -644,6 +661,21 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
             :value="video.mjpeg.frame_detect"
             :disabled="videoDisabled"
             @update:value="updateFrameDetect"
+          />
+        </div>
+        <div v-if="showColorRange">
+          <span class="display-setting-label">
+            {{ colorRangeLabel }}
+            <DisplaySettingHelp :active="popoverOpen" :label="colorRangeLabel" :text="t('settings.advancedSettings.displayPage.colorRangeHint')" />
+          </span>
+          <n-select
+            v-bind="selectProps"
+            :aria-label="colorRangeLabel"
+            :value="video?.color_range ?? 'auto'"
+            :options="colorRangeOptions"
+            :disabled="videoDisabled"
+            @update:value="updateColorRange"
+            @update:show="menuOpen = $event"
           />
         </div>
       </DisplaySettingsGroup>

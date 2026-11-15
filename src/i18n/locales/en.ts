@@ -1723,6 +1723,7 @@ const en = {
         title: 'Recovery',
         action: 'Enter',
         confirmAction: 'Restart to recovery',
+        usbHint: "After the restart, connect the device's USB port to a computer. The whole SD card appears as a drive you can write a complete system image to, and a USB serial console is available. To leave Recovery, restart the device.",
         confirm: 'The device will restart and the current session will end. Continue?',
         processingTitle: 'Entering Recovery',
         processing: 'Sending the Recovery command. Do not disconnect power.',

@@ -1722,6 +1722,7 @@ const zh = {
         title: 'Recovery',
         action: '进入',
         confirmAction: '重启进入 Recovery',
+        usbHint: '重启后，把设备的 USB 口连接到电脑：整张 SD 卡会显示为一个磁盘，可直接写入完整系统镜像，同时提供 USB 串口控制台。要退出 Recovery，请重启设备。',
         confirm: '设备将重新启动，当前会话会中断，是否继续？',
         processingTitle: '正在进入 Recovery',
         processing: '正在发送 Recovery 命令，请勿断开电源。',

@@ -2122,6 +2122,8 @@ export interface RecoveryNetworkPreview {
   settings: RecoveryNetworkSettings
   effective: RecoveryNetworkSettings | null
   error: string | null
+  /** Recovery has no network on this device: it offers USB storage and a console. */
+  usb_only?: boolean
   pending_system_network: boolean
 }
 export const recoveryNetworkApi = {

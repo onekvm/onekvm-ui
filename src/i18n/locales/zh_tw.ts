@@ -1727,6 +1727,7 @@ const zh_tw = {
         title: 'Recovery',
         action: '進入',
         confirmAction: '重新啟動進入 Recovery',
+        usbHint: '重新啟動後，將裝置的 USB 連接埠連接到電腦：整張 SD 卡會顯示為一個磁碟，可直接寫入完整系統映像檔，同時提供 USB 序列埠主控台。要離開 Recovery，請重新啟動裝置。',
         confirm: '裝置將重新啟動，目前工作階段會中斷，是否繼續？',
         processingTitle: '正在進入 Recovery',
         processing: '正在送出 Recovery 命令，請勿中斷電源。',

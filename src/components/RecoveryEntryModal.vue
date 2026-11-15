@@ -11,6 +11,7 @@ const interfaces = shallowRef<string[]>([])
 const loading = shallowRef(false)
 const submitting = shallowRef(false)
 const error = shallowRef('')
+const usbOnly = computed(() => preview.value?.usb_only === true)
 const mode = computed({
   get: () => draft.value?.source === 'system' ? 'system' : draft.value?.mode ?? 'dhcp',
   set: (value: string) => {
@@ -93,9 +94,9 @@ async function enter() {
     :closable="!submitting"
     class="recovery-entry-modal"
   >
-    <p class="recovery-entry-hint">{{ t('settings.recoveryNetwork.hint') }}</p>
+    <p class="recovery-entry-hint">{{ usbOnly ? t('settings.recoveryMode.usbHint') : t('settings.recoveryNetwork.hint') }}</p>
     <n-spin :show="loading">
-      <n-form v-if="draft" :disabled="submitting || preview?.pending_system_network" label-placement="top" @submit.prevent="enter">
+      <n-form v-if="draft && !usbOnly" :disabled="submitting || preview?.pending_system_network" label-placement="top" @submit.prevent="enter">
         <fieldset class="recovery-mode-fieldset" :disabled="submitting || preview?.pending_system_network">
           <legend>{{ t('settings.recoveryNetwork.mode') }}</legend>
           <ul class="recovery-mode-list">
@@ -128,8 +129,8 @@ async function enter() {
           <dt>MAC</dt><dd>{{ effectiveMac }}</dd>
           <dt>DNS</dt><dd>{{ effectiveDns }}</dd>
         </dl>
-        <n-alert v-if="preview?.pending_system_network" type="warning" :show-icon="false">{{ t('settings.recoveryNetwork.pending') }}</n-alert>
       </n-form>
+      <n-alert v-if="preview?.pending_system_network" type="warning" :show-icon="false">{{ t('settings.recoveryNetwork.pending') }}</n-alert>
       <n-alert v-if="error" type="error" :show-icon="false">{{ error }}</n-alert>
     </n-spin>
     <template #footer>

@@ -172,8 +172,16 @@ try {
     await connected
     const packet = frame.slice(0)
     new Uint8Array(packet)[5] = 1
+    const feedsBeforeSwitch = feeds
     socket.onmessage?.({ data: packet })
     assert.equal(muxerCodecs.at(-1), 'H264')
+    assert.equal(feeds, feedsBeforeSwitch, 'Frames wait until the new MediaSource opens')
+    const keyframeRequests = socket.sent.filter((value) => value === 'keyframe').length
+    await Promise.resolve()
+    assert.equal(socket.sent.filter((value) => value === 'keyframe').length, keyframeRequests + 1, 'The ready muxer asks for a keyframe')
+    const next = packet.slice(0)
+    new DataView(next).setBigUint64(8, 1n)
+    socket.onmessage?.({ data: next })
     assert.equal(video.readyState, 2)
     player.destroy()
   }
@@ -215,6 +223,47 @@ try {
     assert.equal(latency.at(-1)?.transportUs, undefined, 'Destroy clears the old connection value')
     await new Promise(resolve => realSetTimeout(resolve, 125))
     assert.equal(latency.length, count, 'A destroyed player cannot keep its telemetry timer alive')
+  }
+  {
+    const video = new Video()
+    const player = new WebSocketVideo(video, 'wss://example.test/video', 'h264', {
+      bitrate: () => {}, disconnected: () => assert.fail('A new resolution must keep the connection'),
+    })
+    const connected = player.connect()
+    const socket = sockets.at(-1)!
+    socket.open()
+    await connected
+    let sequence = 0n
+    const send = (keyframe: boolean, units: number[][]) => {
+      const payload = units.flatMap((unit) => [0, 0, 0, 1, ...unit])
+      const packet = new ArrayBuffer(40 + payload.length)
+      const packetBytes = new Uint8Array(packet)
+      packetBytes.set([0x4f, 0x4b, 0x56, 0x46, 1, 1, keyframe ? 1 : 0])
+      packetBytes.set(payload, 40)
+      new DataView(packet).setBigUint64(8, sequence++)
+      new DataView(packet).setUint32(24, 16666)
+      new DataView(packet).setUint32(32, payload.length)
+      socket.onmessage?.({ data: packet })
+    }
+    const pps = [0x68, 0xee, 0x3c, 0x80]
+    const idr = [0x65, 0x88, 0x84]
+    const before = muxers
+    const feedsBefore = feeds
+    send(true, [[0x67, 0x64, 0x00, 0x28], pps, idr])
+    send(false, [[0x41, 0x9a]])
+    send(true, [[0x67, 0x64, 0x00, 0x28], pps, idr])
+    assert.equal(muxers, before, 'Repeated parameter sets keep the muxer')
+    send(true, [[0x67, 0x64, 0x00, 0x1f], pps, idr])
+    assert.equal(muxers, before + 1, 'A new SPS starts a new muxer')
+    send(false, [[0x41, 0x9a]])
+    assert.equal(feeds, feedsBefore + 3, 'Nothing is fed before the new MediaSource opens')
+    await Promise.resolve()
+    assert.equal(socket.sent.at(-1), 'keyframe', 'The new muxer asks for a keyframe')
+    send(true, [[0x67, 0x64, 0x00, 0x1f], pps, idr])
+    send(false, [[0x41, 0x9a]])
+    assert.equal(muxers, before + 1, 'The same new SPS keeps the new muxer')
+    assert.equal(feeds, feedsBefore + 5, 'Playback resumes from the requested keyframe')
+    player.destroy()
   }
   for (const durationUs of [16667, 33333, 8333]) {
     const video = new Video()

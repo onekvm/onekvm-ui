@@ -5,6 +5,7 @@ import { MseLivePlayback } from '@/lib/mse-live-playback'
 import { VideoTimingSampler } from '@/lib/webrtc-video-timing'
 import { emptyBrowserVideoLatency, type BrowserVideoLatencyUs } from '@/lib/webrtc-playback-stats'
 
+import { videoParameterSets } from '@/lib/video-parameter-sets'
 import { normalizeWebSocketVideoCodec, supportsWebSocketVideo, type WebSocketVideoCodec } from '@/lib/websocket-video-support'
 
 const HEADER_SIZE = 40
@@ -41,6 +42,11 @@ export class WebSocketVideo {
   private opened = false
   private waitingForKeyframe = true
   private lastSequence: bigint | null = null
+  private parameterSets: string | null = null
+  // JMuxer drops the init segment of anything fed before its MediaSource
+  // opens, and never builds the SourceBuffer afterwards.
+  private muxerReady = false
+  private muxerGeneration = 0
   private lastAckAt = -Infinity
   private sampleStartedAt = 0
   private sampleBytes = 0
@@ -160,6 +166,8 @@ export class WebSocketVideo {
   private createMuxer() {
     this.playback?.stop()
     this.muxer?.destroy()
+    this.muxerReady = false
+    const generation = ++this.muxerGeneration
     this.playback = new MseLivePlayback(this.video, () => this.requestKeyframe())
     this.playback.start()
     const options: ExtendedJMuxerOptions = {
@@ -174,7 +182,9 @@ export class WebSocketVideo {
       clearBuffer: true,
       debug: false,
       onReady: () => {
+        if (generation !== this.muxerGeneration) return
         this.log('MSE ready')
+        this.muxerReady = true
         this.requestKeyframe()
       },
       onError: (data: { name?: string }) => {
@@ -233,7 +243,23 @@ export class WebSocketVideo {
       this.waitingForKeyframe = true
       this.lastSequence = null
       this.durationRemainderUs = 0
+      this.parameterSets = null
       this.createMuxer()
+    }
+    // JMuxer builds its init segment from the first SPS only. A new resolution
+    // or encoder configuration, as after the source wakes up, starts over.
+    if (keyframe) {
+      const parameterSets = videoParameterSets(this.codec, bytes.subarray(HEADER_SIZE))
+      if (parameterSets) {
+        if (this.parameterSets !== null && parameterSets !== this.parameterSets) {
+          this.log('parameter sets changed', { sequence: String(sequence) })
+          this.waitingForKeyframe = true
+          this.lastSequence = null
+          this.durationRemainderUs = 0
+          this.createMuxer()
+        }
+        this.parameterSets = parameterSets
+      }
     }
 
     if (this.lastSequence !== null && sequence !== this.lastSequence + 1n) {
@@ -242,6 +268,11 @@ export class WebSocketVideo {
     }
     this.lastSequence = sequence
     if (this.waitingForKeyframe && !keyframe) return
+    if (!this.muxerReady) {
+      // The keyframe requested once the muxer is ready starts playback.
+      this.waitingForKeyframe = true
+      return
+    }
     if (keyframe && this.waitingForKeyframe) {
       this.waitingForKeyframe = false
       this.log('keyframe received', { sequence: String(sequence), bytes: payloadLength })

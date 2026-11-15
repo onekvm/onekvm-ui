@@ -2,6 +2,7 @@
 import { computed, type Component } from 'vue'
 import { Cpu, Fingerprint, HardDrive, Keyboard, LayoutDashboard, Monitor, PanelTop, PanelsTopLeft, Plug, Power, Puzzle, Server, Settings2, ShieldAlert, Toolbox, Video } from '@/icons'
 import { extensionLocalizedText, extensionTranslation, type ExtensionStatus } from '@/api/client'
+import { providesCapabilities } from '@/lib/extension-category'
 import { currentLanguage, t } from '@/i18n/runtime'
 import IconDescriptionList from './IconDescriptionList.vue'
 import PluginDetailsSectionTitle from './PluginDetailsSectionTitle.vue'
@@ -45,8 +46,8 @@ const items = computed(() => {
     const description = extensionLocalizedText(Object.fromEntries(Object.entries(service.i18n || {}).map(([locale, value]) => [locale, value.description])), currentLanguage.value, service.description || '')
     add(`service:${service.id}`, 'service', Server, name, description)
   }
-  // System registrations provide device capabilities; extension manifests request core access.
-  for (const capability of detail.system ? detail.capabilities || [] : []) {
+  // Device backends provide capabilities; extension manifests request core access.
+  for (const capability of providesCapabilities(detail) ? detail.capabilities || [] : []) {
     if (Object.prototype.hasOwnProperty.call(deviceCapabilityMetadata, capability)) {
       const metadata = deviceCapabilityMetadata[capability]
       add(`capability:${capability}`, metadata.key, metadata.icon)

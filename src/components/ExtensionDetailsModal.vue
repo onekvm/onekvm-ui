@@ -4,7 +4,7 @@ import { Cpu, Package } from '@/icons'
 import { extensionRouteURL, extensionTranslation, type ExtensionStatus, type ExtensionSummary } from '@/api/client'
 import { currentLanguage, t } from '@/i18n/runtime'
 import { pluginIcon } from '@/lib/plugin-icons'
-import { extensionCategory } from '@/lib/extension-category'
+import { extensionCategory, providesCapabilities } from '@/lib/extension-category'
 import ExtensionPermissionList from './ExtensionPermissionList.vue'
 import ExtensionFeatureList from './ExtensionFeatureList.vue'
 import ExtensionCapabilityList from './ExtensionCapabilityList.vue'
@@ -81,7 +81,7 @@ function memorySize(bytes: number) {
         </div>
         <template v-else-if="detail">
           <ExtensionFeatureList :detail="detail" />
-          <ExtensionCapabilityList v-if="!detail.system && detail.capabilities?.length" :capabilities="detail.capabilities" />
+          <ExtensionCapabilityList v-if="!providesCapabilities(detail) && detail.capabilities?.length" :capabilities="detail.capabilities" />
           <ExtensionPermissionList :permissions="detail.permissions" />
           <section v-for="section in declarations" :key="section.key" class="plugin-declaration" :data-declaration="section.key">
             <PluginDetailsSectionTitle :icon="section.icon">{{ section.title }}</PluginDetailsSectionTitle>

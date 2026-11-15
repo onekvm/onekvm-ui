@@ -107,7 +107,7 @@ const en = {
       ok: 'Ok',
       cancel: 'Cancel',
       loginButtonText: 'Sign in',
-      rememberPassword: 'Remember password',
+      rememberUsername: 'Remember username',
       mfaTitle: 'Verify sign-in',
       mfaHelp: 'Enter a second factor or confirm on the device.',
       mfaMethod: 'Method',

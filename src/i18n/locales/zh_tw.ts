@@ -107,7 +107,7 @@ const zh_tw = {
       ok: '確定',
       cancel: '取消',
       loginButtonText: '登入',
-      rememberPassword: '記住密碼',
+      rememberUsername: '記住使用者名稱',
       mfaTitle: '驗證登入',
       mfaHelp: '請輸入第二因素，或在裝置上確認。',
       mfaMethod: '驗證方式',

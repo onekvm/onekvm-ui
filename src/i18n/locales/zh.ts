@@ -107,7 +107,7 @@ const zh = {
       ok: '确定',
       cancel: '取消',
       loginButtonText: '登录',
-      rememberPassword: '记住密码',
+      rememberUsername: '记住用户名',
       mfaTitle: '验证登录',
       mfaHelp: '请输入第二因素，或在设备上确认。',
       mfaMethod: '验证方式',

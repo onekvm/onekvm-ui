@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Trash2 } from '@/icons'
+import { computed, ref, useTemplateRef } from 'vue'
+import { FileUp, Trash2 } from '@/icons'
 
 import type { VpnClientConfig } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { networkKindLabel } from '@/lib/network'
-import { parseVpnConfig, serializeVpnConfig, VpnConfigError } from '@/lib/vpn-config'
+import { isPemCertificate, parseVpnConfig, serializeVpnConfig, VpnConfigError } from '@/lib/vpn-config'
 
 const props = defineProps<{ modelValue: VpnClientConfig; disabled?: boolean; parentDevice?: string }>()
 const emit = defineEmits<{
@@ -18,6 +18,13 @@ const editorMode = ref<'form' | 'file'>(props.modelValue.config?.trim() ? 'file'
 const configurationFile = ref(props.modelValue.kind === 'openvpn' ? (props.modelValue.config || '') : '')
 const configurationError = ref('')
 const configurationErrorWarning = ref(false)
+const caInput = useTemplateRef<HTMLInputElement>('caInput')
+// Reads redact an imported file, so a saved client is only checked once edited.
+const edited = ref(false)
+// OpenVPN cannot start an enabled client from the form without a CA.
+const caMissing = computed(() => edited.value && !formValid(props.modelValue))
+// An imported profile with a bare auth-user-pass line reads the username and password entered here.
+const fileAsksForCredentials = computed(() => props.modelValue.kind === 'openvpn' && /^[ \t]*auth-user-pass[ \t]*$/m.test(configurationFile.value))
 const protocolOptions = [
   { label: 'UDP', value: 'udp' },
   { label: 'TCP', value: 'tcp' },
@@ -33,7 +40,7 @@ user "username"`
     : props.modelValue.kind === 'l2tp'
       ? `lns = vpn.example.com
 user "username"`
-      : `plugin rp-pppoe.so
+      : `plugin pppoe.so
 eth0
 user "username"`
 
@@ -64,15 +71,36 @@ function normalized(client: VpnClientConfig): VpnClientConfig {
     parent: client.parent || '',
     username: client.username || '',
     password: client.password || '',
+    ca: client.ca || '',
     service: client.service || '',
     config: client.config || '',
     default_route: Boolean(client.default_route),
   }
 }
 
+function formValid(client: VpnClientConfig) {
+  return client.kind !== 'openvpn' || !client.enabled || isPemCertificate(client.ca || '')
+}
+
 function update<K extends keyof VpnClientConfig>(key: K, value: VpnClientConfig[K]) {
-  emit('update:modelValue', { ...normalized(props.modelValue), [key]: value, config: '' })
-  emit('validity', true)
+  edited.value = true
+  const client = { ...normalized(props.modelValue), [key]: value, config: '' }
+  emit('update:modelValue', client)
+  emit('validity', formValid(client))
+}
+
+/** Change a credential while the configuration file stays in use. */
+function updateFileCredential(key: 'username' | 'password', value: string) {
+  emit('update:modelValue', { ...props.modelValue, [key]: value })
+}
+
+async function readCertificate(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  // Certificates are a few kilobytes; anything larger is not one.
+  if (!file || file.size > 64 * 1024) return
+  update('ca', (await file.text()).trim())
 }
 
 function showConfiguration(value: string, warning: boolean, message: string, valid: boolean) {
@@ -96,7 +124,7 @@ function applyConfigurationFile(value: string, switching: boolean) {
       emit('update:modelValue', { ...props.modelValue, config: value })
       return false
     }
-    showConfiguration(value, false, '', true)
+    showConfiguration(value, false, '', formValid(parsed.client))
     emit('update:modelValue', parsed.client)
     return true
   } catch (reason) {
@@ -170,6 +198,29 @@ function selectEditorMode(value: 'form' | 'file') {
         />
       </n-form-item>
 
+      <n-form-item v-if="modelValue.kind === 'openvpn'" class="span-all" :label="t('network.vpn.ca', 'CA certificate')">
+        <div class="vpn-ca">
+          <n-input
+            :value="modelValue.ca || ''"
+            type="textarea"
+            class="vpn-config-input"
+            :autosize="{ minRows: 3, maxRows: 10 }"
+            :disabled="disabled"
+            :status="caMissing ? 'error' : undefined"
+            placeholder="-----BEGIN CERTIFICATE-----"
+            :input-props="{ spellcheck: false, autocomplete: 'off', autocapitalize: 'off' }"
+            @update:value="update('ca', $event)"
+          />
+          <div class="vpn-ca-actions">
+            <input ref="caInput" type="file" accept=".crt,.pem,.cer,application/x-pem-file" hidden @change="readCertificate" />
+            <n-button size="small" :disabled="disabled" @click="caInput?.click()">
+              <template #icon><FileUp /></template>{{ t('network.vpn.chooseCertificate', 'Choose file') }}
+            </n-button>
+            <span v-if="caMissing">{{ t('network.vpn.caRequired', 'Paste or choose the PEM CA certificate of the server.') }}</span>
+          </div>
+        </div>
+      </n-form-item>
+
       <template v-if="modelValue.kind === 'pppoe'">
         <n-form-item :label="t('network.vpn.parent', 'Parent interface')">
           <n-input
@@ -232,6 +283,26 @@ function selectEditorMode(value: 'form' | 'file') {
         <template v-else>{{ t('network.vpn.configurationError', 'Invalid VPN configuration') }}: {{ configurationError }}</template>
       </n-alert>
       <p>{{ t('network.vpn.configurationHint', 'The interface name is configured separately above and is not part of this file.') }}</p>
+      <div v-if="fileAsksForCredentials" class="vpn-fields">
+        <n-form-item :label="t('network.vpn.username', 'Username')">
+          <n-input
+            :value="modelValue.username || ''"
+            :disabled="disabled"
+            placeholder=""
+            @update:value="updateFileCredential('username', $event)"
+          />
+        </n-form-item>
+        <n-form-item :label="t('network.vpn.password', 'Password')">
+          <n-input
+            type="password"
+            show-password-on="click"
+            :value="modelValue.password || ''"
+            :disabled="disabled"
+            placeholder=""
+            @update:value="updateFileCredential('password', $event)"
+          />
+        </n-form-item>
+      </div>
     </section>
 
     <footer>
@@ -268,6 +339,9 @@ function selectEditorMode(value: 'form' | 'file') {
 }
 .span-all { grid-column: 1 / -1; }
 .configuration-file-editor { display: grid; gap: 8px; }
+.vpn-ca { display: grid; gap: 8px; width: 100%; }
+.vpn-ca-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.vpn-ca-actions span { color: var(--destructive); font-size: 12px; }
 .configuration-file-editor p { margin: 0; color: var(--muted-foreground); font-size: 11px; }
 .vpn-config-input :deep(.n-input__textarea-el) {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

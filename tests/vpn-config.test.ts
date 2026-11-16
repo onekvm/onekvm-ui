@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 
 import type { VpnClientConfig } from '../src/api/client.ts'
-import { parseVpnConfig, serializeVpnConfig, VpnConfigError } from '../src/lib/vpn-config.ts'
+import { isPemCertificate, parseVpnConfig, serializeVpnConfig, VpnConfigError } from '../src/lib/vpn-config.ts'
 
 function client(overrides: Partial<VpnClientConfig> = {}): VpnClientConfig {
   return {
@@ -38,18 +38,24 @@ assert.equal(parsedOpenVPN.protocol, 'udp')
 assert.equal(parsedOpenVPN.username, 'kept')
 assert.equal(parsedOpenVPN.config, '')
 
+const ca = '-----BEGIN CERTIFICATE-----\nMIIBszCCAVmgAwIBAgIU\n-----END CERTIFICATE-----'
+assert.equal(isPemCertificate(ca), true)
+assert.equal(isPemCertificate(''), false)
+assert.equal(isPemCertificate('-----BEGIN CERTIFICATE-----\nnot base64!\n-----END CERTIFICATE-----'), false)
 const filledOpenVPN = client({
   remote: 'vpn.example.com',
   port: 1195,
   protocol: 'tcp',
   username: 'ada',
   password: 'secret',
+  ca,
   default_route: true,
 })
 const filledOpenVPNText = serializeVpnConfig(filledOpenVPN)
 assert.match(filledOpenVPNText, /proto tcp\nremote vpn\.example\.com 1195\n/)
-assert.match(filledOpenVPNText, /redirect-gateway def1\n$/)
-assert.doesNotMatch(filledOpenVPNText, /secret/)
+assert.match(filledOpenVPNText, /remote-cert-tls server\ndata-ciphers-fallback AES-256-GCM\nverb 3\nauth-user-pass\nredirect-gateway def1\n<ca>\n-----BEGIN CERTIFICATE-----\n/)
+assert.match(filledOpenVPNText, /-----END CERTIFICATE-----\n<\/ca>\n$/)
+assert.doesNotMatch(filledOpenVPNText, /secret|persist-key/)
 const roundTripOpenVPN = fieldsOf(filledOpenVPNText, filledOpenVPN)
 assert.equal(roundTripOpenVPN.remote, 'vpn.example.com')
 assert.equal(roundTripOpenVPN.port, 1195)
@@ -57,8 +63,17 @@ assert.equal(roundTripOpenVPN.protocol, 'tcp')
 assert.equal(roundTripOpenVPN.default_route, true)
 assert.equal(roundTripOpenVPN.username, 'ada')
 assert.equal(roundTripOpenVPN.password, 'secret')
+assert.equal(roundTripOpenVPN.ca, ca)
 
-const customOpenVPN = parseVpnConfig(`${generatedOpenVPN}<ca>\nCERT\n</ca>\n`, client())
+// Files of earlier releases keep persist-key; a CRLF CA block keeps later line numbers.
+const crlfOpenVPN = fieldsOf(`client\r\n<ca>\r\n${ca.replace(/\n/g, '\r\n')}\r\n</ca>\r\npersist-key\r\n`, client())
+assert.equal(crlfOpenVPN.ca, ca.replace(/\n/g, '\r\n'))
+assert.throws(
+  () => parseVpnConfig(`client\n<ca>\n${ca}\n</ca>\nproto \n`, client()),
+  (error: unknown) => error instanceof VpnConfigError && error.code === 'protocolInvalid' && error.params.line === 7,
+)
+
+const customOpenVPN = parseVpnConfig(`${generatedOpenVPN}<cert>\nCERT\n</cert>\n`, client())
 assert.equal(customOpenVPN.kind, 'opaque')
 const udp6 = parseVpnConfig('client\ndev tun\nproto udp6\nremote vpn.example.com 1194\n', client())
 assert.equal(udp6.kind, 'opaque')
@@ -105,6 +120,9 @@ const pppoe = client({
   password: 'secret',
   default_route: true,
 })
+assert.match(serializeVpnConfig(pppoe), /^plugin pppoe\.so\neth0\n/)
+const legacyPPPoE = fieldsOf('plugin rp-pppoe.so\neth1\n', client({ kind: 'pppoe', name: 'pppoe0' }))
+assert.equal(legacyPPPoE.parent, 'eth1')
 const pppoeParsed = fieldsOf(serializeVpnConfig(pppoe), client({ kind: 'pppoe', name: 'pppoe0', default_route: false }))
 assert.equal(pppoeParsed.parent, 'eth0')
 assert.equal(pppoeParsed.service, 'isp')

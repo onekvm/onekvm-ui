@@ -192,6 +192,7 @@ export interface VpnClientConfig {
   parent?: string
   username?: string
   password?: string
+  ca?: string
   service?: string
   config?: string
   default_route?: boolean

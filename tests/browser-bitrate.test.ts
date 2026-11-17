@@ -48,6 +48,12 @@ queue.sample()
 queue.sample(2800, 0, 120)
 assert.ok(queue.sample(2800, 0, 140) < 3000, 'sustained RTT growth should reduce cap')
 
+const blip = harness()
+blip.status(10000, 8000)
+for (let i = 0; i < 10; i++) blip.sample(450)
+blip.sample(450, 0, 120)
+assert.ok(blip.sample(450, 0, 140) >= 6000, 'an RTT spike on an application-limited stream must not cut to its idle rate')
+
 const decoder = harness()
 for (let i = 0; i < 15; i++) decoder.sample(2800, 0, 2, { decodeMs: 40 })
 assert.ok(decoder.commands.every(cap => cap === 0 || cap === 3000), 'decoder load alone must not change bitrate')

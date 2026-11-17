@@ -150,7 +150,12 @@ export class BrowserBitrate {
     if ((loss >= 0.08 || this.congested >= 2 || (this.startup && pressure))
       && next.time - this.lastChange >= (this.startup ? 1000 : 2000)) {
       const factor = this.startup ? 0.5 : 0.75
-      target = Math.max(floor, Math.floor(Math.min(this.accepted * factor, kbps > floor ? kbps * 0.85 : this.accepted * factor)))
+      // Without loss, a stream using under half its cap says nothing about the
+      // path: cutting to its idle rate (a static desktop) leaves a cap that the
+      // utilization rule below can never raise, and paced keyframes then stall.
+      const applicationLimited = loss < 0.005 && kbps < this.accepted * 0.5
+      const delivered = !applicationLimited && kbps > floor ? kbps * 0.85 : this.accepted * factor
+      target = Math.max(floor, Math.floor(Math.min(this.accepted * factor, delivered)))
     } else if (this.paced && this.accepted < Math.min(3000, this.maximum)
       && this.lowFrames >= 3 && this.clean >= 3 && next.time - this.lastChange >= 4000) {
       // A small sender budget can stall whole GOPs even on a recovered path.

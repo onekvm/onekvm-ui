@@ -52,6 +52,11 @@ export function parseVpnConfig(text: string, current: VpnClientConfig): VpnParse
   }
 }
 
+/** True when `text` holds a PEM certificate, as the OpenVPN form requires for its CA. */
+export function isPemCertificate(text: string): boolean {
+  return /-----BEGIN CERTIFICATE-----\s*[A-Za-z0-9+/=\s]+-----END CERTIFICATE-----/.test(text)
+}
+
 function serializeOpenVPN(client: VpnClientConfig): string {
   const proto = (client.protocol || 'udp').toLowerCase() === 'tcp' ? 'tcp' : 'udp'
   const lines = ['client', 'dev tun', `proto ${proto}`]
@@ -60,8 +65,12 @@ function serializeOpenVPN(client: VpnClientConfig): string {
     const port = client.port && client.port >= 1 && client.port <= 65535 ? client.port : 1194
     lines.push(`remote ${remote} ${port}`)
   }
-  lines.push('resolv-retry infinite', 'nobind', 'persist-key', 'persist-tun', 'verb 3')
+  lines.push('resolv-retry infinite', 'nobind', 'persist-tun', 'remote-cert-tls server', 'data-ciphers-fallback AES-256-GCM', 'verb 3')
+  // The device supplies the username and password entered in the form.
+  if (client.username) lines.push('auth-user-pass')
   if (client.default_route) lines.push('redirect-gateway def1')
+  const ca = (client.ca || '').trim()
+  if (ca) lines.push('<ca>', ca, '</ca>')
   return `${lines.join('\n')}\n`
 }
 
@@ -76,7 +85,7 @@ function serializePPTP(client: VpnClientConfig): string {
 }
 
 function serializePPPoE(client: VpnClientConfig): string {
-  const lines = ['plugin rp-pppoe.so']
+  const lines = ['plugin pppoe.so']
   const parent = (client.parent || '').trim()
   if (parent) lines.push(parent)
   const service = client.service || ''
@@ -144,6 +153,7 @@ function cleared(current: VpnClientConfig): VpnClientConfig {
     parent: '',
     username: '',
     password: '',
+    ca: '',
     service: '',
     config: '',
     default_route: current.kind === 'pppoe',
@@ -206,11 +216,19 @@ function parseOpenVPN(text: string, current: VpnClientConfig): VpnParseResult {
   let defaultRoute = false
   let foreign = false
   let broken: VpnConfigError | null = null
+  let ca = ''
 
-  for (const entry of sourceLines(text)) {
+  // Keep line numbers while the inline CA leaves the option lines.
+  const options = text.replace(/^[ \t]*<ca>[ \t]*\r?\n([\s\S]*?)^[ \t]*<\/ca>[ \t]*$/m, (block, body: string) => {
+    ca = body.trim()
+    return '\n'.repeat(block.split('\n').length - 1)
+  })
+
+  for (const entry of sourceLines(options)) {
     const { line, text: value } = entry
-    if (['client', 'nobind', 'persist-key', 'persist-tun'].includes(value)) continue
+    if (['client', 'nobind', 'persist-key', 'persist-tun', 'auth-user-pass'].includes(value)) continue
     if (value === 'resolv-retry infinite' || value === 'verb 3' || value === 'dev tun') continue
+    if (value === 'remote-cert-tls server' || value === 'data-ciphers-fallback AES-256-GCM') continue
     if (value === 'redirect-gateway def1') {
       defaultRoute = true
       continue
@@ -259,6 +277,7 @@ function parseOpenVPN(text: string, current: VpnClientConfig): VpnParseResult {
       remote: sawRemote ? remote : '',
       port,
       protocol: sawProtocol ? protocol : 'udp',
+      ca,
       config: '',
       default_route: defaultRoute,
     },
@@ -281,7 +300,8 @@ function parsePeer(text: string, current: VpnClientConfig, kind: 'pptp' | 'pppoe
       if (kind !== 'pptp') fail('unsupportedLine', line, 'Unsupported configuration line')
       continue
     }
-    if (value === 'plugin rp-pppoe.so') {
+    // pppd 2.5 renamed rp-pppoe.so; files from earlier releases still parse.
+    if (value === 'plugin pppoe.so' || value === 'plugin rp-pppoe.so') {
       if (kind !== 'pppoe') fail('unsupportedLine', line, 'Unsupported configuration line')
       sawPlugin = true
       continue

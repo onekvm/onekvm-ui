@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Keyboard, Pin, PinOff } from '@/icons'
 import type { DropdownOption } from 'naive-ui'
 
-import type { KeyboardLayout } from '@/api/client'
+import type { KeyboardLayout, ToolbarIconId } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import ControlOverlay from './ControlOverlay.vue'
@@ -25,6 +25,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   select: [key: string | number]
+  'action-contextmenu': [event: MouseEvent, id: ToolbarIconId]
   'update:show': [show: boolean]
   'text-window': [open: boolean]
 }>()
@@ -200,7 +201,7 @@ onBeforeUnmount(() => {
         </span>
       </div>
       <div :inert="inputSuspended">
-        <KeyboardQuickActions @select="selectOption" />
+        <KeyboardQuickActions @select="selectOption" @contextmenu="(event, id) => emit('action-contextmenu', event, id)" />
         <n-menu accordion :value="null" :options="remainingOptions" :indent="12" class="keyboard-control-menu keyboard-secondary-menu" @update:value="selectOption" />
       </div>
     </div>
@@ -256,7 +257,7 @@ onBeforeUnmount(() => {
           </span>
         </div>
         <div :inert="inputSuspended">
-          <KeyboardQuickActions @select="selectOption" />
+          <KeyboardQuickActions @select="selectOption" @contextmenu="(event, id) => emit('action-contextmenu', event, id)" />
           <n-menu accordion :value="null" :options="remainingOptions" :indent="12" class="keyboard-control-menu keyboard-secondary-menu" @update:value="selectOption" />
         </div>
       </div>

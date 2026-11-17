@@ -2648,6 +2648,8 @@ const zh_tw = {
     toolbar: {
       lock: '鎖定工具列',
       unlock: '解鎖工具列',
+      hideIcon: '隱藏圖示',
+      showIcon: '顯示在工具列',
       addSeparator: '新增分隔線',
       removeSeparator: '移除分隔線',
       folders: {

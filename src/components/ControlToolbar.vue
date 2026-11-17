@@ -56,7 +56,7 @@ import { clientModifierNames, MAGIC_KEY_CODES, magicKeyLabel, sanitizeMagicKey, 
 import { USB_GAMEPAD_UI_ENABLED } from '@/lib/ui-features'
 import { dismissControlOverlays } from '@/lib/overlay-target'
 import { resolveConsoleSubtitle } from '@/lib/console-title'
-import { isKeyboardActionToolbarIcon, normalizeToolbarIcons, toolbarIconHidden } from '@/lib/toolbar-icons'
+import { isKeyboardActionToolbarIcon, isRootOnlyToolbarIcon, isToolbarIconId, normalizeToolbarIcons, setToolbarIconHidden, toolbarIconHidden } from '@/lib/toolbar-icons'
 import { machineDisplayName } from '@/lib/machine'
 import { onekvm, type InputActivity, type TransportState } from '@/lib/onekvm'
 import { sendShortcut, shortcutChordLabel } from '@/lib/keyboard-shortcuts'
@@ -238,6 +238,10 @@ const toolbarContext = useToolbarContextMenu({
     void toolbarLayout.save(layout => ({ ...layout, toolbar_order: order }))
   },
   removeSeparator: id => { void toolbarLayout.save(layout => ({ ...layout, toolbar_order: toolbarLayout.order.value.filter(item => item !== id) })) },
+  iconHidden: id => isToolbarIconId(id) && !isRootOnlyToolbarIcon(id) ? toolbarIconHidden(toolbarLayout.layout.value.toolbar_icons, id) : undefined,
+  setIconHidden: (id, hidden) => {
+    if (isToolbarIconId(id)) void toolbarLayout.save(layout => ({ ...layout, toolbar_icons: setToolbarIconHidden(layout.toolbar_icons, id, hidden) }))
+  },
 })
 const toolbarSeparators = computed(() => {
   const visible = new Set(toolbarLayout.order.value.filter(id => {
@@ -266,6 +270,14 @@ watch([folderOpen, folderEditorOpen, itemDrag.dragging, toolbarContext.show], ()
 function openToolbarContext(event: MouseEvent) {
   dismissOverlays()
   toolbarContext.open(event)
+}
+// Keeps the collection or folder open so several icons can be restored in turn.
+function openMenuItemContext(event: MouseEvent) {
+  if (openMenu.value !== null) openMenu.value = null
+  toolbarContext.open(event, { menu: true })
+}
+function openKeyboardActionContext(event: MouseEvent, id: ToolbarIconId) {
+  toolbarContext.open(event, { id, menu: true })
 }
 function folderForItem(id: string) { return toolbarFolderFor(toolbarLayout.folders.value, id) }
 function setFolderTarget(id: string, target: HTMLElement | null) { folderTargets.value = { ...folderTargets.value, [id]: target } }
@@ -1897,6 +1909,7 @@ onBeforeUnmount(() => {
         :placement="menuPlacement"
         :sheet="toolbarLauncher"
         @select="selectKeyboard"
+        @action-contextmenu="openKeyboardActionContext"
         @update:show="updateMenu('keyboard', $event)"
         @text-window="onKeyboardTextWindow"
       >
@@ -2136,7 +2149,7 @@ onBeforeUnmount(() => {
     <PinnedTools :mobile="toolbarLauncher" :vertical="toolbarVertical" :placement="menuPlacement" :layout="toolbarLayout.layout.value" :order="toolbarLayout.order.value" :folder-targets="folderTargets" :show-labels="toolbarLayout.showLabels.value" @overlay="pinnedOverflowOpen = $event" @activate="onPinnedToolActivate" />
 
     <div v-for="folder in toolbarLayout.folders.value" :key="folder.id" class="toolbar-icon-slot toolbar-folder-slot" :data-toolbar-item="`folder:${folder.id}`" :data-toolbar-folder="folder.id" :style="{ order: toolbarItemOrder(`folder:${folder.id}`) }">
-      <ToolbarCollectionMenu :title="folder.name" :icon="folder.icon" :folder-id="folder.id" :show="folderOpen === folder.id" :count="folderItemCount(folder)" :mobile="toolbarLauncher" :child-open="openMenu !== null || toolbox.menuOpen || keyboardTextWindowOpen" :placement="menuPlacement" @update:show="setFolderOpen(folder.id, $event)" @target="setFolderTarget(folder.id, $event)">
+      <ToolbarCollectionMenu :title="folder.name" :icon="folder.icon" :folder-id="folder.id" :show="folderOpen === folder.id" :count="folderItemCount(folder)" :mobile="toolbarLauncher" :child-open="openMenu !== null || toolbox.menuOpen || keyboardTextWindowOpen" :placement="menuPlacement" @update:show="setFolderOpen(folder.id, $event)" @target="setFolderTarget(folder.id, $event)" @contextmenu="openMenuItemContext">
         <template v-if="canArrangeToolbar && !toolbarContext.locked.value" #footer><n-button quaternary block class="toolbar-folder-edit-button" @click="openFolderEditor(folder)">{{ t('toolbar.folders.edit', 'Edit folder') }}</n-button></template>
       </ToolbarCollectionMenu>
     </div>
@@ -2221,6 +2234,7 @@ onBeforeUnmount(() => {
           :placement="menuPlacement"
           @update:show="collectionMenuOpen = $event"
           @target="collectedIconsTarget = $event"
+          @contextmenu="openMenuItemContext"
         />
       </div>
 

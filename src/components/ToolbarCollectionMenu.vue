@@ -18,6 +18,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:show': [show: boolean]
   target: [target: HTMLElement | null]
+  contextmenu: [event: MouseEvent]
 }>()
 const overlayTo = useOverlayMount()
 const heading = computed(() => props.title || t('toolbar.collectedIcons'))
@@ -143,7 +144,7 @@ onBeforeUnmount(() => {
       </n-tooltip>
     </template>
     <div class="toolbar-collection-heading">{{ heading }}<span>{{ count }}</span></div>
-    <div ref="list" class="toolbar-collected-list" role="menu" :aria-label="heading" :data-toolbar-folder-list="folderId" data-toolbar-surface @keydown="listKeydown"><p v-if="!count" class="toolbar-folder-empty">{{ t('toolbar.folders.empty', 'No icons in this folder') }}</p></div>
+    <div ref="list" class="toolbar-collected-list" role="menu" :aria-label="heading" :data-toolbar-folder-list="folderId" data-toolbar-surface @keydown="listKeydown" @contextmenu="emit('contextmenu', $event)"><p v-if="!count" class="toolbar-folder-empty">{{ t('toolbar.folders.empty', 'No icons in this folder') }}</p></div>
     <slot name="footer" />
   </n-popover>
   <template v-else>
@@ -176,7 +177,7 @@ onBeforeUnmount(() => {
       display-directive="show"
       @update:show="!$event && close(true)"
     >
-      <div ref="list" class="toolbar-collected-list" role="menu" :aria-label="heading" :data-toolbar-folder-list="folderId" data-toolbar-surface @keydown="listKeydown"><p v-if="!count" class="toolbar-folder-empty">{{ t('toolbar.folders.empty', 'No icons in this folder') }}</p></div>
+      <div ref="list" class="toolbar-collected-list" role="menu" :aria-label="heading" :data-toolbar-folder-list="folderId" data-toolbar-surface @keydown="listKeydown" @contextmenu="emit('contextmenu', $event)"><p v-if="!count" class="toolbar-folder-empty">{{ t('toolbar.folders.empty', 'No icons in this folder') }}</p></div>
     <slot name="footer" />
     </n-modal>
   </template>

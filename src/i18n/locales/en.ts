@@ -2644,6 +2644,8 @@ const en = {
     toolbar: {
       lock: 'Lock toolbar',
       unlock: 'Unlock toolbar',
+      hideIcon: 'Hide icon',
+      showIcon: 'Show on toolbar',
       addSeparator: 'Add separator',
       removeSeparator: 'Remove separator',
       folders: {

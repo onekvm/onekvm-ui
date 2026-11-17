@@ -2643,6 +2643,8 @@ const zh = {
     toolbar: {
       lock: '锁定工具栏',
       unlock: '解锁工具栏',
+      hideIcon: '隐藏图标',
+      showIcon: '显示在工具栏',
       addSeparator: '添加分割线',
       removeSeparator: '移除分割线',
       folders: {

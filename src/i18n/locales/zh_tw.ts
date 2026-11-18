@@ -2168,7 +2168,8 @@ const zh_tw = {
       sharing: {
         title: '網路共享',
         usbChangeHint: '切換共享會短暫中斷 USB 網路；若未恢復，請重新取得 IP。',
-        usbAdapterRequired: '請先在 USB 設定中開啟 USB 網路卡。',
+        usbAdapterRequired: '請先開啟 USB 網路卡。',
+        usbAdapterHint: '透過 USB 從 Linux 或 macOS 存取 OneKVM。開關時 USB 會重新設定，鍵盤滑鼠會短暫中斷。',
         staticClientHint: '關閉 DHCP 時，需在連接裝置上將熱點位址設為閘道和 DNS 伺服器。',
       },
       wifi: {

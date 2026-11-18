@@ -2145,7 +2145,9 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
 				  @update:custom-dns-enabled="systemCustomDNS = $event"
 				  @update:dnssec="config.network.dnssec = $event"
 				/>
+				</template>
                 <NetworkSharingSettings :config="config" :status="status" :video-session-id="videoSessionId" :disabled="saving || Boolean(networkApply?.pending)" @update:usb="config.usb = $event" />
+				<template v-if="!simpleSettings">
 				<ActiveRoutesPanel />
 				<StaticRoutesForm
 				  v-model="config.network.static_routes"

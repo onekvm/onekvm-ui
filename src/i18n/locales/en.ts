@@ -2164,7 +2164,8 @@ const en = {
       sharing: {
         title: 'Network sharing',
         usbChangeHint: 'Changing sharing briefly interrupts the USB network. Renew its IP address if it does not recover.',
-        usbAdapterRequired: 'Enable the USB network adapter in USB settings first.',
+        usbAdapterRequired: 'Turn on the USB network adapter first.',
+        usbAdapterHint: 'Access OneKVM over USB from Linux or macOS. Turning it on or off reconfigures USB, and the keyboard and mouse disconnect briefly.',
         staticClientHint: 'With DHCP off, set the AP address as the gateway and DNS server on connected devices.',
       },
       wifi: {

@@ -68,6 +68,10 @@ export function toolbarLayoutOrder(layout: ToolbarLayout, pinnedToolIds: readonl
   if (order.length && !order.includes('collection') && order.includes('settings')) {
     order.splice(order.indexOf('settings'), 0, 'collection')
   }
+  if (order.length && !order.includes('notifications') && order.includes('collection')
+    && !folders.some(folder => folder.items.includes('notifications'))) {
+    order.splice(order.indexOf('collection'), 0, 'notifications')
+  }
   return [...new Set(order.length
     ? [...order, ...defaults.filter(id => !isToolbarSeparator(id))]
     : defaults)]

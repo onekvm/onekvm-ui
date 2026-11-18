@@ -6,6 +6,7 @@ import WindowTaskbar from '@/components/WindowTaskbar.vue'
 import AuthGate from '@/components/AuthGate.vue'
 import UIUpdateGuard from '@/components/UIUpdateGuard.vue'
 import UninstallExtensionDialog from '@/components/UninstallExtensionDialog.vue'
+import NotificationCapture from '@/components/NotificationCapture.vue'
 import { useAccessRevokedRoute } from '@/composables/useAccessRevokedRoute'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { useMessagePlacement } from '@/composables/useMessagePlacement'
@@ -25,6 +26,7 @@ const { noticeVisible, checking } = useAccessRevokedRoute()
     <n-global-style />
     <n-dialog-provider :to="overlayTo">
       <n-message-provider :placement="messagePlacement" :to="overlayTo">
+        <NotificationCapture />
         <div v-if="checking" class="auth-loading" role="status" :aria-label="t('accessRevoked.checking')">
           <n-spin size="small" />
         </div>

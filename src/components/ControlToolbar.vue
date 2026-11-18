@@ -3,6 +3,7 @@ import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { cloudDeviceName, serviceURL } from '@/api/service-url'
 import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import {
+  Bell,
   Check,
   CircleQuestionMark,
   CircleUserRound,
@@ -118,6 +119,8 @@ import KeyboardChordIcon from './KeyboardChordIcon'
 import GamepadPopover from './GamepadPopover.vue'
 import MouseSettingsPopover from './MouseSettingsPopover.vue'
 import PowerControlPopover from './PowerControlPopover.vue'
+import NotificationCenterPopover from './NotificationCenterPopover.vue'
+import { useNotifications } from '@/composables/useNotifications'
 import HddActivityIndicator from './HddActivityIndicator.vue'
 import AudioPopover from './AudioPopover.vue'
 import MediaTransferIndicator from './MediaTransferIndicator.vue'
@@ -189,7 +192,7 @@ const emit = defineEmits<{
 }>()
 
 type DeviceState = 'ready' | 'waiting' | 'error'
-type MenuName = 'display' | 'mouse' | 'keyboard' | 'gamepad' | 'power' | 'audio' | 'language' | 'account'
+type MenuName = 'display' | 'mouse' | 'keyboard' | 'gamepad' | 'power' | 'audio' | 'notifications' | 'language' | 'account'
 const dialog = useAsyncDialog()
 const overlayTo = useOverlayMount()
 const message = useMessage()
@@ -212,6 +215,8 @@ function updateHddIndicatorPreference(show: boolean) {
 
 const openMenu = ref<MenuName | null>(null)
 const toolbox = useToolboxContext()
+const { unread: unreadNotifications } = useNotifications()
+const unreadNotificationsLabel = computed(() => unreadNotifications.value > 99 ? '99+' : String(unreadNotifications.value))
 const { auth } = useAuth()
 const canArrangeToolbar = computed(() => hasPermission(auth, 'settings.manage'))
 const toolbarLayout = useToolbarLayout(() => props.status?.identity)
@@ -1244,6 +1249,7 @@ const actionClusterShown = computed(() => (
   || (props.canSettings && toolbarIconShown('settings'))
   || toolbarIconShown('performance')
   || toolbarIconShown('fullscreen')
+  || toolbarIconShown('notifications')
   || toolbarIconShown('language')
   || toolbarIconShown('account')
   || (toolbox.allowed && toolbarIconShown('toolbox'))
@@ -2224,6 +2230,38 @@ onBeforeUnmount(() => {
         @activate="onCollectedIconClick('toolbox')"
       >
       <ToolboxMenu :menu-item="!toolbarIconShown('toolbox')" :mobile="toolbarLauncher || !toolbarIconShown('toolbox')" :placement="menuPlacement" />
+      </ToolbarIconSlot>
+
+      <ToolbarIconSlot
+        :collected="!toolbarIconShown('notifications')"
+        data-toolbar-item="notifications"
+        :target="toolbarItemTarget('notifications')"
+        :order="toolbarIconStyle('notifications').order"
+        @activate="onCollectedIconClick('notifications')"
+      >
+      <NotificationCenterPopover
+        :placement="menuPlacement"
+        :sheet="toolbarLauncher"
+        @update:show="updateMenu('notifications', $event)"
+      >
+        <n-tooltip :disabled="!toolbarIconShown('notifications') || toolbarLauncher || openMenu === 'notifications'">
+          <template #trigger>
+            <n-button :role="toolbarIconShown('notifications') ? undefined : 'menuitem'"
+              quaternary
+              size="small"
+              class="notification-button"
+              :aria-label="unreadNotifications
+                ? `${t('notifications.title', 'Notifications')} (${unreadNotificationsLabel})`
+                : t('notifications.title', 'Notifications')"
+            >
+              <template #icon><Bell /></template>
+              <span v-if="unreadNotifications" class="notification-badge" aria-hidden="true">{{ unreadNotificationsLabel }}</span>
+              <span class="toolbar-action-label">{{ t('notifications.title', 'Notifications') }}</span>
+            </n-button>
+          </template>
+          {{ t('notifications.title', 'Notifications') }}
+        </n-tooltip>
+      </NotificationCenterPopover>
       </ToolbarIconSlot>
 
       <div v-if="collectedIcons.length" data-toolbar-item="collection" class="toolbar-icon-slot" :style="toolbarIconStyle('collection')">

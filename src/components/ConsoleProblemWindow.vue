@@ -11,6 +11,7 @@ import {
 } from '@/lib/console-problems'
 import { hidReportIsPress } from '@/lib/hid-status'
 import { onekvm } from '@/lib/onekvm'
+import { notify } from '@/composables/useNotifications'
 import ConsoleFloatingWindow from './ConsoleFloatingWindow.vue'
 
 const props = defineProps<{
@@ -50,6 +51,11 @@ async function runAction(action: ConsoleProblemAction) {
     running.value = null
   }
 }
+
+// Each problem shown also goes to the notification list.
+watch(shown, (problem, previous) => {
+  if (problem && problem.id !== previous?.id) notify('warning', problem.title())
+})
 
 watch(() => props.problems, (problems) => {
   tracker = createProblemTracker(problems)

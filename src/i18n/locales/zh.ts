@@ -13,6 +13,12 @@ const zh = {
       regards: '此致',
     },
     taskbar: { title: '任务栏', restore: '恢复 {name}' },
+    notifications: {
+      title: '通知',
+      empty: '没有通知',
+      clear: '全部清除',
+      remove: '删除',
+    },
     toolbox: {
     restoreWindow: '还原',
     minimizeWindow: '最小化',

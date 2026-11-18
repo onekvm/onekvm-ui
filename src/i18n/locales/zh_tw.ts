@@ -13,6 +13,12 @@ const zh_tw = {
       regards: '此致',
     },
     taskbar: { title: '工作列', restore: '還原 {name}' },
+    notifications: {
+      title: '通知',
+      empty: '沒有通知',
+      clear: '全部清除',
+      remove: '刪除',
+    },
     toolbox: {
     restoreWindow: '還原',
     minimizeWindow: '最小化',

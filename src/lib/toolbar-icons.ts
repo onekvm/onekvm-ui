@@ -17,6 +17,7 @@ export const TOOLBAR_ICON_IDS = [
   'performance',
   'fullscreen',
   'toolbox',
+  'notifications',
   'collection',
   'settings',
   'language',
@@ -80,9 +81,11 @@ export function normalizeToolbarIcons(
     if (seen.has(id)) continue
     const preference = { id, hidden: toolbarIconHiddenByDefault(id) }
     if (isDeviceToolbarIcon(id)) device.push(preference)
-    else if (id === 'collection') {
-      const settingsIndex = action.findIndex(icon => icon.id === 'settings')
-      action.splice(settingsIndex < 0 ? action.length : settingsIndex, 0, preference)
+    else if (id === 'collection' || id === 'notifications') {
+      // Added icons join the group before the collection and settings, not after the account.
+      const before = id === 'notifications' ? ['collection', 'settings'] : ['settings']
+      const index = action.findIndex(icon => before.includes(icon.id))
+      action.splice(index < 0 ? action.length : index, 0, preference)
     }
     else action.push(preference)
   }

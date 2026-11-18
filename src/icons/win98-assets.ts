@@ -29,6 +29,7 @@ export const win98IconAssets: Readonly<Record<string, string>> = {
   UserRound: 'status-avatar-default',
   CircleUserRound: 'status-avatar-default',
   Info: 'status-dialog-information',
+  Bell: 'status-dialog-information',
   LockKeyhole: 'status-dialog-password',
   Fingerprint: 'status-dialog-password',
   Shield: 'status-security-high',

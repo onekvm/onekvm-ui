@@ -13,6 +13,12 @@ const en = {
       regards: 'Regards',
     },
     taskbar: { title: 'Taskbar', restore: 'Restore {name}' },
+    notifications: {
+      title: 'Notifications',
+      empty: 'No notifications',
+      clear: 'Clear all',
+      remove: 'Remove',
+    },
     toolbox: {
     restoreWindow: 'Restore',
     minimizeWindow: 'Minimize',

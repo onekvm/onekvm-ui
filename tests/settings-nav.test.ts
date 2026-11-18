@@ -13,6 +13,8 @@ import {
   settingsAppActive,
   settingsBackTarget,
   settingsGroupTone,
+  settingsSectionsForMode,
+  SIMPLE_SETTINGS_SECTIONS,
 } from '../src/lib/settings-nav.ts'
 
 assert.equal(isSettingsIndex(''), true)
@@ -116,3 +118,12 @@ assert.equal(advancedSettingsHash(''), '/settings/advanced')
 assert.equal(advancedSettingsHash('network'), '/settings/advanced/network')
 
 console.log('settings-nav tests passed')
+
+{
+  const all = ['system', 'personalization', 'files', 'display', 'audio', 'network', 'firewall', 'plugins', 'extension:gpio-atx', 'services', 'users', 'time', 'update'].map((key) => ({ key }))
+  assert.deepEqual(settingsSectionsForMode(all, 'advanced').map((item) => item.key), all.map((item) => item.key))
+  assert.deepEqual(settingsSectionsForMode(all, 'simple').map((item) => item.key), ['system', 'display', 'network', 'users', 'update'])
+  assert.deepEqual(settingsSectionsForMode(all, 'simple', 'firewall').map((item) => item.key), ['system', 'display', 'network', 'firewall', 'users', 'update'])
+  assert.deepEqual(settingsSectionsForMode(all, 'simple', 'extension:gpio-atx').map((item) => item.key), ['system', 'display', 'network', 'extension:gpio-atx', 'users', 'update'])
+  assert.deepEqual([...SIMPLE_SETTINGS_SECTIONS], ['system', 'display', 'network', 'users', 'update'])
+}

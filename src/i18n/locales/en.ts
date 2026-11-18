@@ -682,6 +682,7 @@ const en = {
       openPage: 'Open settings page',
       openWindow: 'Open settings window',
         title: 'Advanced settings',
+        mode: { label: 'Settings shown', simple: 'Simple', advanced: 'Advanced' },
         groups: {
           device: 'Device',
           network: 'Network',

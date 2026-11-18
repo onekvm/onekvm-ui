@@ -35,6 +35,7 @@ const emit = defineEmits<{
     <header class="settings-app-heading">
       <h1 class="settings-app-large-title">{{ title }}</h1>
       <p v-if="subtitle" class="settings-app-subtitle">{{ subtitle }}</p>
+      <div v-if="$slots.actions" class="settings-app-actions"><slot name="actions" /></div>
     </header>
     <nav class="settings-app-nav" :aria-label="title">
       <section v-for="group in groups" :key="group.id" class="settings-app-group">
@@ -84,6 +85,11 @@ const emit = defineEmits<{
   letter-spacing: -0.045em;
   line-height: 1.1;
   text-wrap: balance;
+}
+
+.settings-app-actions {
+  max-width: 260px;
+  margin-top: 8px;
 }
 
 .settings-app-subtitle {

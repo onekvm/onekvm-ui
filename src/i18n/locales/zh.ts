@@ -681,6 +681,7 @@ const zh = {
       openPage: '跳转设置',
       openWindow: '窗口设置',
         title: '高级设置',
+        mode: { label: '显示的设置', simple: '简单', advanced: '高级' },
         groups: {
           device: '设备',
           network: '网络',

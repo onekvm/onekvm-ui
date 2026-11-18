@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, shallowRef } from 'vue'
+import { computed, shallowRef, watchEffect } from 'vue'
 import { FileUp, FolderOpen } from '@/icons'
 import { type SystemUpdateLocalFile, type SystemUpdateSource } from '@/api/client'
 import { t } from '@/i18n/runtime'
@@ -7,7 +7,11 @@ import SystemUpdateFilePicker from './SystemUpdateFilePicker.vue'
 
 export type UpdateMethod = 'github' | 'http' | 'tftp' | 'nfs' | 'local' | 'upload'
 
-defineProps<{ disabled: boolean }>()
+const props = defineProps<{
+  disabled: boolean
+  /** Simple settings mode: online update and file upload only, official firmware only. */
+  simple?: boolean
+}>()
 const emit = defineEmits<{ install: [source: SystemUpdateSource] }>()
 const allowUntrusted = defineModel<boolean>('allowUntrusted', { default: false })
 const method = defineModel<UpdateMethod>({ required: true })
@@ -23,7 +27,8 @@ const nfsPath = shallowRef('')
 const localFile = shallowRef<SystemUpdateLocalFile | null>(null)
 const localPickerOpen = shallowRef(false)
 
-const methods = computed(() => [
+const SIMPLE_METHODS: readonly UpdateMethod[] = ['github', 'upload']
+const allMethods = computed(() => [
   { value: 'github', label: t('settings.advancedSettings.systemPage.sourceGithub', 'GitHub 在线升级') },
   { value: 'http', label: t('settings.advancedSettings.systemPage.sourceHttp', 'HTTP 地址') },
   { value: 'tftp', label: t('settings.advancedSettings.systemPage.sourceTftp', 'TFTP') },
@@ -31,6 +36,12 @@ const methods = computed(() => [
   { value: 'local', label: t('settings.advancedSettings.systemPage.sourceLocal', '本地文件') },
   { value: 'upload', label: t('settings.advancedSettings.systemPage.sourceUpload', '上传文件') },
 ] as const)
+const methods = computed(() => props.simple ? allMethods.value.filter((option) => SIMPLE_METHODS.includes(option.value)) : allMethods.value)
+watchEffect(() => {
+  if (!props.simple) return
+  if (!SIMPLE_METHODS.includes(method.value)) method.value = 'github'
+  if (allowUntrusted.value) allowUntrusted.value = false
+})
 
 const request = computed<SystemUpdateSource | null>(() => {
   if (method.value === 'http') {
@@ -70,7 +81,7 @@ function install() {
     </div>
     <div class="update-source-detail">
       <slot name="error" />
-      <div v-if="method !== 'github'" class="update-source-trust">
+      <div v-if="method !== 'github' && !simple" class="update-source-trust">
         <n-checkbox v-model:checked="allowUntrusted" :disabled="disabled">{{ t('settings.advancedSettings.systemPage.allowUntrustedFirmware', 'Allow untrusted firmware for this update') }}</n-checkbox>
         <p>{{ t('settings.advancedSettings.systemPage.untrustedFirmwareHint', 'Accept a signer outside the built-in trust store for this update only. Firmware format, signature integrity, data integrity and model checks still apply. Only install firmware from a source you trust.') }}</p>
       </div>

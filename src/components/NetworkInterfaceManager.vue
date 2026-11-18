@@ -42,6 +42,8 @@ const props = defineProps<{
   pptpAvailable?: boolean
   l2tpAvailable?: boolean
   wifiAvailable?: boolean
+  /** Simple settings mode: list and edit interfaces without adding VLANs, tunnels or VPNs. */
+  simple?: boolean
 }>()
 const emit = defineEmits<{
   'update:modelValue': [value: NetworkConfig]
@@ -486,6 +488,7 @@ watch(() => props.disabled, (disabled, previous) => {
       <span>{{ visibleInterfaces.length }} {{ t('network.interfaces.title', 'Interfaces') }}</span>
       <div>
         <n-dropdown
+          v-if="!simple"
           trigger="click"
           scrollable
           :menu-props="addMenuProps"

@@ -3723,6 +3723,15 @@ html[data-onekvm-jelly] .host-window-frame {
 
 .advanced-settings-sidebar nav { display: grid; gap: 3px; }
 .advanced-settings-nav-heading { display: none; }
+/* Stays in view while the section list scrolls. */
+.advanced-settings-mode {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: -14px -10px 10px;
+  padding: 14px 12px 10px;
+  background: var(--onekvm-surface-inset);
+}
 .advanced-settings-sidebar button {
   display: flex;
   width: 100%;
@@ -5386,6 +5395,18 @@ html[data-onekvm-jelly] .host-window-frame {
   .advanced-settings-sidebar nav {
     display: flex;
     min-width: max-content;
+  }
+  .advanced-settings-sidebar:has(.advanced-settings-mode) {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .advanced-settings-mode {
+    top: auto;
+    left: 0;
+    flex: none;
+    margin: -6px 0 -6px -8px;
+    padding: 6px 0 6px 8px;
   }
   .advanced-settings-sidebar button {
     width: auto;

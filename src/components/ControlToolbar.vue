@@ -268,7 +268,8 @@ const itemDrag = useToolbarItemDrag({
 })
 watch([folderOpen, folderEditorOpen, itemDrag.dragging, toolbarContext.show], () => { emitToolbarOverlay(); armToolbarHide() })
 function openToolbarContext(event: MouseEvent) {
-  dismissOverlays()
+  // The phone toolbar sheet stays open so the menu stays beside the icon it acts on.
+  dismissOverlays({ keepLauncher: true })
   toolbarContext.open(event)
 }
 // Keeps the collection or folder open so several icons can be restored in turn.
@@ -1618,11 +1619,11 @@ function onTrackpadToggle(open: boolean) {
   setLauncherMenuOpen(false)
 }
 
-function dismissOverlays() {
+function dismissOverlays(options: { keepLauncher?: boolean } = {}) {
   folderOpen.value = ''
   collectionMenuOpen.value = false
   if (openMenu.value !== null) openMenu.value = null
-  setLauncherMenuOpen(false)
+  if (!options.keepLauncher) setLauncherMenuOpen(false)
   dismissControlOverlays()
   emitToolbarOverlay()
 }

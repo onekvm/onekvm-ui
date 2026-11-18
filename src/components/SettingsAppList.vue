@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Component } from 'vue'
+import { onBeforeUnmount, shallowRef, useTemplateRef, watch, type Component } from 'vue'
 import { ChevronRight, LoaderCircle } from '@/icons'
 
 import type { SettingsListTone } from '@/lib/settings-nav'
@@ -28,6 +28,22 @@ defineProps<{
 const emit = defineEmits<{
   select: [key: string]
 }>()
+
+// The actions stay at the top while the list scrolls; the divider shows only then.
+const actionsSentinel = useTemplateRef<HTMLElement>('actionsSentinel')
+const actionsStuck = shallowRef(false)
+let observer: IntersectionObserver | undefined
+watch(actionsSentinel, (element) => {
+  observer?.disconnect()
+  observer = undefined
+  actionsStuck.value = false
+  if (!element || typeof IntersectionObserver === 'undefined') return
+  observer = new IntersectionObserver(([entry]) => {
+    actionsStuck.value = Boolean(entry && !entry.isIntersecting && entry.boundingClientRect.top < (entry.rootBounds?.top ?? 0) + 1)
+  })
+  observer.observe(element)
+}, { flush: 'post' })
+onBeforeUnmount(() => observer?.disconnect())
 </script>
 
 <template>
@@ -35,8 +51,13 @@ const emit = defineEmits<{
     <header class="settings-app-heading">
       <h1 class="settings-app-large-title">{{ title }}</h1>
       <p v-if="subtitle" class="settings-app-subtitle">{{ subtitle }}</p>
-      <div v-if="$slots.actions" class="settings-app-actions"><slot name="actions" /></div>
     </header>
+    <template v-if="$slots.actions">
+      <span ref="actionsSentinel" class="settings-app-actions-sentinel" aria-hidden="true" />
+      <div class="settings-app-actions" :class="{ 'is-stuck': actionsStuck }">
+        <div class="settings-app-actions-inner"><slot name="actions" /></div>
+      </div>
+    </template>
     <nav class="settings-app-nav" :aria-label="title">
       <section v-for="group in groups" :key="group.id" class="settings-app-group">
         <h2 v-if="group.label" class="settings-app-group-title">{{ group.label }}</h2>
@@ -87,9 +108,28 @@ const emit = defineEmits<{
   text-wrap: balance;
 }
 
+.settings-app-actions-sentinel {
+  height: 1px;
+  margin: -24px 0 -1px;
+}
+
 .settings-app-actions {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: -8px -16px -12px;
+  padding: 8px 20px;
+  border-bottom: 1px solid transparent;
+  background: var(--background);
+  transition: border-color 0.15s ease;
+}
+
+.settings-app-actions.is-stuck {
+  border-bottom-color: var(--border);
+}
+
+.settings-app-actions-inner {
   max-width: 260px;
-  margin-top: 8px;
 }
 
 .settings-app-subtitle {

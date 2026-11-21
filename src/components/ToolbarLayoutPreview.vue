@@ -11,7 +11,7 @@ import ToolIcon from './toolbox/ToolIcon.vue'
 
 interface PreviewItem { id: string; title: string; glyph: Component; tool: ToolboxTool | null; status: boolean }
 
-const props = defineProps<{ config: PersonalizationConfig }>()
+const props = defineProps<{ config: PersonalizationConfig; username?: string }>()
 const toolbox = useToolboxContext()
 const items = computed(() => {
   const folders = normalizeToolbarFolders(props.config.toolbar_folders)
@@ -41,9 +41,10 @@ const showsLabel = (id: string) => toolbarItemShowsLabel(props.config, id)
   <div class="toolbar-layout-preview" :class="{ 'has-text-labels': anyLabel }" :data-toolbar-label-position="config.toolbar_label_position ?? 'right'" aria-hidden="true">
     <template v-for="item in items" :key="item.id">
     <div v-if="isToolbarSeparator(item.id)" class="toolbar-separator" />
-    <n-button v-else quaternary size="small" tabindex="-1" :class="{ 'device-indicator': item.status }" :data-toolbar-label="showsLabel(item.id) ? '' : undefined" data-state="ready">
+    <n-button v-else quaternary size="small" tabindex="-1" :class="{ 'device-indicator': item.status, 'account-button': item.id === 'account' }" :data-toolbar-label="showsLabel(item.id) ? '' : undefined" data-state="ready">
       <template #icon><ToolIcon v-if="item.tool" :tool="item.tool" /><component :is="item.glyph" v-else /></template>
-      <span v-if="showsLabel(item.id)">{{ item.title }}</span>
+      <span v-if="item.id === 'account' && username" class="button-label account-name">{{ username }}</span>
+      <span v-else-if="showsLabel(item.id)" class="toolbar-action-label">{{ item.title }}</span>
       <span v-if="item.status" class="device-led" />
     </n-button>
     </template>
@@ -51,8 +52,9 @@ const showsLabel = (id: string) => toolbarItemShowsLabel(props.config, id)
 </template>
 
 <style scoped>
-.toolbar-layout-preview { display: flex; gap: 4px; min-width: 0; overflow-x: auto; }
+.toolbar-layout-preview { display: flex; flex: none; align-items: center; gap: 4px; }
 .toolbar-layout-preview :deep(.n-button) { flex-shrink: 0; padding: 0 6px; }
 .toolbar-layout-preview :deep(.n-button__icon) { margin: 0; }
+.toolbar-layout-preview :deep(.account-button .n-button__icon) { margin-right: 6px; }
 .toolbar-layout-preview :deep(.n-button[data-toolbar-label] .n-button__icon) { margin-right: 6px; }
 </style>

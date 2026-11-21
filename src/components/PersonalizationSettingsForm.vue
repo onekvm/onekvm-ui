@@ -73,6 +73,7 @@ function tabAttributes(name: PersonalizationTab): HTMLAttributes {
         {{ t(`settings.advancedSettings.personalizationPage.tabs.${name}`) }}
       </NTab>
     </NTabs>
+    <PersonalizationPreview v-if="activeTab === 'identity' || activeTab === 'toolbar'" :model-value="modelValue" :hostname="hostname" :device-model="deviceModel" />
     <div v-show="activeTab === 'identity'" :id="panelID('identity')" class="personalization-tab-panel" role="tabpanel" :aria-labelledby="tabID('identity')" tabindex="0">
       <PersonalizationIdentitySettings
         :model-value="modelValue"
@@ -95,7 +96,6 @@ function tabAttributes(name: PersonalizationTab): HTMLAttributes {
     <div v-show="activeTab === 'noSignal'" :id="panelID('noSignal')" class="personalization-tab-panel" role="tabpanel" :aria-labelledby="tabID('noSignal')" tabindex="0">
       <PersonalizationNoSignalSettings :disabled="disabled" />
     </div>
-    <PersonalizationPreview v-if="activeTab === 'identity' || activeTab === 'toolbar'" :model-value="modelValue" :hostname="hostname" :device-model="deviceModel" />
   </div>
 </template>
 

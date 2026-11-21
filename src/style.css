@@ -3816,6 +3816,9 @@ html[data-onekvm-jelly] .host-window-frame {
   scrollbar-width: thin;
 }
 .advanced-settings-view { min-height: 100%; }
+/* The personalization preview stays in view while the toolbar icon list scrolls;
+   its offset cancels the top padding above. */
+.advanced-settings-page:not(.is-settings-app) .personalization-preview { position: sticky; top: -28px; z-index: 3; }
 .advanced-settings-panes {
   display: grid;
   min-width: 0;

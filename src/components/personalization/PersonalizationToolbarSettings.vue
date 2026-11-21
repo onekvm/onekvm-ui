@@ -8,6 +8,7 @@ import {
   defaultToolbarIcons,
   isDeviceToolbarIcon,
   isRootOnlyToolbarIcon,
+  isToolbarIconId,
   normalizeToolbarIcons,
   reorderToolbarIcon,
   setToolbarIconPlacement,
@@ -16,7 +17,7 @@ import {
   toolbarIconsEqual,
   type ToolbarIconPlacement,
 } from '@/lib/toolbar-icons'
-import { syncToolbarIconOrder } from '@/lib/toolbar-layout'
+import { setToolbarItemLabel, setToolbarLabels, syncToolbarIconOrder, toolbarAllLabelsShown, toolbarItemShowsLabel } from '@/lib/toolbar-layout'
 import { toolbarIconGlyph as iconGlyph, toolbarIconLabel as iconLabel } from '@/lib/toolbar-labels'
 import ToolbarFoldersSettings from '../ToolbarFoldersSettings.vue'
 import { t } from '@/i18n/runtime'
@@ -33,7 +34,9 @@ function update(patch: Partial<PersonalizationConfig>) {
   emit('update:modelValue', { ...props.modelValue, ...patch })
 }
 const toolbarIcons = computed(() => normalizeToolbarIcons(props.modelValue.toolbar_icons))
-const iconsCustomized = computed(() => !toolbarIconsEqual(toolbarIcons.value, defaultToolbarIcons()) || Boolean(props.modelValue.toolbar_order?.length))
+const iconsCustomized = computed(() => !toolbarIconsEqual(toolbarIcons.value, defaultToolbarIcons()) || Boolean(props.modelValue.toolbar_order?.length)
+  || (props.modelValue.toolbar_label_exceptions ?? []).some(isToolbarIconId))
+const labelsShown = computed(() => Boolean(props.modelValue.toolbar_show_labels || props.modelValue.toolbar_label_exceptions?.length))
 const { dragId, previewIcons, startIconDrag, moveIconDrag, endIconDrag, cancelIconDrag } = useToolbarIconDrag(
   () => toolbarIcons.value,
   () => props.disabled,
@@ -67,19 +70,34 @@ function moveIcon(id: ToolbarIconId, direction: -1 | 1) {
   updateToolbarIcons(reorderToolbarIcon(toolbarIcons.value, id, target.id))
 }
 
-function placeIcon(id: ToolbarIconId, placement: ToolbarIconPlacement) {
-  update({ toolbar_icons: setToolbarIconPlacement(toolbarIcons.value, id, placement) })
+/** On the toolbar an icon shows either just its glyph or its text too. */
+type IconChoice = ToolbarIconPlacement | 'labelled'
+
+function iconChoice(id: ToolbarIconId): IconChoice {
+  const placement = toolbarIconPlacement(toolbarIcons.value, id)
+  return placement === 'toolbar' && toolbarItemShowsLabel(props.modelValue, id) ? 'labelled' : placement
+}
+
+function placeIcon(id: ToolbarIconId, choice: IconChoice) {
+  const placement = choice === 'labelled' ? 'toolbar' : choice
+  const placed = { ...props.modelValue, toolbar_icons: setToolbarIconPlacement(toolbarIcons.value, id, placement) }
+  emit('update:modelValue', placement === 'toolbar' ? setToolbarItemLabel(placed, id, choice === 'labelled') : placed)
 }
 
 function placementOptions(id: ToolbarIconId) {
-  const label = (placement: ToolbarIconPlacement) => t(`settings.advancedSettings.personalizationPage.iconPlacements.${placement}`, placement)
-  return (['toolbar', 'collection', 'hidden'] as const)
-    .filter(placement => placement !== 'collection' || toolbarIconCollectable(id))
-    .map(placement => ({ value: placement, label: label(placement) }))
+  const label = (choice: IconChoice) => t(`settings.advancedSettings.personalizationPage.iconPlacements.${choice}`, choice)
+  return (['toolbar', 'labelled', 'collection', 'hidden'] as const)
+    .filter(choice => !isRootOnlyToolbarIcon(id) || choice === 'toolbar' || choice === 'labelled')
+    .filter(choice => choice !== 'collection' || toolbarIconCollectable(id))
+    .map(choice => ({ value: choice, label: label(choice) }))
 }
 
 function resetIcons() {
-  update({ toolbar_icons: defaultToolbarIcons(), toolbar_order: [] })
+  update({
+    toolbar_icons: defaultToolbarIcons(),
+    toolbar_order: [],
+    toolbar_label_exceptions: (props.modelValue.toolbar_label_exceptions ?? []).filter(id => !isToolbarIconId(id)),
+  })
 }
 </script>
 
@@ -97,9 +115,9 @@ function resetIcons() {
       </header>
       <div class="personalization-switch-row">
         <label id="toolbar-show-labels">{{ t('toolbar.folders.showLabels', 'Show text') }}</label>
-        <n-switch :value="modelValue.toolbar_show_labels ?? false" :disabled="disabled" aria-labelledby="toolbar-show-labels" @update:value="update({ toolbar_show_labels: $event })" />
+        <n-switch :value="toolbarAllLabelsShown(modelValue)" :disabled="disabled" aria-labelledby="toolbar-show-labels" @update:value="emit('update:modelValue', setToolbarLabels(modelValue, $event))" />
       </div>
-      <n-form-item v-if="modelValue.toolbar_show_labels" class="toolbar-label-position-field" :label="t('toolbar.folders.labelPosition', 'Text position')">
+      <n-form-item v-if="labelsShown" class="toolbar-label-position-field" :label="t('toolbar.folders.labelPosition', 'Text position')">
         <n-radio-group :value="modelValue.toolbar_label_position ?? 'right'" :disabled="disabled" :aria-label="t('toolbar.folders.labelPosition', 'Text position')" @update:value="update({ toolbar_label_position: $event })">
           <n-radio-button v-for="position in (['top', 'bottom', 'left', 'right'] as const)" :key="position" :value="position">{{ t(`toolbar.folders.labelPositions.${position}`, position) }}</n-radio-button>
         </n-radio-group>
@@ -148,11 +166,11 @@ function resetIcons() {
               <n-select
                 class="personalization-icon-placement"
                 size="small"
-                :value="toolbarIconPlacement(toolbarIcons, icon.id)"
+                :value="iconChoice(icon.id)"
                 :options="placementOptions(icon.id)"
-                :disabled="disabled || isRootOnlyToolbarIcon(icon.id)"
+                :disabled="disabled"
                 :consistent-menu-width="false"
-                :aria-label="t('settings.advancedSettings.personalizationPage.iconPlacement', 'Where {name} appears').replace('{name}', iconLabel(icon.id))"
+                :aria-label="t('settings.advancedSettings.personalizationPage.iconPlacement', 'How {name} appears').replace('{name}', iconLabel(icon.id))"
                 @update:value="placeIcon(icon.id, $event)"
               />
             </div>
@@ -184,7 +202,7 @@ function resetIcons() {
 .personalization-icon-drag:disabled, .personalization-icon-move:disabled { cursor: default; opacity: 0.4; }
 .personalization-icon-move:not(:disabled):hover, .personalization-icon-drag:not(:disabled):hover { background: var(--secondary); color: var(--foreground); }
 .personalization-icon-moves { display: flex; }
-.personalization-icon-placement { justify-self: end; width: 116px; }
+.personalization-icon-placement { justify-self: end; width: 132px; }
 @media (max-width: 720px) {
   .personalization-icon-drag, .personalization-icon-move { width: 44px; height: 44px; }
 }

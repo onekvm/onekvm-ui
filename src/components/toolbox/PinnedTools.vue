@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import { type DropdownOption } from 'naive-ui'
-import { Ellipsis, PinOff } from '@/icons'
+import { Captions, Ellipsis, PinOff } from '@/icons'
 import { useToolboxContext } from '@/composables/useToolbox'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { useToolbarPinCapacity } from '@/composables/useToolbarPinCapacity'
@@ -9,10 +9,10 @@ import { DISMISS_CONTROL_OVERLAY_EVENT } from '@/lib/overlay-target'
 import { t } from '@/i18n/runtime'
 import ToolIcon from './ToolIcon.vue'
 import ToolbarIconSlot from '../ToolbarIconSlot.vue'
-import { toolbarFolderFor, normalizeToolbarFolders, type ToolbarLayout } from '@/lib/toolbar-layout'
+import { toolbarFolderFor, normalizeToolbarFolders, toolbarItemShowsLabel, type ToolbarLayout } from '@/lib/toolbar-layout'
 
-const props = defineProps<{ layout?: ToolbarLayout; order?: string[]; folderTargets?: Record<string, HTMLElement | null>; showLabels?: boolean; mobile?: boolean; vertical?: boolean; placement?: 'top-end' | 'bottom-end' | 'bottom-start' | 'right-start' | 'left-start' }>()
-const emit = defineEmits<{ overlay: [open: boolean]; activate: [] }>()
+const props = defineProps<{ layout?: ToolbarLayout; order?: string[]; folderTargets?: Record<string, HTMLElement | null>; showLabels?: boolean; labelsEditable?: boolean; mobile?: boolean; vertical?: boolean; placement?: 'top-end' | 'bottom-end' | 'bottom-start' | 'right-start' | 'left-start' }>()
+const emit = defineEmits<{ overlay: [open: boolean]; activate: []; label: [id: string, show: boolean] }>()
 const toolbox = useToolboxContext()
 const mountTo = useOverlayMount()
 const overflowOpen = ref(false)
@@ -20,9 +20,13 @@ const contextToolId = shallowRef('')
 const contextPosition = shallowRef({ x: 0, y: 0 })
 const contextTrigger = shallowRef<HTMLElement | null>(null)
 const contextTool = computed(() => toolbox.pinned.find(({ tool }) => tool.id === contextToolId.value)?.tool)
-const contextOptions = computed<DropdownOption[]>(() => [{
-  key: 'unpin', label: t('toolbox.unpin'), icon: () => h(PinOff, { size: 16 }),
-}])
+const contextLabel = computed(() => toolbarItemShowsLabel(props.layout ?? {}, `tool:${contextToolId.value}`))
+const contextOptions = computed<DropdownOption[]>(() => [
+  ...(props.labelsEditable && !folderFor(contextToolId.value) ? [{
+    key: 'label', label: contextLabel.value ? t('toolbar.hideLabel', 'Hide text') : t('toolbar.showLabel', 'Show text'), icon: () => h(Captions, { size: 16 }),
+  }] : []),
+  { key: 'unpin', label: t('toolbox.unpin'), icon: () => h(PinOff, { size: 16 }) },
+])
 const folders = computed(() => normalizeToolbarFolders(props.layout?.toolbar_folders))
 const folderFor = (id: string) => toolbarFolderFor(folders.value, `tool:${id}`)
 const rootPins = computed(() => toolbox.pinned.filter(({ tool }) => !folderFor(tool.id)))
@@ -62,6 +66,13 @@ function contextKeydown(event: KeyboardEvent, id: string) {
 function closeContextMenu(restoreFocus = false) {
   contextToolId.value = ''
   if (restoreFocus) contextTrigger.value?.focus()
+}
+function selectContextOption(key: string) {
+  if (key !== 'label') return unpinContextTool()
+  const id = contextToolId.value
+  const show = !contextLabel.value
+  closeContextMenu(true)
+  emit('label', `tool:${id}`, show)
 }
 function unpinContextTool() {
   const id = contextToolId.value
@@ -103,7 +114,7 @@ onBeforeUnmount(() => { window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT
       </n-tooltip>
       </ToolbarIconSlot>
       <n-dropdown v-if="overflow.length" trigger="click" :show="overflowOpen" :options="overflowOptions" :to="mountTo" :placement="placement || 'bottom-end'" scrollable :menu-props="menuProps" @update:show="overflowOpen = $event" @select="toolbox.open(String($event)); overflowOpen = false">
-        <n-button quaternary size="small" :style="{ order: overflowOrder }" :aria-label="`${t('toolbox.morePins')} (${overflow.length})`"><template #icon><Ellipsis :size="16" /></template><span class="toolbar-action-label">{{ t('toolbox.morePins') }}</span></n-button>
+        <n-button quaternary size="small" :style="{ order: overflowOrder }" :data-toolbar-label="layout?.toolbar_show_labels ? '' : undefined" :aria-label="`${t('toolbox.morePins')} (${overflow.length})`"><template #icon><Ellipsis :size="16" /></template><span class="toolbar-action-label">{{ t('toolbox.morePins') }}</span></n-button>
       </n-dropdown>
     </div>
   </div>
@@ -118,7 +129,7 @@ onBeforeUnmount(() => { window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT
     :menu-props="contextMenuProps"
     @clickoutside="closeContextMenu()"
     @update:show="!$event && closeContextMenu()"
-    @select="unpinContextTool"
+    @select="selectContextOption"
   />
 </template>
 <style scoped>

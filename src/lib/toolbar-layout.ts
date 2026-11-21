@@ -29,7 +29,36 @@ export interface ToolbarLayout {
   toolbar_folders?: ToolbarFolder[]
   toolbar_order?: string[]
   toolbar_show_labels?: boolean
+  toolbar_label_exceptions?: string[]
   toolbar_label_position?: ToolbarLabelPosition
+}
+
+/** Whether the toolbar item shows its text next to the icon. */
+export function toolbarItemShowsLabel(layout: ToolbarLayout, id: string) {
+  return Boolean(layout.toolbar_show_labels) !== (layout.toolbar_label_exceptions ?? []).includes(id)
+}
+
+export function setToolbarItemLabel<T extends ToolbarLayout>(layout: T, id: string, show: boolean): T {
+  const exceptions = (layout.toolbar_label_exceptions ?? []).filter(item => item !== id)
+  if (show !== Boolean(layout.toolbar_show_labels)) exceptions.push(id)
+  return { ...layout, toolbar_label_exceptions: exceptions }
+}
+
+/** Shows or hides the text of every item, dropping per-item choices. */
+export function setToolbarLabels<T extends ToolbarLayout>(layout: T, show: boolean): T {
+  return { ...layout, toolbar_show_labels: show, toolbar_label_exceptions: [] }
+}
+
+export function toolbarAllLabelsShown(layout: ToolbarLayout) {
+  return Boolean(layout.toolbar_show_labels) && !layout.toolbar_label_exceptions?.length
+}
+
+/** Whether any of the given items on the toolbar itself shows text. */
+export function toolbarAnyLabelShown(layout: ToolbarLayout, items: readonly string[]) {
+  const folders = normalizeToolbarFolders(layout.toolbar_folders)
+  const icons = normalizeToolbarIcons(layout.toolbar_icons)
+  return items.some(id => !isToolbarSeparator(id) && toolbarItemShowsLabel(layout, id)
+    && !toolbarFolderFor(folders, id) && !icons.find(icon => icon.id === id)?.hidden)
 }
 const validToolItem = (value: string) => /^tool:[a-z0-9_-]{1,64}\/[a-z0-9_-]{1,64}$/.test(value)
 export const isToolbarItem = (value: unknown): value is string => typeof value === 'string' && (isToolbarIconId(value) || validToolItem(value))

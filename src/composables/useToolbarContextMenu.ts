@@ -1,6 +1,6 @@
 import { computed, h, shallowRef } from 'vue'
 import type { DropdownOption } from 'naive-ui'
-import { Check, Ellipsis, Eye, EyeOff, FolderPlus, LockKeyhole, Minus, Pencil, Trash2 } from '@/icons'
+import { Captions, Check, Ellipsis, Eye, EyeOff, FolderPlus, LockKeyhole, Minus, Pencil, Trash2 } from '@/icons'
 import { t } from '@/i18n/runtime'
 import { isToolbarSeparator } from '@/lib/toolbar-layout'
 import type { ToolbarIconPlacement } from '@/lib/toolbar-icons'
@@ -19,6 +19,9 @@ export function useToolbarContextMenu(options: {
   /** Whether the item can go into the collection menu. */
   iconCollectable: (id: string) => boolean
   setIconPlacement: (id: string, placement: ToolbarIconPlacement) => void
+  /** Whether the item shows its text; undefined when it has none. */
+  itemLabel: (id: string) => boolean | undefined
+  setItemLabel: (id: string, show: boolean) => void
 }) {
   const locked = shallowRef(localStorage.getItem(lockKey) === '1')
   const show = shallowRef(false)
@@ -37,8 +40,12 @@ export function useToolbarContextMenu(options: {
         visibility.push({ key: 'collect', label: t('toolbar.collectIcon', 'Move to collection'), icon: glyph(Ellipsis), disabled })
       }
       if (placement !== 'hidden') visibility.push({ key: 'hide', label: t('toolbar.hideIcon', 'Hide icon'), icon: glyph(EyeOff), disabled })
-      visibility.push({ type: 'divider', key: 'visibility-divider' })
     }
+    const label = inMenu.value || hidden ? undefined : options.itemLabel(item.value)
+    if (label !== undefined) {
+      visibility.push({ key: 'label', label: label ? t('toolbar.hideLabel', 'Hide text') : t('toolbar.showLabel', 'Show text'), icon: glyph(Captions), disabled })
+    }
+    if (visibility.length) visibility.push({ type: 'divider', key: 'visibility-divider' })
     const lock: DropdownOption = { key: 'lock', label: locked.value ? t('toolbar.unlock', 'Unlock toolbar') : t('toolbar.lock', 'Lock toolbar'), icon: glyph(locked.value ? Check : LockKeyhole) }
     // Separators and folders only apply to items on the toolbar itself.
     if (hidden || inMenu.value) return [...visibility, lock]
@@ -73,6 +80,10 @@ export function useToolbarContextMenu(options: {
     if (locked.value || !options.canArrange()) return
     const placements: Record<string, ToolbarIconPlacement> = { show: 'toolbar', collect: 'collection', hide: 'hidden' }
     if (placements[key] && options.iconPlacement(item.value) !== undefined) options.setIconPlacement(item.value, placements[key])
+    if (key === 'label') {
+      const label = options.itemLabel(item.value)
+      if (label !== undefined) options.setItemLabel(item.value, !label)
+    }
     if (key === 'folder' && options.canCreateFolder()) options.createFolder()
     if (key === 'separator') options.addSeparator(item.value || undefined)
     if (key === 'remove' && isToolbarSeparator(item.value)) options.removeSeparator(item.value)

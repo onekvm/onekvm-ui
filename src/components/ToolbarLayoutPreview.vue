@@ -3,7 +3,7 @@ import { computed, type Component } from 'vue'
 import { Folder, iconComponent } from '@/icons'
 import type { PersonalizationConfig } from '@/api/client'
 import { normalizeToolbarIcons, isToolbarIconId, isKeyboardActionToolbarIcon } from '@/lib/toolbar-icons'
-import { isToolbarSeparator, normalizeToolbarFolders, toolbarFolderFor, toolbarLayoutOrder, visibleToolbarSeparators } from '@/lib/toolbar-layout'
+import { isToolbarSeparator, normalizeToolbarFolders, toolbarAnyLabelShown, toolbarFolderFor, toolbarItemShowsLabel, toolbarLayoutOrder, visibleToolbarSeparators } from '@/lib/toolbar-layout'
 import { toolbarIconGlyph, toolbarIconLabel } from '@/lib/toolbar-labels'
 import { useToolboxContext, type ToolboxTool } from '@/composables/useToolbox'
 import { USB_GAMEPAD_UI_ENABLED } from '@/lib/ui-features'
@@ -33,15 +33,17 @@ const items = computed(() => {
   const separators = new Set(visibleToolbarSeparators(rendered.map(item => item.id), new Set(rendered.filter(item => !isToolbarSeparator(item.id)).map(item => item.id))))
   return rendered.filter(item => !isToolbarSeparator(item.id) || separators.has(item.id))
 })
+const anyLabel = computed(() => toolbarAnyLabelShown(props.config, items.value.map(item => item.id)))
+const showsLabel = (id: string) => toolbarItemShowsLabel(props.config, id)
 </script>
 
 <template>
-  <div class="toolbar-layout-preview" :class="{ 'has-text-labels': config.toolbar_show_labels }" :data-toolbar-label-position="config.toolbar_label_position ?? 'right'" aria-hidden="true">
+  <div class="toolbar-layout-preview" :class="{ 'has-text-labels': anyLabel }" :data-toolbar-label-position="config.toolbar_label_position ?? 'right'" aria-hidden="true">
     <template v-for="item in items" :key="item.id">
     <div v-if="isToolbarSeparator(item.id)" class="toolbar-separator" />
-    <n-button v-else quaternary size="small" tabindex="-1" :class="{ 'device-indicator': item.status }" data-state="ready">
+    <n-button v-else quaternary size="small" tabindex="-1" :class="{ 'device-indicator': item.status }" :data-toolbar-label="showsLabel(item.id) ? '' : undefined" data-state="ready">
       <template #icon><ToolIcon v-if="item.tool" :tool="item.tool" /><component :is="item.glyph" v-else /></template>
-      <span v-if="config.toolbar_show_labels">{{ item.title }}</span>
+      <span v-if="showsLabel(item.id)">{{ item.title }}</span>
       <span v-if="item.status" class="device-led" />
     </n-button>
     </template>
@@ -52,5 +54,5 @@ const items = computed(() => {
 .toolbar-layout-preview { display: flex; gap: 4px; min-width: 0; overflow-x: auto; }
 .toolbar-layout-preview :deep(.n-button) { flex-shrink: 0; padding: 0 6px; }
 .toolbar-layout-preview :deep(.n-button__icon) { margin: 0; }
-.toolbar-layout-preview.has-text-labels :deep(.n-button__icon) { margin-right: 6px; }
+.toolbar-layout-preview :deep(.n-button[data-toolbar-label] .n-button__icon) { margin-right: 6px; }
 </style>

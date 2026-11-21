@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { cloudDeviceName, serviceURL } from '@/api/service-url'
-import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
+import { computed, h, nextTick, onBeforeUnmount, onMounted, provide, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import {
   Bell,
   Check,
@@ -64,11 +64,11 @@ import { sendShortcut, shortcutChordLabel } from '@/lib/keyboard-shortcuts'
 import { useThemeMenu } from '@/composables/useThemeMenu'
 import { hasPermission } from '@/build'
 import { useAuth } from '@/composables/useAuth'
-import { useToolbarLayout } from '@/composables/useToolbarLayout'
+import { toolbarItemLabelKey, useToolbarLayout } from '@/composables/useToolbarLayout'
 import { useToolbarItemDrag } from '@/composables/useToolbarItemDrag'
 import { useToolbarContextMenu } from '@/composables/useToolbarContextMenu'
 import { useToolbarFolderOptions } from '@/composables/useToolbarFolderOptions'
-import { MAX_TOOLBAR_FOLDERS, groupToolbarItems, moveToolbarItem, removeToolbarFolder, toolbarFolderFor, upsertToolbarFolder, visibleToolbarSeparators } from '@/lib/toolbar-layout'
+import { MAX_TOOLBAR_FOLDERS, groupToolbarItems, isToolbarSeparator, moveToolbarItem, removeToolbarFolder, setToolbarItemLabel, toolbarFolderFor, upsertToolbarFolder, visibleToolbarSeparators } from '@/lib/toolbar-layout'
 import type { ToolbarFolder } from '@/api/client'
 import ToolbarFolderDialog from './ToolbarFolderDialog.vue'
 
@@ -220,6 +220,13 @@ const unreadNotificationsLabel = computed(() => unreadNotifications.value > 99 ?
 const { auth } = useAuth()
 const canArrangeToolbar = computed(() => hasPermission(auth, 'settings.manage'))
 const toolbarLayout = useToolbarLayout(() => props.status?.identity)
+provide(toolbarItemLabelKey, toolbarLayout.labelShown)
+/** Items without their own text setting follow the toolbar-wide one. */
+const defaultLabelAttr = computed(() => toolbarLayout.layout.value.toolbar_show_labels ? '' : undefined)
+const labelAttr = (id: string) => toolbarLayout.labelShown(id) ? '' : undefined
+function setItemLabel(id: string, show: boolean) {
+  void toolbarLayout.save(layout => setToolbarItemLabel(layout, id, show))
+}
 const folderOptions = useToolbarFolderOptions()
 const folderOpen = ref('')
 const folderEditorOpen = ref(false)
@@ -248,6 +255,8 @@ const toolbarContext = useToolbarContextMenu({
   setIconPlacement: (id, placement) => {
     if (isToolbarIconId(id)) void toolbarLayout.save(layout => ({ ...layout, toolbar_icons: setToolbarIconPlacement(layout.toolbar_icons, id, placement) }))
   },
+  itemLabel: id => id && !isToolbarSeparator(id) ? toolbarLayout.labelShown(id) : undefined,
+  setItemLabel,
 })
 const toolbarSeparators = computed(() => {
   const visible = new Set(toolbarLayout.order.value.filter(id => {
@@ -1796,7 +1805,7 @@ onBeforeUnmount(() => {
         <span v-if="consoleSubtitle">{{ consoleSubtitle }}</span>
       </div>
       <div class="toolbar-layout" :class="{ 'has-text-labels': toolbarLayout.showLabels.value }" :data-toolbar-label-position="toolbarLayout.layout.value.toolbar_label_position ?? 'right'" data-toolbar-surface>
-      <div v-if="mediaTransferVisible" class="toolbar-icon-slot toolbar-temporary-actions" style="order: -3" data-toolbar-temporary-tasks>
+      <div v-if="mediaTransferVisible" class="toolbar-icon-slot toolbar-temporary-actions" style="order: -3" data-toolbar-temporary-tasks :data-toolbar-label="defaultLabelAttr">
         <MediaTransferIndicator
           :state="mediaTransfer"
           :tooltip-disabled="toolbarLauncher"
@@ -2073,6 +2082,7 @@ onBeforeUnmount(() => {
       <div
         v-if="hddIndicatorVisible && toolbarIconShown('power')"
         class="toolbar-icon-slot"
+        :data-toolbar-label="defaultLabelAttr"
         :style="{ order: toolbarIconStyle('power').order + 1 }"
       >
       <HddActivityIndicator
@@ -2149,6 +2159,7 @@ onBeforeUnmount(() => {
         v-for="item in deviceControlExtensions"
         :key="`${item.extensionId}:${item.slot}:${item.order}`"
         class="toolbar-icon-slot"
+        :data-toolbar-label="defaultLabelAttr"
         style="order: 1000"
       >
         <component :is="item.component" v-bind="extensionHostProps" />
@@ -2156,9 +2167,9 @@ onBeforeUnmount(() => {
 
     </div>
 
-    <PinnedTools :mobile="toolbarLauncher" :vertical="toolbarVertical" :placement="menuPlacement" :layout="toolbarLayout.layout.value" :order="toolbarLayout.order.value" :folder-targets="folderTargets" :show-labels="toolbarLayout.showLabels.value" @overlay="pinnedOverflowOpen = $event" @activate="onPinnedToolActivate" />
+    <PinnedTools :mobile="toolbarLauncher" :vertical="toolbarVertical" :placement="menuPlacement" :layout="toolbarLayout.layout.value" :order="toolbarLayout.order.value" :folder-targets="folderTargets" :show-labels="toolbarLayout.showLabels.value" :labels-editable="canArrangeToolbar && !toolbarContext.locked.value" @overlay="pinnedOverflowOpen = $event" @activate="onPinnedToolActivate" @label="setItemLabel" />
 
-    <div v-for="folder in toolbarLayout.folders.value" :key="folder.id" class="toolbar-icon-slot toolbar-folder-slot" :data-toolbar-item="`folder:${folder.id}`" :data-toolbar-folder="folder.id" :style="{ order: toolbarItemOrder(`folder:${folder.id}`) }">
+    <div v-for="folder in toolbarLayout.folders.value" :key="folder.id" class="toolbar-icon-slot toolbar-folder-slot" :data-toolbar-item="`folder:${folder.id}`" :data-toolbar-folder="folder.id" :data-toolbar-label="labelAttr(`folder:${folder.id}`)" :style="{ order: toolbarItemOrder(`folder:${folder.id}`) }">
       <ToolbarCollectionMenu :title="folder.name" :icon="folder.icon" :folder-id="folder.id" :show="folderOpen === folder.id" :count="folderItemCount(folder)" :mobile="toolbarLauncher" :child-open="openMenu !== null || toolbox.menuOpen || keyboardTextWindowOpen" :placement="menuPlacement" @update:show="setFolderOpen(folder.id, $event)" @target="setFolderTarget(folder.id, $event)" @contextmenu="openMenuItemContext">
         <template v-if="canArrangeToolbar && !toolbarContext.locked.value" #footer><n-button quaternary block class="toolbar-folder-edit-button" @click="openFolderEditor(folder)">{{ t('toolbar.folders.edit', 'Edit folder') }}</n-button></template>
       </ToolbarCollectionMenu>
@@ -2169,6 +2180,7 @@ onBeforeUnmount(() => {
         v-for="item in actionStartExtensions"
         :key="`${item.extensionId}:${item.slot}:${item.order}`"
         class="toolbar-icon-slot"
+        :data-toolbar-label="defaultLabelAttr"
         style="order: 0"
       >
         <component :is="item.component" v-bind="extensionHostProps" />
@@ -2267,7 +2279,7 @@ onBeforeUnmount(() => {
       </NotificationCenterPopover>
       </ToolbarIconSlot>
 
-      <div v-if="collectedIcons.length" data-toolbar-item="collection" class="toolbar-icon-slot" :style="toolbarIconStyle('collection')">
+      <div v-if="collectedIcons.length" data-toolbar-item="collection" class="toolbar-icon-slot" :data-toolbar-label="labelAttr('collection')" :style="toolbarIconStyle('collection')">
         <ToolbarCollectionMenu
           :show="collectionMenuOpen"
           :count="collectedIcons.length"
@@ -2280,7 +2292,7 @@ onBeforeUnmount(() => {
         />
       </div>
 
-      <div v-if="canSettings" data-toolbar-item="settings" class="toolbar-icon-slot" :style="toolbarIconStyle('settings')">
+      <div v-if="canSettings" data-toolbar-item="settings" class="toolbar-icon-slot" :data-toolbar-label="labelAttr('settings')" :style="toolbarIconStyle('settings')">
       <n-tooltip :disabled="toolbarLauncher">
         <template #trigger>
           <n-button quaternary size="small" :aria-label="t('settings.title')" @click="emit('settings')">
@@ -2296,6 +2308,7 @@ onBeforeUnmount(() => {
         v-for="item in actionEndExtensions"
         :key="`${item.extensionId}:${item.slot}:${item.order}`"
         class="toolbar-icon-slot"
+        :data-toolbar-label="defaultLabelAttr"
         style="order: 2000"
       >
         <component :is="item.component" v-bind="extensionHostProps" />
@@ -2388,7 +2401,7 @@ onBeforeUnmount(() => {
                 :aria-label="t('settings.account.title', 'Account')"
               >
                 <template #icon><CircleUserRound /></template>
-                <span v-if="!toolbarIconShown('account') || toolbarVertical && toolbarLayout.showLabels.value" class="toolbar-action-label">{{ t('settings.account.title', 'Account') }}</span>
+                <span v-if="!toolbarIconShown('account') || toolbarVertical && toolbarLayout.labelShown('account')" class="toolbar-action-label">{{ t('settings.account.title', 'Account') }}</span>
                 <span v-if="!toolbarVertical && toolbarIconShown('account')" class="button-label account-name">{{ username }}</span>
               </n-button>
             </template>

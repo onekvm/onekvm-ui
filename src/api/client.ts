@@ -400,6 +400,8 @@ export interface PersonalizationConfig {
   toolbar_folders?: ToolbarFolder[]
   toolbar_order?: string[]
   toolbar_show_labels?: boolean
+  /** Items whose text is shown the opposite way to toolbar_show_labels. */
+  toolbar_label_exceptions?: string[]
   toolbar_label_position?: ToolbarLabelPosition
 }
 

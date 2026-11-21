@@ -40,6 +40,7 @@ export async function loadMarketplaceInstallPackage(extension: ExtensionSummary,
   const response = await invokeExtensionShell<MarketplaceListResponse>(
     PLUGIN_MARKETPLACE_ID,
     'listPackages',
+    { icon_urls: true },
   )
   const packages = Array.isArray(response?.packages) ? response.packages : []
   for (const item of packages) {

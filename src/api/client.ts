@@ -967,6 +967,8 @@ export interface ExtensionSummary {
   icon?:
     | { source: 'lucide'; name: string }
     | { source: 'custom'; path: string; data?: string }
+  /** Marketplace package icon, served by the device. */
+  icon_url?: string
   icon_data_url?: string
   has_page?: boolean
   has_toolbar?: boolean

@@ -63,6 +63,7 @@ function normalizeMarketplacePackages(value: unknown): MarketplacePackage[] {
       icon: record.icon && typeof record.icon === 'object'
         ? record.icon as MarketplacePackage['icon']
         : undefined,
+      icon_url: typeof record.icon_url === 'string' ? record.icon_url : '',
       icon_data_url: typeof record.icon_data_url === 'string' ? record.icon_data_url : '',
       size_bytes: Number(record.size_bytes) || 0,
       installed_size_bytes: Number(record.installed_size_bytes) || 0,
@@ -138,6 +139,7 @@ export function useCloudServices(options: UseCloudServicesOptions) {
       const response = await invokeExtensionShell<MarketplaceListResponse>(
         PLUGIN_MARKETPLACE_ID,
         'listPackages',
+        { icon_urls: true },
       )
       if (generation !== marketplaceGeneration) return
       marketplacePackages.value = normalizeMarketplacePackages(response?.packages)

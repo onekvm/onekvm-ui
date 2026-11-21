@@ -1,5 +1,8 @@
 import type { ExtensionSummary } from '@/api/client'
 
+// Package icons from the Plugin Marketplace, cached by the browser.
+export const MARKETPLACE_ICON_PREFIX = '/api/extension-icons/'
+
 export const WIREGUARD_MARKETPLACE_ID = 'wireguard'
 
 export interface MarketplaceInstallText {
@@ -21,6 +24,7 @@ export interface MarketplaceInstallPackage {
   kind?: string
   sizeBytes: number
   installedSizeBytes: number
+  iconUrl: string
   iconDataUrl: string
   icon?: ExtensionSummary['icon']
   i18n: Record<string, MarketplaceInstallText>
@@ -80,6 +84,11 @@ function readIconDataUrl(record: Record<string, unknown>) {
   return ''
 }
 
+function readIconUrl(value: unknown) {
+  const url = readText(value).trim()
+  return url.startsWith(MARKETPLACE_ICON_PREFIX) ? url : ''
+}
+
 function readIcon(value: unknown): ExtensionSummary['icon'] {
   if (!value || typeof value !== 'object') return undefined
   const record = value as Record<string, unknown>
@@ -124,6 +133,7 @@ export function marketplaceInstallPackageFromRecord(value: unknown, id: string):
     kind: readText(record.kind),
     sizeBytes: Number(record.size_bytes) || 0,
     installedSizeBytes: Number(record.installed_size_bytes) || 0,
+    iconUrl: readIconUrl(record.icon_url),
     iconDataUrl,
     icon: readIcon(record.icon),
     i18n: readI18n(record.i18n),

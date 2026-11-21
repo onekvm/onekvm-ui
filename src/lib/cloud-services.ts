@@ -13,6 +13,7 @@ export interface MarketplacePackage {
   installed: boolean
   i18n?: Record<string, { name: string; description: string }>
   icon?: ExtensionSummary['icon']
+  icon_url?: string
   icon_data_url?: string
   size_bytes?: number
   installed_size_bytes?: number
@@ -38,6 +39,7 @@ function marketplaceSummary(item: MarketplacePackage): CloudServiceEntry {
     enabled: false,
     running: false,
     icon: item.icon,
+    icon_url: item.icon_url,
     icon_data_url: item.icon_data_url,
     marketplaceAvailable: true,
     sizeBytes: Number(item.size_bytes) || 0,

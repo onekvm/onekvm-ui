@@ -9,6 +9,7 @@ const props = defineProps<{
   id: string
   name?: string
   icon?: ExtensionSummary['icon']
+  iconUrl?: string
   iconDataUrl?: string
 }>()
 const emit = defineEmits<{ 'update:show': [show: boolean] }>()
@@ -27,6 +28,7 @@ const summary = computed<ExtensionSummary>(() => {
     enabled: false,
     running: false,
     icon: props.icon,
+    icon_url: props.iconUrl,
     icon_data_url: props.iconDataUrl,
   }
   const current = detail.value
@@ -35,6 +37,7 @@ const summary = computed<ExtensionSummary>(() => {
     ...fallback,
     ...current,
     icon: current.icon || fallback.icon,
+    icon_url: current.icon_url || fallback.icon_url,
     icon_data_url: current.icon_data_url || fallback.icon_data_url,
   }
 })

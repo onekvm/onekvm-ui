@@ -52,7 +52,7 @@
     "test:keyboard-lock": "node --experimental-strip-types tests/keyboard-lock-state.test.ts && node --experimental-strip-types tests/console-keyboard-lock.test.ts",
     "test:keyboard-magic": "node --experimental-strip-types tests/keyboard-magic.test.ts && node --experimental-strip-types tests/keyboard-magic-input.test.ts",
     "test:picture-in-picture": "node --experimental-strip-types tests/picture-in-picture.test.ts",
-    "test:trackpad": "node --experimental-strip-types tests/trackpad.test.ts",
+    "test:trackpad": "node --experimental-strip-types tests/trackpad.test.ts && node --experimental-strip-types tests/touchpad-gestures.test.ts",
     "test:mobile-viewport": "node --experimental-strip-types tests/mobile-viewport.test.ts",
     "test:history-lock": "node --experimental-strip-types tests/history-lock.test.ts",
     "test:fullscreen-inset": "node --experimental-strip-types tests/fullscreen-inset.test.ts",

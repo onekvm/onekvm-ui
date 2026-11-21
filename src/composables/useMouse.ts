@@ -2,6 +2,13 @@ import { onBeforeUnmount, watch, type Ref } from 'vue'
 
 import { sendRelativeMotion } from '@/lib/hid-mouse'
 import { onekvm } from '@/lib/onekvm'
+import {
+  TOUCHPAD_HOLD_MS,
+  TouchpadGesture,
+  touchpadHidDelta,
+  type TouchInput,
+  type TouchpadAction,
+} from '@/lib/touchpad-gestures'
 import { mapAbsoluteMouse, unrotateMouseDelta, type VideoFit, type VideoRotation } from '@/lib/video-fit'
 
 export type MouseMode = 'absolute' | 'relative'
@@ -17,6 +24,7 @@ export function useMouse(
   surface?: Readonly<Ref<HTMLElement | null>>,
   enabled?: Readonly<Ref<boolean>>,
   rotation?: Readonly<Ref<VideoRotation>>,
+  touchInput?: Readonly<Ref<TouchInput>>,
 ) {
   let buttons = 0
   let moveTimer = 0
@@ -30,22 +38,30 @@ export function useMouse(
   let lastClientX = 0
   let lastClientY = 0
   let removeListeners = () => undefined
+  const gesture = new TouchpadGesture()
+  let holdTimer = 0
+  let touchX = absoluteX
+  let touchY = absoluteY
 
   const hidEnabled = () => enabled?.value !== false
+
+  const sourceSize = (element: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement) => ({
+    sourceWidth: element instanceof HTMLVideoElement
+      ? element.videoWidth
+      : element instanceof HTMLCanvasElement
+        ? element.width
+        : element.naturalWidth,
+    sourceHeight: element instanceof HTMLVideoElement
+      ? element.videoHeight
+      : element instanceof HTMLCanvasElement
+        ? element.height
+        : element.naturalHeight,
+  })
 
   const coordinates = (clientX: number, clientY: number) => {
     const element = video.value!
     const rect = element.getBoundingClientRect()
-    const sourceWidth = element instanceof HTMLVideoElement
-      ? element.videoWidth
-      : element instanceof HTMLCanvasElement
-        ? element.width
-        : element.naturalWidth
-    const sourceHeight = element instanceof HTMLVideoElement
-      ? element.videoHeight
-      : element instanceof HTMLCanvasElement
-        ? element.height
-        : element.naturalHeight
+    const { sourceWidth, sourceHeight } = sourceSize(element)
     return mapAbsoluteMouse(
       clientX,
       clientY,
@@ -63,9 +79,12 @@ export function useMouse(
     if (mode.value === 'absolute') {
       onekvm.sendAbsoluteMouse(buttons, absoluteX, absoluteY)
     } else if (pendingX || pendingY) {
-      sendRelativeMotion(buttons, pendingX, pendingY)
-      pendingX = 0
-      pendingY = 0
+      // Keep fractions so slow touchpad slides still add up.
+      const x = Math.round(pendingX)
+      const y = Math.round(pendingY)
+      pendingX -= x
+      pendingY -= y
+      sendRelativeMotion(buttons, x, y)
     }
   }
 
@@ -82,8 +101,126 @@ export function useMouse(
     event.pointerType === 'mouse' ? buttonBits[event.button] : 1
   )
 
+  const usesTouchpad = (event: PointerEvent) =>
+    event.pointerType === 'touch' && touchInput?.value === 'touchpad'
+
+  const clearHoldTimer = () => {
+    if (!holdTimer) return
+    window.clearTimeout(holdTimer)
+    holdTimer = 0
+  }
+
+  const armHoldTimer = () => {
+    clearHoldTimer()
+    if (!gesture.waitingForHold) return
+    holdTimer = window.setTimeout(() => {
+      holdTimer = 0
+      runTouchpad(gesture.hold())
+    }, TOUCHPAD_HOLD_MS)
+  }
+
+  // Sends any pending movement with the old buttons first, so a drag keeps
+  // its last stretch before the button lifts.
+  const setButtons = (next: number) => {
+    if (moveTimer) {
+      window.clearTimeout(moveTimer)
+      flushMove()
+    }
+    buttons = next
+    if (mode.value === 'absolute') onekvm.sendAbsoluteMouse(buttons, absoluteX, absoluteY)
+    else onekvm.sendRelativeMouse(buttons)
+  }
+
+  const moveTouchpadCursor = (dx: number, dy: number) => {
+    const element = video.value
+    if (!element) return
+    const { sourceWidth, sourceHeight } = sourceSize(element)
+    const delta = touchpadHidDelta(
+      dx,
+      dy,
+      element.getBoundingClientRect(),
+      sourceWidth,
+      sourceHeight,
+      videoFit.value,
+      rotation?.value,
+    )
+    if (mode.value === 'absolute') {
+      touchX = Math.max(1, Math.min(0x7fff, touchX + delta.x))
+      touchY = Math.max(1, Math.min(0x7fff, touchY + delta.y))
+      absoluteX = Math.round(touchX)
+      absoluteY = Math.round(touchY)
+    } else if (sourceWidth > 0 && sourceHeight > 0) {
+      pendingX += delta.x * sourceWidth / 0x7ffe
+      pendingY += delta.y * sourceHeight / 0x7ffe
+    }
+    scheduleMove()
+  }
+
+  function runTouchpad(actions: TouchpadAction[]) {
+    for (const action of actions) {
+      switch (action.kind) {
+        case 'move':
+          moveTouchpadCursor(action.dx, action.dy)
+          break
+        case 'click': {
+          const bit = action.button === 'left' ? 1 : 2
+          setButtons(buttons | bit)
+          setButtons(buttons & ~bit)
+          break
+        }
+        case 'press':
+          setButtons(buttons | 1)
+          break
+        case 'release':
+          setButtons(buttons & ~1)
+          break
+        case 'wheel':
+          onekvm.sendRelativeMouse(mode.value === 'relative' ? buttons : 0, 0, 0, action.delta)
+          break
+        case 'held':
+          navigator.vibrate?.(12)
+          break
+      }
+    }
+  }
+
+  const touchpadDown = (event: PointerEvent) => {
+    event.preventDefault()
+    const target = eventTarget()
+    target?.focus({ preventScroll: true })
+    try {
+      target?.setPointerCapture(event.pointerId)
+    } catch {
+      // Capture is best-effort; touch still tracks on the surface.
+    }
+    if (!gesture.active) {
+      touchX = absoluteX
+      touchY = absoluteY
+    }
+    runTouchpad(gesture.down(event.pointerId, event.clientX, event.clientY))
+    armHoldTimer()
+  }
+
+  const touchpadMove = (event: PointerEvent) => {
+    event.preventDefault()
+    const actions = gesture.move(event.pointerId, event.clientX, event.clientY)
+    if (!gesture.waitingForHold) clearHoldTimer()
+    runTouchpad(actions)
+  }
+
+  const touchpadUp = (event: PointerEvent) => {
+    event.preventDefault()
+    const actions = event.type === 'pointercancel' ? gesture.cancel() : gesture.up(event.pointerId)
+    if (!gesture.waitingForHold) clearHoldTimer()
+    runTouchpad(actions)
+  }
+
   const pointerMove = (event: PointerEvent) => {
     if (!hidEnabled()) return
+    if (usesTouchpad(event)) {
+      touchpadMove(event)
+      return
+    }
     if (event.pointerType !== 'mouse' && event.pointerId !== activeTouchId) return
     if (event.pointerType !== 'mouse') event.preventDefault()
     if (mode.value === 'absolute') {
@@ -116,6 +253,10 @@ export function useMouse(
 
   const pointerDown = (event: PointerEvent) => {
     if (!hidEnabled()) return
+    if (usesTouchpad(event)) {
+      touchpadDown(event)
+      return
+    }
     if (event.pointerType !== 'mouse') {
       if (activeTouchId !== null) return
       activeTouchId = event.pointerId
@@ -153,6 +294,10 @@ export function useMouse(
 
   const pointerUp = (event: PointerEvent) => {
     if (!hidEnabled()) return
+    if (usesTouchpad(event)) {
+      touchpadUp(event)
+      return
+    }
     if (event.pointerType !== 'mouse' && event.pointerId !== activeTouchId) return
     if (event.pointerType !== 'mouse') activeTouchId = null
     const bit = event.pointerType === 'mouse' ? buttonBits[event.button] || 1 : 1
@@ -185,6 +330,8 @@ export function useMouse(
     moveTimer = 0
     pendingX = pendingY = 0
     activeTouchId = null
+    clearHoldTimer()
+    gesture.cancel()
     if (buttons === 0) return
     buttons = 0
     onekvm.sendRelativeMouse(0)
@@ -226,7 +373,7 @@ export function useMouse(
     }
   }
 
-  watch([mode, () => rotation?.value], () => {
+  watch([mode, () => rotation?.value, () => touchInput?.value], () => {
     releaseButtons()
     if (document.pointerLockElement) void document.exitPointerLock()
   })

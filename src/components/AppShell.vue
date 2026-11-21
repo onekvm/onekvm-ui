@@ -35,6 +35,8 @@ import {
   settingsAppActive,
 } from '@/lib/settings-nav'
 import { storedHideLocalCursor } from '@/lib/console-pointer'
+import { COARSE_POINTER_QUERY } from '@/lib/mobile-viewport'
+import { TOUCH_INPUT_KEY, parseTouchInput, type TouchInput } from '@/lib/touchpad-gestures'
 import { sanitizeMagicKey } from '@/lib/keyboard-magic'
 import { resolveConsoleTitle } from '@/lib/console-title'
 import { consumeConsoleBack, lockConsoleHistory } from '@/lib/history-lock'
@@ -166,6 +168,11 @@ const {
 })
 const trackpadOpen = ref(false)
 const hideLocalCursor = ref(storedHideLocalCursor(localStorage.getItem(HIDE_LOCAL_CURSOR_KEY)))
+// Phones and tablets use the picture as a touchpad unless chosen otherwise.
+const touchInput = ref<TouchInput>(parseTouchInput(
+  localStorage.getItem(TOUCH_INPUT_KEY),
+  Boolean(window.matchMedia?.(COARSE_POINTER_QUERY)?.matches),
+))
 const status = ref<OneKVMStatus | null>(null)
 watch(() => status.value?.identity?.message_placement, setMessagePlacement, { immediate: true })
 const msdStatus = ref<MSDStatus | null>(null)
@@ -220,6 +227,7 @@ watch(mouseMode, (value) => localStorage.setItem(MOUSE_MODE_KEY, value))
 watch(videoFit, (value) => localStorage.setItem(VIDEO_FIT_KEY, value))
 watch(videoRotation, (value) => localStorage.setItem(VIDEO_ROTATION_KEY, String(value)))
 watch(hideLocalCursor, (value) => localStorage.setItem(HIDE_LOCAL_CURSOR_KEY, String(value)))
+watch(touchInput, (value) => localStorage.setItem(TOUCH_INPUT_KEY, value))
 watch(rightControlAsMeta, (value) => localStorage.setItem(RIGHT_CONTROL_AS_META_KEY, String(value)))
 watch(swapCommandCtrl, (value) => localStorage.setItem(SWAP_COMMAND_CTRL_KEY, String(value)))
 watch(magicKey, (value) => localStorage.setItem(MAGIC_KEY_STORAGE, value))
@@ -677,6 +685,7 @@ onBeforeUnmount(() => {
           :scroll-interval="scrollInterval"
           :mouse-report-rate="mouseReportRate"
           :hide-local-cursor="hideLocalCursor"
+          :touch-input="touchInput"
           :trackpad="trackpadOpen"
           :video-fit="videoFit"
           :video-rotation="videoRotation"
@@ -718,6 +727,7 @@ onBeforeUnmount(() => {
           @update:scroll-interval="updateScrollInterval"
           @update:mouse-report-rate="updateMouseReportRate"
           @update:hide-local-cursor="hideLocalCursor = $event"
+          @update:touch-input="touchInput = $event"
           @update:trackpad="trackpadOpen = $event"
         />
 
@@ -736,6 +746,7 @@ onBeforeUnmount(() => {
           :scroll-interval="scrollInterval"
           :mouse-report-rate="mouseReportRate"
           :hide-local-cursor="hideLocalCursor"
+          :touch-input="touchInput"
           :video-fit="videoFit"
           :video-rotation="videoRotation"
           :keyboard-blocked="keyboardBlocked"

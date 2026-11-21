@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, toRef,
 import { WifiOff } from '@/icons'
 
 import { useMouse, type MouseMode } from '@/composables/useMouse'
+import { type TouchInput } from '@/lib/touchpad-gestures'
 import { consolePointerCursor } from '@/lib/console-pointer'
 import { consoleConnectionProblem } from '@/lib/console-connection'
 import { statusEvents } from '@/lib/status-events'
@@ -36,6 +37,7 @@ const props = defineProps<{
   scrollInterval: number
   mouseReportRate: number
   hideLocalCursor?: boolean
+  touchInput?: TouchInput
   videoFit: VideoFit
   videoRotation: VideoRotation
   keyboardBlocked: boolean
@@ -231,6 +233,7 @@ useMouse(
   inputSurface,
   hidEnabled,
   toRef(props, 'videoRotation'),
+  computed(() => props.touchInput ?? 'direct'),
 )
 
 function updateMetadata() {

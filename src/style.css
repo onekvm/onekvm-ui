@@ -2497,7 +2497,8 @@ html[data-onekvm-jelly] .host-window-frame {
 }
 
 .display-status-popover .display-status-values { padding-top: 6px; }
-.usb-audio-hint {
+.usb-audio-hint,
+.mouse-touch-hint {
   margin: 10px 0 0;
   color: var(--muted-foreground);
   font-size: 11px;

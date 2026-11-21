@@ -1,8 +1,9 @@
 import { computed, h, shallowRef } from 'vue'
 import type { DropdownOption } from 'naive-ui'
-import { Check, Eye, EyeOff, FolderPlus, LockKeyhole, Minus, Pencil, Trash2 } from '@/icons'
+import { Check, Ellipsis, Eye, EyeOff, FolderPlus, LockKeyhole, Minus, Pencil, Trash2 } from '@/icons'
 import { t } from '@/i18n/runtime'
 import { isToolbarSeparator } from '@/lib/toolbar-layout'
+import type { ToolbarIconPlacement } from '@/lib/toolbar-icons'
 
 const lockKey = 'onekvm.toolbar.locked'
 export function useToolbarContextMenu(options: {
@@ -13,9 +14,11 @@ export function useToolbarContextMenu(options: {
   removeFolder: (id: string) => void
   addSeparator: (before?: string) => void
   removeSeparator: (id: string) => void
-  /** Whether the item is hidden; undefined when it cannot be hidden. */
-  iconHidden: (id: string) => boolean | undefined
-  setIconHidden: (id: string, hidden: boolean) => void
+  /** Where the item appears; undefined when it cannot be moved off the toolbar. */
+  iconPlacement: (id: string) => ToolbarIconPlacement | undefined
+  /** Whether the item can go into the collection menu. */
+  iconCollectable: (id: string) => boolean
+  setIconPlacement: (id: string, placement: ToolbarIconPlacement) => void
 }) {
   const locked = shallowRef(localStorage.getItem(lockKey) === '1')
   const show = shallowRef(false)
@@ -24,13 +27,18 @@ export function useToolbarContextMenu(options: {
   const inMenu = shallowRef(false)
   const glyph = (icon: typeof Check) => () => h(icon, { size: 16 })
   const menuOptions = computed<DropdownOption[]>(() => {
-    const hidden = item.value ? options.iconHidden(item.value) : undefined
-    const visibility: DropdownOption[] = hidden === undefined ? [] : [
-      hidden
-        ? { key: 'show', label: t('toolbar.showIcon', 'Show on toolbar'), icon: glyph(Eye), disabled: locked.value || !options.canArrange() }
-        : { key: 'hide', label: t('toolbar.hideIcon', 'Hide icon'), icon: glyph(EyeOff), disabled: locked.value || !options.canArrange() },
-      { type: 'divider', key: 'visibility-divider' },
-    ]
+    const placement = item.value ? options.iconPlacement(item.value) : undefined
+    const hidden = placement === undefined ? undefined : placement !== 'toolbar'
+    const disabled = locked.value || !options.canArrange()
+    const visibility: DropdownOption[] = []
+    if (placement !== undefined) {
+      if (placement !== 'toolbar') visibility.push({ key: 'show', label: t('toolbar.showIcon', 'Show on toolbar'), icon: glyph(Eye), disabled })
+      if (placement === 'toolbar' && options.iconCollectable(item.value)) {
+        visibility.push({ key: 'collect', label: t('toolbar.collectIcon', 'Move to collection'), icon: glyph(Ellipsis), disabled })
+      }
+      if (placement !== 'hidden') visibility.push({ key: 'hide', label: t('toolbar.hideIcon', 'Hide icon'), icon: glyph(EyeOff), disabled })
+      visibility.push({ type: 'divider', key: 'visibility-divider' })
+    }
     const lock: DropdownOption = { key: 'lock', label: locked.value ? t('toolbar.unlock', 'Unlock toolbar') : t('toolbar.lock', 'Lock toolbar'), icon: glyph(locked.value ? Check : LockKeyhole) }
     // Separators and folders only apply to items on the toolbar itself.
     if (hidden || inMenu.value) return [...visibility, lock]
@@ -63,7 +71,8 @@ export function useToolbarContextMenu(options: {
       return
     }
     if (locked.value || !options.canArrange()) return
-    if ((key === 'hide' || key === 'show') && options.iconHidden(item.value) !== undefined) options.setIconHidden(item.value, key === 'hide')
+    const placements: Record<string, ToolbarIconPlacement> = { show: 'toolbar', collect: 'collection', hide: 'hidden' }
+    if (placements[key] && options.iconPlacement(item.value) !== undefined) options.setIconPlacement(item.value, placements[key])
     if (key === 'folder' && options.canCreateFolder()) options.createFolder()
     if (key === 'separator') options.addSeparator(item.value || undefined)
     if (key === 'remove' && isToolbarSeparator(item.value)) options.removeSeparator(item.value)

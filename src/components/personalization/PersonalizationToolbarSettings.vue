@@ -10,8 +10,11 @@ import {
   isRootOnlyToolbarIcon,
   normalizeToolbarIcons,
   reorderToolbarIcon,
-  setToolbarIconHidden,
+  setToolbarIconPlacement,
+  toolbarIconCollectable,
+  toolbarIconPlacement,
   toolbarIconsEqual,
+  type ToolbarIconPlacement,
 } from '@/lib/toolbar-icons'
 import { syncToolbarIconOrder } from '@/lib/toolbar-layout'
 import { toolbarIconGlyph as iconGlyph, toolbarIconLabel as iconLabel } from '@/lib/toolbar-labels'
@@ -64,8 +67,15 @@ function moveIcon(id: ToolbarIconId, direction: -1 | 1) {
   updateToolbarIcons(reorderToolbarIcon(toolbarIcons.value, id, target.id))
 }
 
-function showIcon(id: ToolbarIconId, shown: boolean) {
-  update({ toolbar_icons: setToolbarIconHidden(toolbarIcons.value, id, !shown) })
+function placeIcon(id: ToolbarIconId, placement: ToolbarIconPlacement) {
+  update({ toolbar_icons: setToolbarIconPlacement(toolbarIcons.value, id, placement) })
+}
+
+function placementOptions(id: ToolbarIconId) {
+  const label = (placement: ToolbarIconPlacement) => t(`settings.advancedSettings.personalizationPage.iconPlacements.${placement}`, placement)
+  return (['toolbar', 'collection', 'hidden'] as const)
+    .filter(placement => placement !== 'collection' || toolbarIconCollectable(id))
+    .map(placement => ({ value: placement, label: label(placement) }))
 }
 
 function resetIcons() {
@@ -135,11 +145,15 @@ function resetIcons() {
                   <ChevronDown :size="16" />
                 </button>
               </span>
-              <n-switch
-                :value="!icon.hidden"
+              <n-select
+                class="personalization-icon-placement"
+                size="small"
+                :value="toolbarIconPlacement(toolbarIcons, icon.id)"
+                :options="placementOptions(icon.id)"
                 :disabled="disabled || isRootOnlyToolbarIcon(icon.id)"
-                :aria-label="t('settings.advancedSettings.personalizationPage.showIcon', 'Show {name}').replace('{name}', iconLabel(icon.id))"
-                @update:value="showIcon(icon.id, $event)"
+                :consistent-menu-width="false"
+                :aria-label="t('settings.advancedSettings.personalizationPage.iconPlacement', 'Where {name} appears').replace('{name}', iconLabel(icon.id))"
+                @update:value="placeIcon(icon.id, $event)"
               />
             </div>
           </TransitionGroup>
@@ -170,9 +184,13 @@ function resetIcons() {
 .personalization-icon-drag:disabled, .personalization-icon-move:disabled { cursor: default; opacity: 0.4; }
 .personalization-icon-move:not(:disabled):hover, .personalization-icon-drag:not(:disabled):hover { background: var(--secondary); color: var(--foreground); }
 .personalization-icon-moves { display: flex; }
-.personalization-icon-row :deep(.n-switch) { justify-self: end; }
+.personalization-icon-placement { justify-self: end; width: 116px; }
 @media (max-width: 720px) {
   .personalization-icon-drag, .personalization-icon-move { width: 44px; height: 44px; }
+}
+@media (max-width: 520px) {
+  .personalization-icon-row { grid-template-columns: auto auto minmax(0, 1fr) auto; row-gap: 2px; padding-bottom: 8px; }
+  .personalization-icon-placement { grid-column: 3 / -1; justify-self: stretch; width: auto; }
 }
 @media (prefers-reduced-motion: reduce) {
   .personalization-icon-sort-move { transition: none; }

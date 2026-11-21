@@ -5,8 +5,11 @@ import {
   normalizeToolbarIcons,
   reorderToolbarIcon,
   setToolbarIconHidden,
+  setToolbarIconPlacement,
   toolbarIconCssOrder,
   toolbarIconHidden,
+  toolbarIconPlacement,
+  toolbarIconRemoved,
   toolbarIconsEqual,
 } from '../src/lib/toolbar-icons.ts'
 
@@ -15,8 +18,10 @@ assert.equal(defaults.length, 21)
 assert.equal(defaults[0]?.id, 'display')
 assert.equal(defaults.at(-1)?.id, 'account')
 assert.deepEqual(defaults.filter(icon => icon.hidden).map(icon => icon.id), [
-  'caps_lock', 'num_lock', 'scroll_lock', 'virtual_keyboard', 'keyboard_text', 'ctrl_alt_del',
+  'caps_lock', 'num_lock', 'scroll_lock', 'virtual_keyboard', 'keyboard_text', 'ctrl_alt_del', 'notifications',
 ])
+assert.equal(toolbarIconPlacement(defaults, 'notifications'), 'collection')
+assert.equal(defaults.some(icon => icon.removed), false)
 
 assert.deepEqual(normalizeToolbarIcons(undefined).map(icon => icon.id), defaults.map(icon => icon.id))
 assert.equal(toolbarIconsEqual(undefined, []), true)
@@ -64,5 +69,25 @@ for (const id of ['virtual_keyboard', 'keyboard_text', 'ctrl_alt_del'] as const)
   assert.equal(toolbarIconHidden(setToolbarIconHidden(enabled, id, true), id), true)
   assert.equal(toolbarIconHidden(defaultToolbarIcons(), id), true)
 }
+
+// Collected icons can also be hidden outright; settings and the collection cannot.
+const removedPower = setToolbarIconPlacement(defaults, 'power', 'hidden')
+assert.equal(toolbarIconPlacement(removedPower, 'power'), 'hidden')
+assert.equal(toolbarIconHidden(removedPower, 'power'), true)
+assert.equal(toolbarIconRemoved(removedPower, 'power'), true)
+assert.equal(toolbarIconsEqual(removedPower, defaults), false)
+assert.equal(toolbarIconPlacement(setToolbarIconPlacement(removedPower, 'power', 'collection'), 'power'), 'collection')
+assert.equal(toolbarIconPlacement(setToolbarIconHidden(removedPower, 'power', false), 'power'), 'toolbar')
+assert.equal(toolbarIconRemoved(normalizeToolbarIcons(JSON.parse(JSON.stringify(removedPower))), 'power'), true)
+// A saved removal without hidden still keeps the icon off the toolbar.
+assert.equal(toolbarIconPlacement([{ id: 'audio', removed: true }], 'audio'), 'hidden')
+for (const id of ['settings', 'collection'] as const) {
+  assert.equal(toolbarIconPlacement(setToolbarIconPlacement(defaults, id, 'hidden'), id), 'toolbar')
+  assert.equal(toolbarIconPlacement([{ id, hidden: true, removed: true }], id), 'toolbar')
+}
+// Keyboard actions stay in the keyboard menu when hidden; they have no collection place.
+const hiddenAction = setToolbarIconPlacement(setToolbarIconHidden(defaults, 'ctrl_alt_del', false), 'ctrl_alt_del', 'hidden')
+assert.equal(toolbarIconRemoved(hiddenAction, 'ctrl_alt_del'), false)
+assert.equal(toolbarIconPlacement(hiddenAction, 'ctrl_alt_del'), 'hidden')
 
 console.log('toolbar icon tests passed')

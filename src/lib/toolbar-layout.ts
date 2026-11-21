@@ -88,7 +88,7 @@ export function upsertToolbarFolder<T extends ToolbarLayout>(layout: T, folder: 
   return {
     ...layout,
     toolbar_folders: normalizeToolbarFolders(transferred),
-    toolbar_icons: normalizeToolbarIcons(layout.toolbar_icons).map(icon => next.items.includes(icon.id) ? { ...icon, hidden: false } : icon),
+    toolbar_icons: normalizeToolbarIcons(layout.toolbar_icons).map(icon => next.items.includes(icon.id) ? { ...icon, hidden: false, removed: false } : icon),
   }
 }
 
@@ -127,7 +127,7 @@ export function moveToolbarItem<T extends ToolbarLayout>(
     folder.items.splice(index < 0 ? folder.items.length : index, 0, item)
     return {
       ...layout, toolbar_folders: folders,
-      toolbar_icons: normalizeToolbarIcons(layout.toolbar_icons).map(icon => icon.id === item ? { ...icon, hidden: false } : icon),
+      toolbar_icons: normalizeToolbarIcons(layout.toolbar_icons).map(icon => icon.id === item ? { ...icon, hidden: false, removed: false } : icon),
     }
   }
   const order = rootOrder.filter(id => id !== item)

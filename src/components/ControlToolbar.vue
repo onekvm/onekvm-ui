@@ -57,7 +57,7 @@ import { clientModifierNames, MAGIC_KEY_CODES, magicKeyLabel, sanitizeMagicKey, 
 import { USB_GAMEPAD_UI_ENABLED } from '@/lib/ui-features'
 import { dismissControlOverlays } from '@/lib/overlay-target'
 import { resolveConsoleSubtitle } from '@/lib/console-title'
-import { isKeyboardActionToolbarIcon, isRootOnlyToolbarIcon, isToolbarIconId, normalizeToolbarIcons, setToolbarIconHidden, toolbarIconHidden } from '@/lib/toolbar-icons'
+import { isKeyboardActionToolbarIcon, isRootOnlyToolbarIcon, isToolbarIconId, normalizeToolbarIcons, setToolbarIconPlacement, toolbarIconCollectable, toolbarIconHidden, toolbarIconPlacement, toolbarIconRemoved } from '@/lib/toolbar-icons'
 import { machineDisplayName } from '@/lib/machine'
 import { onekvm, type InputActivity, type TransportState } from '@/lib/onekvm'
 import { sendShortcut, shortcutChordLabel } from '@/lib/keyboard-shortcuts'
@@ -243,9 +243,10 @@ const toolbarContext = useToolbarContextMenu({
     void toolbarLayout.save(layout => ({ ...layout, toolbar_order: order }))
   },
   removeSeparator: id => { void toolbarLayout.save(layout => ({ ...layout, toolbar_order: toolbarLayout.order.value.filter(item => item !== id) })) },
-  iconHidden: id => isToolbarIconId(id) && !isRootOnlyToolbarIcon(id) ? toolbarIconHidden(toolbarLayout.layout.value.toolbar_icons, id) : undefined,
-  setIconHidden: (id, hidden) => {
-    if (isToolbarIconId(id)) void toolbarLayout.save(layout => ({ ...layout, toolbar_icons: setToolbarIconHidden(layout.toolbar_icons, id, hidden) }))
+  iconPlacement: id => isToolbarIconId(id) && !isRootOnlyToolbarIcon(id) ? toolbarIconPlacement(toolbarLayout.layout.value.toolbar_icons, id) : undefined,
+  iconCollectable: id => isToolbarIconId(id) && toolbarIconCollectable(id),
+  setIconPlacement: (id, placement) => {
+    if (isToolbarIconId(id)) void toolbarLayout.save(layout => ({ ...layout, toolbar_icons: setToolbarIconPlacement(layout.toolbar_icons, id, placement) }))
   },
 })
 const toolbarSeparators = computed(() => {
@@ -313,6 +314,8 @@ function folderItemAvailable(id: string) {
 }
 function folderItemCount(folder: ToolbarFolder) { return folder.items.filter(folderItemAvailable).length }
 function toolbarItemTarget(id: ToolbarIconId) {
+  // Removed icons have no place to go, so their slot stays hidden.
+  if (toolbarIconRemoved(toolbarLayout.layout.value.toolbar_icons, id)) return null
   const folder = !toolbarIconHidden(toolbarLayout.layout.value.toolbar_icons, id) && folderForItem(id)
   return folder ? folderTargets.value[folder.id] ?? null : collectedIconsTarget.value
 }
@@ -1216,7 +1219,7 @@ function toolbarIconStyle(id: ToolbarIconId) {
   return { order: toolbarItemOrder(id) }
 }
 const collectedIcons = computed(() => normalizeToolbarIcons(toolbarIcons.value).filter(icon => {
-  if (!icon.hidden) return false
+  if (!icon.hidden || icon.removed) return false
   if (isKeyboardActionToolbarIcon(icon.id)) return false
   if (icon.id === 'gamepad') return USB_GAMEPAD_UI_ENABLED && Boolean(props.status?.hid?.gamepad)
   if (icon.id === 'audio') return audioControlAvailable.value

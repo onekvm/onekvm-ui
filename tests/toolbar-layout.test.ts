@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { defaultToolbarIcons } from '../src/lib/toolbar-icons.ts'
+import { defaultToolbarIcons, setToolbarIconPlacement, toolbarIconPlacement } from '../src/lib/toolbar-icons.ts'
 import { groupToolbarItems, isToolbarSeparator, moveToolbarItem, normalizeToolbarFolders, removeToolbarFolder, syncToolbarIconOrder, toolbarFolderFor, toolbarLayoutOrder, upsertToolbarFolder, visibleToolbarSeparators, type ToolbarLayout } from '../src/lib/toolbar-layout.ts'
 
 const initial: ToolbarLayout = { toolbar_icons: defaultToolbarIcons() }
@@ -111,4 +111,11 @@ const mouseIndex = iconsReordered.findIndex(icon => icon.id === 'mouse')
 assert.deepEqual(syncToolbarIconOrder(customOrder, iconsReordered), ['mouse', 'folder:input', 'display', 'tool:terminal/main', 'collection', 'settings', 'account'])
 assert.deepEqual(customOrder, ['display', 'folder:input', 'mouse', 'tool:terminal/main', 'settings', 'account'])
 assert.deepEqual(syncToolbarIconOrder(undefined, iconsReordered), [])
+// Putting a hidden icon into a folder brings it back.
+const powerHidden: ToolbarLayout = { toolbar_icons: setToolbarIconPlacement(defaultToolbarIcons(), 'power', 'hidden') }
+const powerInFolder = upsertToolbarFolder(powerHidden, { id: 'machine', name: 'Machine', icon: 'Folder', items: ['power'] })
+assert.equal(toolbarIconPlacement(powerInFolder.toolbar_icons, 'power'), 'toolbar')
+const powerFolder = upsertToolbarFolder({ toolbar_icons: defaultToolbarIcons() }, { id: 'machine', name: 'Machine', icon: 'Folder', items: [] })
+const powerMovedBack = moveToolbarItem({ ...powerFolder, toolbar_icons: powerHidden.toolbar_icons }, 'power', { folder: 'machine' })
+assert.equal(toolbarIconPlacement(powerMovedBack.toolbar_icons, 'power'), 'toolbar')
 console.log('toolbar folder and layout tests passed')

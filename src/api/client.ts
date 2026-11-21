@@ -378,7 +378,10 @@ export interface ToolbarFolder {
 
 export interface ToolbarIconPreference {
   id: ToolbarIconId
+  /** In the collection menu instead of on the toolbar. */
   hidden: boolean
+  /** In neither the toolbar nor the collection menu; implies hidden. */
+  removed?: boolean
 }
 
 export type MessagePlacement = 'top-left' | 'top' | 'top-right' | 'bottom-left' | 'bottom' | 'bottom-right'

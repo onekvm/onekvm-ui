@@ -27,8 +27,6 @@ const props = defineProps<{
   videoCodecs?: string[]
   videoBitrateRange?: { minimum: number; maximum: number; step: number; default: number }
   colorRange?: boolean
-  /** Simple settings mode: keep the picture preset, color range and advanced parameters out of view. */
-  simple?: boolean
 }>()
 
 const video = defineModel<OneKVMConfig['video']>({ required: true })
@@ -246,19 +244,19 @@ function setBitrateBudget(value: number) {
             </span>
           </div>
         </n-form-item>
-        <n-form-item v-if="video.codec !== 'mjpeg' && !simple" :label="t('settings.advancedSettings.displayPage.qpPreset', 'Picture preset')">
+        <n-form-item v-if="video.codec !== 'mjpeg'" :label="t('settings.advancedSettings.displayPage.qpPreset', 'Picture preset')">
           <div class="display-setting-stack">
             <n-select :value="qpPresetMode" :options="qpPresetOptions" :disabled="disabled" @update:value="applyQpPreset" />
             <span class="display-setting-field-hint">{{ qpPresetDescription }}</span>
           </div>
         </n-form-item>
-        <n-form-item v-else-if="video.codec === 'mjpeg'" :label="t('screen.frameDetect', 'Frame Detect')">
+        <n-form-item v-else :label="t('screen.frameDetect', 'Frame Detect')">
           <div class="frame-detect-field">
             <n-switch v-model:value="video.mjpeg.frame_detect" :disabled="disabled" />
             <span>{{ t('screen.frameDetectTip', 'Pause transmission while the image is still and resume when it changes.') }}</span>
           </div>
         </n-form-item>
-        <n-form-item v-if="colorRange && video.codec !== 'mjpeg' && !simple" :label="t('settings.advancedSettings.displayPage.colorRange', 'Color range')">
+        <n-form-item v-if="colorRange && video.codec !== 'mjpeg'" :label="t('settings.advancedSettings.displayPage.colorRange', 'Color range')">
           <div class="display-setting-stack">
             <n-select
               :value="video.color_range ?? 'auto'"
@@ -270,7 +268,7 @@ function setBitrateBudget(value: number) {
           </div>
         </n-form-item>
       </div>
-      <div v-if="video.codec !== 'mjpeg' && qpPresetMode === 'custom' && !simple" class="display-settings-fields display-qp-fields">
+      <div v-if="video.codec !== 'mjpeg' && qpPresetMode === 'custom'" class="display-settings-fields display-qp-fields">
         <n-form-item :label="t('settings.advancedSettings.displayPage.initialQp', 'Initial QP')">
           <n-input-number v-model:value="video.h26x.initial_qp" :min="0" :max="51" :disabled="disabled" />
         </n-form-item>
@@ -282,7 +280,7 @@ function setBitrateBudget(value: number) {
         </n-form-item>
         <span class="display-setting-field-hint display-settings-wide">{{ t('settings.advancedSettings.displayPage.qpAutoHint', 'Use 0 for automatic. A smaller number makes the picture clearer and uses more bandwidth.') }}</span>
       </div>
-      <n-collapse v-if="!simple" class="display-advanced-fields">
+      <n-collapse class="display-advanced-fields">
         <n-collapse-item name="advanced" :title="t('settings.advancedSettings.displayPage.advancedParameters', 'Advanced parameters')">
           <div class="display-settings-fields">
             <n-form-item v-if="video.codec !== 'mjpeg'" :label="t('settings.advancedSettings.displayPage.gop', 'Keyframe interval')">

@@ -91,10 +91,8 @@ import {
   isSettingsIndex,
   settingsBackTarget,
   settingsGroupTone,
-  settingsSectionsForMode,
 } from '@/lib/settings-nav'
 import { uiProduct } from '@/product'
-import { useSettingsMode } from '@/composables/useSettingsMode'
 import { useStorageStatus } from '@/composables/useStorageStatus'
 import { useSystemUpdateMonitor } from '@/composables/useSystemUpdateMonitor'
 import { statusEvents } from '@/lib/status-events'
@@ -142,7 +140,6 @@ import DiagnosticsCollectModal from './DiagnosticsCollectModal.vue'
 import { pendingDiagnostics } from '@/lib/diagnostics-pending'
 import FileManagerPage from './file-manager/FileManagerPage.vue'
 import SettingsAppList from './SettingsAppList.vue'
-import SettingsModeSwitch from './SettingsModeSwitch.vue'
 import SystemMemorySpec from './SystemMemorySpec.vue'
 import SystemCertificateFingerprint from './SystemCertificateFingerprint.vue'
 import SystemUSBADBDebug from './SystemUSBADBDebug.vue'
@@ -307,7 +304,6 @@ const updateFileInput = ref<HTMLInputElement | null>(null)
 const updateFileDragging = ref(false)
 const clockTick = ref(Date.now())
 const pluginsExpanded = ref(true)
-const { mode: settingsMode, simple: simpleSettings } = useSettingsMode()
 const sidebarNav = ref<HTMLElement | null>(null)
 const pluginFrame = ref<HTMLIFrameElement | null>(null)
 const pluginFrameHeight = ref<number | null>(null)
@@ -548,8 +544,7 @@ const sections = computed<SidebarSection[]>(() => {
   ]
 })
 
-const modeSections = computed(() => settingsSectionsForMode(sections.value, settingsMode.value, section.value))
-const visibleSections = computed(() => modeSections.value.filter((item) => !item.parent || pluginsExpanded.value || simpleSettings.value))
+const visibleSections = computed(() => sections.value.filter((item) => !item.parent || pluginsExpanded.value))
 const paneSection = computed(() => (isSettingsIndex(section.value) ? lastDetailSection.value : section.value))
 const deviceUptime = computed(() => {
   clockTick.value
@@ -615,7 +610,7 @@ const settingsListGroups = computed(() => {
     extensions: t('settings.advancedSettings.groups.extensions', 'Extensions'),
     admin: t('settings.advancedSettings.groups.administration', 'Administration'),
   }
-  return groupSettingsSections(modeSections.value).map((group) => ({
+  return groupSettingsSections(sections.value).map((group) => ({
     id: group.id,
     label: labels[group.id] || '',
     items: group.items.map((item) => ({
@@ -1923,7 +1918,6 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
     <div class="advanced-settings-layout">
       <aside class="advanced-settings-sidebar">
         <div class="advanced-settings-nav-heading" aria-hidden="true">{{ t('settings.advancedSettings.title', 'Advanced settings') }}</div>
-        <div class="advanced-settings-mode"><SettingsModeSwitch /></div>
         <nav ref="sidebarNav" :aria-label="t('settings.advancedSettings.title', 'Advanced settings')">
           <button
             v-for="item in visibleSections"
@@ -1960,9 +1954,7 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
             :subtitle="deviceVariant"
             :groups="settingsListGroups"
             @select="selectSettingsItem"
-          >
-            <template #actions><SettingsModeSwitch /></template>
-          </SettingsAppList>
+          />
         </div>
         <main ref="settingsMain" class="advanced-settings-main">
         <div class="advanced-settings-view">
@@ -1998,7 +1990,6 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                   :video-codecs="schema?.video_codecs"
                   :video-bitrate-range="schema?.video_bitrate_kbps"
                   :color-range="schema?.capabilities?.video_color_range === true"
-                  :simple="simpleSettings"
                 />
                 <footer class="advanced-settings-actions display-settings-actions">
                   <n-button :disabled="saving" @click="load">{{ t('common.refresh', 'Reload') }}</n-button>
@@ -2106,7 +2097,6 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                   :pptp-available="schema?.capabilities?.pptp !== false"
                   :l2tp-available="schema?.capabilities?.l2tp !== false"
                   :wifi-available="status?.network?.wifi_available === true"
-                  :simple="simpleSettings"
                   @validity="networkEditorsValid = $event"
                   @install-environment="installNetworkEnvironment"
                 />
@@ -2116,7 +2106,6 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
 				  :disabled="saving"
 				  @update:mdns="config.network.mdns = $event"
 				/>
-				<template v-if="!simpleSettings">
 				<DiscoverySettingsForm
 				  v-model="config.network.discovery_url"
 				  :enabled="config.network.discovery_enabled"
@@ -2145,16 +2134,13 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
 				  @update:custom-dns-enabled="systemCustomDNS = $event"
 				  @update:dnssec="config.network.dnssec = $event"
 				/>
-				</template>
                 <NetworkSharingSettings :config="config" :status="status" :video-session-id="videoSessionId" :disabled="saving || Boolean(networkApply?.pending)" @update:usb="config.usb = $event" />
-				<template v-if="!simpleSettings">
 				<ActiveRoutesPanel />
 				<StaticRoutesForm
 				  v-model="config.network.static_routes"
 				  :interfaces="routeInterfaceNames"
 				  :disabled="saving"
 				/>
-				</template>
                 <footer class="advanced-settings-actions">
                   <n-button @click="load">{{ t('common.refresh', 'Reload') }}</n-button>
                   <n-button
@@ -2312,7 +2298,7 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                       </div>
                     </dl>
 
-                    <div v-if="storagePartitions.length && !simpleSettings" class="storage-layout">
+                    <div v-if="storagePartitions.length" class="storage-layout">
                       <h3>{{ t('settings.advancedSettings.systemPage.storageLayout', 'Storage layout') }}</h3>
                       <div class="storage-partition-bar" role="img" :aria-label="t('settings.advancedSettings.systemPage.storageLayout', 'Storage layout')">
                         <n-tooltip
@@ -2413,7 +2399,7 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                         <dt>{{ t('settings.advancedSettings.systemPage.kernelVersion', 'Linux kernel') }}</dt>
                         <dd>{{ status.system?.kernel_version || '-' }}</dd>
                       </div>
-                      <SystemCertificateFingerprint v-if="!simpleSettings" />
+                      <SystemCertificateFingerprint />
                       <div>
                         <dt>{{ t('settings.advancedSettings.systemPage.uptime', 'Uptime') }}</dt>
                         <dd>{{ formatUptime(deviceUptime) }}</dd>
@@ -2462,7 +2448,7 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                   </section>
 
                   <ConfigurationTransferPanel
-                    v-if="hasPermission(auth, 'settings.manage') && !simpleSettings"
+                    v-if="hasPermission(auth, 'settings.manage')"
                     :disabled="systemAction !== null || Boolean(networkApply?.pending)"
                     :video-session-id="props.videoSessionId"
                     @applied="(response) => { if (response.network_apply) setNetworkApplyStatus(response.network_apply); void load() }"
@@ -2484,7 +2470,7 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                         {{ t('settings.factoryReset.action', 'Restore') }}
                       </n-button>
                     </div>
-                    <n-collapse v-if="!simpleSettings" class="system-recovery-tools" :default-expanded-names="[]">
+                    <n-collapse class="system-recovery-tools" :default-expanded-names="[]">
                       <n-collapse-item name="tools" :title="t('settings.advancedSettings.systemPage.recoveryTools', 'Debug and recovery tools')" display-directive="if">
                         <div class="system-settings-group">
                           <SystemUSBADBDebug :disabled="systemAction !== null || !canManageSettings" />
@@ -2605,7 +2591,6 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                   :current-build-id="status?.system?.build_id"
                   :update="systemUpdate?.supported === false ? null : systemUpdate"
                   :switching-slot="slotSwitching"
-                  :show-slots="!simpleSettings"
                   @select-slot="confirmSlotSwitch"
                 />
                 <n-alert v-if="systemUpdate?.supported === false" type="info" :bordered="false">
@@ -2622,7 +2607,6 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                       <SystemUpdateSourceSelector
                         v-model:allow-untrusted="allowUntrustedFirmware"
                         v-model="updateMethod"
-                        :simple="simpleSettings"
                         :disabled="updateInstalling || systemUpdate.operation !== 'idle'"
                         @install="confirmSourceUpdate"
                       >

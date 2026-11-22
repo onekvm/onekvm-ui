@@ -692,7 +692,6 @@ const zh_tw = {
       openPage: '前往設定',
       openWindow: '視窗設定',
         title: '進階設定',
-        mode: { label: '顯示的設定', simple: '簡單', advanced: '進階' },
         groups: {
           device: '裝置',
           network: '網路',

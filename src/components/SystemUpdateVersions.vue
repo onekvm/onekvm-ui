@@ -7,7 +7,6 @@ const props = defineProps<{
   currentBuildId?: string
   update: SystemUpdateStatus | null
   switchingSlot: string
-  showSlots?: boolean
 }>()
 const emit = defineEmits<{ 'select-slot': [slot: SystemUpdateSlot] }>()
 const key = 'settings.advancedSettings.systemPage.'
@@ -33,7 +32,7 @@ function slotVersion(slot: SystemUpdateSlot) {
     </dl>
   </section>
 
-  <section v-if="update && showSlots !== false" class="system-settings-group">
+  <section v-if="update" class="system-settings-group">
     <h2>{{ t(key + 'bootSlots', 'A/B boot slots') }}</h2>
     <ul class="system-slot-list">
       <li v-for="slot in update.slots" :key="slot.name">

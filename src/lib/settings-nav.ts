@@ -24,20 +24,6 @@ const SETTINGS_LIST_GROUPS: { id: string; keys: string[] }[] = [
   { id: 'admin', keys: ['services', 'security', 'logs', 'resources', 'sessions', 'users', 'files', 'update'] },
 ]
 
-export type SettingsMode = 'simple' | 'advanced'
-
-/** Sections listed in simple mode; advanced mode lists every section. */
-export const SIMPLE_SETTINGS_SECTIONS: readonly string[] = ['system', 'display', 'network', 'users', 'update']
-
-/**
- * Sections to list for a mode. The open section stays listed in simple mode so a
- * link to an advanced-only page still shows where the reader is.
- */
-export function settingsSectionsForMode<T extends SettingsListItem>(items: readonly T[], mode: SettingsMode, openSection = ''): T[] {
-  if (mode === 'advanced') return [...items]
-  return items.filter((item) => SIMPLE_SETTINGS_SECTIONS.includes(item.key) || item.key === openSection)
-}
-
 export function isSettingsIndex(section: string) {
   return section === SETTINGS_INDEX || section === ''
 }

@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, toRef,
 import { WifiOff } from '@/icons'
 
 import { useMouse, type MouseMode } from '@/composables/useMouse'
-import { type TouchInput } from '@/lib/touchpad-gestures'
+import { primaryTouchDevice } from '@/lib/touchscreen'
 import { consolePointerCursor } from '@/lib/console-pointer'
 import { consoleConnectionProblem } from '@/lib/console-connection'
 import { statusEvents } from '@/lib/status-events'
@@ -17,6 +17,7 @@ import { useKeyboard } from '@/composables/useKeyboard'
 import KeyboardMagicHint from './KeyboardMagicHint.vue'
 import ConnectionTrace from './ConnectionTrace.vue'
 import TrackpadOverlay from './TrackpadOverlay.vue'
+import TouchMouseButtons from './TouchMouseButtons.vue'
 import { useVideoFps } from '@/composables/useVideoFps'
 import { useVideoPlaybackState } from '@/composables/useVideoPlaybackState'
 import { useMJPEGStream } from '@/composables/useMJPEGStream'
@@ -37,7 +38,6 @@ const props = defineProps<{
   scrollInterval: number
   mouseReportRate: number
   hideLocalCursor?: boolean
-  touchInput?: TouchInput
   videoFit: VideoFit
   videoRotation: VideoRotation
   keyboardBlocked: boolean
@@ -224,7 +224,7 @@ const displayMotion = useVideoDisplayMotion({
   settled: () => { publishCanvasSize(); refreshHidCursor() },
 })
 
-useMouse(
+const { floatingButton, floatingMove } = useMouse(
   inputTarget,
   toRef(props, 'mouseMode'),
   toRef(props, 'scrollInterval'),
@@ -233,8 +233,11 @@ useMouse(
   inputSurface,
   hidEnabled,
   toRef(props, 'videoRotation'),
-  computed(() => props.touchInput ?? 'direct'),
 )
+// Relative mode on a phone or tablet: Left/Right buttons over the touchpad.
+const touchDevice = primaryTouchDevice()
+const touchButtonsShown = computed(() =>
+  touchDevice && props.mouseMode === 'relative' && hidEnabled.value && !props.inputSuspended)
 
 function updateMetadata() {
   if (!video.value) return
@@ -580,6 +583,11 @@ watch(
       @pointerenter="onHidPointerMove"
       @pointermove="onHidPointerMove"
       @pointerleave="onHidPointerLeave"
+    />
+    <TouchMouseButtons
+      v-if="touchButtonsShown"
+      @button="floatingButton"
+      @move="floatingMove"
     />
     <Transition name="console-zoom-badge">
       <button

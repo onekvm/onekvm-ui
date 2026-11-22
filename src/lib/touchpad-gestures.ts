@@ -1,20 +1,13 @@
 import { rotatedVideoSize, type VideoFit, type VideoRotation } from './video-fit.ts'
 
-// Touching the picture works like a laptop touchpad: slide to move the
-// cursor, tap for a left click, long-press for a right click (or keep holding
-// and slide to drag with the left button), two fingers up or down to scroll.
+// In Relative mode the picture works like a laptop touchpad: slide to move
+// the cursor, tap for a left click, long-press for a right click (or keep
+// holding and slide to drag with the left button), two fingers up or down to
+// scroll.
 
-export type TouchInput = 'touchpad' | 'direct'
-
-export const TOUCH_INPUT_KEY = 'onekvm-touch-input'
 export const TOUCHPAD_TAP_SLOP = 12
 export const TOUCHPAD_HOLD_MS = 450
 export const TOUCHPAD_SCROLL_STEP = 24
-
-export function parseTouchInput(stored: string | null, coarsePointer: boolean): TouchInput {
-  if (stored === 'touchpad' || stored === 'direct') return stored
-  return coarsePointer ? 'touchpad' : 'direct'
-}
 
 export type TouchpadAction =
   | { kind: 'move'; dx: number; dy: number }

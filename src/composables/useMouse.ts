@@ -6,10 +6,9 @@ import {
   TOUCHPAD_HOLD_MS,
   TouchpadGesture,
   touchpadHidDelta,
-  type TouchInput,
   type TouchpadAction,
 } from '@/lib/touchpad-gestures'
-import { TOUCHSCREEN_KEEPALIVE_MS, TouchscreenContacts, type MouseMode } from '@/lib/touchscreen'
+import { TOUCHSCREEN_KEEPALIVE_MS, TouchscreenContacts, pointerRole, type MouseMode } from '@/lib/touchscreen'
 import { mapAbsoluteMouse, unrotateMouseDelta, type VideoFit, type VideoRotation } from '@/lib/video-fit'
 
 export type { MouseMode }
@@ -25,9 +24,10 @@ export function useMouse(
   surface?: Readonly<Ref<HTMLElement | null>>,
   enabled?: Readonly<Ref<boolean>>,
   rotation?: Readonly<Ref<VideoRotation>>,
-  touchInput?: Readonly<Ref<TouchInput>>,
 ) {
   let buttons = 0
+  // Buttons held down on the floating Left/Right buttons.
+  let floatingHeld = 0
   let moveTimer = 0
   let lastMoveSent = 0
   let pendingX = 0
@@ -108,11 +108,9 @@ export function useMouse(
     event.pointerType === 'mouse' ? buttonBits[event.button] : 1
   )
 
-  const usesTouchscreen = (event: PointerEvent) =>
-    mode.value === 'touchscreen' && event.pointerType !== 'mouse'
+  const usesTouchscreen = (event: PointerEvent) => pointerRole(mode.value, event.pointerType) === 'contacts'
 
-  const usesTouchpad = (event: PointerEvent) =>
-    event.pointerType === 'touch' && mode.value !== 'touchscreen' && touchInput?.value === 'touchpad'
+  const usesTouchpad = (event: PointerEvent) => pointerRole(mode.value, event.pointerType) === 'touchpad'
 
   const flushContacts = () => {
     if (contactTimer) window.clearTimeout(contactTimer)
@@ -249,6 +247,8 @@ export function useMouse(
           break
         case 'click': {
           const bit = action.button === 'left' ? 1 : 2
+          // A floating button already holds it: a tap must not let it go.
+          if (floatingHeld & bit) break
           setButtons(buttons | bit)
           setButtons(buttons & ~bit)
           break
@@ -257,7 +257,7 @@ export function useMouse(
           setButtons(buttons | 1)
           break
         case 'release':
-          setButtons(buttons & ~1)
+          setButtons(buttons & ~(1 & ~floatingHeld))
           break
         case 'wheel':
           onekvm.sendRelativeMouse(mode.value === 'relative' ? buttons : 0, 0, 0, action.delta)
@@ -427,6 +427,7 @@ export function useMouse(
     moveTimer = 0
     pendingX = pendingY = 0
     activeTouchId = null
+    floatingHeld = 0
     clearHoldTimer()
     gesture.cancel()
     releaseContacts()
@@ -471,7 +472,7 @@ export function useMouse(
     }
   }
 
-  watch([mode, () => rotation?.value, () => touchInput?.value], () => {
+  watch([mode, () => rotation?.value], () => {
     releaseButtons()
     if (document.pointerLockElement) void document.exitPointerLock()
   })
@@ -488,4 +489,19 @@ export function useMouse(
     if (moveTimer) window.clearTimeout(moveTimer)
     releaseButtons()
   })
+
+  /** A floating Left/Right button went down or up (Relative mode). */
+  const floatingButton = (bit: number, down: boolean) => {
+    if (!hidEnabled()) return
+    floatingHeld = down ? floatingHeld | bit : floatingHeld & ~bit
+    setButtons(down ? buttons | bit : buttons & ~bit)
+  }
+
+  /** A finger slid on a held floating button: move like the touchpad. */
+  const floatingMove = (dx: number, dy: number) => {
+    if (!hidEnabled() || (!dx && !dy)) return
+    moveTouchpadCursor(dx, dy)
+  }
+
+  return { floatingButton, floatingMove }
 }

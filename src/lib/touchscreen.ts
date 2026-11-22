@@ -11,17 +11,46 @@ export function primaryTouchDevice() {
   return typeof window !== 'undefined' && window.matchMedia?.(COARSE_POINTER_QUERY)?.matches === true
 }
 
-/**
- * On a touch device the second mouse mode is Touchscreen instead of Relative;
- * a stored choice of either one maps to the mode this device offers.
- */
+/** Touchscreen is offered on phones and tablets only. */
 export function mouseModesFor(touchDevice: boolean): readonly MouseMode[] {
-  return touchDevice ? ['absolute', 'touchscreen'] : ['absolute', 'relative']
+  return touchDevice ? ['absolute', 'relative', 'touchscreen'] : ['absolute', 'relative']
 }
 
+/** A stored Touchscreen choice works like Absolute for a mouse elsewhere. */
 export function parseMouseMode(stored: string | null, touchDevice: boolean): MouseMode {
-  if (stored !== 'relative' && stored !== 'touchscreen') return 'absolute'
-  return touchDevice ? 'touchscreen' : 'relative'
+  if (stored === 'relative') return 'relative'
+  if (stored === 'touchscreen' && touchDevice) return 'touchscreen'
+  return 'absolute'
+}
+
+/**
+ * What a pointer on the picture does in each mouse mode: fingers click where
+ * they touch in Absolute, drive a full-screen touchpad in Relative and become
+ * touchscreen contacts in Touchscreen. A mouse follows the mode as usual.
+ */
+export type PointerRole = 'mouse' | 'direct' | 'touchpad' | 'contacts'
+
+export function pointerRole(mode: MouseMode, pointerType: string): PointerRole {
+  if (pointerType === 'mouse') return 'mouse'
+  if (mode === 'touchscreen') return 'contacts'
+  if (mode === 'relative' && pointerType === 'touch') return 'touchpad'
+  return 'direct'
+}
+
+/** Where the Relative-mode Left/Right buttons sit, as percent of the stage. */
+export const TOUCH_BUTTONS_POSITION_KEY = 'onekvm-touch-buttons-position'
+
+export function parseTouchButtonsPosition(stored: string | null): { x: number; y: number } | null {
+  if (!stored) return null
+  try {
+    const value = JSON.parse(stored) as unknown
+    if (typeof value !== 'object' || value === null) return null
+    const { x, y } = value as Record<string, unknown>
+    if (typeof x !== 'number' || typeof y !== 'number' || !Number.isFinite(x) || !Number.isFinite(y)) return null
+    return { x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) }
+  } catch {
+    return null
+  }
 }
 
 export const TOUCHSCREEN_MAX_CONTACTS = 10

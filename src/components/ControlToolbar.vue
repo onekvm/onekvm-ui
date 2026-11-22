@@ -39,7 +39,6 @@ import { NIcon, NTooltip, useMessage, type DialogReactive, type DropdownOption }
 import { api, type KeyboardLayout, type KeyboardShortcut, type MSDStatus, type OneKVMStatus, type ToolbarIconId } from '@/api/client'
 import type { BrowserISOProgress } from '@/lib/browser-iso'
 import { type MouseMode } from '@/composables/useMouse'
-import { type TouchInput } from '@/lib/touchpad-gestures'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { usePerformanceDock } from '@/composables/usePerformanceDock'
 import { useToolbarPinMotion } from '@/composables/useToolbarPinMotion'
@@ -145,7 +144,6 @@ const props = defineProps<{
   scrollInterval: number
   mouseReportRate: number
   hideLocalCursor?: boolean
-  touchInput?: TouchInput
   trackpad?: boolean
   videoFit: VideoFit
   videoRotation: VideoRotation
@@ -188,7 +186,6 @@ const emit = defineEmits<{
   'update:scrollInterval': [interval: number]
   'update:mouseReportRate': [rate: number]
   'update:hideLocalCursor': [hidden: boolean]
-  'update:touchInput': [input: TouchInput]
   'update:trackpad': [open: boolean]
   'update:videoFit': [fit: VideoFit]
   'update:videoRotation': [rotation: VideoRotation]
@@ -1881,7 +1878,6 @@ onBeforeUnmount(() => {
         :scroll-interval="scrollInterval"
         :mouse-report-rate="mouseReportRate"
         :hide-local-cursor="hideLocalCursor"
-        :touch-input="touchInput"
         :trackpad="trackpad"
         :hid="status?.hid"
         :placement="menuPlacement"
@@ -1891,7 +1887,6 @@ onBeforeUnmount(() => {
         @update:scroll-interval="emit('update:scrollInterval', $event)"
         @update:mouse-report-rate="emit('update:mouseReportRate', $event)"
         @update:hide-local-cursor="emit('update:hideLocalCursor', $event)"
-        @update:touch-input="emit('update:touchInput', $event)"
         @update:trackpad="onTrackpadToggle"
       >
         <n-tooltip :disabled="!toolbarIconShown('mouse') || toolbarLauncher || openMenu === 'mouse'">

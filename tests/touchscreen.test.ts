@@ -6,18 +6,37 @@ import {
   encodeTouchReport,
   mouseModesFor,
   parseMouseMode,
+  parseTouchButtonsPosition,
+  pointerRole,
 } from '../src/lib/touchscreen.ts'
 
-// On a touch device Touchscreen takes the place of Relative, and back.
-assert.deepEqual(mouseModesFor(true), ['absolute', 'touchscreen'])
+// The floating buttons' stored position: percent, clamped; anything else is unset.
+assert.deepEqual(parseTouchButtonsPosition('{"x":25,"y":80}'), { x: 25, y: 80 })
+assert.deepEqual(parseTouchButtonsPosition('{"x":-5,"y":140}'), { x: 0, y: 100 })
+for (const stored of [null, '', 'oops', '[]', '{"x":1}', '{"x":"1","y":2}', '{"x":null,"y":2}']) {
+  assert.equal(parseTouchButtonsPosition(stored), null, String(stored))
+}
+
+// Phones and tablets add Touchscreen; Relative stays everywhere.
+assert.deepEqual(mouseModesFor(true), ['absolute', 'relative', 'touchscreen'])
 assert.deepEqual(mouseModesFor(false), ['absolute', 'relative'])
-assert.equal(parseMouseMode('relative', true), 'touchscreen')
-assert.equal(parseMouseMode('touchscreen', true), 'touchscreen')
-assert.equal(parseMouseMode('touchscreen', false), 'relative')
+assert.equal(parseMouseMode('relative', true), 'relative')
 assert.equal(parseMouseMode('relative', false), 'relative')
+assert.equal(parseMouseMode('touchscreen', true), 'touchscreen')
+assert.equal(parseMouseMode('touchscreen', false), 'absolute')
 assert.equal(parseMouseMode('absolute', true), 'absolute')
 assert.equal(parseMouseMode(null, true), 'absolute')
 assert.equal(parseMouseMode('other', false), 'absolute')
+
+// Each mode gives fingers their own behaviour; a mouse follows the mode.
+assert.equal(pointerRole('absolute', 'touch'), 'direct')
+assert.equal(pointerRole('relative', 'touch'), 'touchpad')
+assert.equal(pointerRole('touchscreen', 'touch'), 'contacts')
+assert.equal(pointerRole('touchscreen', 'pen'), 'contacts')
+assert.equal(pointerRole('relative', 'pen'), 'direct')
+for (const mode of ['absolute', 'relative', 'touchscreen'] as const) {
+  assert.equal(pointerRole(mode, 'mouse'), 'mouse')
+}
 
 // One finger: touching while down, lifted once, then nothing to send.
 let contacts = new TouchscreenContacts()

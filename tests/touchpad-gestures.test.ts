@@ -3,15 +3,8 @@ import assert from 'node:assert/strict'
 import { mapAbsoluteMouse } from '../src/lib/video-fit.ts'
 import {
   TouchpadGesture,
-  parseTouchInput,
   touchpadHidDelta,
 } from '../src/lib/touchpad-gestures.ts'
-
-assert.equal(parseTouchInput(null, true), 'touchpad')
-assert.equal(parseTouchInput(null, false), 'direct')
-assert.equal(parseTouchInput('direct', true), 'direct')
-assert.equal(parseTouchInput('touchpad', false), 'touchpad')
-assert.equal(parseTouchInput('bogus', false), 'direct')
 
 // Tap: left click.
 let gesture = new TouchpadGesture()

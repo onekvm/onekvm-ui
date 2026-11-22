@@ -3,7 +3,6 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Mouse } from '@/icons'
 
 import { type MouseMode } from '@/composables/useMouse'
-import { type TouchInput } from '@/lib/touchpad-gestures'
 import { mouseModesFor, primaryTouchDevice } from '@/lib/touchscreen'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { t } from '@/i18n/runtime'
@@ -21,7 +20,6 @@ const props = defineProps<{
   placement?: 'top-end' | 'bottom-end' | 'right-start' | 'left-start'
   sheet?: boolean
   trackpad?: boolean
-  touchInput?: TouchInput
 }>()
 
 const emit = defineEmits<{
@@ -31,7 +29,6 @@ const emit = defineEmits<{
   'update:mouseReportRate': [rate: number]
   'update:hideLocalCursor': [hidden: boolean]
   'update:trackpad': [open: boolean]
-  'update:touchInput': [input: TouchInput]
 }>()
 
 const overlayTo = useOverlayMount()
@@ -43,14 +40,10 @@ const mouseModeLabels = computed<Record<MouseMode, string>>(() => ({
   relative: t('mouse.relative', 'Relative'),
   touchscreen: t('mouse.touchscreen', 'Touchscreen mode'),
 }))
-const mouseModes = mouseModesFor(primaryTouchDevice())
+const touchDevice = primaryTouchDevice()
+const mouseModes = mouseModesFor(touchDevice)
 const mouseModeOptions = computed(() =>
   mouseModes.map((value) => ({ label: mouseModeLabels.value[value], value })))
-const touchCapable = typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0
-const touchInputOptions = computed(() => [
-  { label: t('mouse.touchInputTouchpad', 'Trackpad'), value: 'touchpad' as const },
-  { label: t('mouse.touchInputDirect', 'Direct click'), value: 'direct' as const },
-])
 const mouseModeLabel = computed(() => mouseModeOptions.value.find((option) => option.value === props.mouseMode)?.label || '')
 const scrollOptions = Array.from({ length: 16 }, (_, index) => {
   const value = index * 10
@@ -122,12 +115,6 @@ function updateCustomReportRate(value: number | null) {
   emit('update:mouseReportRate', next)
 }
 
-function updateTouchInput(value: string | number | null) {
-  if (value !== 'touchpad' && value !== 'direct') return
-  if (value === props.touchInput) return
-  emit('update:touchInput', value)
-}
-
 function updateTrackpad(value: boolean) {
   if (value === Boolean(props.trackpad)) return
   emit('update:trackpad', value)
@@ -160,19 +147,6 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
       </header>
       <HidHostAlert :hid="hid" />
       <div class="display-status-values">
-        <div v-if="touchCapable && mouseMode !== 'touchscreen'">
-          <span>{{ t('mouse.touchPicture', 'Touching the picture') }}</span>
-          <n-select
-            v-bind="selectProps"
-            :value="touchInput ?? 'direct'"
-            :options="touchInputOptions"
-            @update:value="updateTouchInput"
-            @update:show="menuOpen = $event"
-          />
-        </div>
-        <p v-if="touchCapable && mouseMode !== 'touchscreen' && touchInput === 'touchpad'" class="mouse-touch-hint">
-          {{ t('mouse.touchpadGestures', 'Tap to left-click, long-press to right-click, long-press then slide to drag, slide two fingers up or down to scroll.') }}
-        </p>
         <div v-if="sheet">
           <span>{{ t('mouse.floatingTrackpad', 'Floating trackpad') }}</span>
           <n-switch
@@ -199,6 +173,9 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
             @update:show="menuOpen = $event"
           />
         </div>
+        <p v-if="touchDevice && mouseMode === 'relative'" class="mouse-touch-hint">
+          {{ t('mouse.touchpadGestures', 'Tap to left-click, long-press to right-click, slide two fingers up or down to scroll. Long-press then slide, or hold a floating button and slide, to drag. Drag the handle to move the buttons.') }}
+        </p>
         <p v-if="mouseMode === 'touchscreen'" class="mouse-touch-hint">
           {{ t('mouse.touchscreenHint', 'Up to 10 fingers. macOS does not support touchscreens; use Absolute mode there.') }}
         </p>

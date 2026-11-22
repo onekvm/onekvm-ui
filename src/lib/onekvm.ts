@@ -33,6 +33,7 @@ import { activateBrowserMicrophone } from '@/lib/microphone-access'
 import { WebRTCAudio, AudioLatencyRecovery, type AudioRecoveryReason } from '@/lib/webrtc-audio'
 import { KeyboardReportState } from '@/lib/keyboard-report-state'
 import { audioPlaybackAvailable } from '@/lib/audio-settings'
+import { encodeTouchReport, TOUCH_REPORT_TYPE, type TouchContact } from '@/lib/touchscreen'
 
 export type ConnectionState =
   | 'idle'
@@ -507,6 +508,12 @@ class OneKVMTransport {
     view.setUint16(2, clampAbsolute(x), true)
     view.setUint16(4, clampAbsolute(y), true)
     if (this.send(report)) this.emitActivity('mouse')
+  }
+
+  /** Touchscreen contacts; an empty list sends nothing. */
+  sendTouch(contacts: readonly TouchContact[]) {
+    const report = encodeTouchReport(contacts)
+    if (report && this.send(report)) this.emitActivity('mouse')
   }
 
   sendGamepad(report: GamepadReport) {
@@ -1121,7 +1128,8 @@ class OneKVMTransport {
 		return false
 	  }
 	}
-    const channel = report[0] === 2 || report[0] === 3 ? this.pointer ?? this.control : this.control
+    const pointerReport = report[0] === 2 || report[0] === 3 || report[0] === TOUCH_REPORT_TYPE
+    const channel = pointerReport ? this.pointer ?? this.control : this.control
     if (channel?.readyState !== 'open') return false
     channel.send(Uint8Array.from(report))
     this.emitHIDReport(report)

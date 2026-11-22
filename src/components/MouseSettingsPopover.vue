@@ -4,6 +4,7 @@ import { Mouse } from '@/icons'
 
 import { type MouseMode } from '@/composables/useMouse'
 import { type TouchInput } from '@/lib/touchpad-gestures'
+import { mouseModesFor, primaryTouchDevice } from '@/lib/touchscreen'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { t } from '@/i18n/runtime'
 import { DISMISS_CONTROL_OVERLAY_EVENT } from '@/lib/overlay-target'
@@ -37,10 +38,14 @@ const overlayTo = useOverlayMount()
 const popoverOpen = ref(false)
 const menuOpen = ref(false)
 
-const mouseModeOptions = computed(() => [
-  { label: t('mouse.absolute', 'Absolute'), value: 'absolute' as const },
-  { label: t('mouse.relative', 'Relative'), value: 'relative' as const },
-])
+const mouseModeLabels = computed<Record<MouseMode, string>>(() => ({
+  absolute: t('mouse.absolute', 'Absolute'),
+  relative: t('mouse.relative', 'Relative'),
+  touchscreen: t('mouse.touchscreen', 'Touchscreen mode'),
+}))
+const mouseModes = mouseModesFor(primaryTouchDevice())
+const mouseModeOptions = computed(() =>
+  mouseModes.map((value) => ({ label: mouseModeLabels.value[value], value })))
 const touchCapable = typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0
 const touchInputOptions = computed(() => [
   { label: t('mouse.touchInputTouchpad', 'Trackpad'), value: 'touchpad' as const },
@@ -87,9 +92,9 @@ function forceClose() {
 }
 
 function updateMode(value: string | number | null) {
-  if (value !== 'absolute' && value !== 'relative') return
-  if (value === props.mouseMode) return
-  emit('update:mouseMode', value)
+  const mode = mouseModes.find((option) => option === value)
+  if (!mode || mode === props.mouseMode) return
+  emit('update:mouseMode', mode)
 }
 
 function updateScroll(value: string | number | null) {
@@ -155,7 +160,7 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
       </header>
       <HidHostAlert :hid="hid" />
       <div class="display-status-values">
-        <div v-if="touchCapable">
+        <div v-if="touchCapable && mouseMode !== 'touchscreen'">
           <span>{{ t('mouse.touchPicture', 'Touching the picture') }}</span>
           <n-select
             v-bind="selectProps"
@@ -165,7 +170,7 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
             @update:show="menuOpen = $event"
           />
         </div>
-        <p v-if="touchCapable && touchInput === 'touchpad'" class="mouse-touch-hint">
+        <p v-if="touchCapable && mouseMode !== 'touchscreen' && touchInput === 'touchpad'" class="mouse-touch-hint">
           {{ t('mouse.touchpadGestures', 'Tap to left-click, long-press to right-click, long-press then slide to drag, slide two fingers up or down to scroll.') }}
         </p>
         <div v-if="sheet">
@@ -194,6 +199,9 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
             @update:show="menuOpen = $event"
           />
         </div>
+        <p v-if="mouseMode === 'touchscreen'" class="mouse-touch-hint">
+          {{ t('mouse.touchscreenHint', 'Up to 10 fingers. macOS does not support touchscreens; use Absolute mode there.') }}
+        </p>
         <div>
           <span>{{ t('settings.mouse.scroll', 'Scroll interval') }}</span>
           <n-select

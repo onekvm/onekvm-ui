@@ -9,9 +9,10 @@ import {
   type TouchInput,
   type TouchpadAction,
 } from '@/lib/touchpad-gestures'
+import { TOUCHSCREEN_KEEPALIVE_MS, TouchscreenContacts, type MouseMode } from '@/lib/touchscreen'
 import { mapAbsoluteMouse, unrotateMouseDelta, type VideoFit, type VideoRotation } from '@/lib/video-fit'
 
-export type MouseMode = 'absolute' | 'relative'
+export type { MouseMode }
 
 const buttonBits = [1, 4, 2, 8, 16]
 
@@ -42,8 +43,14 @@ export function useMouse(
   let holdTimer = 0
   let touchX = absoluteX
   let touchY = absoluteY
+  const contacts = new TouchscreenContacts()
+  let contactTimer = 0
+  let keepaliveTimer = 0
+  let lastContactSent = 0
 
   const hidEnabled = () => enabled?.value !== false
+  // A mouse in Touchscreen mode moves the pointer as in Absolute mode.
+  const absolute = () => mode.value !== 'relative'
 
   const sourceSize = (element: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement) => ({
     sourceWidth: element instanceof HTMLVideoElement
@@ -76,7 +83,7 @@ export function useMouse(
   const flushMove = () => {
     moveTimer = 0
     lastMoveSent = performance.now()
-    if (mode.value === 'absolute') {
+    if (absolute()) {
       onekvm.sendAbsoluteMouse(buttons, absoluteX, absoluteY)
     } else if (pendingX || pendingY) {
       // Keep fractions so slow touchpad slides still add up.
@@ -101,8 +108,86 @@ export function useMouse(
     event.pointerType === 'mouse' ? buttonBits[event.button] : 1
   )
 
+  const usesTouchscreen = (event: PointerEvent) =>
+    mode.value === 'touchscreen' && event.pointerType !== 'mouse'
+
   const usesTouchpad = (event: PointerEvent) =>
-    event.pointerType === 'touch' && touchInput?.value === 'touchpad'
+    event.pointerType === 'touch' && mode.value !== 'touchscreen' && touchInput?.value === 'touchpad'
+
+  const flushContacts = () => {
+    if (contactTimer) window.clearTimeout(contactTimer)
+    contactTimer = 0
+    if (keepaliveTimer) window.clearTimeout(keepaliveTimer)
+    keepaliveTimer = 0
+    const report = contacts.report()
+    if (report.length) {
+      lastContactSent = performance.now()
+      onekvm.sendTouch(report)
+    }
+    // OneKVM lifts held contacts when the browser goes quiet for a second.
+    if (contacts.active) keepaliveTimer = window.setTimeout(flushContacts, TOUCHSCREEN_KEEPALIVE_MS)
+  }
+
+  const scheduleContacts = () => {
+    if (contactTimer) return
+    const reportIntervalMs = 1000 / Math.max(1, reportRate.value)
+    const delay = Math.max(0, reportIntervalMs - (performance.now() - lastContactSent))
+    contactTimer = window.setTimeout(flushContacts, delay)
+  }
+
+  // Sends coalesced motion first so the host sees it before a finger change.
+  const flushPendingContacts = () => {
+    if (contactTimer) flushContacts()
+  }
+
+  const releaseContacts = () => {
+    if (contactTimer) window.clearTimeout(contactTimer)
+    contactTimer = 0
+    if (keepaliveTimer) window.clearTimeout(keepaliveTimer)
+    keepaliveTimer = 0
+    if (contacts.cancel()) flushContacts()
+  }
+
+  const touchscreenDown = (event: PointerEvent) => {
+    event.preventDefault()
+    if (contacts.has(event.pointerId) || !video.value) return
+    // A finger that lands outside the picture is not a contact.
+    const point = coordinates(event.clientX, event.clientY)
+    if (!point.inside) return
+    const target = eventTarget()
+    target?.focus({ preventScroll: true })
+    try {
+      target?.setPointerCapture(event.pointerId)
+    } catch {
+      // Capture is best-effort; touch still tracks on the surface.
+    }
+    flushPendingContacts()
+    if (contacts.down(event.pointerId, point.x, point.y)) flushContacts()
+  }
+
+  const touchscreenMove = (event: PointerEvent) => {
+    if (!contacts.has(event.pointerId)) return
+    event.preventDefault()
+    if (!video.value) return
+    // Outside the picture the contact stays on the nearest edge.
+    const point = coordinates(event.clientX, event.clientY)
+    if (contacts.move(event.pointerId, point.x, point.y)) scheduleContacts()
+  }
+
+  const touchscreenUp = (event: PointerEvent) => {
+    if (!contacts.has(event.pointerId)) return
+    event.preventDefault()
+    let moved = false
+    if (event.type !== 'pointercancel' && video.value) {
+      const point = coordinates(event.clientX, event.clientY)
+      moved = contacts.move(event.pointerId, point.x, point.y)
+    }
+    // The last position goes out while still touching, then the lift.
+    if (moved) flushContacts()
+    else flushPendingContacts()
+    contacts.up(event.pointerId)
+    flushContacts()
+  }
 
   const clearHoldTimer = () => {
     if (!holdTimer) return
@@ -127,7 +212,7 @@ export function useMouse(
       flushMove()
     }
     buttons = next
-    if (mode.value === 'absolute') onekvm.sendAbsoluteMouse(buttons, absoluteX, absoluteY)
+    if (absolute()) onekvm.sendAbsoluteMouse(buttons, absoluteX, absoluteY)
     else onekvm.sendRelativeMouse(buttons)
   }
 
@@ -144,7 +229,7 @@ export function useMouse(
       videoFit.value,
       rotation?.value,
     )
-    if (mode.value === 'absolute') {
+    if (absolute()) {
       touchX = Math.max(1, Math.min(0x7fff, touchX + delta.x))
       touchY = Math.max(1, Math.min(0x7fff, touchY + delta.y))
       absoluteX = Math.round(touchX)
@@ -217,13 +302,17 @@ export function useMouse(
 
   const pointerMove = (event: PointerEvent) => {
     if (!hidEnabled()) return
+    if (usesTouchscreen(event)) {
+      touchscreenMove(event)
+      return
+    }
     if (usesTouchpad(event)) {
       touchpadMove(event)
       return
     }
     if (event.pointerType !== 'mouse' && event.pointerId !== activeTouchId) return
     if (event.pointerType !== 'mouse') event.preventDefault()
-    if (mode.value === 'absolute') {
+    if (absolute()) {
       if (!video.value) return
       const point = coordinates(event.clientX, event.clientY)
       if (!point.inside) return
@@ -253,6 +342,10 @@ export function useMouse(
 
   const pointerDown = (event: PointerEvent) => {
     if (!hidEnabled()) return
+    if (usesTouchscreen(event)) {
+      touchscreenDown(event)
+      return
+    }
     if (usesTouchpad(event)) {
       touchpadDown(event)
       return
@@ -278,7 +371,7 @@ export function useMouse(
       return
     }
     buttons |= bit
-    if (mode.value === 'absolute') {
+    if (absolute()) {
       const point = coordinates(event.clientX, event.clientY)
       if (!point.inside) {
         buttons &= ~bit
@@ -294,6 +387,10 @@ export function useMouse(
 
   const pointerUp = (event: PointerEvent) => {
     if (!hidEnabled()) return
+    if (usesTouchscreen(event)) {
+      touchscreenUp(event)
+      return
+    }
     if (usesTouchpad(event)) {
       touchpadUp(event)
       return
@@ -304,7 +401,7 @@ export function useMouse(
     if ((buttons & bit) === 0) return
     event.preventDefault()
     buttons &= ~bit
-    if (mode.value === 'absolute' && video.value) {
+    if (absolute() && video.value) {
       const point = coordinates(event.clientX, event.clientY)
       if (point.inside) {
         absoluteX = point.x
@@ -332,6 +429,7 @@ export function useMouse(
     activeTouchId = null
     clearHoldTimer()
     gesture.cancel()
+    releaseContacts()
     if (buttons === 0) return
     buttons = 0
     onekvm.sendRelativeMouse(0)

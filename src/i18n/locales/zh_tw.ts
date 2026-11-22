@@ -436,6 +436,8 @@ const zh_tw = {
       mode: '滑鼠模式',
       absolute: '絕對模式',
       relative: '相對模式',
+      touchscreen: '觸控螢幕模式',
+      touchscreenHint: '最多 10 指。macOS 不支援觸控螢幕，請改用絕對模式。',
       speed: '滾輪速度',
       fast: '快',
       slow: '慢',

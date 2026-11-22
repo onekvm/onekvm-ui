@@ -436,6 +436,8 @@ const en = {
       mode: 'Mouse mode',
       absolute: 'Absolute mode',
       relative: 'Relative mode',
+      touchscreen: 'Touchscreen mode',
+      touchscreenHint: 'Up to 10 fingers. macOS does not support touchscreens; use Absolute mode there.',
       speed: 'Wheel speed',
       fast: 'Fast',
       slow: 'Slow',

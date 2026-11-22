@@ -18,6 +18,7 @@ import { useDeviceInputSettings } from '@/composables/useDeviceInputSettings'
 import { useKeyboardLockOverlay } from '@/composables/useKeyboardLockOverlay'
 import { hasPermission } from '@/build'
 import { type MouseMode } from '@/composables/useMouse'
+import { parseMouseMode, primaryTouchDevice } from '@/lib/touchscreen'
 import { parseVideoFit, parseVideoRotation, VIDEO_FIT_KEY, VIDEO_ROTATION_KEY, type VideoFit, type VideoRotation } from '@/lib/video-fit'
 import {
   parseToolbarDock,
@@ -153,9 +154,7 @@ const magicKey = ref(sanitizeMagicKey(localStorage.getItem(MAGIC_KEY_STORAGE)))
 const userShortcuts = ref<KeyboardShortcut[]>(loadLocalShortcuts())
 const deviceShortcuts = ref<KeyboardShortcut[]>([])
 const keyboardLayout = ref<KeyboardLayout>('us')
-const mouseMode = ref<MouseMode>(
-  localStorage.getItem(MOUSE_MODE_KEY) === 'relative' ? 'relative' : 'absolute',
-)
+const mouseMode = ref<MouseMode>(parseMouseMode(localStorage.getItem(MOUSE_MODE_KEY), primaryTouchDevice()))
 const videoFit = ref<VideoFit>(parseVideoFit(localStorage.getItem(VIDEO_FIT_KEY)))
 const videoRotation = shallowRef<VideoRotation>(parseVideoRotation(localStorage.getItem(VIDEO_ROTATION_KEY)))
 const {

@@ -97,6 +97,7 @@ onBeforeUnmount(() => {
           <section class="control-sheet-card" role="dialog" aria-modal="true">
             <header class="control-sheet-header">
               <strong class="control-sheet-title"><slot name="title" /></strong>
+              <slot name="sheet-actions" />
               <button
                 type="button"
                 class="control-sheet-close"

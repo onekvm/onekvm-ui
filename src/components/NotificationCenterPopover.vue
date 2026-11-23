@@ -48,10 +48,22 @@ onBeforeUnmount(() => releaseList?.())
   >
     <slot />
     <template #title>{{ t('notifications.title', 'Notifications') }}</template>
+    <template #sheet-actions>
+      <n-button v-if="entries.length" quaternary size="small" @click="clear">
+        <template #icon><Trash2 /></template>
+        {{ t('notifications.clear', 'Clear all') }}
+      </n-button>
+    </template>
     <template #panel>
       <div class="notification-center">
         <header class="control-popover-header notification-center-header">
           <strong>{{ t('notifications.title', 'Notifications') }}</strong>
+          <div v-if="entries.length && !sheet" class="control-popover-header-actions">
+            <n-button quaternary size="tiny" @click="clear">
+              <template #icon><Trash2 /></template>
+              {{ t('notifications.clear', 'Clear all') }}
+            </n-button>
+          </div>
         </header>
         <p v-if="!entries.length && !loading" class="notification-center-empty">{{ t('notifications.empty', 'No notifications') }}</p>
         <NotificationList
@@ -62,12 +74,6 @@ onBeforeUnmount(() => releaseList?.())
           removable
           @remove="remove"
         />
-        <footer v-if="entries.length" class="notification-center-footer">
-          <n-button quaternary size="small" @click="clear">
-            <template #icon><Trash2 /></template>
-            {{ t('notifications.clear', 'Clear all') }}
-          </n-button>
-        </footer>
       </div>
     </template>
   </ControlOverlay>
@@ -78,11 +84,6 @@ onBeforeUnmount(() => releaseList?.())
   display: grid;
   gap: 8px;
   min-width: 0;
-}
-
-.notification-center-footer {
-  display: flex;
-  justify-content: flex-end;
 }
 
 .notification-center-empty {

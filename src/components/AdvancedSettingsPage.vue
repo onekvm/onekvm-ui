@@ -6,6 +6,7 @@ import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, wat
 import {
   ArrowLeft,
   Activity,
+  Bell,
   Box,
   Boxes,
   Cable,
@@ -124,6 +125,7 @@ import OnlineSessionsPage from './OnlineSessionsPage.vue'
 import LogsPage from './LogsPage.vue'
 import ServicesPage from './ServicesPage.vue'
 import SecuritySettingsPage from './SecuritySettingsPage.vue'
+import NotificationSettingsPage from './NotificationSettingsPage.vue'
 import StaticRoutesForm from './StaticRoutesForm.vue'
 import TimezoneMap from './TimezoneMap.vue'
 import SystemUpdateSourceSelector, { type UpdateMethod } from './SystemUpdateSourceSelector.vue'
@@ -177,7 +179,7 @@ function sectionFromRoute(route: string): Section {
     }
   }
   if (uiProduct.settingsSections?.some((item) => item.key === normalized)) return normalized
-  return ['display', 'audio', 'personalization', 'network', 'firewall', 'keyboard', 'usb', 'cloud', 'plugins', 'services', 'security', 'logs', 'resources', 'sessions', 'system', 'files', 'users', 'time', 'update'].includes(normalized) ? normalized : 'system'
+  return ['display', 'audio', 'personalization', 'network', 'firewall', 'keyboard', 'usb', 'cloud', 'plugins', 'services', 'security', 'notifications', 'logs', 'resources', 'sessions', 'system', 'files', 'users', 'time', 'update'].includes(normalized) ? normalized : 'system'
 }
 
 function routeFromSection(value: Section) {
@@ -525,6 +527,7 @@ const sections = computed<SidebarSection[]>(() => {
     ...pluginPages,
     { key: 'services', label: t('settings.advancedSettings.services', 'Services'), icon: ListRestart },
     { key: 'security', label: t('settings.advancedSettings.security', 'Security'), icon: ShieldCheck },
+    { key: 'notifications', label: t('settings.advancedSettings.notifications', 'Notifications'), icon: Bell },
     { key: 'logs', label: t('settings.advancedSettings.logs', 'Logs'), icon: ScrollText },
     { key: 'resources', label: t('settings.advancedSettings.resources', 'Resource monitor'), icon: Activity },
     { key: 'sessions', label: t('settings.advancedSettings.sessions', 'Online sessions'), icon: RadioTower },
@@ -1308,6 +1311,19 @@ function selectSettingsItem(key: string) {
   lastDetailSection.value = targetKey
   section.value = targetKey
   emit('navigate', routeFromSection(targetKey))
+}
+
+const pluginFocus = shallowRef('')
+
+/** A plugin's own page when it has one, otherwise its details in Plugins. */
+function openPluginSettings(id: string) {
+  const extension = extensions.value.find((entry) => entry.id === id)
+  if (extension?.enabled && extension.has_page) {
+    selectSettingsItem(`extension:${id}`)
+    return
+  }
+  pluginFocus.value = id
+  selectSettingsItem('plugins')
 }
 
 function openCloudProvider(id: string) {
@@ -2175,7 +2191,9 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                   :active="paneSection === 'plugins'"
                   :catalog="extensions"
                   :catalog-loading="extensionsLoading"
+                  :focus="pluginFocus"
                   @catalog="updateExtensions"
+                  @focused="pluginFocus = ''"
                 />
               </section>
 
@@ -2217,6 +2235,14 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
 
               <section v-else-if="paneSection === 'security'" class="advanced-settings-section">
                 <SecuritySettingsPage />
+              </section>
+
+              <section v-else-if="paneSection === 'notifications'" class="advanced-settings-section">
+                <NotificationSettingsPage
+                  :catalog="extensions"
+                  @open-plugins="selectSettingsItem('plugins')"
+                  @open-plugin="openPluginSettings"
+                />
               </section>
 
               <section v-else-if="paneSection === 'logs'" class="advanced-settings-section">

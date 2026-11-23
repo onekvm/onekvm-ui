@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue'
-import { Cpu, Fingerprint, HardDrive, Keyboard, LayoutDashboard, Monitor, PanelTop, PanelsTopLeft, Plug, Power, Puzzle, Server, Settings2, ShieldAlert, Toolbox, Video } from '@/icons'
+import { Bell, Cpu, Fingerprint, HardDrive, Keyboard, LayoutDashboard, Monitor, PanelTop, PanelsTopLeft, Plug, Power, Puzzle, Server, Settings2, ShieldAlert, Toolbox, Video } from '@/icons'
 import { extensionLocalizedText, extensionTranslation, type ExtensionStatus } from '@/api/client'
 import { providesCapabilities } from '@/lib/extension-category'
 import { currentLanguage, t } from '@/i18n/runtime'
@@ -32,6 +32,7 @@ const items = computed(() => {
   if (mcpTools) add('mcp-tools', 'mcpTools', Plug, '', t('settings.plugins.featureDetails.mcpTools.description').replace('{count}', String(mcpTools)))
   const mqttEntities = detail.contributions?.filter(item => item.point === 'extend.mqtt' && item.version === 1).length || 0
   if (mqttEntities) add('mqtt-entities', 'mqttEntities', Plug, '', t('settings.plugins.featureDetails.mqttEntities.description').replace('{count}', String(mqttEntities)))
+  if (detail.contributions?.some(item => item.point === 'extend.notification' && item.version === 1)) add('notification-channel', 'notificationChannel', Bell)
   for (const tool of detail.toolbox?.items || []) {
     const title = extensionLocalizedText(Object.fromEntries(Object.entries(tool.i18n || {}).map(([locale, value]) => [locale, value.title])), currentLanguage.value, tool.title)
     add(`toolbox:${tool.id}`, tool.presentation === 'drawer' ? 'toolDrawer' : 'toolWindow', Toolbox, title)

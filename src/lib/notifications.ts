@@ -1,56 +1,111 @@
-export type NotificationLevel = 'error' | 'warning' | 'success' | 'info'
+import type { NotificationCategory, NotificationLevel, ServerNotification } from '../api/client.ts'
+
+export type { NotificationLevel }
 
 export interface NotificationEntry {
-  id: string
+  id: number
   level: NotificationLevel
+  category: NotificationCategory
+  /** Core event type, or `web.message` for a console prompt. */
+  event: string
+  /** Text from Core, in the device language. */
   text: string
+  data: Record<string, unknown>
   /** Time of the latest occurrence, in milliseconds since the epoch. */
   at: number
-  /** How many times the same text arrived in a row. */
+  /** How many times the same notification arrived in a row. */
   count: number
+  read: boolean
+}
+
+export interface NotificationListState {
+  revision: number
+  unread: number
+  entries: NotificationEntry[]
 }
 
 export const NOTIFICATION_LEVELS: readonly NotificationLevel[] = ['error', 'warning', 'success', 'info']
-/** Entries kept per browser; the oldest drop off first. */
-export const NOTIFICATION_LIMIT = 100
-/** The same text again within this window updates the latest entry instead of adding one. */
-export const NOTIFICATION_MERGE_MS = 10_000
+const CATEGORIES: readonly NotificationCategory[] = ['web', 'sign_in', 'video_signal', 'network']
 
-/** Newest first. */
-export function appendNotification(
-  list: readonly NotificationEntry[],
-  next: { level: NotificationLevel; text: string },
-  now: number,
-  id: string,
-): NotificationEntry[] {
-  const text = next.text.trim()
-  if (!text) return [...list]
-  const latest = list[0]
-  if (latest && latest.level === next.level && latest.text === text && now - latest.at <= NOTIFICATION_MERGE_MS) {
-    return [{ ...latest, at: now, count: latest.count + 1 }, ...list.slice(1)]
+function count(value: unknown) {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null
+}
+
+export function parseNotification(value: unknown): NotificationEntry | null {
+  if (!value || typeof value !== 'object') return null
+  const item = value as Partial<ServerNotification>
+  const id = count(item.id)
+  const at = count(item.updated_at_unix_ms)
+  const repeats = count(item.count)
+  if (id === null || at === null || repeats === null || repeats < 1) return null
+  if (!NOTIFICATION_LEVELS.includes(item.level as NotificationLevel)) return null
+  if (typeof item.event !== 'string' || typeof item.text !== 'string' || !item.text) return null
+  return {
+    id,
+    level: item.level as NotificationLevel,
+    category: CATEGORIES.includes(item.category as NotificationCategory) ? item.category as NotificationCategory : 'web',
+    event: item.event,
+    text: item.text,
+    data: item.data && typeof item.data === 'object' && !Array.isArray(item.data) ? item.data : {},
+    at,
+    count: repeats,
+    read: item.read === true,
   }
-  return [{ id, level: next.level, text, at: now, count: 1 }, ...list].slice(0, NOTIFICATION_LIMIT)
 }
 
-export function unreadNotificationCount(list: readonly NotificationEntry[], seenAt: number) {
-  return list.filter((entry) => entry.at > seenAt).length
-}
-
-export function parseStoredNotifications(value: unknown): { entries: NotificationEntry[]; seenAt: number } {
-  const record = value && typeof value === 'object' ? value as { entries?: unknown; seenAt?: unknown } : {}
+export function parseNotificationList(value: unknown): NotificationListState {
+  const record = value && typeof value === 'object' ? value as { revision?: unknown; unread?: unknown; entries?: unknown } : {}
   const entries = Array.isArray(record.entries)
-    ? record.entries.filter(isNotificationEntry).slice(0, NOTIFICATION_LIMIT)
+    ? record.entries.map(parseNotification).filter((entry): entry is NotificationEntry => entry !== null)
     : []
-  const seenAt = typeof record.seenAt === 'number' && Number.isFinite(record.seenAt) ? record.seenAt : 0
-  return { entries, seenAt }
+  return {
+    revision: count(record.revision) ?? 0,
+    unread: count(record.unread) ?? entries.filter((entry) => !entry.read).length,
+    entries,
+  }
 }
 
-function isNotificationEntry(value: unknown): value is NotificationEntry {
-  if (!value || typeof value !== 'object') return false
-  const entry = value as Partial<NotificationEntry>
-  return typeof entry.id === 'string'
-    && NOTIFICATION_LEVELS.includes(entry.level as NotificationLevel)
-    && typeof entry.text === 'string' && entry.text.length > 0
-    && typeof entry.at === 'number' && Number.isFinite(entry.at)
-    && typeof entry.count === 'number' && entry.count >= 1
+type Translate = (path: string, fallback?: string) => string
+
+function textField(data: Record<string, unknown>, key: string) {
+  const value = data[key]
+  return typeof value === 'string' && value ? value : ''
+}
+
+function fill(template: string, values: Record<string, string>) {
+  return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) => values[key] ?? match)
+}
+
+/** Core events in the browser's language; other entries keep their own text. */
+export function notificationText(entry: NotificationEntry, t: Translate) {
+  const username = textField(entry.data, 'username')
+  const address = textField(entry.data, 'address')
+  const who = (subject: string) => {
+    let text = subject
+    if (username) text = fill(t('notifications.events.withUser', '{{subject}}: {{username}}'), { subject: text, username })
+    if (address) text = fill(t('notifications.events.withAddress', '{{subject}} ({{address}})'), { subject: text, address })
+    return text
+  }
+  switch (entry.event) {
+    case 'auth.login.succeeded':
+      return who(t('notifications.events.signedIn', 'Signed in'))
+    case 'auth.login.failed':
+      return ['blocked', 'rate_limited', 'weak_credentials'].includes(textField(entry.data, 'reason'))
+        ? who(t('notifications.events.signInBlocked', 'Sign-in blocked'))
+        : who(t('notifications.events.signInFailed', 'Sign-in failed'))
+    case 'video.signal.changed':
+      return entry.data.connected === true
+        ? t('notifications.events.videoRestored', 'Video signal restored')
+        : t('notifications.events.videoLost', 'No video signal')
+    case 'network.state.changed': {
+      if (entry.data.ethernet_connected !== true && entry.data.wifi_connected !== true) {
+        return t('notifications.events.networkDisconnected', 'Network disconnected')
+      }
+      const ip = textField(entry.data, 'ip')
+      const subject = t('notifications.events.networkChanged', 'Network changed')
+      return ip ? fill(t('notifications.events.withUser', '{{subject}}: {{username}}'), { subject, username: ip }) : subject
+    }
+    default:
+      return entry.text
+  }
 }

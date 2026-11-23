@@ -342,6 +342,64 @@ export interface OneKVMConfig {
   keyboard: KeyboardConfig
   input: InputConfig
   usb: USBConfig
+  notifications?: NotificationConfig
+}
+
+export type NotificationLevel = 'error' | 'warning' | 'success' | 'info'
+export type NotificationCategory = 'web' | 'sign_in' | 'video_signal' | 'network'
+
+export interface WebhookHeader {
+  name: string
+  value: string
+}
+
+export interface WebhookConfig {
+  enabled: boolean
+  url: string
+  /** Lowest level delivered; `info` delivers everything. */
+  min_level: Exclude<NotificationLevel, 'success'>
+  headers: WebhookHeader[]
+}
+
+export interface NotificationConfig {
+  web_messages: boolean
+  sign_in: boolean
+  video_signal: boolean
+  network: boolean
+  webhook: WebhookConfig
+}
+
+export interface ServerNotification {
+  id: number
+  level: NotificationLevel
+  category: NotificationCategory
+  /** Core event type, or `web.message` for a console prompt. */
+  event: string
+  text: string
+  data?: Record<string, unknown>
+  count: number
+  created_at_unix_ms: number
+  updated_at_unix_ms: number
+  read: boolean
+}
+
+export interface NotificationList {
+  revision: number
+  unread: number
+  entries: ServerNotification[]
+}
+
+export interface NotificationChannelResult {
+  ok: boolean
+  at_unix_ms: number
+  error?: string
+  suppressed?: number
+}
+
+export interface NotificationChannels {
+  webhook: { last: NotificationChannelResult | null }
+  extensions: { id: string; source: string; title?: string; last: NotificationChannelResult | null }[]
+  error?: string
 }
 
 export type ConsoleTitleSource = 'device_name' | 'hostname' | 'custom'
@@ -604,6 +662,8 @@ export interface OneKVMStatus {
   variant_label?: string
   version: string
   uptime_seconds: number
+  /** Core notification list version and unread count; absent on older Core. */
+  notifications?: { revision: number; unread: number }
   video: {
     active: boolean
     hdmi_connected: boolean
@@ -1823,6 +1883,28 @@ export const api = {
     headers: { 'Content-Type': file.type || 'application/octet-stream' },
   }),
   clearNoSignalImage: () => request<void>('/api/personalization/no-signal', { method: 'DELETE' }),
+  getNotifications: () => request<NotificationList>('/api/notifications', { cache: 'no-store' }),
+  recordNotification: (level: NotificationLevel, text: string) =>
+    request<ServerNotification | undefined>('/api/notifications', {
+      method: 'POST',
+      body: JSON.stringify({ level, text }),
+    }),
+  markNotificationsRead: () => request<{ revision: number; unread: number }>('/api/notifications/read', { method: 'POST' }),
+  clearNotifications: () => request<{ revision: number; unread: number }>('/api/notifications', { method: 'DELETE' }),
+  removeNotification: (id: number) =>
+    request<{ revision: number; unread: number }>(`/api/notifications/${encodeURIComponent(String(id))}`, { method: 'DELETE' }),
+  getNotificationChannels: () => request<NotificationChannels>('/api/notifications/channels', { cache: 'no-store' }),
+  testNotificationChannel: (id: string, webhook?: WebhookConfig) =>
+    request<{ ok: true }>('/api/notifications/channels/test', {
+      method: 'POST',
+      body: JSON.stringify(webhook ? { id, webhook } : { id }),
+    }),
+  getNotificationConfig: () => request<NotificationConfig>('/api/config/notifications', { cache: 'no-store' }),
+  saveNotificationConfig: (config: NotificationConfig) =>
+    request<NotificationConfig>('/api/config/notifications', {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    }),
   getInputConfig: () => request<InputConfig>('/api/config/input', { cache: 'no-store' }),
   saveInputConfig: (input: InputConfig) =>
     request<InputConfig>('/api/config/input', {

@@ -1,51 +1,75 @@
 import assert from 'node:assert/strict'
 
-import {
-  NOTIFICATION_LIMIT,
-  NOTIFICATION_MERGE_MS,
-  appendNotification,
-  parseStoredNotifications,
-  unreadNotificationCount,
-} from '../src/lib/notifications.ts'
+import { notificationText, parseNotification, parseNotificationList } from '../src/lib/notifications.ts'
 
-// Newest first; blank text is ignored.
-let list = appendNotification([], { level: 'error', text: ' Save failed ' }, 1000, 'a')
-assert.deepEqual(list, [{ id: 'a', level: 'error', text: 'Save failed', at: 1000, count: 1 }])
-assert.equal(appendNotification(list, { level: 'info', text: '  ' }, 1100, 'b').length, 1)
-list = appendNotification(list, { level: 'success', text: 'Saved' }, 2000, 'b')
-assert.deepEqual(list.map((entry) => entry.id), ['b', 'a'])
+const server = (fields: Record<string, unknown>) => ({
+  id: 1,
+  level: 'warning',
+  category: 'sign_in',
+  event: 'auth.login.failed',
+  text: 'Sign-in failed: admin (192.0.2.7)',
+  data: { username: 'admin', reason: 'invalid_credentials', address: '192.0.2.7' },
+  count: 1,
+  created_at_unix_ms: 10,
+  updated_at_unix_ms: 20,
+  read: false,
+  ...fields,
+})
 
-// The same prompt again soon after updates the latest entry.
-list = appendNotification(list, { level: 'success', text: 'Saved' }, 2000 + NOTIFICATION_MERGE_MS, 'c')
-assert.equal(list.length, 2)
-assert.deepEqual(list[0], { id: 'b', level: 'success', text: 'Saved', at: 2000 + NOTIFICATION_MERGE_MS, count: 2 })
-// Later, or with another level, it is a new entry.
-list = appendNotification(list, { level: 'success', text: 'Saved' }, 3000 + 2 * NOTIFICATION_MERGE_MS, 'd')
-list = appendNotification(list, { level: 'error', text: 'Saved' }, 3001 + 2 * NOTIFICATION_MERGE_MS, 'e')
-assert.deepEqual(list.map((entry) => entry.id), ['e', 'd', 'b', 'a'])
-
-// Unread entries are the ones newer than the last time the list was opened.
-assert.equal(unreadNotificationCount(list, 0), 4)
-assert.equal(unreadNotificationCount(list, 2000 + NOTIFICATION_MERGE_MS), 2)
-
-// The oldest drop off past the limit.
-let many = list
-for (let index = 0; index < NOTIFICATION_LIMIT + 5; index++) {
-  many = appendNotification(many, { level: 'info', text: `n${index}` }, 10_000_000 + index, `n${index}`)
-}
-assert.equal(many.length, NOTIFICATION_LIMIT)
-assert.equal(many[0]?.id, `n${NOTIFICATION_LIMIT + 4}`)
-
-// Stored data is checked entry by entry.
-assert.deepEqual(parseStoredNotifications(null), { entries: [], seenAt: 0 })
-assert.deepEqual(parseStoredNotifications({
-  seenAt: 5,
+// Entries are checked one by one; the latest occurrence is the entry time.
+const list = parseNotificationList({
+  revision: 7,
+  unread: 1,
   entries: [
-    { id: 'x', level: 'warning', text: 'HDMI', at: 4, count: 1 },
-    { id: 'y', level: 'bogus', text: 'bad', at: 4, count: 1 },
-    { id: 'z', level: 'info', text: '', at: 4, count: 1 },
+    server({}),
+    server({ id: 2, level: 'bogus' }),
+    server({ id: 3, text: '' }),
+    server({ id: 4, count: 0 }),
     'junk',
+    server({ id: 5, level: 'success', category: 'web', event: 'web.message', text: 'Saved', data: undefined, read: true }),
   ],
-}), { entries: [{ id: 'x', level: 'warning', text: 'HDMI', at: 4, count: 1 }], seenAt: 5 })
+})
+assert.equal(list.revision, 7)
+assert.equal(list.unread, 1)
+assert.deepEqual(list.entries.map((entry) => entry.id), [1, 5])
+assert.equal(list.entries[0]?.at, 20)
+assert.deepEqual(list.entries[1]?.data, {})
+assert.deepEqual(parseNotificationList(null), { revision: 0, unread: 0, entries: [] })
+
+// Core events follow the browser language; other entries keep their text.
+const messages: Record<string, string> = {
+  'notifications.events.signInFailed': '登录失败',
+  'notifications.events.signInBlocked': '登录已被阻止',
+  'notifications.events.signedIn': '已登录',
+  'notifications.events.withUser': '{{subject}}：{{username}}',
+  'notifications.events.withAddress': '{{subject}}（{{address}}）',
+  'notifications.events.videoLost': '视频信号已断开',
+  'notifications.events.networkChanged': '网络已变化',
+}
+const zh = (path: string, fallback?: string) => messages[path] ?? fallback ?? path
+const english = (_path: string, fallback?: string) => fallback ?? _path
+
+const failed = list.entries[0]!
+assert.equal(notificationText(failed, zh), '登录失败：admin（192.0.2.7）')
+assert.equal(notificationText(failed, english), 'Sign-in failed: admin (192.0.2.7)')
+assert.equal(
+  notificationText({ ...failed, data: { username: 'root', reason: 'blocked' } }, zh),
+  '登录已被阻止：root',
+)
+assert.equal(notificationText({ ...failed, event: 'auth.login.succeeded', data: {} }, zh), '已登录')
+assert.equal(
+  notificationText({ ...failed, event: 'video.signal.changed', data: { connected: false } }, zh),
+  '视频信号已断开',
+)
+assert.equal(
+  notificationText({ ...failed, event: 'network.state.changed', data: { wifi_connected: true, ip: '192.0.2.9' } }, zh),
+  '网络已变化：192.0.2.9',
+)
+assert.equal(
+  notificationText({ ...failed, event: 'network.state.changed', data: { ethernet_connected: false } }, english),
+  'Network disconnected',
+)
+assert.equal(notificationText(list.entries[1]!, zh), 'Saved')
+assert.equal(notificationText(parseNotification(server({ event: 'future.event', text: 'From Core' }))!, zh), 'From Core')
 
 console.log('notifications tests passed')

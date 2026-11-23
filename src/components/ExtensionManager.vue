@@ -21,8 +21,14 @@ import { pluginIcon } from '@/lib/plugin-icons'
 import ExtensionDetailsModal from './ExtensionDetailsModal.vue'
 import InstallEnableOption from './InstallEnableOption.vue'
 
-const props = defineProps<{ active: boolean; catalog?: ExtensionSummary[]; catalogLoading?: boolean }>()
-const emit = defineEmits<{ catalog: [value: ExtensionSummary[]] }>()
+const props = defineProps<{
+  active: boolean
+  catalog?: ExtensionSummary[]
+  catalogLoading?: boolean
+  /** Open this plugin's details once it is listed. */
+  focus?: string
+}>()
+const emit = defineEmits<{ catalog: [value: ExtensionSummary[]]; focused: [] }>()
 
 type ExtensionDraft = {
   enabled: boolean
@@ -498,6 +504,14 @@ watch(() => props.catalog, (catalog) => {
 
 watch(() => props.active, (active) => {
   if (active && !props.catalog) void load()
+}, { immediate: true })
+
+watch([() => props.focus, extensions], ([focus]) => {
+  if (!focus) return
+  const status = extensions.value.find((item) => item.id === focus)
+  if (!status) return
+  emit('focused')
+  void openDetails(status)
 }, { immediate: true })
 </script>
 

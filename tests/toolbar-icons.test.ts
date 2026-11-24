@@ -17,6 +17,10 @@ const defaults = defaultToolbarIcons()
 assert.equal(defaults.length, 21)
 assert.equal(defaults[0]?.id, 'display')
 assert.equal(defaults.at(-1)?.id, 'account')
+// The collection comes first among the action icons.
+assert.deepEqual(defaults.slice(13).map(icon => icon.id), [
+  'collection', 'performance', 'fullscreen', 'toolbox', 'notifications', 'settings', 'language', 'account',
+])
 assert.deepEqual(defaults.filter(icon => icon.hidden).map(icon => icon.id), [
   'caps_lock', 'num_lock', 'scroll_lock', 'virtual_keyboard', 'keyboard_text', 'ctrl_alt_del', 'notifications',
 ])
@@ -53,9 +57,9 @@ const hiddenPower = setToolbarIconHidden(defaults, 'power', true)
 assert.equal(toolbarIconHidden(hiddenPower, 'power'), true)
 assert.equal(setToolbarIconHidden(defaults, 'settings', true).some(icon => icon.id === 'settings' && icon.hidden), false)
 assert.equal(toolbarIconHidden(setToolbarIconHidden(defaults, 'collection', true), 'collection'), false)
-const collectionFirst = reorderToolbarIcon(defaults, 'collection', 'performance')
-assert.ok(collectionFirst.findIndex(icon => icon.id === 'collection') < collectionFirst.findIndex(icon => icon.id === 'performance'))
-assert.equal(toolbarIconsEqual(collectionFirst, normalizeToolbarIcons(JSON.parse(JSON.stringify(collectionFirst)))), true)
+const performanceFirst = reorderToolbarIcon(defaults, 'performance', 'collection')
+assert.ok(performanceFirst.findIndex(icon => icon.id === 'performance') < performanceFirst.findIndex(icon => icon.id === 'collection'))
+assert.equal(toolbarIconsEqual(performanceFirst, normalizeToolbarIcons(JSON.parse(JSON.stringify(performanceFirst)))), true)
 const oldIcons = defaults.filter(icon => icon.id !== 'collection')
 const upgradedIcons = normalizeToolbarIcons(oldIcons)
 assert.equal(upgradedIcons.findIndex(icon => icon.id === 'collection') + 1, upgradedIcons.findIndex(icon => icon.id === 'settings'))

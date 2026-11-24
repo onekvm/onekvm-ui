@@ -14,11 +14,11 @@ export const TOOLBAR_ICON_IDS = [
   'power',
   'audio',
   'virtual_media',
+  'collection',
   'performance',
   'fullscreen',
   'toolbox',
   'notifications',
-  'collection',
   'settings',
   'language',
   'account',
@@ -86,6 +86,8 @@ export function normalizeToolbarIcons(icons: ToolbarIconInput): ToolbarIconPrefe
     if (isDeviceToolbarIcon(icon.id)) device.push(preference)
     else action.push(preference)
   }
+  if (!seen.size) return defaultToolbarIcons()
+  // A saved list gets the icons it lacks: one saved before they existed.
   for (const id of TOOLBAR_ICON_IDS) {
     if (seen.has(id)) continue
     const preference = { id, hidden: toolbarIconHiddenByDefault(id), removed: false }

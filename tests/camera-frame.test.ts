@@ -5,6 +5,7 @@ import {
   avcToAnnexB,
   CAMERA_HEADER_SIZE,
   cameraBitrate,
+  cameraCodecs,
   containRect,
   coverCrop,
   encodeCameraFrame,
@@ -37,6 +38,10 @@ assert.deepEqual(containRect(1080, 1920, 1280, 720), { x: 438, y: 0, width: 405,
 assert.deepEqual(containRect(2560, 1440, 1280, 720), { x: 0, y: 0, width: 1280, height: 720 })
 
 assert.equal(cameraBitrate(1280, 720, 30, 16_192_000), 2_764_800)
+assert.equal(cameraBitrate(1920, 1080, 60, 16_192_000), 12_441_600, '1080p60 stays under the USB link')
+assert.deepEqual(cameraCodecs(1920, 1080, 30), ['avc1.42E028', 'avc1.4D4028', 'avc1.640028'])
+assert.deepEqual(cameraCodecs(1280, 720, 60), ['avc1.42E028', 'avc1.4D4028', 'avc1.640028'])
+assert.deepEqual(cameraCodecs(1920, 1080, 60), ['avc1.42E02A', 'avc1.4D402A', 'avc1.64002A'], '1080p60 needs level 4.2')
 assert.equal(cameraBitrate(1920, 1080, 30, 4_000_000), 4_000_000, 'the USB link caps the bitrate')
 assert.equal(cameraBitrate(640, 360, 15, 16_192_000), 345_600)
 assert.equal(cameraBitrate(320, 240, 15, 16_192_000), 250_000)

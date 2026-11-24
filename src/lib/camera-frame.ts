@@ -2,8 +2,15 @@
 export const CAMERA_SUBPROTOCOL = 'onekvm.camera.v1'
 export const CAMERA_HEADER_SIZE = 24
 
-/** H.264 profiles to try, most widely decodable first; level 4.0 covers 1080p30. */
-export const CAMERA_H264_CODECS = ['avc1.42E028', 'avc1.4D4028', 'avc1.640028']
+/**
+ * H.264 profiles to try, most widely decodable first, at the lowest level
+ * that carries the format: 4.0 up to 1080p30, 4.2 for 1080p60.
+ */
+export function cameraCodecs(width: number, height: number, fps: number) {
+  const macroblocksPerSecond = Math.ceil(width / 16) * Math.ceil(height / 16) * fps
+  const level = macroblocksPerSecond > 245_760 ? '2A' : '28'
+  return ['42E0', '4D40', '6400'].map((profile) => `avc1.${profile}${level}`)
+}
 
 /** `OKCF | 1 | codec 1 (H.264 Annex B) | 0 0 | sequence | width | height | length`, big endian. */
 export function encodeCameraFrame(sequence: bigint, width: number, height: number, unit: Uint8Array): Uint8Array {

@@ -6,9 +6,9 @@ import { api } from '@/api/client'
 import {
   annexBUnits,
   avcToAnnexB,
-  CAMERA_H264_CODECS,
   CAMERA_SUBPROTOCOL,
   cameraBitrate,
+  cameraCodecs,
   containRect,
   coverCrop,
   encodeCameraFrame,
@@ -216,10 +216,10 @@ class CameraShare {
     let stream: MediaStream
     if (source === 'screen') {
       if (!media?.getDisplayMedia) throw named('NotFoundError')
-      stream = await media.getDisplayMedia({ audio: false, video: { frameRate: { ideal: 30 } } })
+      stream = await media.getDisplayMedia({ audio: false, video: { frameRate: { ideal: 60 } } })
     } else {
       if (!media?.getUserMedia) throw named('NotFoundError')
-      const video: MediaTrackConstraints = { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } }
+      const video: MediaTrackConstraints = { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 60 } }
       if (deviceId) video.deviceId = { exact: deviceId }
       stream = await media.getUserMedia({ audio: false, video })
       this.update({ deviceId: stream.getVideoTracks()[0]?.getSettings().deviceId || deviceId })
@@ -563,7 +563,7 @@ async function openFile(file: File): Promise<Capture> {
 async function chooseEncoderConfig(width: number, height: number, fps: number, bitrate: number) {
   if (typeof VideoEncoder === 'undefined') return null
   for (const annexB of [true, false]) {
-    for (const codec of CAMERA_H264_CODECS) {
+    for (const codec of cameraCodecs(width, height, fps)) {
       const config: VideoEncoderConfig = {
         codec, width, height, bitrate, framerate: fps, latencyMode: 'realtime',
         avc: { format: annexB ? 'annexb' : 'avc' },

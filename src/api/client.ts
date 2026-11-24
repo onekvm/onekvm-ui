@@ -353,12 +353,22 @@ export interface WebhookHeader {
   value: string
 }
 
-export interface WebhookConfig {
+export interface NotificationChannelConfig {
+  /** Assigned by Core when saved; blank for a new channel. */
+  id: string
+  /** `webhook` or an extension channel type `<extension>/<channel>`. */
+  type: string
+  /** Optional label; the type title is shown when blank. */
+  name: string
   enabled: boolean
-  url: string
   /** Lowest level delivered; `info` delivers everything. */
   min_level: Exclude<NotificationLevel, 'success'>
-  headers: WebhookHeader[]
+  /** Form values other than password fields; a webhook keeps its `url` here. */
+  settings?: Record<string, ExtensionSettingValue>
+  /** Password fields. Saved values read back blank; a blank value keeps the saved one. */
+  secrets?: Record<string, string>
+  /** Webhook request headers. Saved values read back blank. */
+  headers?: WebhookHeader[]
 }
 
 export interface NotificationConfig {
@@ -366,7 +376,7 @@ export interface NotificationConfig {
   sign_in: boolean
   video_signal: boolean
   network: boolean
-  webhook: WebhookConfig
+  channels: NotificationChannelConfig[]
 }
 
 export interface ServerNotification {
@@ -396,9 +406,26 @@ export interface NotificationChannelResult {
   suppressed?: number
 }
 
+export interface NotificationChannelSchema {
+  required?: string[]
+  /** Field order; unlisted fields follow by name. */
+  order?: string[]
+  properties: Record<string, ExtensionSettingProperty>
+}
+
+/** Channel type contributed by an enabled extension. */
+export interface NotificationChannelType {
+  type: string
+  source: string
+  title?: string
+  i18n?: ExtensionLocalizedText
+  settings_schema: NotificationChannelSchema
+}
+
 export interface NotificationChannels {
-  webhook: { last: NotificationChannelResult | null }
-  extensions: { id: string; source: string; title?: string; last: NotificationChannelResult | null }[]
+  types: NotificationChannelType[]
+  /** Latest delivery result by channel ID. */
+  results: Record<string, NotificationChannelResult>
   error?: string
 }
 
@@ -1894,10 +1921,10 @@ export const api = {
   removeNotification: (id: number) =>
     request<{ revision: number; unread: number }>(`/api/notifications/${encodeURIComponent(String(id))}`, { method: 'DELETE' }),
   getNotificationChannels: () => request<NotificationChannels>('/api/notifications/channels', { cache: 'no-store' }),
-  testNotificationChannel: (id: string, webhook?: WebhookConfig) =>
+  testNotificationChannel: (channel: NotificationChannelConfig) =>
     request<{ ok: true }>('/api/notifications/channels/test', {
       method: 'POST',
-      body: JSON.stringify(webhook ? { id, webhook } : { id }),
+      body: JSON.stringify({ channel }),
     }),
   getNotificationConfig: () => request<NotificationConfig>('/api/config/notifications', { cache: 'no-store' }),
   saveNotificationConfig: (config: NotificationConfig) =>

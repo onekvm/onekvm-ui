@@ -4,18 +4,27 @@ import { NTab, NTabs, useMessage } from 'naive-ui'
 
 import {
   api,
+  extensionLocalizedText,
   extensionTranslation,
   type ExtensionSummary,
+  type NotificationChannelConfig,
   type NotificationChannelResult,
   type NotificationChannels,
   type NotificationConfig,
-  type WebhookConfig,
 } from '@/api/client'
 import { hasPermission } from '@/build'
 import { useAuth } from '@/composables/useAuth'
 import { useNotifications } from '@/composables/useNotifications'
 import { currentLanguage, t } from '@/i18n/runtime'
-import { Bell, Plus, RefreshCw, Save, Settings, Trash2, X } from '@/icons'
+import { Plus, RefreshCw, Save, Trash2 } from '@/icons'
+import {
+  MAX_CHANNELS,
+  WEBHOOK_CHANNEL,
+  invalidFields,
+  newChannel,
+  normalizedChannel,
+} from '@/lib/notification-channels'
+import NotificationChannelCard from './notifications/NotificationChannelCard.vue'
 import NotificationList from './notifications/NotificationList.vue'
 
 const props = defineProps<{ catalog?: ExtensionSummary[] }>()
@@ -31,8 +40,8 @@ const releaseList = watchList()
 
 const form = ref<NotificationConfig | null>(null)
 const saved = shallowRef('')
-// Saved header values are not sent back; a blank value keeps the saved one.
-const savedHeaders = shallowRef(new Set<string>())
+// Saved secrets read back blank; a blank value keeps the saved one.
+const savedChannels = shallowRef<NotificationChannelConfig[]>([])
 const loading = shallowRef(false)
 const saving = shallowRef(false)
 const error = shallowRef('')
@@ -99,44 +108,79 @@ const categories = computed<{ key: Category; label: string; hint: string }[]>(()
   },
 ])
 
-const levelOptions = computed(() => [
-  { value: 'info', label: t('settings.advancedSettings.notificationsPage.levelAll', 'All') },
-  { value: 'warning', label: t('settings.advancedSettings.notificationsPage.levelWarning', 'Warnings and errors') },
-  { value: 'error', label: t('settings.advancedSettings.notificationsPage.levelError', 'Errors only') },
-])
-
 function normalized(config: NotificationConfig): NotificationConfig {
-  return {
-    ...config,
-    webhook: {
-      ...config.webhook,
-      url: config.webhook.url.trim(),
-      headers: config.webhook.headers.map((header) => ({ name: header.name.trim(), value: header.value.trim() })),
-    },
-  }
+  return { ...config, channels: config.channels.map(normalizedChannel) }
 }
 
 const dirty = computed(() => !!form.value && JSON.stringify(normalized(form.value)) !== saved.value)
-const webhookUrlValid = computed(() => {
-  const url = form.value?.webhook.url.trim() ?? ''
-  if (!url) return !form.value?.webhook.enabled
-  try {
-    const parsed = new URL(url)
-    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !!parsed.hostname
-  } catch {
-    return false
+
+function channelType(channel: NotificationChannelConfig) {
+  return channels.value?.types.find((kind) => kind.type === channel.type)
+}
+
+function savedChannel(channel: NotificationChannelConfig) {
+  return channel.id ? savedChannels.value.find((item) => item.id === channel.id && item.type === channel.type) : undefined
+}
+
+function savedSecrets(channel: NotificationChannelConfig) {
+  return Object.keys(savedChannel(channel)?.secrets || {})
+}
+
+function savedHeaders(channel: NotificationChannelConfig) {
+  return (savedChannel(channel)?.headers || []).map((header) => header.name.toLowerCase())
+}
+
+function pluginName(source: string) {
+  const extension = props.catalog?.find((item) => item.id === source)
+  return extension ? extensionTranslation(extension, currentLanguage.value).name : source
+}
+
+function typeTitle(type: string) {
+  if (type === WEBHOOK_CHANNEL) return 'Webhook'
+  const kind = channels.value?.types.find((item) => item.type === type)
+  const source = type.split('/')[0] || type
+  return extensionLocalizedText(kind?.i18n, currentLanguage.value, kind?.title || '') || pluginName(source)
+}
+
+// Unknown until the types are read; a channel of a missing type is kept but not sent.
+function unavailable(channel: NotificationChannelConfig) {
+  return channel.type !== WEBHOOK_CHANNEL && !!channels.value && !channels.value.error && !channelType(channel)
+}
+
+const valid = computed(() => (form.value?.channels ?? []).every((channel) =>
+  !invalidFields(channel, channelType(channel)?.settings_schema, savedSecrets(channel)).length))
+
+const addOptions = computed(() => [
+  { key: WEBHOOK_CHANNEL, label: typeTitle(WEBHOOK_CHANNEL) },
+  ...(channels.value?.types ?? []).map((kind) => ({ key: kind.type, label: typeTitle(kind.type) })),
+])
+
+function addChannel(type: string) {
+  if (!form.value || form.value.channels.length >= MAX_CHANNELS) return
+  form.value.channels.push(newChannel(type, channels.value?.types.find((kind) => kind.type === type)?.settings_schema))
+}
+
+function removeChannel(index: number) {
+  form.value?.channels.splice(index, 1)
+}
+
+// New channels have no ID until they are saved.
+const channelKeys = new WeakMap<NotificationChannelConfig, string>()
+let nextKey = 0
+function channelKey(channel: NotificationChannelConfig) {
+  let key = channelKeys.get(channel)
+  if (!key) {
+    key = channel.id ? `saved-${channel.id}` : `new-${++nextKey}`
+    channelKeys.set(channel, key)
   }
-})
-const headersValid = computed(() => {
-  const names = new Set<string>()
-  return (form.value?.webhook.headers ?? []).every((header) => {
-    const name = header.name.trim().toLowerCase()
-    if (!/^[!#$%&'*+\-.^_`|~0-9a-z]{1,64}$/.test(name) || names.has(name)) return false
-    names.add(name)
-    return !['host', 'content-length', 'content-type', 'transfer-encoding', 'connection'].includes(name)
-  })
-})
-const valid = computed(() => webhookUrlValid.value && headersValid.value)
+  return key
+}
+
+function openPlugin(channel: NotificationChannelConfig) {
+  const source = channel.type.split('/')[0] || ''
+  if (props.catalog?.some((item) => item.id === source)) emit('open-plugin', source)
+  else emit('open-plugins')
+}
 
 function errorText(reason: unknown) {
   return reason instanceof Error ? reason.message : String(reason)
@@ -146,20 +190,15 @@ async function loadChannels() {
   try {
     channels.value = await api.getNotificationChannels()
   } catch (reason) {
-    channels.value = { webhook: { last: null }, extensions: [], error: errorText(reason) }
+    channels.value = { types: [], results: {}, error: errorText(reason) }
   }
 }
 
 function apply(config: NotificationConfig) {
-  form.value = structuredClone(config)
-  saved.value = JSON.stringify(normalized(config))
-  savedHeaders.value = new Set(config.webhook.headers.map((header) => header.name.toLowerCase()))
-}
-
-function headerValuePlaceholder(name: string) {
-  return savedHeaders.value.has(name.trim().toLowerCase())
-    ? t('settings.advancedSettings.notificationsPage.keepValue', 'Leave blank to keep the saved value')
-    : t('settings.advancedSettings.notificationsPage.headerValue', 'Value')
+  const channels = config.channels ?? []
+  form.value = structuredClone({ ...config, channels })
+  saved.value = JSON.stringify(normalized({ ...config, channels }))
+  savedChannels.value = structuredClone(channels)
 }
 
 async function load() {
@@ -188,31 +227,18 @@ async function save() {
   }
 }
 
-async function test(id: string, webhook?: WebhookConfig) {
-  testing[id] = true
+async function test(channel: NotificationChannelConfig) {
+  const key = channelKey(channel)
+  testing[key] = true
   try {
-    await api.testNotificationChannel(id, webhook)
+    await api.testNotificationChannel(normalizedChannel(channel))
     message.success(t('settings.advancedSettings.notificationsPage.testSent', 'Test notification sent'))
   } catch (reason) {
     message.error(errorText(reason))
   } finally {
-    testing[id] = false
+    testing[key] = false
   }
 }
-
-function addHeader() {
-  form.value?.webhook.headers.push({ name: '', value: '' })
-}
-
-function removeHeader(index: number) {
-  form.value?.webhook.headers.splice(index, 1)
-}
-
-const pluginChannels = computed(() => (channels.value?.extensions ?? []).map((channel) => {
-  const extension = props.catalog?.find((item) => item.id === channel.source)
-  const plugin = extension ? extensionTranslation(extension, currentLanguage.value).name : channel.source
-  return { ...channel, name: channel.title || plugin, plugin }
-}))
 
 const timeFormat = computed(() => new Intl.DateTimeFormat(document.documentElement.lang || undefined, {
   month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -310,115 +336,36 @@ onBeforeUnmount(() => {
         <div v-show="activeTab === 'channels'" :id="panelID('channels')" class="notification-tab-panel" role="tabpanel" :aria-labelledby="tabID('channels')" tabindex="0">
           <p class="notification-hint">{{ t('settings.advancedSettings.notificationsPage.channelsHint', 'Sign-in, video signal and network notifications are sent to enabled channels.') }}</p>
 
-          <section class="notification-panel" aria-labelledby="notification-webhook-heading">
-            <div class="notification-card-header">
-              <div class="notification-card-title">
-                <h2 id="notification-webhook-heading">Webhook</h2>
-                <p class="notification-hint">{{ t('settings.advancedSettings.notificationsPage.webhookHint', 'Sends a JSON POST to the URL.') }}</p>
-                <p v-if="lastResult(channels?.webhook.last)" class="notification-status" :class="{ failed: channels?.webhook.last?.ok === false }">
-                  {{ lastResult(channels?.webhook.last) }}
-                </p>
-              </div>
-              <div class="notification-card-actions">
-                <n-button
-                  v-if="form.webhook.enabled"
-                  size="small"
-                  :loading="testing.webhook"
-                  :disabled="!canManage || !form.webhook.url.trim() || !valid"
-                  @click="test('webhook', normalized(form).webhook)"
-                >
-                  <template #icon><Bell aria-hidden="true" /></template>
-                  {{ t('settings.advancedSettings.notificationsPage.test', 'Send test') }}
-                </n-button>
-                <n-switch
-                  v-model:value="form.webhook.enabled"
-                  :disabled="!canManage || saving"
-                  aria-labelledby="notification-webhook-heading"
-                />
-              </div>
-            </div>
-            <div v-if="form.webhook.enabled" class="notification-webhook-fields">
-              <label class="notification-field">
-                <span>{{ t('settings.advancedSettings.notificationsPage.webhookUrl', 'URL') }}</span>
-                <n-input
-                  v-model:value="form.webhook.url"
-                  :disabled="!canManage || saving"
-                  :status="webhookUrlValid ? undefined : 'error'"
-                  placeholder="https://"
-                  :input-props="{ inputmode: 'url', autocomplete: 'off', spellcheck: false }"
-                />
-              </label>
-              <label class="notification-field">
-                <span>{{ t('settings.advancedSettings.notificationsPage.minLevel', 'Send') }}</span>
-                <n-select v-model:value="form.webhook.min_level" :options="levelOptions" :disabled="!canManage || saving" />
-              </label>
-              <div class="notification-field">
-                <span>{{ t('settings.advancedSettings.notificationsPage.headers', 'Request headers') }}</span>
-                <div v-for="(header, index) in form.webhook.headers" :key="index" class="notification-header-row">
-                  <n-input
-                    v-model:value="header.name"
-                    :disabled="!canManage || saving"
-                    :placeholder="t('settings.advancedSettings.notificationsPage.headerName', 'Name')"
-                    :status="headersValid ? undefined : 'error'"
-                    :input-props="{ autocomplete: 'off', spellcheck: false }"
-                  />
-                  <n-input
-                    v-model:value="header.value"
-                    type="password"
-                    show-password-on="click"
-                    :disabled="!canManage || saving"
-                    :placeholder="headerValuePlaceholder(header.name)"
-                    :input-props="{ autocomplete: 'off' }"
-                  />
-                  <n-button
-                    quaternary
-                    circle
-                    :disabled="!canManage || saving"
-                    :aria-label="t('common.delete', 'Delete')"
-                    @click="removeHeader(index)"
-                  >
-                    <template #icon><X aria-hidden="true" /></template>
-                  </n-button>
-                </div>
-                <div>
-                  <n-button
-                    v-if="form.webhook.headers.length < 8"
-                    size="small"
-                    dashed
-                    :disabled="!canManage || saving"
-                    @click="addHeader"
-                  >
-                    <template #icon><Plus aria-hidden="true" /></template>
-                    {{ t('settings.advancedSettings.notificationsPage.addHeader', 'Add header') }}
-                  </n-button>
-                </div>
-              </div>
-            </div>
-          </section>
+          <NotificationChannelCard
+            v-for="(channel, index) in form.channels"
+            :key="channelKey(channel)"
+            :channel="channel"
+            :type-title="typeTitle(channel.type)"
+            :schema="channelType(channel)?.settings_schema"
+            :unavailable="unavailable(channel)"
+            :saved-secrets="savedSecrets(channel)"
+            :saved-headers="savedHeaders(channel)"
+            :status="channel.id ? lastResult(channels?.results[channel.id]) : ''"
+            :failed="!!channel.id && channels?.results[channel.id]?.ok === false"
+            :testing="!!testing[channelKey(channel)]"
+            :disabled="saving"
+            :can-manage="canManage"
+            :initially-open="!channel.id"
+            @test="test(channel)"
+            @remove="removeChannel(index)"
+            @open-plugin="openPlugin(channel)"
+          />
 
-          <section v-for="channel in pluginChannels" :key="channel.id" class="notification-panel">
-            <div class="notification-card-header">
-              <div class="notification-card-title">
-                <h2>{{ channel.name }}</h2>
-                <p v-if="channel.name !== channel.plugin" class="notification-hint">{{ channel.plugin }}</p>
-                <p v-if="lastResult(channel.last)" class="notification-status" :class="{ failed: channel.last?.ok === false }">
-                  {{ lastResult(channel.last) }}
-                </p>
-              </div>
-              <div class="notification-card-actions">
-                <n-button size="small" :loading="testing[channel.id]" :disabled="!canManage" @click="test(channel.id)">
-                  <template #icon><Bell aria-hidden="true" /></template>
-                  {{ t('settings.advancedSettings.notificationsPage.test', 'Send test') }}
-                </n-button>
-                <n-button size="small" @click="emit('open-plugin', channel.source)">
-                  <template #icon><Settings aria-hidden="true" /></template>
-                  {{ t('settings.advancedSettings.notificationsPage.channelSettings', 'Settings') }}
-                </n-button>
-              </div>
-            </div>
-          </section>
+          <div v-if="canManage && form.channels.length < MAX_CHANNELS">
+            <n-dropdown trigger="click" :options="addOptions" :disabled="saving" @select="addChannel">
+              <n-button dashed :disabled="saving">
+                <template #icon><Plus aria-hidden="true" /></template>
+                {{ t('settings.advancedSettings.notificationsPage.addChannel', 'Add channel') }}
+              </n-button>
+            </n-dropdown>
+          </div>
 
-          <section v-if="channels && !channels.extensions.length" class="notification-panel">
+          <section v-if="channels && !channels.types.length" class="notification-panel">
             <div class="notification-card-header">
               <p class="notification-hint">
                 {{ channels.error || t('settings.advancedSettings.notificationsPage.noPluginChannels', 'Plugins can add more channels.') }}
@@ -451,21 +398,12 @@ onBeforeUnmount(() => {
 h2 { margin: 0; color: var(--foreground); font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
 .notification-hint { margin: 0; color: var(--muted-foreground); line-height: 1.6; overflow-wrap: anywhere; }
 .notification-card-title .notification-hint { margin-top: 8px; }
-.notification-status { margin: 4px 0 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
-.notification-status.failed { color: var(--destructive); }
 .notification-empty { margin: 0; padding: 24px 0; color: var(--muted-foreground); text-align: center; }
 .notification-card-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-width: 0; }
 .notification-card-title { min-width: 0; }
-.notification-card-actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; }
-.notification-webhook-fields { display: grid; gap: 14px; padding-top: 16px; border-top: 1px solid var(--border); }
-.notification-field { display: grid; gap: 6px; min-width: 0; }
-.notification-field > span { color: var(--muted-foreground); font-size: 13px; }
-.notification-header-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 .notification-actions { display: flex; justify-content: flex-end; }
 @media (max-width: 760px) {
   .notification-panel { padding: 16px; }
   .notification-card-header { flex-wrap: wrap; }
-  .notification-header-row { grid-template-columns: minmax(0, 1fr) auto; }
-  .notification-header-row > :nth-child(2) { grid-column: 1; }
 }
 </style>

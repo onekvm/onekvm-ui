@@ -4,7 +4,7 @@ import { groupToolbarItems, isToolbarSeparator, moveToolbarItem, normalizeToolba
 
 const initial: ToolbarLayout = { toolbar_icons: defaultToolbarIcons() }
 assert.deepEqual(normalizeToolbarFolders(undefined), [])
-assert.equal(toolbarLayoutOrder(initial).length, 23)
+assert.equal(toolbarLayoutOrder(initial).length, 24)
 assert.ok(toolbarLayoutOrder(initial).includes('separator:controls'))
 // A saved order from before the notifications icon existed gets it beside the collection.
 const savedOrder = toolbarLayoutOrder({ ...initial, toolbar_order: ['display', 'toolbox', 'collection', 'settings', 'account'] })

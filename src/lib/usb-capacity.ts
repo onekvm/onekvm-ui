@@ -3,13 +3,13 @@ import type { OneKVMConfig, OneKVMStatus, USBConfig } from '../api/client'
 export const usbEndpointCosts = {
   keyboard: { inn: 1, out: 0 }, mouse: { inn: 2, out: 0 },
   keyboardLeds: { inn: 0, out: 1 }, audio: { inn: 0, out: 1 },
-  microphone: { inn: 1, out: 0 }, gamepad: { inn: 1, out: 0 },
+  microphone: { inn: 1, out: 0 }, gamepad: { inn: 1, out: 0 }, camera: { inn: 1, out: 0 },
   storage: { inn: 1, out: 1 }, mtp: { inn: 2, out: 1 },
   network: { inn: 2, out: 1 },
 } as const
 
 export type USBGadget = NonNullable<OneKVMStatus['hid']>['gadget']
-export type USBFunctionOverrides = Partial<Record<'audio' | 'microphone' | 'gamepad' | 'keyboardOut' | 'storage' | 'mtp' | 'network', boolean>>
+export type USBFunctionOverrides = Partial<Record<'audio' | 'microphone' | 'gamepad' | 'camera' | 'keyboardOut' | 'storage' | 'mtp' | 'network', boolean>>
 
 export function usbSpeakerEnabled(audio: { enabled: boolean; source?: 'usb' | 'hdmi' }) {
   return audio.enabled
@@ -22,6 +22,7 @@ export function usbEndpointUse(usb: USBConfig, audio: OneKVMConfig['audio'], gad
     audio: overrides.audio ?? usbSpeakerEnabled(audio),
     microphone: overrides.microphone ?? Boolean(audio.microphone),
     gamepad: overrides.gamepad ?? Boolean(usb.gamepad),
+    camera: overrides.camera ?? Boolean(usb.camera),
     network: overrides.network ?? Boolean(usb.network_adapter),
     storage: (gadget?.mass_storage ?? true) && (overrides.storage ?? usb.mass_storage !== false),
     mtp: (gadget?.mtp_available ?? Boolean(gadget?.mtp)) && (overrides.mtp ?? usb.mtp !== false),

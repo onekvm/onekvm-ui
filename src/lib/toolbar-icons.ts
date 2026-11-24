@@ -13,6 +13,7 @@ export const TOOLBAR_ICON_IDS = [
   'gamepad',
   'power',
   'audio',
+  'camera',
   'virtual_media',
   'collection',
   'performance',
@@ -37,6 +38,7 @@ const DEVICE_TOOLBAR_ICONS = new Set<ToolbarIconId>([
   'gamepad',
   'power',
   'audio',
+  'camera',
   'virtual_media',
 ])
 

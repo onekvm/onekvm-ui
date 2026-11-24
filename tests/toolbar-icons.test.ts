@@ -14,11 +14,11 @@ import {
 } from '../src/lib/toolbar-icons.ts'
 
 const defaults = defaultToolbarIcons()
-assert.equal(defaults.length, 21)
+assert.equal(defaults.length, 22)
 assert.equal(defaults[0]?.id, 'display')
 assert.equal(defaults.at(-1)?.id, 'account')
 // The collection comes first among the action icons.
-assert.deepEqual(defaults.slice(13).map(icon => icon.id), [
+assert.deepEqual(defaults.slice(14).map(icon => icon.id), [
   'collection', 'performance', 'fullscreen', 'toolbox', 'notifications', 'settings', 'language', 'account',
 ])
 assert.deepEqual(defaults.filter(icon => icon.hidden).map(icon => icon.id), [
@@ -40,7 +40,7 @@ const mixed = normalizeToolbarIcons([
 ])
 assert.deepEqual(mixed.map(icon => icon.id), [
   'mouse', 'display', 'keyboard', 'caps_lock', 'num_lock', 'scroll_lock', 'virtual_keyboard', 'keyboard_text', 'ctrl_alt_del',
-  'gamepad', 'power', 'audio', 'virtual_media',
+  'gamepad', 'power', 'audio', 'camera', 'virtual_media',
   'account', 'notifications', 'collection', 'settings', 'language', 'performance', 'fullscreen', 'toolbox',
 ])
 assert.equal(toolbarIconHidden(mixed, 'mouse'), true)

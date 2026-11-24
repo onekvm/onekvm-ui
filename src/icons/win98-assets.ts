@@ -24,6 +24,7 @@ export const win98IconAssets: Readonly<Record<string, string>> = {
   MemoryStick: 'devices-drive-harddisk',
   Gamepad2: 'devices-input-gaming',
   Volume2: 'status-audio-volume-high',
+  Camera: 'mimes-video-x-generic',
   Sun: 'status-weather-clear',
   Moon: 'status-weather-clear-night',
   UserRound: 'status-avatar-default',

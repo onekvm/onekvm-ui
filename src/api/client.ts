@@ -444,6 +444,7 @@ export type ToolbarIconId =
   | 'gamepad'
   | 'power'
   | 'audio'
+  | 'camera'
   | 'virtual_media'
   | 'performance'
   | 'fullscreen'
@@ -509,6 +510,7 @@ export interface USBConfig {
 	iso_product: string
 	drive_product: string
 	gamepad: boolean
+	camera?: boolean
 	mass_storage?: boolean
 	mtp?: boolean
 	keyboard_name?: string
@@ -746,7 +748,19 @@ export interface OneKVMStatus {
       mtp: boolean
       network_adapter?: boolean
       network_sharing?: boolean
+      camera_available?: boolean
+      camera?: boolean
     }
+  }
+  camera?: {
+    supported: boolean
+    enabled: boolean
+    attached: boolean
+    streaming: boolean
+    width: number
+    height: number
+    fps: number
+    session: string
   }
   power: {
     available: boolean
@@ -1818,6 +1832,7 @@ export const api = {
     `/api/stream/ws${videoCodec ? `?video_codec=${encodeURIComponent(videoCodec)}` : ''}`,
   ),
   getAudioWebSocketURL: () => serviceWebSocketURL('/api/audio/ws'),
+  getCameraWebSocketURL: () => serviceWebSocketURL('/api/camera/ws'),
   getHIDWebSocketURL: () => serviceWebSocketURL('/api/hid/ws'),
   resetUSB: () => request<{ status: string }>('/api/hid/reset', { method: 'POST' }),
   getMSDWebSocketURL: () => serviceWebSocketURL('/api/msd/ws'),

@@ -4,6 +4,7 @@ import { cloudDeviceName, serviceURL } from '@/api/service-url'
 import { computed, h, nextTick, onBeforeUnmount, onMounted, provide, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import {
   Bell,
+  Camera,
   Check,
   CircleQuestionMark,
   CircleUserRound,
@@ -123,6 +124,8 @@ import NotificationCenterPopover from './NotificationCenterPopover.vue'
 import { useNotifications } from '@/composables/useNotifications'
 import HddActivityIndicator from './HddActivityIndicator.vue'
 import AudioPopover from './AudioPopover.vue'
+import CameraPopover from './CameraPopover.vue'
+import { cameraShare } from '@/lib/camera-share'
 import MediaTransferIndicator from './MediaTransferIndicator.vue'
 import type { MediaTransferState } from '@/lib/media-transfer'
 import ControlOverlay from './ControlOverlay.vue'
@@ -192,7 +195,7 @@ const emit = defineEmits<{
 }>()
 
 type DeviceState = 'ready' | 'waiting' | 'error'
-type MenuName = 'display' | 'mouse' | 'keyboard' | 'gamepad' | 'power' | 'audio' | 'notifications' | 'language' | 'account'
+type MenuName = 'display' | 'mouse' | 'keyboard' | 'gamepad' | 'power' | 'audio' | 'camera' | 'notifications' | 'language' | 'account'
 const dialog = useAsyncDialog()
 const overlayTo = useOverlayMount()
 const message = useMessage()
@@ -318,6 +321,7 @@ function folderItemAvailable(id: string) {
   if (id.startsWith('tool:')) return toolbox.pinned.some(({ tool }) => `tool:${tool.id}` === id)
   if (id === 'gamepad') return USB_GAMEPAD_UI_ENABLED && Boolean(props.status?.hid?.gamepad)
   if (id === 'audio' && !audioControlAvailable.value) return false
+  if (id === 'camera' && !cameraAvailable.value) return false
   if (id === 'toolbox' && !toolbox.allowed) return false
   return normalizeToolbarIcons(toolbarLayout.layout.value.toolbar_icons).some(icon => icon.id === id && !icon.hidden)
 }
@@ -1221,6 +1225,7 @@ const toolbarIcons = computed(() => toolbarLayout.layout.value.toolbar_icons)
 const audioControlAvailable = computed(() => Boolean(
   props.status?.audio.sources?.length || props.status?.audio.enabled || props.status?.audio.microphone_available,
 ))
+const cameraAvailable = computed(() => Boolean(props.status?.camera?.enabled))
 function toolbarIconShown(id: ToolbarIconId) {
   return !toolbarIconHidden(toolbarIcons.value, id) && !folderForItem(id)
 }
@@ -1232,6 +1237,7 @@ const collectedIcons = computed(() => normalizeToolbarIcons(toolbarIcons.value).
   if (isKeyboardActionToolbarIcon(icon.id)) return false
   if (icon.id === 'gamepad') return USB_GAMEPAD_UI_ENABLED && Boolean(props.status?.hid?.gamepad)
   if (icon.id === 'audio') return audioControlAvailable.value
+  if (icon.id === 'camera') return cameraAvailable.value
   if (icon.id === 'toolbox') return toolbox.allowed
   return true
 }))
@@ -1250,6 +1256,7 @@ const deviceClusterShown = computed(() => {
   const builtin = (['display', 'mouse', 'keyboard', 'caps_lock', 'num_lock', 'scroll_lock', 'virtual_keyboard', 'keyboard_text', 'ctrl_alt_del', 'power', 'virtual_media'] as const).some(toolbarIconShown)
     || (USB_GAMEPAD_UI_ENABLED && Boolean(props.status?.hid?.gamepad) && toolbarIconShown('gamepad'))
     || (audioControlAvailable.value && toolbarIconShown('audio'))
+    || (cameraAvailable.value && toolbarIconShown('camera'))
     || (hddIndicatorVisible.value && toolbarIconShown('power'))
   return builtin
     || deviceControlExtensions.value.length > 0
@@ -1303,6 +1310,20 @@ const audioStateLabel = computed(() => {
   if (speaker) return t('usbAudio.speaker', 'Speaker')
   if (microphone) return t('usbAudio.microphone', 'Microphone')
   return t('usbAudio.off', 'Off')
+})
+
+const cameraSession = shallowRef(cameraShare.state())
+onBeforeUnmount(cameraShare.subscribe(state => { cameraSession.value = state }))
+const cameraState = computed<DeviceState>(() => {
+  if (cameraSession.value.error === 'connection') return 'error'
+  return cameraSession.value.sharing ? 'ready' : 'waiting'
+})
+const cameraStateLabel = computed(() => cameraSession.value.sharing
+  ? t('camera.sharing', 'Sharing')
+  : t('usbAudio.off', 'Off'))
+// Turning the USB camera off ends sharing in this browser too.
+watch(() => props.status?.camera?.enabled, enabled => {
+  if (enabled === false && cameraShare.state().sharing) cameraShare.stop()
 })
 
 const mediaOpen = computed(() =>
@@ -2123,6 +2144,38 @@ onBeforeUnmount(() => {
           {{ t('usbAudio.title', 'Audio') }}: {{ audioStateLabel }}
         </n-tooltip>
       </AudioPopover>
+      </ToolbarIconSlot>
+
+      <ToolbarIconSlot v-if="cameraAvailable"
+        :collected="!toolbarIconShown('camera')"
+        data-toolbar-item="camera"
+        :target="toolbarItemTarget('camera')"
+        :order="toolbarIconStyle('camera').order"
+        @activate="onCollectedIconClick('camera')"
+      >
+      <CameraPopover
+        :status="status"
+        :placement="menuPlacement"
+        :sheet="toolbarLauncher"
+        @update:show="updateMenu('camera', $event)"
+      >
+        <n-tooltip :disabled="!toolbarIconShown('camera') || toolbarLauncher || openMenu === 'camera'">
+          <template #trigger>
+            <n-button :role="toolbarIconShown('camera') ? undefined : 'menuitem'"
+              quaternary
+              size="small"
+              class="device-indicator"
+              :data-state="cameraState"
+              :aria-label="`${t('camera.title', 'Camera')}: ${cameraStateLabel}`"
+            >
+              <template #icon><Camera /></template>
+              <span class="device-led" />
+              <span class="toolbar-action-label">{{ t('camera.title', 'Camera') }}</span>
+            </n-button>
+          </template>
+          {{ t('camera.title', 'Camera') }}: {{ cameraStateLabel }}
+        </n-tooltip>
+      </CameraPopover>
       </ToolbarIconSlot>
 
       <ToolbarIconSlot

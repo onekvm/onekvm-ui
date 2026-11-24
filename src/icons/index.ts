@@ -21,6 +21,7 @@ export const Box = iconComponent('Box')!
 export const Boxes = iconComponent('Boxes')!
 export const BrickWallShield = iconComponent('BrickWallShield')!
 export const Cable = iconComponent('Cable')!
+export const Camera = iconComponent('Camera')!
 export const Captions = iconComponent('Captions')!
 export const Check = iconComponent('Check')!
 export const CheckCircle2 = iconComponent('CheckCircle2')!

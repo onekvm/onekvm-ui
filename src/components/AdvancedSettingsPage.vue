@@ -2763,6 +2763,14 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                     <h2>{{ t('settings.advancedSettings.systemPage.updateStatus', '升级状态') }}</h2>
                     <p v-if="updateInstalling">{{ t('settings.advancedSettings.systemPage.updateBackground', 'After upload, the update continues in the background. You can return to this page to view its progress.') }}</p>
                     <div class="system-update-panel">
+                      <div class="system-update-status">
+                        <Download :size="19" />
+                        <div>
+                          <strong>{{ updateOperationLabel(systemUpdate.operation) }}</strong>
+                          <span>{{ systemUpdate.operation !== 'idle' ? systemUpdate.progress.message || systemUpdate.compatible : systemUpdate.compatible }}</span>
+                        </div>
+                        <span v-if="systemUpdate.operation !== 'idle'">{{ systemUpdate.progress.percentage }}%</span>
+                      </div>
                       <template v-if="updateTransfer">
                         <n-progress
                           type="line"
@@ -2774,14 +2782,6 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                           {{ formatBytes(updateTransfer.bytes) }}<template v-if="updateTransfer.total"> / {{ formatBytes(updateTransfer.total) }}</template><template v-if="updateTransfer.speed > 0"> · {{ formatBytes(updateTransfer.speed) }}/s</template>
                         </span>
                       </template>
-                      <div class="system-update-status">
-                        <Download :size="19" />
-                        <div>
-                          <strong>{{ updateOperationLabel(systemUpdate.operation) }}</strong>
-                          <span>{{ systemUpdate.operation !== 'idle' ? systemUpdate.progress.message || systemUpdate.compatible : systemUpdate.compatible }}</span>
-                        </div>
-                        <span v-if="systemUpdate.operation !== 'idle'">{{ systemUpdate.progress.percentage }}%</span>
-                      </div>
                       <n-progress
                         v-if="(systemUpdate.operation !== 'idle' || updateInstalling) && !updateTransfer"
                         type="line"

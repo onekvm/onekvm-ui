@@ -5,6 +5,8 @@ export const BITRATE_CHANNEL = 'onekvm.bitrate.v1'
 // its eligible automatic maximum without requiring a query round trip.
 const REQUEST_MAXIMUM = 0xfffffffe
 const STARTUP_MS = 8000
+// Startup recovery ceiling, and the lowest cap that brief pressure may cause.
+const RECOVERY_KBPS = 3000
 type Stat = RTCStats & Record<string, unknown>
 type Snapshot = {
   id: string; time: number; bytes: number; packets: number; lost: number
@@ -27,6 +29,7 @@ export class BrowserBitrate {
   private pacingClean = 0
   private decodeMs = 0
   private lowFrames = 0
+  private severeLossRun = 0
   private startup = true
   private startupUntil: number | null = null
   private pending: number | null = null
@@ -79,6 +82,7 @@ export class BrowserBitrate {
     this.pacingClean = 0
     this.decodeMs = 0
     this.lowFrames = 0
+    this.severeLossRun = 0
   }
 
   sample(reports: RTCStatsReport | Iterable<RTCStats>, rttMs: number | null, route: string | null, visible: boolean) {
@@ -111,6 +115,7 @@ export class BrowserBitrate {
       this.clean = this.congested = this.pacingClean = 0
       this.decodeMs = 0
       this.lowFrames = 0
+      this.severeLossRun = 0
       this.send(visible && this.maximum && !this.accepted ? this.maximum : 0)
       return
     }
@@ -135,19 +140,29 @@ export class BrowserBitrate {
     const delayMs = emitted > 0 ? (next.delay - previous.delay) * 1000 / emitted : 0
     if (frames > 0) this.decodeMs = (next.decode - previous.decode) * 1000 / frames
     const queued = rttMs !== null && rttMs > this.minimumRtt + Math.max(40, this.minimumRtt * 0.5)
+    const lossPressure = loss >= 0.025
     // Decoder load/freeze alone is not evidence of a bandwidth bottleneck.
-    const pressure = loss >= 0.025 || queued || (delayMs > 100 && loss >= 0.005)
+    const pressure = lossPressure || queued || (delayMs > 100 && loss >= 0.005)
+    const severeLoss = loss >= 0.08
+    this.severeLossRun = severeLoss ? this.severeLossRun + 1 : 0
     if (pressure) this.paced = true
     this.pacingClean = !pressure ? this.pacingClean + 1 : 0
-    if (this.paced && this.pacingClean >= 10 && this.accepted >= 3000 && kbps <= this.accepted * 0.95) {
+    if (this.paced && this.pacingClean >= 10 && this.accepted >= RECOVERY_KBPS && kbps <= this.accepted * 0.95) {
       this.paced = false
     }
     this.congested = pressure ? this.congested + 1 : 0
     this.clean = !pressure && loss < 0.005 && this.decodeMs < 25 ? this.clean + 1 : 0
     this.lowFrames = frames * 1000 / elapsed < 10 ? this.lowFrames + 1 : 0
     const floor = Math.min(300, this.maximum)
+    const recovery = Math.min(RECOVERY_KBPS, this.maximum)
+    // Wi-Fi retries and a busy host delay or drop packets for a second or two
+    // whatever we send. Cutting on each spike ratchets a static desktop down to
+    // its idle rate, and the next motion or keyframe stalls behind the sender
+    // budget. Only a full queue (loss with queuing delay), persistent pressure
+    // or repeated heavy loss shows the path cannot carry the recovery ceiling.
+    const sustained = (lossPressure && queued) || this.congested >= 4 || this.severeLossRun >= 2
     let target = this.accepted
-    if ((loss >= 0.08 || this.congested >= 2 || (this.startup && pressure))
+    if ((severeLoss || this.congested >= 2 || (this.startup && pressure))
       && next.time - this.lastChange >= (this.startup ? 1000 : 2000)) {
       const factor = this.startup ? 0.5 : 0.75
       // Without loss, a stream using under half its cap says nothing about the
@@ -156,11 +171,12 @@ export class BrowserBitrate {
       const applicationLimited = loss < 0.005 && kbps < this.accepted * 0.5
       const delivered = !applicationLimited && kbps > floor ? kbps * 0.85 : this.accepted * factor
       target = Math.max(floor, Math.floor(Math.min(this.accepted * factor, delivered)))
-    } else if (this.paced && this.accepted < Math.min(3000, this.maximum)
+      if (!sustained) target = Math.max(target, Math.min(recovery, this.accepted))
+    } else if (this.paced && this.accepted < recovery
       && this.lowFrames >= 3 && this.clean >= 3 && next.time - this.lastChange >= 4000) {
       // A small sender budget can stall whole GOPs even on a recovered path.
       // Restore only the startup ceiling, with healthy feedback and decoder headroom.
-      target = Math.min(3000, this.maximum, Math.ceil(this.accepted + Math.max(400, this.accepted * 0.25)))
+      target = Math.min(recovery, Math.ceil(this.accepted + Math.max(400, this.accepted * 0.25)))
     } else if (!this.startup && this.clean >= 5 && kbps >= this.accepted * 0.7 && next.time - this.lastChange >= 4000) {
       target = Math.min(this.maximum, Math.ceil(this.accepted + Math.max(200, this.accepted * 0.12)))
     }

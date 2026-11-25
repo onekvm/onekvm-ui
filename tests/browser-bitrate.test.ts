@@ -29,7 +29,8 @@ function harness() {
 }
 const loss = harness()
 loss.sample()
-assert.ok(loss.sample(1800, 40) < 1800, 'severe loss should reduce below delivered throughput')
+assert.equal(loss.sample(1800, 40), 3000, 'one heavy-loss second keeps the recovery ceiling')
+assert.ok(loss.sample(1800, 40) < 1800, 'repeated severe loss should reduce below delivered throughput')
 assert.equal(loss.controller.cap, 3000, 'unacknowledged request is not displayed')
 assert.equal(loss.modes.at(-1), 0x4f4b4250, 'congestion requests a wire budget')
 const reduced = loss.commands.at(-1)!
@@ -37,7 +38,7 @@ loss.status(10000, reduced)
 assert.equal(loss.sample(1450), reduced, 'reassert unchanged cap after a lost command')
 assert.equal(loss.modes.at(-1), 0x4f4b4250, 'reassert constrained-path mode')
 for (let i = 0; i < 8; i++) loss.sample(1450)
-assert.ok(loss.commands.slice(2).some(cap => cap > reduced), 'clean busy traffic should recover')
+assert.ok(loss.commands.slice(3).some(cap => cap > reduced), 'clean busy traffic should recover')
 
 const staticDesktop = harness()
 for (let i = 0; i < 25; i++) staticDesktop.sample(150)
@@ -46,6 +47,8 @@ assert.ok(staticDesktop.commands.every(cap => cap === 0 || cap === 3000), 'appli
 const queue = harness()
 queue.sample()
 queue.sample(2800, 0, 120)
+queue.sample(2800, 0, 140)
+assert.equal(queue.sample(2800, 0, 140), 3000, 'a brief RTT spike keeps the recovery ceiling')
 assert.ok(queue.sample(2800, 0, 140) < 3000, 'sustained RTT growth should reduce cap')
 
 const blip = harness()
@@ -53,6 +56,38 @@ blip.status(10000, 8000)
 for (let i = 0; i < 10; i++) blip.sample(450)
 blip.sample(450, 0, 120)
 assert.ok(blip.sample(450, 0, 140) >= 6000, 'an RTT spike on an application-limited stream must not cut to its idle rate')
+
+// Wi-Fi drops a few packets and spikes RTT; a static desktop using a tenth of
+// its cap is not what fills the path, and its cap must keep motion headroom.
+const wifi = harness()
+wifi.status(10000, 10000)
+for (let i = 0; i < 9; i++) wifi.sample(1100, 0, 3, { gap: 1000 })
+for (let i = 0; i < 40; i++) {
+  const cap = wifi.sample(1100, i % 3 === 0 ? 9 : 2, i % 4 === 0 ? 60 : 3)
+  if (cap && cap !== wifi.controller.cap) wifi.status(10000, cap)
+}
+assert.ok(wifi.commands.every(cap => cap === 0 || cap >= 3000), 'link loss must not ratchet an application-limited cap to its idle rate')
+
+// Measured on Wi-Fi: RTT +60 ms for three samples every six, with the encoder
+// using most of its cap. Each spike must not cut the cap further.
+const spikes = harness()
+spikes.status(10000, 10000)
+for (let i = 0; i < 60; i++) {
+  const cap = spikes.controller.cap!
+  const sent = spikes.sample(Math.min(4000, cap * 0.8), i % 6 < 3 ? 2 : 0, i % 6 < 3 ? 65 : 5, { gap: i < 16 ? 500 : 1000 })
+  if (sent && sent !== cap) spikes.status(10000, sent)
+}
+assert.ok(spikes.commands.every(cap => cap === 0 || cap >= 3000), 'delay spikes must not ratchet the cap below the recovery ceiling')
+
+// A path slower than even the idle stream keeps losing heavily: cut below it.
+const slowPath = harness()
+slowPath.status(10000, 10000)
+for (let i = 0; i < 9; i++) slowPath.sample(1100)
+const burst = slowPath.sample(700, 120)
+assert.equal(burst, 3000, 'one heavy-loss burst keeps the recovery ceiling')
+slowPath.status(10000, burst)
+slowPath.sample(700, 120)
+assert.ok(slowPath.sample(700, 120) < 700, 'sustained heavy loss cuts below delivery')
 
 const decoder = harness()
 for (let i = 0; i < 15; i++) decoder.sample(2800, 0, 2, { decodeMs: 40 })

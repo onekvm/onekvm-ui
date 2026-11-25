@@ -563,6 +563,13 @@ const {
   status: systemUpdate, progress: onlineUpdateProgress, busy: updateInstalling,
   started: updateStarted, unavailable: systemUpdateUnavailable, error: updateStatusError,
 } = updateMonitor
+/** The installed update starts only after a restart into its slot. */
+const updateRestartPending = computed(() => {
+  const update = systemUpdate.value
+  if (!update || update.operation !== 'idle' || onlineUpdateProgress.value?.phase !== 'complete') return false
+  const booted = update.slots.find((slot) => slot.class === 'rootfs' && slot.state === 'booted')
+  return Boolean(booted && update.primary_slot && update.primary_slot !== booted.name)
+})
 
 const activeExtensionParent = computed(() => {
   const sidebarParent = sections.value.find((item) => item.key === paneSection.value)?.parent
@@ -2756,6 +2763,14 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                         status="success"
                       />
                       <SystemUpdateError v-if="onlineUpdateProgress?.error || systemUpdate.last_error" class="system-update-error" :error="onlineUpdateProgress?.error || systemUpdate.last_error" />
+                      <n-alert v-if="updateRestartPending" type="success" :bordered="false" class="system-update-restart">
+                        <div class="system-update-restart-body">
+                          <span>{{ t('settings.advancedSettings.systemPage.updateRestart', 'Restart the device to use the new system.') }}</span>
+                          <n-button size="small" type="primary" :loading="rebooting" :disabled="systemAction !== null" @click="confirmSystemReboot">
+                            {{ t('settings.rebootDevice.action', 'Restart') }}
+                          </n-button>
+                        </div>
+                      </n-alert>
 
                     </div>
                   </section>

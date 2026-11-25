@@ -1460,6 +1460,7 @@ const zh_tw = {
           updateInstalling: '正在安裝',
           updateDownloading: '正在下載升級套件',
           updateComplete: '系統升級已安裝',
+          updateRestart: '重新啟動裝置後使用新系統。',
           installUpdate: '安裝系統升級',
           installUpdateConfirm: '將選取的已簽署升級套件安裝到非活動分割區？',
           selectBundle: '選擇升級套件',

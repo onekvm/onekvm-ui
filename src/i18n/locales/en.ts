@@ -1461,6 +1461,7 @@ const en = {
           updateInstalling: 'Installing',
           updateDownloading: 'Downloading update bundle',
           updateComplete: 'System update installed',
+          updateRestart: 'Restart the device to use the new system.',
           installUpdate: 'Install system update',
           installUpdateConfirm: 'Install the selected signed update bundle to the inactive slot?',
           selectBundle: 'Select bundle',

@@ -4652,6 +4652,8 @@ html[data-onekvm-jelly] .host-window-frame {
 .system-update-panel > .n-progress { padding: 0 14px 12px; }
 .system-update-error { padding: 0 14px 12px; color: var(--destructive-hover); font-size: 12px; overflow-wrap: anywhere; }
 .system-update-transfer { padding: 0 14px 12px; color: var(--muted-foreground); font-size: 12px; }
+.system-update-panel > .system-update-restart { margin: 0 14px 12px; width: auto; }
+.system-update-restart-body { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
 .system-update-input { display: none; }
 .system-update-upload {
   display: grid;

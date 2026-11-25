@@ -1460,6 +1460,7 @@ const zh = {
           updateInstalling: '正在安装',
           updateDownloading: '正在下载升级包',
           updateComplete: '系统升级已安装',
+          updateRestart: '重启设备后使用新系统。',
           installUpdate: '安装系统升级',
           installUpdateConfirm: '将选中的已签名升级包安装到非活动分区？',
           selectBundle: '选择升级包',

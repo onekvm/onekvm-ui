@@ -1582,11 +1582,28 @@ async function readDeviceFile(path: string, signal?: AbortSignal) {
   return new Uint8Array(await response.arrayBuffer())
 }
 
+interface PostFileOptions {
+  contentType?: string
+  headers?: Record<string, string>
+  /** The field a successful response must carry. */
+  resultField?: string
+}
+
 function postOctetStream<T>(
   path: string,
   file: Blob,
   onProgress?: (loaded: number, total: number) => void,
   signal?: AbortSignal,
+) {
+  return postFile<T>(path, file, onProgress, signal)
+}
+
+function postFile<T>(
+  path: string,
+  file: Blob,
+  onProgress?: (loaded: number, total: number) => void,
+  signal?: AbortSignal,
+  { contentType = 'application/octet-stream', headers = {}, resultField = 'id' }: PostFileOptions = {},
 ) {
   return new Promise<T>((resolve, reject) => {
     const xhr = new XMLHttpRequest()
@@ -1595,7 +1612,8 @@ function postOctetStream<T>(
     xhr.open('POST', `${serviceBaseUrl()}${path}`)
     xhr.withCredentials = import.meta.env.VITE_WITH_CREDENTIALS !== 'false'
     xhr.setRequestHeader('Accept', 'application/json')
-    xhr.setRequestHeader('Content-Type', 'application/octet-stream')
+    xhr.setRequestHeader('Content-Type', contentType)
+    for (const [name, value] of Object.entries(headers)) xhr.setRequestHeader(name, value)
     xhr.upload.addEventListener('progress', (event) => {
       onProgress?.(event.loaded, event.lengthComputable && event.total > 0 ? event.total : file.size)
     })
@@ -1606,7 +1624,7 @@ function postOctetStream<T>(
       } catch {
         // Preserve the HTTP status fallback when an intermediary returns HTML.
       }
-      if (xhr.status >= 200 && xhr.status < 300 && body && typeof body === 'object' && 'id' in body) {
+      if (xhr.status >= 200 && xhr.status < 300 && body && typeof body === 'object' && resultField in body) {
         removeAbortListener()
         onProgress?.(file.size, file.size)
         resolve(body as T)
@@ -2161,11 +2179,15 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ slot, allow_bad: allowBad }),
     }),
-  installSystemUpdate: (file: File, allowUntrusted = false) =>
-    request<{ status: string }>('/api/system/update/bundle', {
-      method: 'POST',
-      body: file,
-      headers: { 'Content-Type': 'application/vnd.onekvm.firmware-update', 'X-OneKVM-Allow-Untrusted': String(allowUntrusted) },
+  installSystemUpdate: (
+    file: File,
+    allowUntrusted = false,
+    onProgress?: (loaded: number, total: number) => void,
+  ) =>
+    postFile<{ status: string }>('/api/system/update/bundle', file, onProgress, undefined, {
+      contentType: 'application/vnd.onekvm.firmware-update',
+      headers: { 'X-OneKVM-Allow-Untrusted': String(allowUntrusted) },
+      resultField: 'status',
     }),
   getExtensions: () => request<ExtensionSummary[]>('/api/extensions'),
   getConsoleExtensions: () => consoleExtensions.get(serviceBaseUrl(), () => request<ConsoleExtension[]>('/api/extensions/console', { cache: 'no-store' })),

@@ -96,6 +96,7 @@ import {
 import { uiProduct } from '@/product'
 import { useStorageStatus } from '@/composables/useStorageStatus'
 import { useSystemUpdateMonitor } from '@/composables/useSystemUpdateMonitor'
+import { useUploadProgress } from '@/composables/useUploadProgress'
 import { statusEvents } from '@/lib/status-events'
 
 import ExtensionLayoutPage from './ExtensionLayoutPage.vue'
@@ -289,9 +290,20 @@ const updateMethod = shallowRef<UpdateMethod>('github')
 const allowUntrustedFirmware = shallowRef(false)
 const onlineUpdateError = ref('')
 const onlineUpdateLoading = ref(false)
-const onlineDownloadPercent = computed(() => {
+const bundleUpload = useUploadProgress()
+const updateStatusSection = ref<HTMLElement | null>(null)
+/** The bundle this browser is sending, or the server's own transfer. */
+const updateTransfer = computed(() => {
+  if (bundleUpload.uploading.value) {
+    return { bytes: bundleUpload.transferred.value, total: bundleUpload.total.value, speed: bundleUpload.speed.value }
+  }
   const progress = onlineUpdateProgress.value
-  return progress?.total_bytes ? Math.round(progress.bytes / progress.total_bytes * 100) : 0
+  if (progress?.phase !== 'downloading' && progress?.phase !== 'uploading') return null
+  return { bytes: progress.bytes, total: progress.total_bytes, speed: 0 }
+})
+const updateTransferPercent = computed(() => {
+  const transfer = updateTransfer.value
+  return transfer?.total ? Math.min(100, Math.round(transfer.bytes / transfer.total * 100)) : 0
 })
 const selectedTimezone = ref('UTC')
 const selectedNTP = ref(true)
@@ -782,7 +794,7 @@ function connectionLabel(connected: boolean, available = true) {
 
 function updateOperationLabel(operation: string) {
   if (operation === 'idle') {
-    if (onlineUpdateProgress.value?.phase === 'uploading') return t('settings.advancedSettings.systemPage.updateUploading', 'Uploading update bundle…')
+    if (bundleUpload.uploading.value || onlineUpdateProgress.value?.phase === 'uploading') return t('settings.advancedSettings.systemPage.updateUploading', 'Uploading update bundle…')
     if (onlineUpdateProgress.value?.phase === 'error') return t('settings.advancedSettings.systemPage.updateFailed', 'System update failed')
     if (onlineUpdateProgress.value?.phase === 'complete') return t('settings.advancedSettings.systemPage.updateComplete', 'System update installed')
     if (onlineUpdateProgress.value?.phase === 'checking') return t('settings.advancedSettings.systemPage.updateChecking', 'Checking kernel versions and plugin dependencies…')
@@ -920,6 +932,12 @@ async function loadOnlineUpdate() {
   }
 }
 
+/** Bring the status into view once an update the user started is under way. */
+function revealUpdateStatus() {
+  updateStarted.value = true
+  void nextTick(() => updateStatusSection.value?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
+}
+
 function confirmOnlineUpdate() {
   if (onlineUpdateLoading.value || updateInstalling.value || systemUpdate.value?.operation !== 'idle' || !onlineUpdate.value?.available) return
   dialog.warning({
@@ -933,7 +951,7 @@ function confirmOnlineUpdate() {
       onlineUpdateProgress.value = null
       try {
         await api.startSystemOnlineUpdate()
-        updateStarted.value = true
+        revealUpdateStatus()
         await updateMonitor.follow()
       } catch (reason) {
         updateInstalling.value = false
@@ -958,7 +976,7 @@ function confirmSourceUpdate(source: SystemUpdateSource) {
       onlineUpdateProgress.value = null
       try {
         await api.startSystemUpdateSource(source, allowUntrustedFirmware.value)
-        updateStarted.value = true
+        revealUpdateStatus()
         await updateMonitor.follow()
       } catch (reason) {
         updateInstalling.value = false
@@ -989,21 +1007,29 @@ function confirmSystemUpdate() {
     content: allowUntrustedFirmware.value ? t('settings.advancedSettings.systemPage.untrustedFirmwareConfirm', 'Install firmware from an untrusted signer to the inactive slot? Firmware format, signature integrity, data integrity and model checks will still be required.') : t('settings.advancedSettings.systemPage.installUpdateConfirm', 'Install the selected signed update bundle to the inactive slot?'),
     positiveText: t('settings.advancedSettings.systemPage.install', 'Install'),
     negativeText: t('common.cancel', 'Cancel'),
-    onPositiveClick: async () => {
-      if (!updateFile.value) return
-      updateInstalling.value = true
-      try {
-        await api.installSystemUpdate(updateFile.value, allowUntrustedFirmware.value)
-        updateStarted.value = true
-        await updateMonitor.follow()
-      } catch (reason) {
-        updateInstalling.value = false
-        message.error(reason instanceof Error ? reason.message : String(reason))
-        await updateMonitor.refresh()
-        return false
-      }
+    onPositiveClick: () => {
+      if (updateFile.value) void uploadSystemUpdate(updateFile.value)
     },
   })
+}
+
+// The dialog closes at once; the status section shows the upload.
+async function uploadSystemUpdate(file: File) {
+  updateInstalling.value = true
+  onlineUpdateProgress.value = null
+  const upload = bundleUpload.begin(file.name, file.size)
+  revealUpdateStatus()
+  try {
+    await api.installSystemUpdate(file, allowUntrustedFirmware.value, bundleUpload.progress)
+    bundleUpload.finish(upload)
+    await updateMonitor.follow()
+  } catch (reason) {
+    bundleUpload.finish(upload)
+    updateInstalling.value = false
+    updateStarted.value = false
+    message.error(reason instanceof Error ? reason.message : String(reason))
+    await updateMonitor.refresh()
+  }
 }
 
 let schemaRequest: Promise<void> | null = null
@@ -2718,7 +2744,7 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                           </n-button>
                           <n-button
                             type="primary"
-                            :loading="updateInstalling"
+                            :loading="updateInstalling || bundleUpload.uploading.value"
                             :disabled="!updateFile || systemUpdate.operation !== 'idle'"
                             @click="confirmSystemUpdate"
                           >
@@ -2733,20 +2759,21 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
 
                   <SystemUpdatePreflight :progress="onlineUpdateProgress" :disabled="updateInstalling || systemUpdate.operation !== 'idle'" @install="installPreparedUpdate" @cancel="cancelPreparedUpdate" />
 
-                  <section v-if="updateStarted || systemUpdate.operation !== 'idle'" class="system-settings-group">
+                  <section v-if="updateStarted || systemUpdate.operation !== 'idle'" ref="updateStatusSection" class="system-settings-group">
                     <h2>{{ t('settings.advancedSettings.systemPage.updateStatus', '升级状态') }}</h2>
                     <p v-if="updateInstalling">{{ t('settings.advancedSettings.systemPage.updateBackground', 'After upload, the update continues in the background. You can return to this page to view its progress.') }}</p>
                     <div class="system-update-panel">
-                      <n-progress
-                        v-if="onlineUpdateProgress?.phase === 'downloading' || onlineUpdateProgress?.phase === 'uploading'"
-                        type="line"
-                        :percentage="onlineDownloadPercent"
-                        :show-indicator="onlineUpdateProgress.total_bytes > 0"
-                        :processing="onlineUpdateProgress.total_bytes === 0"
-                      />
-                      <span v-if="onlineUpdateProgress?.phase === 'downloading' || onlineUpdateProgress?.phase === 'uploading'" class="system-update-transfer">
-                        {{ formatBytes(onlineUpdateProgress.bytes) }}<template v-if="onlineUpdateProgress.total_bytes"> / {{ formatBytes(onlineUpdateProgress.total_bytes) }}</template>
-                      </span>
+                      <template v-if="updateTransfer">
+                        <n-progress
+                          type="line"
+                          :percentage="updateTransferPercent"
+                          :show-indicator="updateTransfer.total > 0"
+                          :processing="updateTransfer.total === 0"
+                        />
+                        <span class="system-update-transfer">
+                          {{ formatBytes(updateTransfer.bytes) }}<template v-if="updateTransfer.total"> / {{ formatBytes(updateTransfer.total) }}</template><template v-if="updateTransfer.speed > 0"> · {{ formatBytes(updateTransfer.speed) }}/s</template>
+                        </span>
+                      </template>
                       <div class="system-update-status">
                         <Download :size="19" />
                         <div>
@@ -2756,7 +2783,7 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                         <span v-if="systemUpdate.operation !== 'idle'">{{ systemUpdate.progress.percentage }}%</span>
                       </div>
                       <n-progress
-                        v-if="systemUpdate.operation !== 'idle' || updateInstalling"
+                        v-if="(systemUpdate.operation !== 'idle' || updateInstalling) && !updateTransfer"
                         type="line"
                         :percentage="systemUpdate.progress.percentage"
                         :show-indicator="false"

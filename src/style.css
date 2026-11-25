@@ -2274,13 +2274,20 @@ html[data-onekvm-jelly] .host-window-frame {
 .settings-form .n-select { width: 100%; }
 
 .control-popover {
+  display: flex;
+  flex-direction: column;
   width: min(420px, calc(100vw - 16px));
   max-height: calc(100vh - 56px);
+}
+
+.control-popover-scroll {
+  min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
 }
 
 .mouse-control-popover { width: min(320px, calc(100vw - 16px)); }
+.console-problem-popover { width: min(320px, calc(100vw - 16px)); }
 .display-status-control-popover { width: min(320px, calc(100vw - 16px)); }
 .keyboard-control-popover { width: min(390px, calc(100vw - 16px)); }
 .power-control-popover { width: min(320px, calc(100vw - 16px)); }

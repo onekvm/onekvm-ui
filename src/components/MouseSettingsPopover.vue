@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Mouse } from '@/icons'
 
+import type { OneKVMStatus } from '@/api/client'
 import { type MouseMode } from '@/composables/useMouse'
 import { mouseModesFor, primaryTouchDevice } from '@/lib/touchscreen'
 import { useOverlayMount } from '@/composables/useOverlayMount'
@@ -16,7 +17,7 @@ const props = defineProps<{
   scrollInterval: number
   mouseReportRate: number
   hideLocalCursor?: boolean
-  hid?: { available: boolean; connected: boolean } | null
+  hid?: OneKVMStatus['hid'] | null
   placement?: 'top-end' | 'bottom-end' | 'right-start' | 'left-start'
   sheet?: boolean
   trackpad?: boolean
@@ -145,7 +146,7 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
           :subtitle="`${t('mouse.mode', 'Mouse mode')} · ${mouseModeLabel}`"
         />
       </header>
-      <HidHostAlert :hid="hid" />
+      <HidHostAlert :hid="hid" anchor="mouse" />
       <div class="display-status-values">
         <div v-if="sheet">
           <span>{{ t('mouse.floatingTrackpad', 'Floating trackpad') }}</span>

@@ -57,6 +57,8 @@ import { hidIndicatorState } from '@/lib/hid-status'
 import { clientModifierNames, MAGIC_KEY_CODES, magicKeyLabel, sanitizeMagicKey, type ChordNameSet } from '@/lib/keyboard-magic'
 import { USB_GAMEPAD_UI_ENABLED } from '@/lib/ui-features'
 import { dismissControlOverlays } from '@/lib/overlay-target'
+import { anchoredProblem, problemAnchors } from '@/lib/console-problem-anchor'
+import type { ConsoleProblemAnchor } from '@/lib/console-problems'
 import { resolveConsoleSubtitle } from '@/lib/console-title'
 import { isKeyboardActionToolbarIcon, isRootOnlyToolbarIcon, isToolbarIconId, normalizeToolbarIcons, setToolbarIconPlacement, toolbarIconCollectable, toolbarIconHidden, toolbarIconPlacement, toolbarIconRemoved } from '@/lib/toolbar-icons'
 import { machineDisplayName } from '@/lib/machine'
@@ -125,6 +127,7 @@ import { useNotifications } from '@/composables/useNotifications'
 import HddActivityIndicator from './HddActivityIndicator.vue'
 import AudioPopover from './AudioPopover.vue'
 import CameraPopover from './CameraPopover.vue'
+import ConsoleProblemPopover from './ConsoleProblemPopover.vue'
 import { cameraShare } from '@/lib/camera-share'
 import MediaTransferIndicator from './MediaTransferIndicator.vue'
 import type { MediaTransferState } from '@/lib/media-transfer'
@@ -690,6 +693,11 @@ function refreshHideEdge() {
   )
 }
 
+/** A console problem points at its toolbar button while no toolbar menu covers it. */
+const problemPopoverShown = computed(() => Boolean(anchoredProblem.value)
+  && openMenu.value === null && !collectionMenuOpen.value && !pinnedOverflowOpen.value
+  && !folderOpen.value && !toolbarContext.show.value)
+
 function armToolbarHide() {
   clearToolbarHideTimer()
   if (!hideEdge.value) {
@@ -701,6 +709,7 @@ function armToolbarHide() {
     || toolbox.menuOpen
     || collectionMenuOpen.value || pinnedOverflowOpen.value || folderOpen.value || folderEditorOpen.value || itemDrag.dragging.value || toolbarContext.show.value
     || launcherMenuOpen.value
+    || problemPopoverShown.value
     || pointerOnToolbarChrome.value
     || performanceDock.dragging.value
     || toolbarDragging.value
@@ -719,6 +728,7 @@ function armToolbarHide() {
       || toolbox.menuOpen
       || collectionMenuOpen.value || pinnedOverflowOpen.value || folderOpen.value || folderEditorOpen.value || itemDrag.dragging.value || toolbarContext.show.value
       || launcherMenuOpen.value
+      || problemPopoverShown.value
       || pointerOnToolbarChrome.value
       || performanceDock.dragging.value
       || toolbarDragging.value
@@ -1651,6 +1661,17 @@ function updateMenu(name: MenuName, visible: boolean) {
   emitToolbarOverlay()
 }
 
+watch(() => {
+  const available = !toolbarLauncher.value && !props.pipActive
+  return { mouse: available && toolbarIconShown('mouse'), keyboard: available && toolbarIconShown('keyboard') }
+}, (anchors) => Object.assign(problemAnchors, anchors), { immediate: true, deep: true })
+
+function problemTarget(anchor: ConsoleProblemAnchor) {
+  return toolbarEl.value?.querySelector<HTMLElement>(`[data-toolbar-item="${anchor}"] .device-indicator`) ?? null
+}
+
+watch(problemPopoverShown, () => armToolbarHide())
+
 function onTrackpadToggle(open: boolean) {
   emit('update:trackpad', open)
   if (!open) return
@@ -1723,6 +1744,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  Object.assign(problemAnchors, { mouse: false, keyboard: false })
   performanceDock.register(null, null)
   clearToolbarHideTimer()
   window.clearTimeout(mousePulseTimer)
@@ -2513,6 +2535,11 @@ onBeforeUnmount(() => {
     </Teleport>
   </header>
   <n-dropdown trigger="manual" :show="toolbarContext.show.value" :x="toolbarContext.position.value.x" :y="toolbarContext.position.value.y" :options="toolbarContext.menuOptions.value" :to="overlayTo" :menu-props="() => ({ class: 'host-menu' })" @select="toolbarContext.select" @clickoutside="toolbarContext.show.value = false" @update:show="toolbarContext.show.value = $event" />
+  <ConsoleProblemPopover
+    :problem="problemPopoverShown ? anchoredProblem : null"
+    :target="problemTarget"
+    :placement="menuPlacement"
+  />
   <ToolbarFolderDialog :show="folderEditorOpen" :folder="editingFolder" :options="folderOptions" :saving="toolbarLayout.saving.value" @update:show="folderEditorOpen = $event" @save="saveFolder" />
   <KeyboardTextWindow
     ref="keyboardTextWindow"

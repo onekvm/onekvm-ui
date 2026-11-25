@@ -10,7 +10,14 @@ export interface ConsoleInputActivity {
   reportAt: number
   /** Last key press, click, wheel turn or gamepad button. */
   pressAt: number
+  /** Last keyboard report. */
+  keyboardAt: number
+  /** Last mouse report, including pointer motion. */
+  mouseAt: number
 }
+
+/** Toolbar button a problem popover can point at. */
+export type ConsoleProblemAnchor = 'mouse' | 'keyboard'
 
 export interface ConsoleProblemContext {
   status: OneKVMStatus | null | undefined
@@ -43,6 +50,11 @@ export interface ConsoleProblem {
   active: (context: ConsoleProblemContext) => boolean
   /** Tell this user now; defaults to every viewer while active. */
   relevant?: (context: ConsoleProblemContext) => boolean
+  /**
+   * Toolbar buttons it can point at. While the first of them is on the
+   * toolbar, a popover at that button replaces the floating window.
+   */
+  anchors?: readonly ConsoleProblemAnchor[]
 }
 
 export const recentInput = (context: ConsoleProblemContext) =>
@@ -50,6 +62,12 @@ export const recentInput = (context: ConsoleProblemContext) =>
 
 export const recentPress = (context: ConsoleProblemContext) =>
   context.now - context.input.pressAt <= RECENT_INPUT_MS
+
+export const recentKeyboard = (context: ConsoleProblemContext) =>
+  context.now - context.input.keyboardAt <= RECENT_INPUT_MS
+
+export const recentMouse = (context: ConsoleProblemContext) =>
+  context.now - context.input.mouseAt <= RECENT_INPUT_MS
 
 type TrackedProblem = Pick<ConsoleProblem, 'id' | 'active' | 'relevant'>
 

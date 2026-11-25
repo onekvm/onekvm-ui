@@ -1,67 +1,42 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useMessage } from 'naive-ui'
+import { computed } from 'vue'
 
-import { api } from '@/api/client'
-import { hidHostAlert, type HIDHostAlert } from '@/lib/hid-status'
+import type { OneKVMStatus } from '@/api/client'
+import type { ConsoleProblemAnchor } from '@/lib/console-problems'
+import { hidHostAlert } from '@/lib/hid-status'
+import { usbInputProblemFor } from '@/lib/usb-input-problems'
 import { t } from '@/i18n/runtime'
+import ConsoleProblemContent from './ConsoleProblemContent.vue'
 
 const props = defineProps<{
-  hid?: { available: boolean; connected: boolean } | null
+  hid?: OneKVMStatus['hid'] | null
+  /** The input whose popover shows it; others show only a disconnected gadget. */
+  anchor?: ConsoleProblemAnchor
 }>()
 
-const message = useMessage()
-const resetting = ref(false)
-const kind = computed(() => hidHostAlert(props.hid))
-const copy = computed<Record<HIDHostAlert, { title: string; detail: string }>>(() => ({
-  disconnected: {
-    title: t('deviceStatus.hidDisconnectedTitle', 'USB keyboard and mouse are not connected'),
-    detail: t(
-      'deviceStatus.hidDisconnected',
-      'The target PC has not enumerated this USB gadget. Keystrokes and mouse movement will not reach the host.',
-    ),
-  },
-  unavailable: {
-    title: t('deviceStatus.hidUnavailableTitle', 'USB keyboard and mouse unavailable'),
-    detail: t('deviceStatus.hidUnavailable', 'USB keyboard and mouse are not available on this device.'),
-  },
-}))
-
-async function resetUSB() {
-  if (resetting.value) return
-  resetting.value = true
-  try {
-    await api.resetUSB()
-    message.success(t('deviceStatus.usbResetSuccess', 'USB has been reset.'))
-  } catch (error) {
-    message.error(t('deviceStatus.usbResetFailed', 'Failed to reset USB.'))
-    console.error('reset USB failed', error)
-  } finally {
-    resetting.value = false
-  }
-}
+const unavailable = computed(() => hidHostAlert(props.hid) === 'unavailable')
+const problem = computed(() => (props.hid ? usbInputProblemFor(props.anchor, { hid: props.hid } as OneKVMStatus) : null))
 </script>
 
 <template>
   <n-alert
-    v-if="kind"
+    v-if="unavailable"
     type="warning"
     :bordered="false"
     class="hid-host-alert"
-    :title="copy[kind].title"
+    :title="t('deviceStatus.hidUnavailableTitle', 'USB keyboard and mouse unavailable')"
   >
-    <div>{{ copy[kind].detail }}</div>
-    <n-button
-      v-if="kind === 'disconnected'"
-      class="hid-host-reset"
-      size="small"
-      secondary
-      type="warning"
-      :loading="resetting"
-      @click="resetUSB"
-    >
-      {{ t('deviceStatus.resetUsb', 'Reset USB') }}
-    </n-button>
+    <div>{{ t('deviceStatus.hidUnavailable', 'USB keyboard and mouse are not available on this device.') }}</div>
+  </n-alert>
+  <n-alert
+    v-else-if="problem"
+    type="warning"
+    :bordered="false"
+    class="hid-host-alert"
+    :title="problem.title()"
+    role="alert"
+  >
+    <ConsoleProblemContent :problem="problem" compact />
   </n-alert>
 </template>
 
@@ -69,9 +44,5 @@ async function resetUSB() {
 .hid-host-alert :deep(.n-alert-body) {
   font-size: 12px;
   line-height: 1.45;
-}
-
-.hid-host-reset {
-  margin-top: 10px;
 }
 </style>

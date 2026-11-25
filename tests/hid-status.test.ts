@@ -4,7 +4,9 @@ import {
   hidHostAlert,
   hidIndicatorState,
   hidReportIsPress,
+  hidReportKind,
   usbInputDisconnected,
+  usbInputKindStalled,
   usbInputStalled,
 } from '../src/lib/hid-status.ts'
 
@@ -29,6 +31,20 @@ assert.equal(usbInputStalled(connected), false)
 assert.equal(usbInputStalled({ ...connected, write_stalled: true }), true)
 assert.equal(usbInputStalled({ available: true, connected: false, write_stalled: true }), false)
 assert.equal(usbInputStalled({ available: false, connected: true, write_stalled: true }), false)
+// Older Core reports one flag for both inputs.
+assert.equal(usbInputKindStalled('mouse', { ...connected, write_stalled: true }), true)
+assert.equal(usbInputKindStalled('keyboard', { ...connected, write_stalled: true }), true)
+const mouseOnly = { ...connected, write_stalled: true, keyboard_stalled: false, mouse_stalled: true }
+assert.equal(usbInputKindStalled('mouse', mouseOnly), true)
+assert.equal(usbInputKindStalled('keyboard', mouseOnly), false, 'a BIOS that reads the keyboard is not a keyboard problem')
+assert.equal(usbInputStalled(mouseOnly), false, 'one stalled input is not both')
+assert.equal(usbInputStalled({ ...mouseOnly, keyboard_stalled: true }), true)
+assert.equal(usbInputKindStalled('mouse', { ...mouseOnly, connected: false }), false)
+
+assert.equal(hidReportKind(Uint8Array.of(1, 0, 0, 4, 0, 0, 0, 0)), 'keyboard')
+assert.equal(hidReportKind(Uint8Array.of(2, 0, 5, 5, 0)), 'mouse')
+assert.equal(hidReportKind(Uint8Array.of(3, 0, 1, 2, 3, 4)), 'mouse')
+assert.equal(hidReportKind(Uint8Array.of(4, 0, 1, 8, 0, 0, 0, 0, 0, 0)), null)
 
 assert.equal(hidReportIsPress(Uint8Array.of(1, 0, 0, 4, 0, 0, 0, 0)), true)
 assert.equal(hidReportIsPress(Uint8Array.of(1, 2, 0, 0, 0, 0, 0, 0)), true)

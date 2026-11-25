@@ -736,6 +736,9 @@ export interface OneKVMStatus {
     macro_generation?: number
     macro_owner?: string | null
     write_stalled?: boolean
+    /** Per input; absent on older Core, which reports only `write_stalled`. */
+    keyboard_stalled?: boolean
+    mouse_stalled?: boolean
     num_lock?: boolean
     caps_lock?: boolean
     scroll_lock?: boolean

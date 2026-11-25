@@ -78,7 +78,10 @@ const stageStyle = computed(() => (
 ))
 let canvasObserver: ResizeObserver | undefined
 let trackpadFramed = false
-const { playing, hasFrame, onPlaying, onWaiting: onVideoWaiting, reset: resetPlayback } = useVideoPlaybackState(video)
+const { playing, hasFrame, onPlaying, onWaiting: onVideoWaiting, reset: resetPlayback } = useVideoPlaybackState(
+  video,
+  () => props.signalConnected,
+)
 const mediaError = ref(false)
 const reconnecting = ref(false)
 const mjpegReload = ref(0)

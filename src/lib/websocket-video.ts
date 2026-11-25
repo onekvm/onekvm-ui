@@ -10,6 +10,8 @@ import { normalizeWebSocketVideoCodec, supportsWebSocketVideo, type WebSocketVid
 
 const HEADER_SIZE = 40
 const MAGIC = [0x4f, 0x4b, 0x56, 0x46]
+/** Video fed without a decoded picture before the startup timeout runs. */
+const STARTUP_MEDIA_MS = 1000
 
 interface WebSocketVideoCallbacks {
   bitrate: (kbps: number) => void
@@ -56,6 +58,7 @@ export class WebSocketVideo {
   private timingTimer: ReturnType<typeof setTimeout> | undefined
   private timingProbes = 0
   private decoded = false
+  private startupMediaMs = 0
   private playbackFailed = false
   private readonly onDecoded = () => {
     this.decoded = true
@@ -286,7 +289,12 @@ export class WebSocketVideo {
       isLastVideoFrameComplete: true,
     }
     this.durationRemainderUs = (Math.max(1000, durationUsec) + this.durationRemainderUs) % 1000
-    if (!this.decoded && this.startupTimer === undefined) {
+    if (!this.decoded) this.startupMediaMs += frame.duration!
+    // A browser that cannot decode the codec never shows a picture, however
+    // much video it gets. A paused source (the no-signal still while the
+    // backend rearms its input) sends a few frames and then nothing for
+    // seconds; that is not a decoder failure.
+    if (!this.decoded && this.startupTimer === undefined && this.startupMediaMs >= STARTUP_MEDIA_MS) {
       this.startupTimer = setTimeout(() => {
         this.failPlayback(`The browser could not start ${this.codec.toUpperCase()} playback over WebSocket`, true)
       }, 5000)

@@ -149,7 +149,21 @@ try {
     socket.open()
     await connected
     assert.equal(failures.length, 0, 'Opening a socket alone is not a decode failure')
-    socket.onmessage?.({ data: frame })
+    const feedFrames = (from: number, count: number) => {
+      for (let sequence = from; sequence < from + count; sequence++) {
+        const packet = frame.slice(0)
+        new DataView(packet).setBigUint64(8, BigInt(sequence))
+        socket.onmessage?.({ data: packet })
+      }
+    }
+    if (behavior === 'advertised-only') {
+      feedFrames(0, 6)
+      await new Promise((resolve) => realSetTimeout(resolve, 30))
+      assert.equal(failures.length, 0, 'A source that pauses after a few frames is not a decode failure')
+      feedFrames(6, 60)
+    } else {
+      feedFrames(0, 1)
+    }
     await new Promise((resolve) => realSetTimeout(resolve, 30))
     assert.equal(failures.length, behavior === 'decoded' ? 0 : 1, `${behavior} playback is reported once`)
     if (failures.length) assert.equal(failures[0]!.unsupported, true)

@@ -114,7 +114,8 @@ onBeforeUnmount(() => {
     :show="show"
     :placement="placement"
     :to="overlayTo"
-    :show-arrow="false"
+    show-arrow
+    arrow-point-to-center
     :width="280"
     style="max-width: calc(100vw - 24px)"
     display-directive="show"

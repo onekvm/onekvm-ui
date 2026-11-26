@@ -65,10 +65,10 @@ function ledLabel(value: boolean | undefined | null) {
       <div
         v-if="!available || hasLed(pwrLed) || hasLed(hddLed)"
         class="power-status-values"
-        :aria-label="t('power.atxStatus', 'ATX status')"
+        :aria-label="t('power.status', 'Power Status')"
       >
         <div v-if="!available">
-          <span>{{ t('power.atxStatus', 'ATX status') }}</span>
+          <span>{{ t('power.status', 'Power Status') }}</span>
           <strong>{{ t('deviceStatus.error', 'Disconnected') }}</strong>
         </div>
         <div v-else-if="hasLed(pwrLed)">

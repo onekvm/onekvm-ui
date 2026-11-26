@@ -42,6 +42,7 @@ assert.equal(parsed?.packageName, 'onekvm-extension-wireguard')
 assert.equal(parsed?.sizeBytes, 4096)
 assert.equal(parsed?.installedSizeBytes, 8192)
 assert.equal(parsed?.iconDataUrl, 'data:image/svg+xml;base64,abc')
+assert.equal(parsed?.iconUrl, '')
 assert.deepEqual(parsed?.icon, {
   source: 'lucide',
   name: 'cloud',
@@ -87,3 +88,7 @@ assert.equal(failureProgress.logTruncated, true)
 assert.equal(marketplaceInstallProgressFromRecord({ phase: 'prepare' }).log, '')
 assert.equal(marketplaceFormatPackageSize(2048), '2 KiB')
 assert.equal(fillMarketplaceTemplate('Install "{name}"', { name: 'WireGuard' }), 'Install "WireGuard"')
+
+const iconFile = `/api/extension-icons/${'a'.repeat(64)}.png`
+assert.equal(marketplaceInstallPackageFromRecord({ id: 'wireguard', package: 'onekvm-extension-wireguard', icon_url: iconFile }, 'wireguard')?.iconUrl, iconFile)
+assert.equal(marketplaceInstallPackageFromRecord({ id: 'wireguard', package: 'onekvm-extension-wireguard', icon_url: 'https://example.com/a.png' }, 'wireguard')?.iconUrl, '')

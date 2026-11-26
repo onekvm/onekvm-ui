@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue'
-import { Cpu, Fingerprint, HardDrive, Keyboard, LayoutDashboard, Monitor, PanelTop, PanelsTopLeft, Plug, Power, Puzzle, Server, Settings2, ShieldAlert, Toolbox, Video } from '@/icons'
+import { Bell, Cpu, Fingerprint, HardDrive, Keyboard, LayoutDashboard, Monitor, PanelTop, PanelsTopLeft, Plug, Power, Puzzle, Server, Settings2, ShieldAlert, Toolbox, Video } from '@/icons'
 import { extensionLocalizedText, extensionTranslation, type ExtensionStatus } from '@/api/client'
+import { providesCapabilities } from '@/lib/extension-category'
 import { currentLanguage, t } from '@/i18n/runtime'
 import IconDescriptionList from './IconDescriptionList.vue'
 import PluginDetailsSectionTitle from './PluginDetailsSectionTitle.vue'
@@ -11,9 +12,9 @@ type Feature = { id: string; icon: Component; label: string; description: string
 const deviceCapabilityMetadata: Readonly<Record<string, { key: string; icon: Component }>> = {
   video: { key: 'video', icon: Video },
   hid: { key: 'hid', icon: Keyboard },
-  atx: { key: 'atx', icon: Power },
-  'atx.pwr-led': { key: 'powerLed', icon: Power },
-  'atx.hdd-led': { key: 'diskLed', icon: HardDrive },
+  power: { key: 'power', icon: Power },
+  'power.pwr-led': { key: 'powerLed', icon: Power },
+  'power.hdd-led': { key: 'diskLed', icon: HardDrive },
   msd: { key: 'virtualMedia', icon: HardDrive },
   npu: { key: 'npu', icon: Cpu },
   screen: { key: 'screen', icon: Monitor },
@@ -31,6 +32,7 @@ const items = computed(() => {
   if (mcpTools) add('mcp-tools', 'mcpTools', Plug, '', t('settings.plugins.featureDetails.mcpTools.description').replace('{count}', String(mcpTools)))
   const mqttEntities = detail.contributions?.filter(item => item.point === 'extend.mqtt' && item.version === 1).length || 0
   if (mqttEntities) add('mqtt-entities', 'mqttEntities', Plug, '', t('settings.plugins.featureDetails.mqttEntities.description').replace('{count}', String(mqttEntities)))
+  if (detail.contributions?.some(item => item.point === 'extend.notification' && item.version === 1)) add('notification-channel', 'notificationChannel', Bell)
   for (const tool of detail.toolbox?.items || []) {
     const title = extensionLocalizedText(Object.fromEntries(Object.entries(tool.i18n || {}).map(([locale, value]) => [locale, value.title])), currentLanguage.value, tool.title)
     add(`toolbox:${tool.id}`, tool.presentation === 'drawer' ? 'toolDrawer' : 'toolWindow', Toolbox, title)
@@ -45,8 +47,8 @@ const items = computed(() => {
     const description = extensionLocalizedText(Object.fromEntries(Object.entries(service.i18n || {}).map(([locale, value]) => [locale, value.description])), currentLanguage.value, service.description || '')
     add(`service:${service.id}`, 'service', Server, name, description)
   }
-  // System registrations provide device capabilities; extension manifests request core access.
-  for (const capability of detail.system ? detail.capabilities || [] : []) {
+  // Device backends provide capabilities; extension manifests request core access.
+  for (const capability of providesCapabilities(detail) ? detail.capabilities || [] : []) {
     if (Object.prototype.hasOwnProperty.call(deviceCapabilityMetadata, capability)) {
       const metadata = deviceCapabilityMetadata[capability]
       add(`capability:${capability}`, metadata.key, metadata.icon)

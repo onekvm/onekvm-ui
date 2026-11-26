@@ -74,7 +74,7 @@ pnpm test:recovery  # Recovery API 与语言包测试
 
 项目还提供 `pnpm test:*` 形式的专项回归测试；请根据修改范围运行相关测试。
 
-生产文件输出到 `dist/`。Recovery 是第二次 Vite 构建，把 JS/CSS 内联进
+生产文件输出到 `dist/`，文本资源同时生成 Brotli（`.br`）和 gzip（`.gz`）版本，Core 按浏览器支持的编码发送。Recovery 是第二次 Vite 构建，把 JS/CSS 内联进
 `dist-recovery/index.html`，供 initramfs 网页服务器使用。该页面提供固件刷写
 （`.fwup` 更新包或完整 `.img`）、重置默认用户、恢复出厂设置和重启，并支持
 跟随系统 / 浅色 / 深色外观。

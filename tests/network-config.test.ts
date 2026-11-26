@@ -38,6 +38,8 @@ assert.equal(usesCustomWebRtcIce({ stun: 'stun:custom.example:3478' }), true, 'a
 assert.equal(usesCustomWebRtcIce({ stun: 'stun:stun.cloudflare.com:3478' }), true, 'an intentional subset of built-in servers remains custom')
 assert.equal(usesCustomWebRtcIce({ stun: DEFAULT_WEBRTC_STUN_SERVERS, turn_servers: [{ url: 'turn:relay.example:3478', username: 'user', credential: 'secret' }] }), true, 'TURN enables custom settings even alongside default STUN')
 assert.equal(isNetworkConfigValid(base), true, 'default config is valid')
+assert.equal(isNetworkConfigValid({ ...base, primary_interface: '', interfaces: [] }), true, 'a machine without Ethernet has no primary link')
+assert.equal(isNetworkConfigValid({ ...base, primary_interface: 'eth1' }), false, 'a named primary link must be configured')
 
 const mixed = {
   ...base,

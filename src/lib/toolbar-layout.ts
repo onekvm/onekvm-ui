@@ -29,7 +29,36 @@ export interface ToolbarLayout {
   toolbar_folders?: ToolbarFolder[]
   toolbar_order?: string[]
   toolbar_show_labels?: boolean
+  toolbar_label_exceptions?: string[]
   toolbar_label_position?: ToolbarLabelPosition
+}
+
+/** Whether the toolbar item shows its text next to the icon. */
+export function toolbarItemShowsLabel(layout: ToolbarLayout, id: string) {
+  return Boolean(layout.toolbar_show_labels) !== (layout.toolbar_label_exceptions ?? []).includes(id)
+}
+
+export function setToolbarItemLabel<T extends ToolbarLayout>(layout: T, id: string, show: boolean): T {
+  const exceptions = (layout.toolbar_label_exceptions ?? []).filter(item => item !== id)
+  if (show !== Boolean(layout.toolbar_show_labels)) exceptions.push(id)
+  return { ...layout, toolbar_label_exceptions: exceptions }
+}
+
+/** Shows or hides the text of every item, dropping per-item choices. */
+export function setToolbarLabels<T extends ToolbarLayout>(layout: T, show: boolean): T {
+  return { ...layout, toolbar_show_labels: show, toolbar_label_exceptions: [] }
+}
+
+export function toolbarAllLabelsShown(layout: ToolbarLayout) {
+  return Boolean(layout.toolbar_show_labels) && !layout.toolbar_label_exceptions?.length
+}
+
+/** Whether any of the given items on the toolbar itself shows text. */
+export function toolbarAnyLabelShown(layout: ToolbarLayout, items: readonly string[]) {
+  const folders = normalizeToolbarFolders(layout.toolbar_folders)
+  const icons = normalizeToolbarIcons(layout.toolbar_icons)
+  return items.some(id => !isToolbarSeparator(id) && toolbarItemShowsLabel(layout, id)
+    && !toolbarFolderFor(folders, id) && !icons.find(icon => icon.id === id)?.hidden)
 }
 const validToolItem = (value: string) => /^tool:[a-z0-9_-]{1,64}\/[a-z0-9_-]{1,64}$/.test(value)
 export const isToolbarItem = (value: unknown): value is string => typeof value === 'string' && (isToolbarIconId(value) || validToolItem(value))
@@ -68,6 +97,10 @@ export function toolbarLayoutOrder(layout: ToolbarLayout, pinnedToolIds: readonl
   if (order.length && !order.includes('collection') && order.includes('settings')) {
     order.splice(order.indexOf('settings'), 0, 'collection')
   }
+  if (order.length && !order.includes('notifications') && order.includes('collection')
+    && !folders.some(folder => folder.items.includes('notifications'))) {
+    order.splice(order.indexOf('collection'), 0, 'notifications')
+  }
   return [...new Set(order.length
     ? [...order, ...defaults.filter(id => !isToolbarSeparator(id))]
     : defaults)]
@@ -84,7 +117,7 @@ export function upsertToolbarFolder<T extends ToolbarLayout>(layout: T, folder: 
   return {
     ...layout,
     toolbar_folders: normalizeToolbarFolders(transferred),
-    toolbar_icons: normalizeToolbarIcons(layout.toolbar_icons).map(icon => next.items.includes(icon.id) ? { ...icon, hidden: false } : icon),
+    toolbar_icons: normalizeToolbarIcons(layout.toolbar_icons).map(icon => next.items.includes(icon.id) ? { ...icon, hidden: false, removed: false } : icon),
   }
 }
 
@@ -123,7 +156,7 @@ export function moveToolbarItem<T extends ToolbarLayout>(
     folder.items.splice(index < 0 ? folder.items.length : index, 0, item)
     return {
       ...layout, toolbar_folders: folders,
-      toolbar_icons: normalizeToolbarIcons(layout.toolbar_icons).map(icon => icon.id === item ? { ...icon, hidden: false } : icon),
+      toolbar_icons: normalizeToolbarIcons(layout.toolbar_icons).map(icon => icon.id === item ? { ...icon, hidden: false, removed: false } : icon),
     }
   }
   const order = rootOrder.filter(id => id !== item)

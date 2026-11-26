@@ -14,3 +14,48 @@ export function hidHostAlert(hid?: { available: boolean; connected: boolean } | 
   if (!hid.connected) return 'disconnected'
   return null
 }
+
+type HIDInputState = {
+  available: boolean
+  connected: boolean
+  write_stalled?: boolean
+  keyboard_stalled?: boolean
+  mouse_stalled?: boolean
+}
+
+export type HIDInputKind = 'keyboard' | 'mouse'
+
+/** The input a browser report drives; gamepad and others are neither. */
+export function hidReportKind(report: Uint8Array): HIDInputKind | null {
+  if (report[0] === 1) return 'keyboard'
+  if (report[0] === 2 || report[0] === 3) return 'mouse'
+  return null
+}
+
+/** Key presses, clicks, wheel turns and gamepad buttons; not pointer motion. */
+export function hidReportIsPress(report: Uint8Array): boolean {
+  switch (report[0]) {
+    case 1: return report.subarray(1, 8).some(Boolean)
+    case 2: return Boolean(report[1] || report[4])
+    case 3: return Boolean(report[1])
+    case 4: return Boolean(report[1] || report[2])
+    default: return false
+  }
+}
+
+/** The host has not connected the USB keyboard and mouse. */
+export function usbInputDisconnected(hid?: HIDInputState | null): boolean {
+  return Boolean(hid?.available && !hid.connected)
+}
+
+/** The host is connected but has stopped reading this input's reports. */
+export function usbInputKindStalled(kind: HIDInputKind, hid?: HIDInputState | null): boolean {
+  if (!hid?.available || !hid.connected) return false
+  // Older Core keeps one timer for both inputs.
+  return Boolean((kind === 'keyboard' ? hid.keyboard_stalled : hid.mouse_stalled) ?? hid.write_stalled)
+}
+
+/** The host is connected but reads neither keyboard nor mouse reports. */
+export function usbInputStalled(hid?: HIDInputState | null): boolean {
+  return usbInputKindStalled('keyboard', hid) && usbInputKindStalled('mouse', hid)
+}

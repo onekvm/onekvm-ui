@@ -26,13 +26,15 @@ export function errorMessage(error: unknown) {
 
 export type RecoveryStatus = {
   addresses: string[]
+  /** False when this device's Recovery cannot install firmware files. */
+  firmware: boolean
   firmwareMax: number
   storageType: string
   storageBytes: number
 }
 
 function emptyRecoveryStatus(): RecoveryStatus {
-  return { addresses: [], firmwareMax: 0, storageType: '', storageBytes: 0 }
+  return { addresses: [], firmware: true, firmwareMax: 0, storageType: '', storageBytes: 0 }
 }
 
 export function parseRecoveryStatus(body: string): RecoveryStatus {
@@ -43,7 +45,13 @@ export function parseRecoveryStatus(body: string): RecoveryStatus {
     return emptyRecoveryStatus()
   }
   if (!parsed || typeof parsed !== 'object') return emptyRecoveryStatus()
-  const record = parsed as { addresses?: unknown; firmwareMax?: unknown; storageType?: unknown; storageBytes?: unknown }
+  const record = parsed as {
+    addresses?: unknown
+    firmware?: unknown
+    firmwareMax?: unknown
+    storageType?: unknown
+    storageBytes?: unknown
+  }
   const addresses = Array.isArray(record.addresses)
     ? record.addresses.filter((item): item is string => typeof item === 'string' && item.length > 0)
     : []
@@ -57,7 +65,9 @@ export function parseRecoveryStatus(body: string): RecoveryStatus {
     typeof record.storageBytes === 'number' && Number.isFinite(record.storageBytes) && record.storageBytes > 0
       ? Math.floor(record.storageBytes)
       : 0
-  return { addresses, firmwareMax, storageType, storageBytes }
+  // Recovery servers that predate the field always install firmware.
+  const firmware = record.firmware !== false
+  return { addresses, firmware, firmwareMax, storageType, storageBytes }
 }
 
 export function formatBytes(bytes: number) {

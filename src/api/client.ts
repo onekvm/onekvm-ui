@@ -1,4 +1,4 @@
-import { createExtensionQuery } from '../lib/extension-query.ts'
+import { createExtensionQuery, extensionRequestChange } from '../lib/extension-query.ts'
 import type { WifiApNetwork } from '../lib/wifi-ap-network'
 import { resolveServiceURL, serviceBaseUrl, serviceURL, serviceWebSocketURL } from './service-url.ts'
 export type IPv4Mode = 'disabled' | 'dhcp' | 'dhcp-static' | 'static'
@@ -321,6 +321,7 @@ export interface OneKVMConfig {
     resolution: number
     mjpeg: { frame_detect: boolean }
     source_device: string
+    color_range?: 'auto' | 'limited' | 'full'
   }
   audio: {
     enabled: boolean
@@ -341,6 +342,91 @@ export interface OneKVMConfig {
   keyboard: KeyboardConfig
   input: InputConfig
   usb: USBConfig
+  notifications?: NotificationConfig
+}
+
+export type NotificationLevel = 'error' | 'warning' | 'success' | 'info'
+export type NotificationCategory = 'web' | 'sign_in' | 'video_signal' | 'network'
+
+export interface WebhookHeader {
+  name: string
+  value: string
+}
+
+export interface NotificationChannelConfig {
+  /** Assigned by Core when saved; blank for a new channel. */
+  id: string
+  /** `webhook` or an extension channel type `<extension>/<channel>`. */
+  type: string
+  /** Optional label; the type title is shown when blank. */
+  name: string
+  enabled: boolean
+  /** Lowest level delivered; `info` delivers everything. */
+  min_level: Exclude<NotificationLevel, 'success'>
+  /** Form values other than password fields; a webhook keeps its `url` here. */
+  settings?: Record<string, ExtensionSettingValue>
+  /** Password fields. Saved values read back blank; a blank value keeps the saved one. */
+  secrets?: Record<string, string>
+  /** Webhook request headers. Saved values read back blank. */
+  headers?: WebhookHeader[]
+}
+
+export interface NotificationConfig {
+  web_messages: boolean
+  sign_in: boolean
+  video_signal: boolean
+  network: boolean
+  channels: NotificationChannelConfig[]
+}
+
+export interface ServerNotification {
+  id: number
+  level: NotificationLevel
+  category: NotificationCategory
+  /** Core event type, or `web.message` for a console prompt. */
+  event: string
+  text: string
+  data?: Record<string, unknown>
+  count: number
+  created_at_unix_ms: number
+  updated_at_unix_ms: number
+  read: boolean
+}
+
+export interface NotificationList {
+  revision: number
+  unread: number
+  entries: ServerNotification[]
+}
+
+export interface NotificationChannelResult {
+  ok: boolean
+  at_unix_ms: number
+  error?: string
+  suppressed?: number
+}
+
+export interface NotificationChannelSchema {
+  required?: string[]
+  /** Field order; unlisted fields follow by name. */
+  order?: string[]
+  properties: Record<string, ExtensionSettingProperty>
+}
+
+/** Channel type contributed by an enabled extension. */
+export interface NotificationChannelType {
+  type: string
+  source: string
+  title?: string
+  i18n?: ExtensionLocalizedText
+  settings_schema: NotificationChannelSchema
+}
+
+export interface NotificationChannels {
+  types: NotificationChannelType[]
+  /** Latest delivery result by channel ID. */
+  results: Record<string, NotificationChannelResult>
+  error?: string
 }
 
 export type ConsoleTitleSource = 'device_name' | 'hostname' | 'custom'
@@ -358,10 +444,12 @@ export type ToolbarIconId =
   | 'gamepad'
   | 'power'
   | 'audio'
+  | 'camera'
   | 'virtual_media'
   | 'performance'
   | 'fullscreen'
   | 'toolbox'
+  | 'notifications'
   | 'collection'
   | 'settings'
   | 'language'
@@ -376,7 +464,10 @@ export interface ToolbarFolder {
 
 export interface ToolbarIconPreference {
   id: ToolbarIconId
+  /** In the collection menu instead of on the toolbar. */
   hidden: boolean
+  /** In neither the toolbar nor the collection menu; implies hidden. */
+  removed?: boolean
 }
 
 export type MessagePlacement = 'top-left' | 'top' | 'top-right' | 'bottom-left' | 'bottom' | 'bottom-right'
@@ -395,6 +486,8 @@ export interface PersonalizationConfig {
   toolbar_folders?: ToolbarFolder[]
   toolbar_order?: string[]
   toolbar_show_labels?: boolean
+  /** Items whose text is shown the opposite way to toolbar_show_labels. */
+  toolbar_label_exceptions?: string[]
   toolbar_label_position?: ToolbarLabelPosition
 }
 
@@ -417,6 +510,7 @@ export interface USBConfig {
 	iso_product: string
 	drive_product: string
 	gamepad: boolean
+	camera?: boolean
 	mass_storage?: boolean
 	mtp?: boolean
 	keyboard_name?: string
@@ -597,6 +691,8 @@ export interface OneKVMStatus {
   variant_label?: string
   version: string
   uptime_seconds: number
+  /** Core notification list version and unread count; absent on older Core. */
+  notifications?: { revision: number; unread: number }
   video: {
     active: boolean
     hdmi_connected: boolean
@@ -639,6 +735,10 @@ export interface OneKVMStatus {
     gamepad?: boolean
     macro_generation?: number
     macro_owner?: string | null
+    write_stalled?: boolean
+    /** Per input; absent on older Core, which reports only `write_stalled`. */
+    keyboard_stalled?: boolean
+    mouse_stalled?: boolean
     num_lock?: boolean
     caps_lock?: boolean
     scroll_lock?: boolean
@@ -651,9 +751,21 @@ export interface OneKVMStatus {
       mtp: boolean
       network_adapter?: boolean
       network_sharing?: boolean
+      camera_available?: boolean
+      camera?: boolean
     }
   }
-  atx: {
+  camera?: {
+    supported: boolean
+    enabled: boolean
+    attached: boolean
+    streaming: boolean
+    width: number
+    height: number
+    fps: number
+    session: string
+  }
+  power: {
     available: boolean
     pwr_led?: boolean
     hdd_led?: boolean
@@ -769,6 +881,8 @@ export interface SystemUpdateSlot {
 }
 
 export interface SystemUpdateStatus {
+  /** false when the image cannot install system updates. */
+  supported?: boolean
   compatible: string
   booted_slot: string
   primary_slot: string
@@ -787,7 +901,7 @@ export interface SystemOnlineUpdate {
   current_version: string
   latest_version: string | null
   available: boolean
-  reason: 'source_not_configured' | 'up_to_date' | 'bundle_missing' | ''
+  reason: 'source_not_configured' | 'up_to_date' | 'bundle_missing' | 'unsupported' | ''
   asset_name?: string
   asset_size?: number
 }
@@ -957,6 +1071,8 @@ export interface ExtensionSummary {
   icon?:
     | { source: 'lucide'; name: string }
     | { source: 'custom'; path: string; data?: string }
+  /** Marketplace package icon, served by the device. */
+  icon_url?: string
   icon_data_url?: string
   has_page?: boolean
   has_toolbar?: boolean
@@ -1274,13 +1390,6 @@ export function invalidateExtensionCaches() {
   msdSources.invalidate()
 }
 
-function changesExtensions(path: string, method: string | undefined) {
-  if (!path.startsWith('/api/extensions') || !method || method.toUpperCase() === 'GET') return false
-  const invoke = path.match(/\/invoke\/([^/?]+)/)
-  return !invoke || !['status', 'assistance_info', 'list_packages', 'list_sources', 'install_progress',
-    'set_source', 'set_source_enabled', 'remove_source'].includes(decodeURIComponent(invoke[1]!))
-}
-
 let extensionRequestQueue: Promise<void> = Promise.resolve()
 
 function isExtensionRequest(path: string) {
@@ -1319,9 +1428,9 @@ async function requestUnqueued<T>(path: string, options: RequestInit = {}): Prom
     throw new APIError(body?.error || `HTTP ${response.status}`, response.status)
   }
 
-  if (changesExtensions(path, options.method)) {
-    window.dispatchEvent(new Event('onekvm:extensions-changed'))
-  }
+  const change = extensionRequestChange(path, options.method)
+  if (change === 'catalog') window.dispatchEvent(new Event('onekvm:extensions-changed'))
+  else if (change === 'media') msdSources.invalidate()
   if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
 }
@@ -1473,11 +1582,28 @@ async function readDeviceFile(path: string, signal?: AbortSignal) {
   return new Uint8Array(await response.arrayBuffer())
 }
 
+interface PostFileOptions {
+  contentType?: string
+  headers?: Record<string, string>
+  /** The field a successful response must carry. */
+  resultField?: string
+}
+
 function postOctetStream<T>(
   path: string,
   file: Blob,
   onProgress?: (loaded: number, total: number) => void,
   signal?: AbortSignal,
+) {
+  return postFile<T>(path, file, onProgress, signal)
+}
+
+function postFile<T>(
+  path: string,
+  file: Blob,
+  onProgress?: (loaded: number, total: number) => void,
+  signal?: AbortSignal,
+  { contentType = 'application/octet-stream', headers = {}, resultField = 'id' }: PostFileOptions = {},
 ) {
   return new Promise<T>((resolve, reject) => {
     const xhr = new XMLHttpRequest()
@@ -1486,7 +1612,8 @@ function postOctetStream<T>(
     xhr.open('POST', `${serviceBaseUrl()}${path}`)
     xhr.withCredentials = import.meta.env.VITE_WITH_CREDENTIALS !== 'false'
     xhr.setRequestHeader('Accept', 'application/json')
-    xhr.setRequestHeader('Content-Type', 'application/octet-stream')
+    xhr.setRequestHeader('Content-Type', contentType)
+    for (const [name, value] of Object.entries(headers)) xhr.setRequestHeader(name, value)
     xhr.upload.addEventListener('progress', (event) => {
       onProgress?.(event.loaded, event.lengthComputable && event.total > 0 ? event.total : file.size)
     })
@@ -1497,7 +1624,7 @@ function postOctetStream<T>(
       } catch {
         // Preserve the HTTP status fallback when an intermediary returns HTML.
       }
-      if (xhr.status >= 200 && xhr.status < 300 && body && typeof body === 'object' && 'id' in body) {
+      if (xhr.status >= 200 && xhr.status < 300 && body && typeof body === 'object' && resultField in body) {
         removeAbortListener()
         onProgress?.(file.size, file.size)
         resolve(body as T)
@@ -1726,6 +1853,7 @@ export const api = {
     `/api/stream/ws${videoCodec ? `?video_codec=${encodeURIComponent(videoCodec)}` : ''}`,
   ),
   getAudioWebSocketURL: () => serviceWebSocketURL('/api/audio/ws'),
+  getCameraWebSocketURL: () => serviceWebSocketURL('/api/camera/ws'),
   getHIDWebSocketURL: () => serviceWebSocketURL('/api/hid/ws'),
   resetUSB: () => request<{ status: string }>('/api/hid/reset', { method: 'POST' }),
   getMSDWebSocketURL: () => serviceWebSocketURL('/api/msd/ws'),
@@ -1818,6 +1946,28 @@ export const api = {
     headers: { 'Content-Type': file.type || 'application/octet-stream' },
   }),
   clearNoSignalImage: () => request<void>('/api/personalization/no-signal', { method: 'DELETE' }),
+  getNotifications: () => request<NotificationList>('/api/notifications', { cache: 'no-store' }),
+  recordNotification: (level: NotificationLevel, text: string) =>
+    request<ServerNotification | undefined>('/api/notifications', {
+      method: 'POST',
+      body: JSON.stringify({ level, text }),
+    }),
+  markNotificationsRead: () => request<{ revision: number; unread: number }>('/api/notifications/read', { method: 'POST' }),
+  clearNotifications: () => request<{ revision: number; unread: number }>('/api/notifications', { method: 'DELETE' }),
+  removeNotification: (id: number) =>
+    request<{ revision: number; unread: number }>(`/api/notifications/${encodeURIComponent(String(id))}`, { method: 'DELETE' }),
+  getNotificationChannels: () => request<NotificationChannels>('/api/notifications/channels', { cache: 'no-store' }),
+  testNotificationChannel: (channel: NotificationChannelConfig) =>
+    request<{ ok: true }>('/api/notifications/channels/test', {
+      method: 'POST',
+      body: JSON.stringify({ channel }),
+    }),
+  getNotificationConfig: () => request<NotificationConfig>('/api/config/notifications', { cache: 'no-store' }),
+  saveNotificationConfig: (config: NotificationConfig) =>
+    request<NotificationConfig>('/api/config/notifications', {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    }),
   getInputConfig: () => request<InputConfig>('/api/config/input', { cache: 'no-store' }),
   saveInputConfig: (input: InputConfig) =>
     request<InputConfig>('/api/config/input', {
@@ -2029,11 +2179,15 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ slot, allow_bad: allowBad }),
     }),
-  installSystemUpdate: (file: File, allowUntrusted = false) =>
-    request<{ status: string }>('/api/system/update/bundle', {
-      method: 'POST',
-      body: file,
-      headers: { 'Content-Type': 'application/vnd.onekvm.firmware-update', 'X-OneKVM-Allow-Untrusted': String(allowUntrusted) },
+  installSystemUpdate: (
+    file: File,
+    allowUntrusted = false,
+    onProgress?: (loaded: number, total: number) => void,
+  ) =>
+    postFile<{ status: string }>('/api/system/update/bundle', file, onProgress, undefined, {
+      contentType: 'application/vnd.onekvm.firmware-update',
+      headers: { 'X-OneKVM-Allow-Untrusted': String(allowUntrusted) },
+      resultField: 'status',
     }),
   getExtensions: () => request<ExtensionSummary[]>('/api/extensions'),
   getConsoleExtensions: () => consoleExtensions.get(serviceBaseUrl(), () => request<ConsoleExtension[]>('/api/extensions/console', { cache: 'no-store' })),
@@ -2125,6 +2279,8 @@ export interface RecoveryNetworkPreview {
   settings: RecoveryNetworkSettings
   effective: RecoveryNetworkSettings | null
   error: string | null
+  /** Recovery has no network on this device: it offers USB storage and a console. */
+  usb_only?: boolean
   pending_system_network: boolean
 }
 export const recoveryNetworkApi = {

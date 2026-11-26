@@ -6,6 +6,7 @@ import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, wat
 import {
   ArrowLeft,
   Activity,
+  Bell,
   Box,
   Boxes,
   Cable,
@@ -95,6 +96,7 @@ import {
 import { uiProduct } from '@/product'
 import { useStorageStatus } from '@/composables/useStorageStatus'
 import { useSystemUpdateMonitor } from '@/composables/useSystemUpdateMonitor'
+import { useUploadProgress } from '@/composables/useUploadProgress'
 import { statusEvents } from '@/lib/status-events'
 
 import ExtensionLayoutPage from './ExtensionLayoutPage.vue'
@@ -124,6 +126,7 @@ import OnlineSessionsPage from './OnlineSessionsPage.vue'
 import LogsPage from './LogsPage.vue'
 import ServicesPage from './ServicesPage.vue'
 import SecuritySettingsPage from './SecuritySettingsPage.vue'
+import NotificationSettingsPage from './NotificationSettingsPage.vue'
 import StaticRoutesForm from './StaticRoutesForm.vue'
 import TimezoneMap from './TimezoneMap.vue'
 import SystemUpdateSourceSelector, { type UpdateMethod } from './SystemUpdateSourceSelector.vue'
@@ -177,7 +180,7 @@ function sectionFromRoute(route: string): Section {
     }
   }
   if (uiProduct.settingsSections?.some((item) => item.key === normalized)) return normalized
-  return ['display', 'audio', 'personalization', 'network', 'firewall', 'keyboard', 'usb', 'cloud', 'plugins', 'services', 'security', 'logs', 'resources', 'sessions', 'system', 'files', 'users', 'time', 'update'].includes(normalized) ? normalized : 'system'
+  return ['display', 'audio', 'personalization', 'network', 'firewall', 'keyboard', 'usb', 'cloud', 'plugins', 'services', 'security', 'notifications', 'logs', 'resources', 'sessions', 'system', 'files', 'users', 'time', 'update'].includes(normalized) ? normalized : 'system'
 }
 
 function routeFromSection(value: Section) {
@@ -287,9 +290,20 @@ const updateMethod = shallowRef<UpdateMethod>('github')
 const allowUntrustedFirmware = shallowRef(false)
 const onlineUpdateError = ref('')
 const onlineUpdateLoading = ref(false)
-const onlineDownloadPercent = computed(() => {
+const bundleUpload = useUploadProgress()
+const updateStatusSection = ref<HTMLElement | null>(null)
+/** The bundle this browser is sending, or the server's own transfer. */
+const updateTransfer = computed(() => {
+  if (bundleUpload.uploading.value) {
+    return { bytes: bundleUpload.transferred.value, total: bundleUpload.total.value, speed: bundleUpload.speed.value }
+  }
   const progress = onlineUpdateProgress.value
-  return progress?.total_bytes ? Math.round(progress.bytes / progress.total_bytes * 100) : 0
+  if (progress?.phase !== 'downloading' && progress?.phase !== 'uploading') return null
+  return { bytes: progress.bytes, total: progress.total_bytes, speed: 0 }
+})
+const updateTransferPercent = computed(() => {
+  const transfer = updateTransfer.value
+  return transfer?.total ? Math.min(100, Math.round(transfer.bytes / transfer.total * 100)) : 0
 })
 const selectedTimezone = ref('UTC')
 const selectedNTP = ref(true)
@@ -525,6 +539,7 @@ const sections = computed<SidebarSection[]>(() => {
     ...pluginPages,
     { key: 'services', label: t('settings.advancedSettings.services', 'Services'), icon: ListRestart },
     { key: 'security', label: t('settings.advancedSettings.security', 'Security'), icon: ShieldCheck },
+    { key: 'notifications', label: t('settings.advancedSettings.notifications', 'Notifications'), icon: Bell },
     { key: 'logs', label: t('settings.advancedSettings.logs', 'Logs'), icon: ScrollText },
     { key: 'resources', label: t('settings.advancedSettings.resources', 'Resource monitor'), icon: Activity },
     { key: 'sessions', label: t('settings.advancedSettings.sessions', 'Online sessions'), icon: RadioTower },
@@ -560,6 +575,13 @@ const {
   status: systemUpdate, progress: onlineUpdateProgress, busy: updateInstalling,
   started: updateStarted, unavailable: systemUpdateUnavailable, error: updateStatusError,
 } = updateMonitor
+/** The installed update starts only after a restart into its slot. */
+const updateRestartPending = computed(() => {
+  const update = systemUpdate.value
+  if (!update || update.operation !== 'idle' || onlineUpdateProgress.value?.phase !== 'complete') return false
+  const booted = update.slots.find((slot) => slot.class === 'rootfs' && slot.state === 'booted')
+  return Boolean(booted && update.primary_slot && update.primary_slot !== booted.name)
+})
 
 const activeExtensionParent = computed(() => {
   const sidebarParent = sections.value.find((item) => item.key === paneSection.value)?.parent
@@ -772,7 +794,7 @@ function connectionLabel(connected: boolean, available = true) {
 
 function updateOperationLabel(operation: string) {
   if (operation === 'idle') {
-    if (onlineUpdateProgress.value?.phase === 'uploading') return t('settings.advancedSettings.systemPage.updateUploading', 'Uploading update bundle…')
+    if (bundleUpload.uploading.value || onlineUpdateProgress.value?.phase === 'uploading') return t('settings.advancedSettings.systemPage.updateUploading', 'Uploading update bundle…')
     if (onlineUpdateProgress.value?.phase === 'error') return t('settings.advancedSettings.systemPage.updateFailed', 'System update failed')
     if (onlineUpdateProgress.value?.phase === 'complete') return t('settings.advancedSettings.systemPage.updateComplete', 'System update installed')
     if (onlineUpdateProgress.value?.phase === 'checking') return t('settings.advancedSettings.systemPage.updateChecking', 'Checking kernel versions and plugin dependencies…')
@@ -788,6 +810,7 @@ function updateOperationLabel(operation: string) {
 
 function onlineUpdateLabel(update: SystemOnlineUpdate) {
   if (update.available) return t('settings.advancedSettings.systemPage.onlineAvailable', 'A new system update is available')
+  if (update.reason === 'unsupported') return t('settings.advancedSettings.systemPage.updateErrors.unsupported', 'This device does not support system updates. To update, flash new firmware to its storage.')
   if (update.reason === 'source_not_configured') return t('settings.advancedSettings.systemPage.onlineNoSource', 'No online update source is configured for this model')
   if (update.reason === 'bundle_missing') return t('settings.advancedSettings.systemPage.onlineNoBundle', 'The latest release has no compatible .fwup update bundle')
   return t('settings.advancedSettings.systemPage.onlineUpToDate', 'No newer system update is available')
@@ -909,6 +932,12 @@ async function loadOnlineUpdate() {
   }
 }
 
+/** Bring the status into view once an update the user started is under way. */
+function revealUpdateStatus() {
+  updateStarted.value = true
+  void nextTick(() => updateStatusSection.value?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
+}
+
 function confirmOnlineUpdate() {
   if (onlineUpdateLoading.value || updateInstalling.value || systemUpdate.value?.operation !== 'idle' || !onlineUpdate.value?.available) return
   dialog.warning({
@@ -922,7 +951,7 @@ function confirmOnlineUpdate() {
       onlineUpdateProgress.value = null
       try {
         await api.startSystemOnlineUpdate()
-        updateStarted.value = true
+        revealUpdateStatus()
         await updateMonitor.follow()
       } catch (reason) {
         updateInstalling.value = false
@@ -947,7 +976,7 @@ function confirmSourceUpdate(source: SystemUpdateSource) {
       onlineUpdateProgress.value = null
       try {
         await api.startSystemUpdateSource(source, allowUntrustedFirmware.value)
-        updateStarted.value = true
+        revealUpdateStatus()
         await updateMonitor.follow()
       } catch (reason) {
         updateInstalling.value = false
@@ -978,21 +1007,29 @@ function confirmSystemUpdate() {
     content: allowUntrustedFirmware.value ? t('settings.advancedSettings.systemPage.untrustedFirmwareConfirm', 'Install firmware from an untrusted signer to the inactive slot? Firmware format, signature integrity, data integrity and model checks will still be required.') : t('settings.advancedSettings.systemPage.installUpdateConfirm', 'Install the selected signed update bundle to the inactive slot?'),
     positiveText: t('settings.advancedSettings.systemPage.install', 'Install'),
     negativeText: t('common.cancel', 'Cancel'),
-    onPositiveClick: async () => {
-      if (!updateFile.value) return
-      updateInstalling.value = true
-      try {
-        await api.installSystemUpdate(updateFile.value, allowUntrustedFirmware.value)
-        updateStarted.value = true
-        await updateMonitor.follow()
-      } catch (reason) {
-        updateInstalling.value = false
-        message.error(reason instanceof Error ? reason.message : String(reason))
-        await updateMonitor.refresh()
-        return false
-      }
+    onPositiveClick: () => {
+      if (updateFile.value) void uploadSystemUpdate(updateFile.value)
     },
   })
+}
+
+// The dialog closes at once; the status section shows the upload.
+async function uploadSystemUpdate(file: File) {
+  updateInstalling.value = true
+  onlineUpdateProgress.value = null
+  const upload = bundleUpload.begin(file.name, file.size)
+  revealUpdateStatus()
+  try {
+    await api.installSystemUpdate(file, allowUntrustedFirmware.value, bundleUpload.progress)
+    bundleUpload.finish(upload)
+    await updateMonitor.follow()
+  } catch (reason) {
+    bundleUpload.finish(upload)
+    updateInstalling.value = false
+    updateStarted.value = false
+    message.error(reason instanceof Error ? reason.message : String(reason))
+    await updateMonitor.refresh()
+  }
 }
 
 let schemaRequest: Promise<void> | null = null
@@ -1307,6 +1344,19 @@ function selectSettingsItem(key: string) {
   lastDetailSection.value = targetKey
   section.value = targetKey
   emit('navigate', routeFromSection(targetKey))
+}
+
+const pluginFocus = shallowRef('')
+
+/** A plugin's own page when it has one, otherwise its details in Plugins. */
+function openPluginSettings(id: string) {
+  const extension = extensions.value.find((entry) => entry.id === id)
+  if (extension?.enabled && extension.has_page) {
+    selectSettingsItem(`extension:${id}`)
+    return
+  }
+  pluginFocus.value = id
+  selectSettingsItem('plugins')
 }
 
 function openCloudProvider(id: string) {
@@ -1988,6 +2038,7 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                   :read-only="schema?.read_only"
                   :video-codecs="schema?.video_codecs"
                   :video-bitrate-range="schema?.video_bitrate_kbps"
+                  :color-range="schema?.capabilities?.video_color_range === true"
                 />
                 <footer class="advanced-settings-actions display-settings-actions">
                   <n-button :disabled="saving" @click="load">{{ t('common.refresh', 'Reload') }}</n-button>
@@ -2173,7 +2224,9 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                   :active="paneSection === 'plugins'"
                   :catalog="extensions"
                   :catalog-loading="extensionsLoading"
+                  :focus="pluginFocus"
                   @catalog="updateExtensions"
+                  @focused="pluginFocus = ''"
                 />
               </section>
 
@@ -2215,6 +2268,14 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
 
               <section v-else-if="paneSection === 'security'" class="advanced-settings-section">
                 <SecuritySettingsPage />
+              </section>
+
+              <section v-else-if="paneSection === 'notifications'" class="advanced-settings-section">
+                <NotificationSettingsPage
+                  :catalog="extensions"
+                  @open-plugins="selectSettingsItem('plugins')"
+                  @open-plugin="openPluginSettings"
+                />
               </section>
 
               <section v-else-if="paneSection === 'logs'" class="advanced-settings-section">
@@ -2587,15 +2648,18 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                 <SystemUpdateVersions
                   :current-version="status?.system?.os_version || onlineUpdate?.current_version || status?.version"
                   :current-build-id="status?.system?.build_id"
-                  :update="systemUpdate"
+                  :update="systemUpdate?.supported === false ? null : systemUpdate"
                   :switching-slot="slotSwitching"
                   @select-slot="confirmSlotSwitch"
                 />
+                <n-alert v-if="systemUpdate?.supported === false" type="info" :bordered="false">
+                  {{ t('settings.advancedSettings.systemPage.updateErrors.unsupported', 'This device does not support system updates. To update, flash new firmware to its storage.') }}
+                </n-alert>
                 <n-alert v-if="systemUpdateUnavailable || updateStatusError" type="warning" :bordered="false">
                   {{ t('settings.advancedSettings.systemPage.updateReconnecting', 'Update status is temporarily unavailable. Reconnecting…') }}
                   <n-button text @click="updateMonitor.refresh()">{{ t('common.retry', 'Retry') }}</n-button>
                 </n-alert>
-                <template v-if="systemUpdate">
+                <template v-if="systemUpdate && systemUpdate.supported !== false">
                   <section class="system-settings-group">
                     <h2>{{ t('settings.advancedSettings.systemPage.systemUpdate', 'System update') }}</h2>
                     <div class="system-update-panel">
@@ -2680,7 +2744,7 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                           </n-button>
                           <n-button
                             type="primary"
-                            :loading="updateInstalling"
+                            :loading="updateInstalling || bundleUpload.uploading.value"
                             :disabled="!updateFile || systemUpdate.operation !== 'idle'"
                             @click="confirmSystemUpdate"
                           >
@@ -2695,20 +2759,10 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
 
                   <SystemUpdatePreflight :progress="onlineUpdateProgress" :disabled="updateInstalling || systemUpdate.operation !== 'idle'" @install="installPreparedUpdate" @cancel="cancelPreparedUpdate" />
 
-                  <section v-if="updateStarted || systemUpdate.operation !== 'idle'" class="system-settings-group">
+                  <section v-if="updateStarted || systemUpdate.operation !== 'idle'" ref="updateStatusSection" class="system-settings-group">
                     <h2>{{ t('settings.advancedSettings.systemPage.updateStatus', '升级状态') }}</h2>
                     <p v-if="updateInstalling">{{ t('settings.advancedSettings.systemPage.updateBackground', 'After upload, the update continues in the background. You can return to this page to view its progress.') }}</p>
                     <div class="system-update-panel">
-                      <n-progress
-                        v-if="onlineUpdateProgress?.phase === 'downloading' || onlineUpdateProgress?.phase === 'uploading'"
-                        type="line"
-                        :percentage="onlineDownloadPercent"
-                        :show-indicator="onlineUpdateProgress.total_bytes > 0"
-                        :processing="onlineUpdateProgress.total_bytes === 0"
-                      />
-                      <span v-if="onlineUpdateProgress?.phase === 'downloading' || onlineUpdateProgress?.phase === 'uploading'" class="system-update-transfer">
-                        {{ formatBytes(onlineUpdateProgress.bytes) }}<template v-if="onlineUpdateProgress.total_bytes"> / {{ formatBytes(onlineUpdateProgress.total_bytes) }}</template>
-                      </span>
                       <div class="system-update-status">
                         <Download :size="19" />
                         <div>
@@ -2717,14 +2771,33 @@ watch(() => [props.status?.audio.enabled, props.status?.audio.source, props.stat
                         </div>
                         <span v-if="systemUpdate.operation !== 'idle'">{{ systemUpdate.progress.percentage }}%</span>
                       </div>
+                      <template v-if="updateTransfer">
+                        <n-progress
+                          type="line"
+                          :percentage="updateTransferPercent"
+                          :show-indicator="updateTransfer.total > 0"
+                          :processing="updateTransfer.total === 0"
+                        />
+                        <span class="system-update-transfer">
+                          {{ formatBytes(updateTransfer.bytes) }}<template v-if="updateTransfer.total"> / {{ formatBytes(updateTransfer.total) }}</template><template v-if="updateTransfer.speed > 0"> · {{ formatBytes(updateTransfer.speed) }}/s</template>
+                        </span>
+                      </template>
                       <n-progress
-                        v-if="systemUpdate.operation !== 'idle' || updateInstalling"
+                        v-if="(systemUpdate.operation !== 'idle' || updateInstalling) && !updateTransfer"
                         type="line"
                         :percentage="systemUpdate.progress.percentage"
                         :show-indicator="false"
                         status="success"
                       />
                       <SystemUpdateError v-if="onlineUpdateProgress?.error || systemUpdate.last_error" class="system-update-error" :error="onlineUpdateProgress?.error || systemUpdate.last_error" />
+                      <n-alert v-if="updateRestartPending" type="success" :bordered="false" class="system-update-restart">
+                        <div class="system-update-restart-body">
+                          <span>{{ t('settings.advancedSettings.systemPage.updateRestart', 'Restart the device to use the new system.') }}</span>
+                          <n-button size="small" type="primary" :loading="rebooting" :disabled="systemAction !== null" @click="confirmSystemReboot">
+                            {{ t('settings.rebootDevice.action', 'Restart') }}
+                          </n-button>
+                        </div>
+                      </n-alert>
 
                     </div>
                   </section>

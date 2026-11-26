@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict'
-import { defaultToolbarIcons } from '../src/lib/toolbar-icons.ts'
-import { groupToolbarItems, isToolbarSeparator, moveToolbarItem, normalizeToolbarFolders, removeToolbarFolder, syncToolbarIconOrder, toolbarFolderFor, toolbarLayoutOrder, upsertToolbarFolder, visibleToolbarSeparators, type ToolbarLayout } from '../src/lib/toolbar-layout.ts'
+import { defaultToolbarIcons, setToolbarIconPlacement, toolbarIconPlacement } from '../src/lib/toolbar-icons.ts'
+import { groupToolbarItems, isToolbarSeparator, moveToolbarItem, normalizeToolbarFolders, removeToolbarFolder, setToolbarItemLabel, setToolbarLabels, syncToolbarIconOrder, toolbarAllLabelsShown, toolbarAnyLabelShown, toolbarFolderFor, toolbarItemShowsLabel, toolbarLayoutOrder, upsertToolbarFolder, visibleToolbarSeparators, type ToolbarLayout } from '../src/lib/toolbar-layout.ts'
 
 const initial: ToolbarLayout = { toolbar_icons: defaultToolbarIcons() }
 assert.deepEqual(normalizeToolbarFolders(undefined), [])
-assert.equal(toolbarLayoutOrder(initial).length, 22)
+assert.equal(toolbarLayoutOrder(initial).length, 24)
 assert.ok(toolbarLayoutOrder(initial).includes('separator:controls'))
+// A saved order from before the notifications icon existed gets it beside the collection.
+const savedOrder = toolbarLayoutOrder({ ...initial, toolbar_order: ['display', 'toolbox', 'collection', 'settings', 'account'] })
+assert.deepEqual(savedOrder.slice(0, 6), ['display', 'toolbox', 'notifications', 'collection', 'settings', 'account'])
 assert.equal(toolbarLayoutOrder(initial).at(-2), 'separator:account')
 assert.deepEqual(visibleToolbarSeparators(toolbarLayoutOrder(initial), new Set(['display', 'fullscreen', 'account'])), ['separator:controls', 'separator:account'])
 assert.deepEqual(visibleToolbarSeparators(toolbarLayoutOrder(initial), new Set(['display', 'account'])), ['separator:controls'])
@@ -108,4 +111,33 @@ const mouseIndex = iconsReordered.findIndex(icon => icon.id === 'mouse')
 assert.deepEqual(syncToolbarIconOrder(customOrder, iconsReordered), ['mouse', 'folder:input', 'display', 'tool:terminal/main', 'collection', 'settings', 'account'])
 assert.deepEqual(customOrder, ['display', 'folder:input', 'mouse', 'tool:terminal/main', 'settings', 'account'])
 assert.deepEqual(syncToolbarIconOrder(undefined, iconsReordered), [])
+// Putting a hidden icon into a folder brings it back.
+const powerHidden: ToolbarLayout = { toolbar_icons: setToolbarIconPlacement(defaultToolbarIcons(), 'power', 'hidden') }
+const powerInFolder = upsertToolbarFolder(powerHidden, { id: 'machine', name: 'Machine', icon: 'Folder', items: ['power'] })
+assert.equal(toolbarIconPlacement(powerInFolder.toolbar_icons, 'power'), 'toolbar')
+const powerFolder = upsertToolbarFolder({ toolbar_icons: defaultToolbarIcons() }, { id: 'machine', name: 'Machine', icon: 'Folder', items: [] })
+const powerMovedBack = moveToolbarItem({ ...powerFolder, toolbar_icons: powerHidden.toolbar_icons }, 'power', { folder: 'machine' })
+assert.equal(toolbarIconPlacement(powerMovedBack.toolbar_icons, 'power'), 'toolbar')
+// Each item can show its text on its own; the toolbar-wide switch sets every item.
+const powerText = setToolbarItemLabel(initial, 'power', true)
+assert.deepEqual(powerText.toolbar_label_exceptions, ['power'])
+assert.equal(toolbarItemShowsLabel(powerText, 'power'), true)
+assert.equal(toolbarItemShowsLabel(powerText, 'display'), false)
+assert.equal(toolbarAllLabelsShown(powerText), false)
+assert.equal(toolbarAnyLabelShown(powerText, toolbarLayoutOrder(powerText)), true)
+assert.deepEqual(setToolbarItemLabel(powerText, 'power', false).toolbar_label_exceptions, [])
+const allText = setToolbarLabels(powerText, true)
+assert.deepEqual(allText.toolbar_label_exceptions, [])
+assert.equal(toolbarAllLabelsShown(allText), true)
+const allButTool = setToolbarItemLabel(allText, 'tool:terminal/main', false)
+assert.deepEqual(allButTool.toolbar_label_exceptions, ['tool:terminal/main'])
+assert.equal(toolbarItemShowsLabel(allButTool, 'tool:terminal/main'), false)
+assert.equal(toolbarItemShowsLabel(allButTool, 'folder:input'), true)
+assert.deepEqual(setToolbarLabels(allButTool, false), { ...allButTool, toolbar_show_labels: false, toolbar_label_exceptions: [] })
+// Text on an item that is not on the toolbar itself does not count.
+const collectedText = setToolbarItemLabel({ toolbar_icons: setToolbarIconPlacement(defaultToolbarIcons(), 'power', 'collection') }, 'power', true)
+assert.equal(toolbarAnyLabelShown(collectedText, toolbarLayoutOrder(collectedText)), false)
+const folderText = setToolbarItemLabel(upsertToolbarFolder(initial, { id: 'machine', name: 'Machine', icon: 'Folder', items: ['power'] }), 'power', true)
+assert.equal(toolbarAnyLabelShown(folderText, toolbarLayoutOrder(folderText)), false)
+assert.equal(toolbarAnyLabelShown(setToolbarItemLabel(folderText, 'folder:machine', true), toolbarLayoutOrder(folderText)), true)
 console.log('toolbar folder and layout tests passed')

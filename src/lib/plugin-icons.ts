@@ -1,5 +1,7 @@
 import type { Component } from 'vue'
 import { extensionAssetURL } from '../api/client.ts'
+import { serviceURL } from '../api/service-url.ts'
+import { MARKETPLACE_ICON_PREFIX } from './marketplace-install.ts'
 import { Box, Cloud, iconComponent } from '../icons/index.ts'
 
 export const ONEKVM_CLOUD_ID = 'cloud'
@@ -21,9 +23,13 @@ export function namedPluginIcon(name: string | undefined, fallback: Component = 
 export function pluginIcon(status: {
   id?: string
   version?: string
+  icon_url?: string
   icon_data_url?: string
   icon?: { source?: string; name?: string; data?: string; path?: string }
 }, fallback: Component = Box): { component: Component; url: string } {
+  if (typeof status.icon_url === 'string' && status.icon_url.startsWith(MARKETPLACE_ICON_PREFIX)) {
+    return { component: fallback, url: serviceURL(status.icon_url) }
+  }
   const dataUrl =
     (typeof status.icon_data_url === 'string' && status.icon_data_url.trim())
     || (status.icon && 'data' in status.icon && typeof status.icon.data === 'string'

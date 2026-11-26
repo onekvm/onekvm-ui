@@ -72,7 +72,8 @@ onBeforeUnmount(() => {
     :show="show"
     trigger="click"
     :placement="placement || 'bottom-end'"
-    :show-arrow="false"
+    show-arrow
+    arrow-point-to-center
     class="host-control-popover"
     :class="popoverClass"
     :theme-overrides="compactPopoverTheme"
@@ -80,7 +81,10 @@ onBeforeUnmount(() => {
     @update:show="updateShow"
   >
     <template #trigger><slot /></template>
-    <slot name="panel" />
+    <!-- Scroll inside, so the popover itself does not clip its arrow. -->
+    <div class="control-popover-scroll">
+      <slot name="panel" />
+    </div>
   </n-popover>
   <template v-else>
     <span class="control-sheet-trigger" @click="updateShow(true)">
@@ -97,6 +101,7 @@ onBeforeUnmount(() => {
           <section class="control-sheet-card" role="dialog" aria-modal="true">
             <header class="control-sheet-header">
               <strong class="control-sheet-title"><slot name="title" /></strong>
+              <slot name="sheet-actions" />
               <button
                 type="button"
                 class="control-sheet-close"

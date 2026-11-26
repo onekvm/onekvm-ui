@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, toRef,
 import { WifiOff } from '@/icons'
 
 import { useMouse, type MouseMode } from '@/composables/useMouse'
+import { primaryTouchDevice } from '@/lib/touchscreen'
 import { consolePointerCursor } from '@/lib/console-pointer'
 import { consoleConnectionProblem } from '@/lib/console-connection'
 import { statusEvents } from '@/lib/status-events'
@@ -16,6 +17,7 @@ import { useKeyboard } from '@/composables/useKeyboard'
 import KeyboardMagicHint from './KeyboardMagicHint.vue'
 import ConnectionTrace from './ConnectionTrace.vue'
 import TrackpadOverlay from './TrackpadOverlay.vue'
+import TouchMouseButtons from './TouchMouseButtons.vue'
 import { useVideoFps } from '@/composables/useVideoFps'
 import { useVideoPlaybackState } from '@/composables/useVideoPlaybackState'
 import { useMJPEGStream } from '@/composables/useMJPEGStream'
@@ -76,7 +78,10 @@ const stageStyle = computed(() => (
 ))
 let canvasObserver: ResizeObserver | undefined
 let trackpadFramed = false
-const { playing, hasFrame, onPlaying, onWaiting: onVideoWaiting, reset: resetPlayback } = useVideoPlaybackState(video)
+const { playing, hasFrame, onPlaying, onWaiting: onVideoWaiting, reset: resetPlayback } = useVideoPlaybackState(
+  video,
+  () => props.signalConnected,
+)
 const mediaError = ref(false)
 const reconnecting = ref(false)
 const mjpegReload = ref(0)
@@ -222,7 +227,7 @@ const displayMotion = useVideoDisplayMotion({
   settled: () => { publishCanvasSize(); refreshHidCursor() },
 })
 
-useMouse(
+const { floatingButton, floatingMove } = useMouse(
   inputTarget,
   toRef(props, 'mouseMode'),
   toRef(props, 'scrollInterval'),
@@ -232,6 +237,10 @@ useMouse(
   hidEnabled,
   toRef(props, 'videoRotation'),
 )
+// Relative mode on a phone or tablet: Left/Right buttons over the touchpad.
+const touchDevice = primaryTouchDevice()
+const touchButtonsShown = computed(() =>
+  touchDevice && props.mouseMode === 'relative' && hidEnabled.value && !props.inputSuspended)
 
 function updateMetadata() {
   if (!video.value) return
@@ -578,6 +587,11 @@ watch(
       @pointermove="onHidPointerMove"
       @pointerleave="onHidPointerLeave"
     />
+    <TouchMouseButtons
+      v-if="touchButtonsShown"
+      @button="floatingButton"
+      @move="floatingMove"
+    />
     <Transition name="console-zoom-badge">
       <button
         v-if="zoomBadgeShown"
@@ -636,6 +650,7 @@ watch(
       to=".console-connection-overlays"
       preset="card"
       class="connection-problem-modal"
+      :show-mask="false"
       :title="t('screen.connectionLostTitle', 'Connection interrupted')"
       :closable="false"
       :mask-closable="false"

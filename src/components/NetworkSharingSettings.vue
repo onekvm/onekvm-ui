@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, shallowRef, watch } from 'vue'
 import { api, type OneKVMConfig, type OneKVMStatus, type USBConfig, type WifiStatus } from '@/api/client'
 import { t } from '@/i18n/runtime'
+import { usbFunctionsFit } from '@/lib/usb-capacity'
 
 const props = defineProps<{ config: OneKVMConfig; status: OneKVMStatus | null; videoSessionId: string; disabled?: boolean }>()
 const emit = defineEmits<{ 'update:usb': [value: USBConfig] }>()
@@ -9,11 +10,14 @@ const wifi = shallowRef<WifiStatus | null>(null)
 const loading = shallowRef(false)
 const savingAp = shallowRef(false)
 const savingUsb = shallowRef(false)
+const savingAdapter = shallowRef(false)
 const loadError = shallowRef('')
 const actionError = shallowRef('')
 const hasWifi = computed(() => props.status?.network?.wifi_available === true)
 const gadget = computed(() => props.status?.hid?.gadget)
-const busy = computed(() => Boolean(props.disabled || loading.value || savingAp.value || savingUsb.value))
+const busy = computed(() => Boolean(props.disabled || loading.value || savingAp.value || savingUsb.value || savingAdapter.value))
+const adapterBlocked = computed(() => !props.config.usb.network_adapter
+  && !usbFunctionsFit(props.config.usb, props.config.audio, gadget.value, { network: true }))
 
 async function refresh() {
   if (!hasWifi.value || busy.value) return
@@ -40,6 +44,23 @@ async function shareAp(enabled: boolean) {
   } finally { savingAp.value = false }
 }
 
+async function setUsbAdapter(enabled: boolean) {
+  if (busy.value) return
+  savingAdapter.value = true
+  actionError.value = ''
+  try {
+    const current = await api.getConfig()
+    if (enabled && !current.usb.network_adapter && !usbFunctionsFit(current.usb, current.audio, gadget.value, { network: true })) {
+      emit('update:usb', current.usb)
+      throw new Error(t('settings.advancedSettings.usbPage.networkSharingBlocked', 'Not enough USB capacity. Turn off unused USB functions first.'))
+    }
+    const usb = { ...current.usb, network_adapter: enabled, network_sharing: enabled && Boolean(current.usb.network_sharing) }
+    await api.saveConfig({ ...current, usb }, props.videoSessionId)
+    emit('update:usb', usb)
+  } catch (reason) {
+    actionError.value = reason instanceof Error ? reason.message : String(reason)
+  } finally { savingAdapter.value = false }
+}
 async function shareUsb(enabled: boolean) {
   if (busy.value || (enabled && !props.config.usb.network_adapter)) return
   savingUsb.value = true
@@ -48,7 +69,7 @@ async function shareUsb(enabled: boolean) {
     const current = await api.getConfig()
     if (enabled && !current.usb.network_adapter) {
       emit('update:usb', current.usb)
-      throw new Error(t('network.sharing.usbAdapterRequired', 'Enable the USB network adapter in USB settings first.'))
+      throw new Error(t('network.sharing.usbAdapterRequired', 'Turn on the USB network adapter first.'))
     }
     const usb = { ...current.usb, network_sharing: enabled }
     await api.saveConfig({ ...current, usb }, props.videoSessionId)
@@ -78,10 +99,26 @@ onBeforeUnmount(() => window.clearInterval(timer))
     </div>
     <div v-if="gadget?.network_adapter != null" class="network-sharing-row">
       <div class="network-sharing-copy">
+        <strong>{{ t('settings.advancedSettings.usbPage.networkAdapter', 'USB network adapter') }}</strong>
+        <span>{{ t('network.sharing.usbAdapterHint', 'Access OneKVM over USB from Linux or macOS. Turning it on or off reconfigures USB, and the keyboard and mouse disconnect briefly.') }}</span>
+      </div>
+      <div class="network-sharing-controls">
+        <n-tooltip :disabled="!adapterBlocked" placement="left">
+          <template #trigger>
+            <span>
+              <n-switch :value="Boolean(config.usb.network_adapter)" :disabled="busy || adapterBlocked" :loading="savingAdapter" :aria-label="t('settings.advancedSettings.usbPage.networkAdapter', 'USB network adapter')" @update:value="setUsbAdapter" />
+            </span>
+          </template>
+          {{ t('settings.advancedSettings.usbPage.networkSharingBlocked', 'Not enough USB capacity. Turn off unused USB functions first.') }}
+        </n-tooltip>
+      </div>
+    </div>
+    <div v-if="gadget?.network_adapter != null" class="network-sharing-row">
+      <div class="network-sharing-copy">
         <strong>{{ t('settings.advancedSettings.usbPage.networkSharing', 'Share internet with the USB adapter') }}</strong>
         <span>{{ t('settings.advancedSettings.usbPage.networkSharingHint', 'Set the controlled device to obtain its IP address and DNS automatically. OneKVM needs an internet connection.') }}</span>
         <span v-if="config.usb.network_adapter">{{ t('network.sharing.usbChangeHint', 'Changing sharing briefly interrupts the USB network. Renew its IP address if it does not recover.') }}</span>
-        <span v-if="!config.usb.network_adapter">{{ t('network.sharing.usbAdapterRequired', 'Enable the USB network adapter in USB settings first.') }}</span>
+        <span v-if="!config.usb.network_adapter">{{ t('network.sharing.usbAdapterRequired', 'Turn on the USB network adapter first.') }}</span>
       </div>
       <div class="network-sharing-controls">
         <n-switch :value="Boolean(config.usb.network_sharing)" :disabled="busy || !config.usb.network_adapter" :loading="savingUsb" :aria-label="t('settings.advancedSettings.usbPage.networkSharing', 'Share internet with the USB adapter')" @update:value="shareUsb" />

@@ -47,6 +47,7 @@ assert.equal(errorMessage(new Error('firmware install failed')), 'firmware insta
 assert.equal(errorMessage('boom'), 'boom')
 assert.deepEqual(parseRecoveryStatus('{"addresses":["192.168.1.21","10.0.0.5"],"firmwareMax":8388608}'), {
   addresses: ['192.168.1.21', '10.0.0.5'],
+  firmware: true,
   firmwareMax: 8388608,
   storageType: '',
   storageBytes: 0,
@@ -57,6 +58,7 @@ assert.deepEqual(
   ),
   {
     addresses: ['192.168.1.21'],
+    firmware: true,
     firmwareMax: 1,
     storageType: 'SD Card',
     storageBytes: 32010928128,
@@ -64,16 +66,21 @@ assert.deepEqual(
 )
 assert.deepEqual(parseRecoveryStatus('{"addresses":[1,""]}'), {
   addresses: [],
+  firmware: true,
   firmwareMax: 0,
   storageType: '',
   storageBytes: 0,
 })
 assert.deepEqual(parseRecoveryStatus('not-json'), {
   addresses: [],
+  firmware: true,
   firmwareMax: 0,
   storageType: '',
   storageBytes: 0,
 })
+// A device whose Recovery cannot install firmware hides the upload.
+assert.equal(parseRecoveryStatus('{"addresses":[],"firmware":false,"firmwareMax":8388608}').firmware, false)
+assert.equal(parseRecoveryStatus('{"addresses":[],"firmware":"no"}').firmware, true)
 assert.equal(formatBytes(8 * 1024 * 1024), '8 MiB')
 assert.equal(formatBytes(512 * 1024), '512 KiB')
 assert.equal(formatStorageCapacity(32010928128), '32 GB')

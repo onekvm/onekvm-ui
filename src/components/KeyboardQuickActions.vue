@@ -3,19 +3,23 @@ import { computed } from 'vue'
 import { Keyboard, TextCursorInput } from '@/icons'
 import { NButton } from 'naive-ui'
 import { t } from '@/i18n/runtime'
+import type { ToolbarIconId } from '@/api/client'
 import KeyboardChordIcon from './KeyboardChordIcon'
 
-const emit = defineEmits<{ select: [key: 'cad' | 'virtual' | 'send-text'] }>()
+const emit = defineEmits<{
+  select: [key: 'cad' | 'virtual' | 'send-text']
+  contextmenu: [event: MouseEvent, id: ToolbarIconId]
+}>()
 const actions = computed(() => [
-  { key: 'virtual' as const, label: t('keyboard.virtualKeyboard'), icon: Keyboard },
-  { key: 'send-text' as const, label: t('keyboard.paste', 'Send text'), icon: TextCursorInput },
-  { key: 'cad' as const, label: t('keyboard.ctrlaltdel'), icon: KeyboardChordIcon },
+  { key: 'virtual' as const, id: 'virtual_keyboard' as const, label: t('keyboard.virtualKeyboard'), icon: Keyboard },
+  { key: 'send-text' as const, id: 'keyboard_text' as const, label: t('keyboard.paste', 'Send text'), icon: TextCursorInput },
+  { key: 'cad' as const, id: 'ctrl_alt_del' as const, label: t('keyboard.ctrlaltdel'), icon: KeyboardChordIcon },
 ])
 </script>
 
 <template>
   <div class="keyboard-quick-actions" role="group" :aria-label="t('keyboard.actions', 'Actions')">
-    <NButton v-for="action in actions" :key="action.key" secondary @click="emit('select', action.key)">
+    <NButton v-for="action in actions" :key="action.key" secondary @click="emit('select', action.key)" @contextmenu="emit('contextmenu', $event, action.id)">
       <component :is="action.icon" :size="18" aria-hidden="true" />
       <span>{{ action.label }}</span>
     </NButton>

@@ -49,8 +49,8 @@ const logoSource = computed(() => theme.value.appearance === 'light'
   : serviceURL('/brand/onekvm-logo-inverse.svg'))
 const rememberedLogin = readRememberedLogin()
 const username = ref(rememberedLogin?.username || '')
-const password = ref(rememberedLogin?.password || '')
-const rememberPassword = ref(Boolean(rememberedLogin))
+const password = ref('')
+const rememberUsername = ref(Boolean(rememberedLogin))
 const hostname = ref('onekvm')
 const setupUsername = ref('admin')
 const setupPassword = ref('')
@@ -158,7 +158,7 @@ function setupRedirectTarget(network: NetworkConfig) {
 watch(
   () => auth.username,
   (value) => {
-    if (rememberPassword.value && username.value) return
+    if (rememberUsername.value && username.value) return
     username.value = value || ''
   },
   { immediate: true },
@@ -167,7 +167,7 @@ watch(
 watch(currentLanguage, (language) => {
   setupLanguage.value = language as DeviceLanguage
 })
-watch(rememberPassword, (enabled) => {
+watch(rememberUsername, (enabled) => {
   if (enabled) return
   clearRememberedLogin()
 })
@@ -179,8 +179,7 @@ watch(
     const remembered = readRememberedLogin()
     if (!remembered) return
     username.value = remembered.username
-    password.value = remembered.password
-    rememberPassword.value = true
+    rememberUsername.value = true
   },
 )
 
@@ -211,7 +210,7 @@ async function submit() {
       return
     }
     persistRememberedLogin()
-    if (!rememberPassword.value) password.value = ''
+    password.value = ''
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : String(reason)
   } finally {
@@ -239,7 +238,7 @@ async function submitMfa() {
     totpCode.value = ''
     backupCode.value = ''
     persistRememberedLogin()
-    if (!rememberPassword.value) password.value = ''
+    password.value = ''
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : String(reason)
   } finally {
@@ -248,8 +247,8 @@ async function submitMfa() {
 }
 
 function persistRememberedLogin() {
-  if (rememberPassword.value && username.value) {
-    writeRememberedLogin({ username: username.value, password: password.value })
+  if (rememberUsername.value && username.value) {
+    writeRememberedLogin({ username: username.value })
     return
   }
   clearRememberedLogin()
@@ -486,7 +485,7 @@ onUnmounted(() => {
           <CircleCheck v-if="setupNetworkValid" class="ios-state done" />
           <Circle v-else class="ios-state" />
           <span>{{ t('auth.networkStep', 'Network') }}</span>
-          <em>{{ setupNetwork.primary_interface || 'eth0' }}</em>
+          <em>{{ setupNetwork.primary_interface || t('wifi.title', 'Wi-Fi') }}</em>
           <ChevronRight />
         </button>
         <button type="button" class="ios-menu" @click="openSetupPage('region')">
@@ -726,8 +725,8 @@ onUnmounted(() => {
           </n-form-item>
         </n-form>
         <label v-if="!cloudHosted" class="auth-remember">
-          <n-checkbox v-model:checked="rememberPassword">
-            {{ t('auth.rememberPassword', 'Remember password') }}
+          <n-checkbox v-model:checked="rememberUsername">
+            {{ t('auth.rememberUsername', 'Remember username') }}
           </n-checkbox>
         </label>
         <n-button type="primary" attr-type="submit" block :loading="busy" :disabled="!username || !password">

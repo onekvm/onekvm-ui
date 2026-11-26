@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Keyboard, Pin, PinOff } from '@/icons'
 import type { DropdownOption } from 'naive-ui'
 
-import type { KeyboardLayout } from '@/api/client'
+import type { KeyboardLayout, OneKVMStatus, ToolbarIconId } from '@/api/client'
 import { t } from '@/i18n/runtime'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import ControlOverlay from './ControlOverlay.vue'
@@ -15,7 +15,7 @@ const props = defineProps<{
   options: DropdownOption[]
   layout: KeyboardLayout
   inputSuspended?: boolean
-  hid?: { available: boolean; connected: boolean } | null
+  hid?: OneKVMStatus['hid'] | null
   numLock?: boolean
   capsLock?: boolean
   scrollLock?: boolean
@@ -25,6 +25,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   select: [key: string | number]
+  'action-contextmenu': [event: MouseEvent, id: ToolbarIconId]
   'update:show': [show: boolean]
   'text-window': [open: boolean]
 }>()
@@ -181,7 +182,7 @@ onBeforeUnmount(() => {
           </n-tooltip>
         </div>
       </header>
-      <HidHostAlert :hid="hid" />
+      <HidHostAlert :hid="hid" anchor="keyboard" />
       <div class="keyboard-lock-status" role="status">
         <span class="keyboard-lock-indicator" :data-state="lockState(capsLock)" :aria-label="`${t('keyboard.capsLock', 'Caps Lock')}: ${lockLabel(capsLock)}`">
           <i />
@@ -200,7 +201,7 @@ onBeforeUnmount(() => {
         </span>
       </div>
       <div :inert="inputSuspended">
-        <KeyboardQuickActions @select="selectOption" />
+        <KeyboardQuickActions @select="selectOption" @contextmenu="(event, id) => emit('action-contextmenu', event, id)" />
         <n-menu accordion :value="null" :options="remainingOptions" :indent="12" class="keyboard-control-menu keyboard-secondary-menu" @update:value="selectOption" />
       </div>
     </div>
@@ -233,7 +234,7 @@ onBeforeUnmount(() => {
         </div>
       </header>
       <div class="keyboard-status-content">
-        <HidHostAlert :hid="hid" />
+        <HidHostAlert :hid="hid" anchor="keyboard" />
         <div class="keyboard-pinned-layout">
           <span>{{ t('keyboard.layout', 'Keyboard layout') }}</span>
           <strong>{{ layoutLabel(layout) }}</strong>
@@ -256,7 +257,7 @@ onBeforeUnmount(() => {
           </span>
         </div>
         <div :inert="inputSuspended">
-          <KeyboardQuickActions @select="selectOption" />
+          <KeyboardQuickActions @select="selectOption" @contextmenu="(event, id) => emit('action-contextmenu', event, id)" />
           <n-menu accordion :value="null" :options="remainingOptions" :indent="12" class="keyboard-control-menu keyboard-secondary-menu" @update:value="selectOption" />
         </div>
       </div>

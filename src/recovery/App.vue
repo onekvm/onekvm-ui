@@ -70,6 +70,7 @@ const confirmKind = ref<ConfirmKind | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const addresses = ref<string[]>([])
 const firmwareMax = ref(0)
+const firmwareSupported = ref(true)
 const storageType = ref('')
 const storageBytes = ref(0)
 const flashProgress = ref<FirmwareProgress | null>(null)
@@ -246,6 +247,7 @@ async function refreshAddresses() {
     const status = await loadRecoveryStatus()
     addresses.value = status.addresses
     firmwareMax.value = status.firmwareMax
+    firmwareSupported.value = status.firmware
     storageType.value = status.storageType
     storageBytes.value = status.storageBytes
   } catch {
@@ -333,6 +335,7 @@ onUnmounted(() => {
     </section>
 
     <section
+      v-if="firmwareSupported"
       class="card firmware"
       :class="{ dragging }"
       @dragenter.prevent="dragging = true"

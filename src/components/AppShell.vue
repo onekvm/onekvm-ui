@@ -18,6 +18,7 @@ import { useDeviceInputSettings } from '@/composables/useDeviceInputSettings'
 import { useKeyboardLockOverlay } from '@/composables/useKeyboardLockOverlay'
 import { hasPermission } from '@/build'
 import { type MouseMode } from '@/composables/useMouse'
+import { parseMouseMode, primaryTouchDevice } from '@/lib/touchscreen'
 import { parseVideoFit, parseVideoRotation, VIDEO_FIT_KEY, VIDEO_ROTATION_KEY, type VideoFit, type VideoRotation } from '@/lib/video-fit'
 import {
   parseToolbarDock,
@@ -61,6 +62,8 @@ import RemoteConsole from './RemoteConsole.vue'
 import VideoPerformanceOverlay from './VideoPerformanceOverlay.vue'
 import AdvancedSettingsLoading from './AdvancedSettingsLoading.vue'
 import VideoFallbackModal from './VideoFallbackModal.vue'
+import ConsoleProblemWindow from './ConsoleProblemWindow.vue'
+import { CONSOLE_PROBLEMS } from '@/lib/console-problem-registry'
 import KeyboardLockOverlay from './KeyboardLockOverlay.vue'
 
 const AccountDrawer = defineAsyncComponent(() => import('./AccountDrawer.vue'))
@@ -149,9 +152,7 @@ const magicKey = ref(sanitizeMagicKey(localStorage.getItem(MAGIC_KEY_STORAGE)))
 const userShortcuts = ref<KeyboardShortcut[]>(loadLocalShortcuts())
 const deviceShortcuts = ref<KeyboardShortcut[]>([])
 const keyboardLayout = ref<KeyboardLayout>('us')
-const mouseMode = ref<MouseMode>(
-  localStorage.getItem(MOUSE_MODE_KEY) === 'relative' ? 'relative' : 'absolute',
-)
+const mouseMode = ref<MouseMode>(parseMouseMode(localStorage.getItem(MOUSE_MODE_KEY), primaryTouchDevice()))
 const videoFit = ref<VideoFit>(parseVideoFit(localStorage.getItem(VIDEO_FIT_KEY)))
 const videoRotation = shallowRef<VideoRotation>(parseVideoRotation(localStorage.getItem(VIDEO_ROTATION_KEY)))
 const {
@@ -654,6 +655,11 @@ onBeforeUnmount(() => {
       @pointerdown.capture="onekvm.unlockAudio()"
     >
         <div class="console-connection-overlays" />
+        <ConsoleProblemWindow
+          :problems="CONSOLE_PROBLEMS"
+          :status="status"
+          :enabled="auth.authenticated && !videoFallbackShown"
+        />
         <ControlToolbar
           ref="controlToolbar"
           :state="state"

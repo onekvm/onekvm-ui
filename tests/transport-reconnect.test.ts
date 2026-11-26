@@ -32,7 +32,9 @@ const sockets: FakeSocket[] = []
 class FakeSocket {
   static OPEN = 1
   static CLOSING = 2
+  static refuse = false
   readyState = 0
+  sent: unknown[] = []
   binaryType = ''
   onopen: (() => void) | null = null
   onclose: (() => void) | null = null
@@ -46,10 +48,17 @@ class FakeSocket {
     sockets.push(this)
     queueMicrotask(() => {
       if (this.readyState !== 0) return
+      if (FakeSocket.refuse) {
+        this.readyState = 3
+        this.onerror?.()
+        this.onclose?.()
+        return
+      }
       this.readyState = FakeSocket.OPEN
       this.onopen?.()
     })
   }
+  send(value: unknown) { this.sent.push(value) }
   close() { this.readyState = 3; this.onclose?.() }
   receive(bytes: number[]) { this.onmessage?.({ data: Uint8Array.from(bytes).buffer }) }
 }
@@ -337,6 +346,32 @@ try {
   assert.equal(peers.length, countBeforeClose, 'Closing while status loads must prevent a new peer')
   assert.equal(state?.connection, 'closed')
   assert.ok(sockets.every((socket) => socket.readyState === 3), 'Closing a session must close its LED socket')
+
+  // MJPEG and WebSocket video carry input on the HID WebSocket. A dropped
+  // socket, as when the host suspends USB, reconnects without ending the session.
+  api.getStatus = async () => snapshot('mjpeg')
+  await onekvm.connect()
+  assert.equal(state?.connection, 'connected')
+  const mjpegSocket = sockets.at(-1)!
+  onekvm.sendKeyboard([4])
+  assert.equal(mjpegSocket.sent.length, 1, 'MJPEG input uses the HID WebSocket')
+  const socketsBeforeDrop = sockets.length
+  mjpegSocket.close()
+  assert.equal(state?.connection, 'connected', 'A dropped HID socket keeps the video session')
+  assert.equal(state?.controlReady, false)
+  await new Promise((resolve) => setTimeout(resolve, 1100))
+  assert.equal(sockets.length, socketsBeforeDrop + 1, 'The HID WebSocket reconnects')
+  assert.equal(state?.controlReady, true)
+  onekvm.sendKeyboard([5])
+  assert.equal(sockets.at(-1)!.sent.length, 1, 'Input resumes on the new socket')
+  FakeSocket.refuse = true
+  sockets.at(-1)!.close()
+  await new Promise((resolve) => setTimeout(resolve, 4500))
+  assert.equal(state?.connection, 'connected', 'Reconnect attempts continue for a few seconds')
+  await new Promise((resolve) => setTimeout(resolve, 1000))
+  assert.equal(state?.connection, 'disconnected', 'A HID WebSocket that cannot reopen ends the session')
+  FakeSocket.refuse = false
+  await onekvm.close()
   unsubscribeLED()
   unsubscribe()
   console.log('transport-reconnect tests passed')

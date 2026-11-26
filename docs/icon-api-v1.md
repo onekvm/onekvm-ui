@@ -83,5 +83,8 @@ image and explicit brand assets keep their original precedence.
 Custom icons returned as a manifest path are loaded through the extension asset
 URL using the extension ID and version, so details and installed lists can show
 the same image as package previews and the marketplace.
+Marketplace package icons arrive as `icon_url` paths below
+`/api/extension-icons/`, named by content hash and cached by the browser; they
+take precedence over `icon_data_url`.
 
 Recovery uses a separate boot-time bundle and does not load this runtime.

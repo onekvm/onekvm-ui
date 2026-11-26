@@ -68,6 +68,7 @@ const packageIcon = computed(() => props.entry
   ? pluginIcon({
     id: props.entry.id,
     version: props.entry.version,
+    icon_url: props.entry.iconUrl,
     icon_data_url: props.entry.iconDataUrl,
     icon: props.entry.icon,
   }, PackageCheck)
@@ -347,6 +348,7 @@ async function runInstall() {
     :id="entry.id"
     :name="localized.name"
     :icon="entry.icon"
+    :icon-url="entry.iconUrl"
     :icon-data-url="entry.iconDataUrl"
   />
 </template>

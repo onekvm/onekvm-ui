@@ -13,11 +13,13 @@ export const TOOLBAR_ICON_IDS = [
   'gamepad',
   'power',
   'audio',
+  'camera',
   'virtual_media',
+  'collection',
   'performance',
   'fullscreen',
   'toolbox',
-  'collection',
+  'notifications',
   'settings',
   'language',
   'account',
@@ -36,6 +38,7 @@ const DEVICE_TOOLBAR_ICONS = new Set<ToolbarIconId>([
   'gamepad',
   'power',
   'audio',
+  'camera',
   'virtual_media',
 ])
 
@@ -52,7 +55,7 @@ export function isKeyboardActionToolbarIcon(id: ToolbarIconId) {
 }
 
 function toolbarIconHiddenByDefault(id: ToolbarIconId) {
-  return id === 'caps_lock' || id === 'num_lock' || id === 'scroll_lock' || isKeyboardActionToolbarIcon(id)
+  return id === 'caps_lock' || id === 'num_lock' || id === 'scroll_lock' || id === 'notifications' || isKeyboardActionToolbarIcon(id)
 }
 
 export function isRootOnlyToolbarIcon(id: string) {
@@ -60,29 +63,42 @@ export function isRootOnlyToolbarIcon(id: string) {
 }
 
 export function defaultToolbarIcons(): ToolbarIconPreference[] {
-  return TOOLBAR_ICON_IDS.map(id => ({ id, hidden: toolbarIconHiddenByDefault(id) }))
+  return TOOLBAR_ICON_IDS.map(id => ({ id, hidden: toolbarIconHiddenByDefault(id), removed: false }))
 }
 
-export function normalizeToolbarIcons(
-  icons: readonly { id?: string; hidden?: boolean }[] | null | undefined,
-): ToolbarIconPreference[] {
+type ToolbarIconInput = readonly { id?: string; hidden?: boolean; removed?: boolean }[] | null | undefined
+
+/** Where an icon appears: on the toolbar, in the collection menu, or nowhere. */
+export type ToolbarIconPlacement = 'toolbar' | 'collection' | 'hidden'
+
+/** Keyboard actions stay in the keyboard menu, so they have no collection place. */
+export function toolbarIconCollectable(id: ToolbarIconId) {
+  return !isKeyboardActionToolbarIcon(id) && !isRootOnlyToolbarIcon(id)
+}
+
+export function normalizeToolbarIcons(icons: ToolbarIconInput): ToolbarIconPreference[] {
   const seen = new Set<ToolbarIconId>()
   const device: ToolbarIconPreference[] = []
   const action: ToolbarIconPreference[] = []
   for (const icon of icons ?? []) {
     if (!isToolbarIconId(icon?.id) || seen.has(icon.id)) continue
     seen.add(icon.id)
-    const preference = { id: icon.id, hidden: Boolean(icon.hidden) && !isRootOnlyToolbarIcon(icon.id) }
+    const removed = Boolean(icon.removed) && !isRootOnlyToolbarIcon(icon.id)
+    const preference = { id: icon.id, hidden: (Boolean(icon.hidden) || removed) && !isRootOnlyToolbarIcon(icon.id), removed }
     if (isDeviceToolbarIcon(icon.id)) device.push(preference)
     else action.push(preference)
   }
+  if (!seen.size) return defaultToolbarIcons()
+  // A saved list gets the icons it lacks: one saved before they existed.
   for (const id of TOOLBAR_ICON_IDS) {
     if (seen.has(id)) continue
-    const preference = { id, hidden: toolbarIconHiddenByDefault(id) }
+    const preference = { id, hidden: toolbarIconHiddenByDefault(id), removed: false }
     if (isDeviceToolbarIcon(id)) device.push(preference)
-    else if (id === 'collection') {
-      const settingsIndex = action.findIndex(icon => icon.id === 'settings')
-      action.splice(settingsIndex < 0 ? action.length : settingsIndex, 0, preference)
+    else if (id === 'collection' || id === 'notifications') {
+      // Added icons join the group before the collection and settings, not after the account.
+      const before = id === 'notifications' ? ['collection', 'settings'] : ['settings']
+      const index = action.findIndex(icon => before.includes(icon.id))
+      action.splice(index < 0 ? action.length : index, 0, preference)
     }
     else action.push(preference)
   }
@@ -90,7 +106,7 @@ export function normalizeToolbarIcons(
 }
 
 export function reorderToolbarIcon(
-  icons: readonly { id?: string; hidden?: boolean }[] | null | undefined,
+  icons: ToolbarIconInput,
   from: ToolbarIconId,
   to: ToolbarIconId,
 ) {
@@ -104,36 +120,47 @@ export function reorderToolbarIcon(
   return next
 }
 
-export function setToolbarIconHidden(
-  icons: readonly { id?: string; hidden?: boolean }[] | null | undefined,
-  id: ToolbarIconId,
-  hidden: boolean,
-) {
+/** Moves the icon between the toolbar and the collection menu. */
+export function setToolbarIconHidden(icons: ToolbarIconInput, id: ToolbarIconId, hidden: boolean) {
+  return setToolbarIconPlacement(icons, id, hidden ? 'collection' : 'toolbar')
+}
+
+export function setToolbarIconPlacement(icons: ToolbarIconInput, id: ToolbarIconId, placement: ToolbarIconPlacement) {
+  if (isRootOnlyToolbarIcon(id)) placement = 'toolbar'
+  // A hidden keyboard action is still in the keyboard menu: the same as collected.
+  if (placement === 'hidden' && isKeyboardActionToolbarIcon(id)) placement = 'collection'
   return normalizeToolbarIcons(icons).map(icon => (
-    icon.id === id ? { ...icon, hidden: hidden && !isRootOnlyToolbarIcon(id) } : icon
+    icon.id === id ? { ...icon, hidden: placement !== 'toolbar', removed: placement === 'hidden' } : icon
   ))
 }
 
-export function toolbarIconsEqual(
-  left: readonly { id?: string; hidden?: boolean }[] | null | undefined,
-  right: readonly { id?: string; hidden?: boolean }[] | null | undefined,
-) {
+export function toolbarIconPlacement(icons: ToolbarIconInput, id: ToolbarIconId): ToolbarIconPlacement {
+  const icon = normalizeToolbarIcons(icons).find(icon => icon.id === id)
+  if (!icon?.hidden) return 'toolbar'
+  return icon.removed || !toolbarIconCollectable(id) ? 'hidden' : 'collection'
+}
+
+export function toolbarIconsEqual(left: ToolbarIconInput, right: ToolbarIconInput) {
   const normalizedLeft = normalizeToolbarIcons(left)
   const normalizedRight = normalizeToolbarIcons(right)
   return normalizedLeft.length === normalizedRight.length
-    && normalizedLeft.every((icon, index) => icon.id === normalizedRight[index]?.id && icon.hidden === normalizedRight[index]?.hidden)
+    && normalizedLeft.every((icon, index) => icon.id === normalizedRight[index]?.id
+      && icon.hidden === normalizedRight[index]?.hidden && icon.removed === normalizedRight[index]?.removed)
 }
 
-export function toolbarIconHidden(
-  icons: readonly { id?: string; hidden?: boolean }[] | null | undefined,
-  id: ToolbarIconId,
-) {
+/** Not on the toolbar: collected or removed. */
+export function toolbarIconHidden(icons: ToolbarIconInput, id: ToolbarIconId) {
   return normalizeToolbarIcons(icons).some(icon => icon.id === id && icon.hidden)
+}
+
+/** In neither the toolbar nor the collection menu. */
+export function toolbarIconRemoved(icons: ToolbarIconInput, id: ToolbarIconId) {
+  return normalizeToolbarIcons(icons).some(icon => icon.id === id && icon.removed)
 }
 
 /** Even slots leave the following odd slot for the HDD indicator beside Power. */
 export function toolbarIconCssOrder(
-  icons: readonly { id?: string; hidden?: boolean }[] | null | undefined,
+  icons: ToolbarIconInput,
   id: ToolbarIconId,
 ) {
   const index = normalizeToolbarIcons(icons).findIndex(icon => icon.id === id)

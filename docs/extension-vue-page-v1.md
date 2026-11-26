@@ -71,6 +71,11 @@ terminal.open(hostElement)
 fitAddon.fit()
 ```
 
+`runtime.serviceURL(path)` turns a device API path such as
+`/api/extension-icons/<name>` into a URL that also works when the console is
+opened through a cloud relay. Older host UIs do not provide it; fall back to the
+path itself.
+
 The curated Vue runtime also exposes the rendering helpers used by compiled
 page components and built-ins such as `Teleport`. This allows a page to mount
 host-rendered controls into placeholders inside canvas markup.
@@ -86,8 +91,9 @@ older host UIs should provide a text fallback when this component is absent.
 
 `runtime.dialogs.ExtensionDetails` renders the same read-only details dialog as
 Plugin management, including declared features, permissions, dependencies, and
-kernel modules. It accepts `show: boolean`, `id: string`, and an optional
-fallback `name: string`; handle `onUpdate:show` to close it. Loading, errors,
+kernel modules. It accepts `show: boolean`, `id: string`, and optional
+fallbacks `name: string`, `icon`, `iconUrl: string` (a marketplace icon path)
+and `iconDataUrl: string`; handle `onUpdate:show` to close it. Loading, errors,
 retry, localization, and theme handling belong to the host component.
 
 ```js

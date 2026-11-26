@@ -137,7 +137,7 @@ const audioLatencyTotal = computed(() => formatLatencyUs(sumLatencyUs(
   <TransitionGroup :name="animatePanels === false ? 'performance-panel-static' : 'performance-panel'" :css="animatePanels !== false" tag="div" class="display-status-values">
     <section key="stream" class="display-status-column" data-performance-panel="stream">
       <h2>
-        <span>{{ t('screen.streamColumn', 'Stream') }}</span>
+        <span class="display-status-title">{{ t('screen.streamColumn', 'Stream') }}</span>
         <span class="display-status-format">
           <PerformanceConnectionBadge :transport="transport" :stats="webrtcConnection" />
           <n-tag class="display-status-format-badge" size="small" round :bordered="false" :title="`${t('screen.bitDepth')}: ${t('screen.bitDepthHint')}`">
@@ -185,7 +185,7 @@ const audioLatencyTotal = computed(() => formatLatencyUs(sumLatencyUs(
 
     <section v-if="showLatency" key="latency" class="display-status-column" data-performance-panel="latency">
       <h2>
-        <span>{{ t('screen.latencyColumn', 'Latency') }}</span>
+        <span class="display-status-title">{{ t('screen.latencyColumn', 'Latency') }}</span>
         <PerformanceLatencyMetric variant="total" :label="t('screen.videoLatency', 'Video latency')" :value="knownLatencyTotal" :hint="latencyTotalHint" />
       </h2>
       <div class="display-status-meta">
@@ -248,7 +248,7 @@ const audioLatencyTotal = computed(() => formatLatencyUs(sumLatencyUs(
 
     <section v-if="showLatency && audioEnabled" key="audio-latency" class="display-status-column" data-performance-panel="audio-latency">
       <h2>
-        <span>{{ t('screen.audioLatencyColumn', 'Audio latency') }}</span>
+        <span class="display-status-title">{{ t('screen.audioLatencyColumn', 'Audio latency') }}</span>
         <PerformanceLatencyMetric variant="total" :label="t('screen.audioLatencyColumn', 'Audio latency')" :value="audioLatencyTotal" :hint="t('screen.audioLatencyTotalHint')" />
       </h2>
       <div class="display-status-meta">
@@ -267,6 +267,9 @@ const audioLatencyTotal = computed(() => formatLatencyUs(sumLatencyUs(
 
 <style scoped>
 .display-status-values { position: relative; }
+
+/* The badges beside a title wrap; the title itself never breaks. */
+.display-status-title { flex: none; white-space: nowrap; }
 
 .display-status-format {
   display: inline-flex;

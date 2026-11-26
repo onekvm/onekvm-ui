@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import { cloudDeviceName, serviceURL } from '@/api/service-url'
-import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
+import { computed, h, nextTick, onBeforeUnmount, onMounted, provide, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import {
+  Bell,
+  Camera,
   Check,
   CircleQuestionMark,
   CircleUserRound,
@@ -55,19 +57,21 @@ import { hidIndicatorState } from '@/lib/hid-status'
 import { clientModifierNames, MAGIC_KEY_CODES, magicKeyLabel, sanitizeMagicKey, type ChordNameSet } from '@/lib/keyboard-magic'
 import { USB_GAMEPAD_UI_ENABLED } from '@/lib/ui-features'
 import { dismissControlOverlays } from '@/lib/overlay-target'
+import { anchoredProblem, problemAnchors } from '@/lib/console-problem-anchor'
+import type { ConsoleProblemAnchor } from '@/lib/console-problems'
 import { resolveConsoleSubtitle } from '@/lib/console-title'
-import { isKeyboardActionToolbarIcon, normalizeToolbarIcons, toolbarIconHidden } from '@/lib/toolbar-icons'
+import { isKeyboardActionToolbarIcon, isRootOnlyToolbarIcon, isToolbarIconId, normalizeToolbarIcons, setToolbarIconPlacement, toolbarIconCollectable, toolbarIconHidden, toolbarIconPlacement, toolbarIconRemoved } from '@/lib/toolbar-icons'
 import { machineDisplayName } from '@/lib/machine'
 import { onekvm, type InputActivity, type TransportState } from '@/lib/onekvm'
 import { sendShortcut, shortcutChordLabel } from '@/lib/keyboard-shortcuts'
 import { useThemeMenu } from '@/composables/useThemeMenu'
 import { hasPermission } from '@/build'
 import { useAuth } from '@/composables/useAuth'
-import { useToolbarLayout } from '@/composables/useToolbarLayout'
+import { toolbarItemLabelKey, useToolbarLayout } from '@/composables/useToolbarLayout'
 import { useToolbarItemDrag } from '@/composables/useToolbarItemDrag'
 import { useToolbarContextMenu } from '@/composables/useToolbarContextMenu'
 import { useToolbarFolderOptions } from '@/composables/useToolbarFolderOptions'
-import { MAX_TOOLBAR_FOLDERS, groupToolbarItems, moveToolbarItem, removeToolbarFolder, toolbarFolderFor, upsertToolbarFolder, visibleToolbarSeparators } from '@/lib/toolbar-layout'
+import { MAX_TOOLBAR_FOLDERS, groupToolbarItems, isToolbarSeparator, moveToolbarItem, removeToolbarFolder, setToolbarItemLabel, toolbarFolderFor, upsertToolbarFolder, visibleToolbarSeparators } from '@/lib/toolbar-layout'
 import type { ToolbarFolder } from '@/api/client'
 import ToolbarFolderDialog from './ToolbarFolderDialog.vue'
 
@@ -118,8 +122,13 @@ import KeyboardChordIcon from './KeyboardChordIcon'
 import GamepadPopover from './GamepadPopover.vue'
 import MouseSettingsPopover from './MouseSettingsPopover.vue'
 import PowerControlPopover from './PowerControlPopover.vue'
+import NotificationCenterPopover from './NotificationCenterPopover.vue'
+import { useNotifications } from '@/composables/useNotifications'
 import HddActivityIndicator from './HddActivityIndicator.vue'
 import AudioPopover from './AudioPopover.vue'
+import CameraPopover from './CameraPopover.vue'
+import ConsoleProblemPopover from './ConsoleProblemPopover.vue'
+import { cameraShare } from '@/lib/camera-share'
 import MediaTransferIndicator from './MediaTransferIndicator.vue'
 import type { MediaTransferState } from '@/lib/media-transfer'
 import ControlOverlay from './ControlOverlay.vue'
@@ -189,7 +198,7 @@ const emit = defineEmits<{
 }>()
 
 type DeviceState = 'ready' | 'waiting' | 'error'
-type MenuName = 'display' | 'mouse' | 'keyboard' | 'gamepad' | 'power' | 'audio' | 'language' | 'account'
+type MenuName = 'display' | 'mouse' | 'keyboard' | 'gamepad' | 'power' | 'audio' | 'camera' | 'notifications' | 'language' | 'account'
 const dialog = useAsyncDialog()
 const overlayTo = useOverlayMount()
 const message = useMessage()
@@ -198,8 +207,8 @@ const powerAction = ref<PowerAction | null>(null)
 const HDD_INDICATOR_KEY = 'onekvm.hddIndicator'
 const showHddIndicator = shallowRef(readHddIndicatorPreference())
 const hddIndicatorVisible = computed(() => showHddIndicator.value
-  && Boolean(props.status?.atx?.available)
-  && typeof props.status?.atx?.hdd_led === 'boolean')
+  && Boolean(props.status?.power?.available)
+  && typeof props.status?.power?.hdd_led === 'boolean')
 
 function readHddIndicatorPreference() {
   try { return localStorage.getItem(HDD_INDICATOR_KEY) === '1' } catch { return false }
@@ -212,9 +221,18 @@ function updateHddIndicatorPreference(show: boolean) {
 
 const openMenu = ref<MenuName | null>(null)
 const toolbox = useToolboxContext()
+const { unread: unreadNotifications } = useNotifications()
+const unreadNotificationsLabel = computed(() => unreadNotifications.value > 99 ? '99+' : String(unreadNotifications.value))
 const { auth } = useAuth()
 const canArrangeToolbar = computed(() => hasPermission(auth, 'settings.manage'))
 const toolbarLayout = useToolbarLayout(() => props.status?.identity)
+provide(toolbarItemLabelKey, toolbarLayout.labelShown)
+/** Items without their own text setting follow the toolbar-wide one. */
+const defaultLabelAttr = computed(() => toolbarLayout.layout.value.toolbar_show_labels ? '' : undefined)
+const labelAttr = (id: string) => toolbarLayout.labelShown(id) ? '' : undefined
+function setItemLabel(id: string, show: boolean) {
+  void toolbarLayout.save(layout => setToolbarItemLabel(layout, id, show))
+}
 const folderOptions = useToolbarFolderOptions()
 const folderOpen = ref('')
 const folderEditorOpen = ref(false)
@@ -238,6 +256,13 @@ const toolbarContext = useToolbarContextMenu({
     void toolbarLayout.save(layout => ({ ...layout, toolbar_order: order }))
   },
   removeSeparator: id => { void toolbarLayout.save(layout => ({ ...layout, toolbar_order: toolbarLayout.order.value.filter(item => item !== id) })) },
+  iconPlacement: id => isToolbarIconId(id) && !isRootOnlyToolbarIcon(id) ? toolbarIconPlacement(toolbarLayout.layout.value.toolbar_icons, id) : undefined,
+  iconCollectable: id => isToolbarIconId(id) && toolbarIconCollectable(id),
+  setIconPlacement: (id, placement) => {
+    if (isToolbarIconId(id)) void toolbarLayout.save(layout => ({ ...layout, toolbar_icons: setToolbarIconPlacement(layout.toolbar_icons, id, placement) }))
+  },
+  itemLabel: id => id && !isToolbarSeparator(id) ? toolbarLayout.labelShown(id) : undefined,
+  setItemLabel,
 })
 const toolbarSeparators = computed(() => {
   const visible = new Set(toolbarLayout.order.value.filter(id => {
@@ -264,8 +289,17 @@ const itemDrag = useToolbarItemDrag({
 })
 watch([folderOpen, folderEditorOpen, itemDrag.dragging, toolbarContext.show], () => { emitToolbarOverlay(); armToolbarHide() })
 function openToolbarContext(event: MouseEvent) {
-  dismissOverlays()
+  // The phone toolbar sheet stays open so the menu stays beside the icon it acts on.
+  dismissOverlays({ keepLauncher: true })
   toolbarContext.open(event)
+}
+// Keeps the collection or folder open so several icons can be restored in turn.
+function openMenuItemContext(event: MouseEvent) {
+  if (openMenu.value !== null) openMenu.value = null
+  toolbarContext.open(event, { menu: true })
+}
+function openKeyboardActionContext(event: MouseEvent, id: ToolbarIconId) {
+  toolbarContext.open(event, { id, menu: true })
 }
 function folderForItem(id: string) { return toolbarFolderFor(toolbarLayout.folders.value, id) }
 function setFolderTarget(id: string, target: HTMLElement | null) { folderTargets.value = { ...folderTargets.value, [id]: target } }
@@ -290,11 +324,14 @@ function folderItemAvailable(id: string) {
   if (id.startsWith('tool:')) return toolbox.pinned.some(({ tool }) => `tool:${tool.id}` === id)
   if (id === 'gamepad') return USB_GAMEPAD_UI_ENABLED && Boolean(props.status?.hid?.gamepad)
   if (id === 'audio' && !audioControlAvailable.value) return false
+  if (id === 'camera' && !cameraAvailable.value) return false
   if (id === 'toolbox' && !toolbox.allowed) return false
   return normalizeToolbarIcons(toolbarLayout.layout.value.toolbar_icons).some(icon => icon.id === id && !icon.hidden)
 }
 function folderItemCount(folder: ToolbarFolder) { return folder.items.filter(folderItemAvailable).length }
 function toolbarItemTarget(id: ToolbarIconId) {
+  // Removed icons have no place to go, so their slot stays hidden.
+  if (toolbarIconRemoved(toolbarLayout.layout.value.toolbar_icons, id)) return null
   const folder = !toolbarIconHidden(toolbarLayout.layout.value.toolbar_icons, id) && folderForItem(id)
   return folder ? folderTargets.value[folder.id] ?? null : collectedIconsTarget.value
 }
@@ -656,6 +693,11 @@ function refreshHideEdge() {
   )
 }
 
+/** A console problem points at its toolbar button while no toolbar menu covers it. */
+const problemPopoverShown = computed(() => Boolean(anchoredProblem.value)
+  && openMenu.value === null && !collectionMenuOpen.value && !pinnedOverflowOpen.value
+  && !folderOpen.value && !toolbarContext.show.value)
+
 function armToolbarHide() {
   clearToolbarHideTimer()
   if (!hideEdge.value) {
@@ -667,6 +709,7 @@ function armToolbarHide() {
     || toolbox.menuOpen
     || collectionMenuOpen.value || pinnedOverflowOpen.value || folderOpen.value || folderEditorOpen.value || itemDrag.dragging.value || toolbarContext.show.value
     || launcherMenuOpen.value
+    || problemPopoverShown.value
     || pointerOnToolbarChrome.value
     || performanceDock.dragging.value
     || toolbarDragging.value
@@ -685,6 +728,7 @@ function armToolbarHide() {
       || toolbox.menuOpen
       || collectionMenuOpen.value || pinnedOverflowOpen.value || folderOpen.value || folderEditorOpen.value || itemDrag.dragging.value || toolbarContext.show.value
       || launcherMenuOpen.value
+      || problemPopoverShown.value
       || pointerOnToolbarChrome.value
       || performanceDock.dragging.value
       || toolbarDragging.value
@@ -1191,6 +1235,7 @@ const toolbarIcons = computed(() => toolbarLayout.layout.value.toolbar_icons)
 const audioControlAvailable = computed(() => Boolean(
   props.status?.audio.sources?.length || props.status?.audio.enabled || props.status?.audio.microphone_available,
 ))
+const cameraAvailable = computed(() => Boolean(props.status?.camera?.enabled))
 function toolbarIconShown(id: ToolbarIconId) {
   return !toolbarIconHidden(toolbarIcons.value, id) && !folderForItem(id)
 }
@@ -1198,10 +1243,11 @@ function toolbarIconStyle(id: ToolbarIconId) {
   return { order: toolbarItemOrder(id) }
 }
 const collectedIcons = computed(() => normalizeToolbarIcons(toolbarIcons.value).filter(icon => {
-  if (!icon.hidden) return false
+  if (!icon.hidden || icon.removed) return false
   if (isKeyboardActionToolbarIcon(icon.id)) return false
   if (icon.id === 'gamepad') return USB_GAMEPAD_UI_ENABLED && Boolean(props.status?.hid?.gamepad)
   if (icon.id === 'audio') return audioControlAvailable.value
+  if (icon.id === 'camera') return cameraAvailable.value
   if (icon.id === 'toolbox') return toolbox.allowed
   return true
 }))
@@ -1220,6 +1266,7 @@ const deviceClusterShown = computed(() => {
   const builtin = (['display', 'mouse', 'keyboard', 'caps_lock', 'num_lock', 'scroll_lock', 'virtual_keyboard', 'keyboard_text', 'ctrl_alt_del', 'power', 'virtual_media'] as const).some(toolbarIconShown)
     || (USB_GAMEPAD_UI_ENABLED && Boolean(props.status?.hid?.gamepad) && toolbarIconShown('gamepad'))
     || (audioControlAvailable.value && toolbarIconShown('audio'))
+    || (cameraAvailable.value && toolbarIconShown('camera'))
     || (hddIndicatorVisible.value && toolbarIconShown('power'))
   return builtin
     || deviceControlExtensions.value.length > 0
@@ -1231,6 +1278,7 @@ const actionClusterShown = computed(() => (
   || (props.canSettings && toolbarIconShown('settings'))
   || toolbarIconShown('performance')
   || toolbarIconShown('fullscreen')
+  || toolbarIconShown('notifications')
   || toolbarIconShown('language')
   || toolbarIconShown('account')
   || (toolbox.allowed && toolbarIconShown('toolbox'))
@@ -1250,13 +1298,13 @@ const gamepadState = computed<DeviceState>(() => {
 
 const powerState = computed<DeviceState>(() => {
   if (!props.status) return 'waiting'
-  if (!props.status.atx?.available) return 'error'
-  if (props.status.atx.pwr_led === true) return 'ready'
+  if (!props.status.power?.available) return 'error'
+  if (props.status.power.pwr_led === true) return 'ready'
   return 'waiting'
 })
 
 const powerStateLabel = computed(() => {
-  const led = props.status?.atx?.pwr_led
+  const led = props.status?.power?.pwr_led
   if (led === true) return t('power.on', 'Host is On')
   if (led === false) return t('power.off', 'Host is Off')
   return t('power.title', 'Power')
@@ -1272,6 +1320,20 @@ const audioStateLabel = computed(() => {
   if (speaker) return t('usbAudio.speaker', 'Speaker')
   if (microphone) return t('usbAudio.microphone', 'Microphone')
   return t('usbAudio.off', 'Off')
+})
+
+const cameraSession = shallowRef(cameraShare.state())
+onBeforeUnmount(cameraShare.subscribe(state => { cameraSession.value = state }))
+const cameraState = computed<DeviceState>(() => {
+  if (cameraSession.value.error === 'connection') return 'error'
+  return cameraSession.value.sharing ? 'ready' : 'waiting'
+})
+const cameraStateLabel = computed(() => cameraSession.value.sharing
+  ? t('camera.sharing', 'Sharing')
+  : t('usbAudio.off', 'Off'))
+// Turning the USB camera off ends sharing in this browser too.
+watch(() => props.status?.camera?.enabled, enabled => {
+  if (enabled === false && cameraShare.state().sharing) cameraShare.stop()
 })
 
 const mediaOpen = computed(() =>
@@ -1599,6 +1661,17 @@ function updateMenu(name: MenuName, visible: boolean) {
   emitToolbarOverlay()
 }
 
+watch(() => {
+  const available = !toolbarLauncher.value && !props.pipActive
+  return { mouse: available && toolbarIconShown('mouse'), keyboard: available && toolbarIconShown('keyboard') }
+}, (anchors) => Object.assign(problemAnchors, anchors), { immediate: true, deep: true })
+
+function problemTarget(anchor: ConsoleProblemAnchor) {
+  return toolbarEl.value?.querySelector<HTMLElement>(`[data-toolbar-item="${anchor}"] .device-indicator`) ?? null
+}
+
+watch(problemPopoverShown, () => armToolbarHide())
+
 function onTrackpadToggle(open: boolean) {
   emit('update:trackpad', open)
   if (!open) return
@@ -1606,11 +1679,11 @@ function onTrackpadToggle(open: boolean) {
   setLauncherMenuOpen(false)
 }
 
-function dismissOverlays() {
+function dismissOverlays(options: { keepLauncher?: boolean } = {}) {
   folderOpen.value = ''
   collectionMenuOpen.value = false
   if (openMenu.value !== null) openMenu.value = null
-  setLauncherMenuOpen(false)
+  if (!options.keepLauncher) setLauncherMenuOpen(false)
   dismissControlOverlays()
   emitToolbarOverlay()
 }
@@ -1671,6 +1744,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  Object.assign(problemAnchors, { mouse: false, keyboard: false })
   performanceDock.register(null, null)
   clearToolbarHideTimer()
   window.clearTimeout(mousePulseTimer)
@@ -1774,7 +1848,7 @@ onBeforeUnmount(() => {
         <span v-if="consoleSubtitle">{{ consoleSubtitle }}</span>
       </div>
       <div class="toolbar-layout" :class="{ 'has-text-labels': toolbarLayout.showLabels.value }" :data-toolbar-label-position="toolbarLayout.layout.value.toolbar_label_position ?? 'right'" data-toolbar-surface>
-      <div v-if="mediaTransferVisible" class="toolbar-icon-slot toolbar-temporary-actions" style="order: -3" data-toolbar-temporary-tasks>
+      <div v-if="mediaTransferVisible" class="toolbar-icon-slot toolbar-temporary-actions" style="order: -3" data-toolbar-temporary-tasks :data-toolbar-label="defaultLabelAttr">
         <MediaTransferIndicator
           :state="mediaTransfer"
           :tooltip-disabled="toolbarLauncher"
@@ -1897,6 +1971,7 @@ onBeforeUnmount(() => {
         :placement="menuPlacement"
         :sheet="toolbarLauncher"
         @select="selectKeyboard"
+        @action-contextmenu="openKeyboardActionContext"
         @update:show="updateMenu('keyboard', $event)"
         @text-window="onKeyboardTextWindow"
       >
@@ -2015,10 +2090,10 @@ onBeforeUnmount(() => {
         @activate="onCollectedIconClick('power')"
       >
       <PowerControlPopover
-        :available="Boolean(status?.atx?.available)"
-        :can-power="canPower && Boolean(status?.atx?.available)"
-        :pwr-led="status?.atx?.pwr_led"
-        :hdd-led="status?.atx?.hdd_led"
+        :available="Boolean(status?.power?.available)"
+        :can-power="canPower && Boolean(status?.power?.available)"
+        :pwr-led="status?.power?.pwr_led"
+        :hdd-led="status?.power?.hdd_led"
         :show-hdd-indicator="showHddIndicator"
         :loading-action="powerAction"
         :placement="menuPlacement"
@@ -2050,11 +2125,12 @@ onBeforeUnmount(() => {
       <div
         v-if="hddIndicatorVisible && toolbarIconShown('power')"
         class="toolbar-icon-slot"
+        :data-toolbar-label="defaultLabelAttr"
         :style="{ order: toolbarIconStyle('power').order + 1 }"
       >
       <HddActivityIndicator
-        :available="Boolean(status?.atx?.available)"
-        :led="status?.atx?.hdd_led"
+        :available="Boolean(status?.power?.available)"
+        :led="status?.power?.hdd_led"
         :expanded="toolbarLauncher"
       />
       </div>
@@ -2092,6 +2168,38 @@ onBeforeUnmount(() => {
       </AudioPopover>
       </ToolbarIconSlot>
 
+      <ToolbarIconSlot v-if="cameraAvailable"
+        :collected="!toolbarIconShown('camera')"
+        data-toolbar-item="camera"
+        :target="toolbarItemTarget('camera')"
+        :order="toolbarIconStyle('camera').order"
+        @activate="onCollectedIconClick('camera')"
+      >
+      <CameraPopover
+        :status="status"
+        :placement="menuPlacement"
+        :sheet="toolbarLauncher"
+        @update:show="updateMenu('camera', $event)"
+      >
+        <n-tooltip :disabled="!toolbarIconShown('camera') || toolbarLauncher || openMenu === 'camera'">
+          <template #trigger>
+            <n-button :role="toolbarIconShown('camera') ? undefined : 'menuitem'"
+              quaternary
+              size="small"
+              class="device-indicator"
+              :data-state="cameraState"
+              :aria-label="`${t('camera.title', 'Camera')}: ${cameraStateLabel}`"
+            >
+              <template #icon><Camera /></template>
+              <span class="device-led" />
+              <span class="toolbar-action-label">{{ t('camera.title', 'Camera') }}</span>
+            </n-button>
+          </template>
+          {{ t('camera.title', 'Camera') }}: {{ cameraStateLabel }}
+        </n-tooltip>
+      </CameraPopover>
+      </ToolbarIconSlot>
+
       <ToolbarIconSlot
         :collected="!toolbarIconShown('virtual_media')"
         data-toolbar-item="virtual_media"
@@ -2126,6 +2234,7 @@ onBeforeUnmount(() => {
         v-for="item in deviceControlExtensions"
         :key="`${item.extensionId}:${item.slot}:${item.order}`"
         class="toolbar-icon-slot"
+        :data-toolbar-label="defaultLabelAttr"
         style="order: 1000"
       >
         <component :is="item.component" v-bind="extensionHostProps" />
@@ -2133,10 +2242,10 @@ onBeforeUnmount(() => {
 
     </div>
 
-    <PinnedTools :mobile="toolbarLauncher" :vertical="toolbarVertical" :placement="menuPlacement" :layout="toolbarLayout.layout.value" :order="toolbarLayout.order.value" :folder-targets="folderTargets" :show-labels="toolbarLayout.showLabels.value" @overlay="pinnedOverflowOpen = $event" @activate="onPinnedToolActivate" />
+    <PinnedTools :mobile="toolbarLauncher" :vertical="toolbarVertical" :placement="menuPlacement" :layout="toolbarLayout.layout.value" :order="toolbarLayout.order.value" :folder-targets="folderTargets" :show-labels="toolbarLayout.showLabels.value" :labels-editable="canArrangeToolbar && !toolbarContext.locked.value" @overlay="pinnedOverflowOpen = $event" @activate="onPinnedToolActivate" @label="setItemLabel" />
 
-    <div v-for="folder in toolbarLayout.folders.value" :key="folder.id" class="toolbar-icon-slot toolbar-folder-slot" :data-toolbar-item="`folder:${folder.id}`" :data-toolbar-folder="folder.id" :style="{ order: toolbarItemOrder(`folder:${folder.id}`) }">
-      <ToolbarCollectionMenu :title="folder.name" :icon="folder.icon" :folder-id="folder.id" :show="folderOpen === folder.id" :count="folderItemCount(folder)" :mobile="toolbarLauncher" :child-open="openMenu !== null || toolbox.menuOpen || keyboardTextWindowOpen" :placement="menuPlacement" @update:show="setFolderOpen(folder.id, $event)" @target="setFolderTarget(folder.id, $event)">
+    <div v-for="folder in toolbarLayout.folders.value" :key="folder.id" class="toolbar-icon-slot toolbar-folder-slot" :data-toolbar-item="`folder:${folder.id}`" :data-toolbar-folder="folder.id" :data-toolbar-label="labelAttr(`folder:${folder.id}`)" :style="{ order: toolbarItemOrder(`folder:${folder.id}`) }">
+      <ToolbarCollectionMenu :title="folder.name" :icon="folder.icon" :folder-id="folder.id" :show="folderOpen === folder.id" :count="folderItemCount(folder)" :mobile="toolbarLauncher" :child-open="openMenu !== null || toolbox.menuOpen || keyboardTextWindowOpen" :placement="menuPlacement" @update:show="setFolderOpen(folder.id, $event)" @target="setFolderTarget(folder.id, $event)" @contextmenu="openMenuItemContext">
         <template v-if="canArrangeToolbar && !toolbarContext.locked.value" #footer><n-button quaternary block class="toolbar-folder-edit-button" @click="openFolderEditor(folder)">{{ t('toolbar.folders.edit', 'Edit folder') }}</n-button></template>
       </ToolbarCollectionMenu>
     </div>
@@ -2146,6 +2255,7 @@ onBeforeUnmount(() => {
         v-for="item in actionStartExtensions"
         :key="`${item.extensionId}:${item.slot}:${item.order}`"
         class="toolbar-icon-slot"
+        :data-toolbar-label="defaultLabelAttr"
         style="order: 0"
       >
         <component :is="item.component" v-bind="extensionHostProps" />
@@ -2212,7 +2322,39 @@ onBeforeUnmount(() => {
       <ToolboxMenu :menu-item="!toolbarIconShown('toolbox')" :mobile="toolbarLauncher || !toolbarIconShown('toolbox')" :placement="menuPlacement" />
       </ToolbarIconSlot>
 
-      <div v-if="collectedIcons.length" data-toolbar-item="collection" class="toolbar-icon-slot" :style="toolbarIconStyle('collection')">
+      <ToolbarIconSlot
+        :collected="!toolbarIconShown('notifications')"
+        data-toolbar-item="notifications"
+        :target="toolbarItemTarget('notifications')"
+        :order="toolbarIconStyle('notifications').order"
+        @activate="onCollectedIconClick('notifications')"
+      >
+      <NotificationCenterPopover
+        :placement="menuPlacement"
+        :sheet="toolbarLauncher"
+        @update:show="updateMenu('notifications', $event)"
+      >
+        <n-tooltip :disabled="!toolbarIconShown('notifications') || toolbarLauncher || openMenu === 'notifications'">
+          <template #trigger>
+            <n-button :role="toolbarIconShown('notifications') ? undefined : 'menuitem'"
+              quaternary
+              size="small"
+              class="notification-button"
+              :aria-label="unreadNotifications
+                ? `${t('notifications.title', 'Notifications')} (${unreadNotificationsLabel})`
+                : t('notifications.title', 'Notifications')"
+            >
+              <template #icon><Bell /></template>
+              <span v-if="unreadNotifications" class="notification-badge" aria-hidden="true">{{ unreadNotificationsLabel }}</span>
+              <span class="toolbar-action-label">{{ t('notifications.title', 'Notifications') }}</span>
+            </n-button>
+          </template>
+          {{ t('notifications.title', 'Notifications') }}
+        </n-tooltip>
+      </NotificationCenterPopover>
+      </ToolbarIconSlot>
+
+      <div v-if="collectedIcons.length" data-toolbar-item="collection" class="toolbar-icon-slot" :data-toolbar-label="labelAttr('collection')" :style="toolbarIconStyle('collection')">
         <ToolbarCollectionMenu
           :show="collectionMenuOpen"
           :count="collectedIcons.length"
@@ -2221,10 +2363,11 @@ onBeforeUnmount(() => {
           :placement="menuPlacement"
           @update:show="collectionMenuOpen = $event"
           @target="collectedIconsTarget = $event"
+          @contextmenu="openMenuItemContext"
         />
       </div>
 
-      <div v-if="canSettings" data-toolbar-item="settings" class="toolbar-icon-slot" :style="toolbarIconStyle('settings')">
+      <div v-if="canSettings" data-toolbar-item="settings" class="toolbar-icon-slot" :data-toolbar-label="labelAttr('settings')" :style="toolbarIconStyle('settings')">
       <n-tooltip :disabled="toolbarLauncher">
         <template #trigger>
           <n-button quaternary size="small" :aria-label="t('settings.title')" @click="emit('settings')">
@@ -2240,6 +2383,7 @@ onBeforeUnmount(() => {
         v-for="item in actionEndExtensions"
         :key="`${item.extensionId}:${item.slot}:${item.order}`"
         class="toolbar-icon-slot"
+        :data-toolbar-label="defaultLabelAttr"
         style="order: 2000"
       >
         <component :is="item.component" v-bind="extensionHostProps" />
@@ -2332,7 +2476,7 @@ onBeforeUnmount(() => {
                 :aria-label="t('settings.account.title', 'Account')"
               >
                 <template #icon><CircleUserRound /></template>
-                <span v-if="!toolbarIconShown('account') || toolbarVertical && toolbarLayout.showLabels.value" class="toolbar-action-label">{{ t('settings.account.title', 'Account') }}</span>
+                <span v-if="!toolbarIconShown('account') || toolbarVertical && toolbarLayout.labelShown('account')" class="toolbar-action-label">{{ t('settings.account.title', 'Account') }}</span>
                 <span v-if="!toolbarVertical && toolbarIconShown('account')" class="button-label account-name">{{ username }}</span>
               </n-button>
             </template>
@@ -2391,6 +2535,11 @@ onBeforeUnmount(() => {
     </Teleport>
   </header>
   <n-dropdown trigger="manual" :show="toolbarContext.show.value" :x="toolbarContext.position.value.x" :y="toolbarContext.position.value.y" :options="toolbarContext.menuOptions.value" :to="overlayTo" :menu-props="() => ({ class: 'host-menu' })" @select="toolbarContext.select" @clickoutside="toolbarContext.show.value = false" @update:show="toolbarContext.show.value = $event" />
+  <ConsoleProblemPopover
+    :problem="problemPopoverShown ? anchoredProblem : null"
+    :target="problemTarget"
+    :placement="menuPlacement"
+  />
   <ToolbarFolderDialog :show="folderEditorOpen" :folder="editingFolder" :options="folderOptions" :saving="toolbarLayout.saving.value" @update:show="folderEditorOpen = $event" @save="saveFolder" />
   <KeyboardTextWindow
     ref="keyboardTextWindow"

@@ -330,7 +330,8 @@ export function validMTU(mtu: number | undefined, ipv6 = false) {
 
 export function isNetworkConfigValid(config: NetworkConfig) {
   if (usesCustomDNS(config) && (!config.dns?.length || !config.dns.every(isDNSServer))) return false
-  if (!config.interfaces.some(item => item.name === config.primary_interface && item.kind === 'physical')) return false
+  // Machines without Ethernet have no primary link; the Wi-Fi station owns the wireless one.
+  if (config.primary_interface && !config.interfaces.some(item => item.name === config.primary_interface && item.kind === 'physical')) return false
   if (config.discovery_enabled !== false && usesCustomDiscoveryURL(config) && !validDiscoveryURL(config.discovery_url ?? '')) return false
   const names = new Set<string>()
   for (const wireGuard of config.interfaces.filter(isWireGuardInterface)) {

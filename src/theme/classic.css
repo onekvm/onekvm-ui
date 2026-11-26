@@ -43,7 +43,7 @@ html[data-onekvm-skin="classic"] .n-slider-handle-indicator {
   padding: 3px 5px;
   font-size: 12px;
 }
-html[data-onekvm-skin="classic"] .n-tooltip .n-popover-arrow-wrapper {
+html[data-onekvm-skin="classic"] :is(.n-tooltip, .host-control-popover, .toolbar-collection) .n-popover-arrow-wrapper {
   display: none;
 }
 

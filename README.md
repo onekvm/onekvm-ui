@@ -86,9 +86,10 @@ pnpm test:recovery  # Recovery API and locale tests
 Focused regression tests are also available as `pnpm test:*` scripts; run the
 tests related to the code you change.
 
-Production assets are written to `dist/`. Recovery is a second Vite build that
-inlines JS and CSS into `dist-recovery/index.html` for the initramfs web
-server. That page exposes firmware flash (`.fwup` updates or a complete
+Production assets are written to `dist/`, with Brotli (`.br`) and gzip (`.gz`)
+variants of text assets that Core sends to browsers accepting them. Recovery is
+a second Vite build that inlines JS and CSS into `dist-recovery/index.html` for
+the initramfs web server. That page exposes firmware flash (`.fwup` updates or a complete
 `.img`), reset of the default Web user, factory reset, and reboot. Appearance
 follows the system, or can be locked to light or dark.
 

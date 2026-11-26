@@ -33,6 +33,7 @@ import { activateBrowserMicrophone } from '@/lib/microphone-access'
 import { WebRTCAudio, AudioLatencyRecovery, type AudioRecoveryReason } from '@/lib/webrtc-audio'
 import { KeyboardReportState } from '@/lib/keyboard-report-state'
 import { audioPlaybackAvailable } from '@/lib/audio-settings'
+import { encodeTouchReport, TOUCH_REPORT_TYPE, type TouchContact } from '@/lib/touchscreen'
 
 export type ConnectionState =
   | 'idle'
@@ -88,6 +89,9 @@ const clampAbsolute = (value: number) => Math.max(0, Math.min(0x7fff, Math.round
 const SPEAKER_VOLUME_KEY = 'onekvm-speaker-volume'
 const SPEAKER_ENABLED_KEY = 'onekvm-speaker-enabled'
 const MICROPHONE_VOLUME_KEY = 'onekvm-microphone-volume'
+// Failed reopen attempts, one second apart, before the console reports a lost
+// HID connection in WebSocket and MJPEG modes.
+const HID_RECONNECT_ATTEMPTS = 5
 
 function clampVolume(value: number) {
   if (!Number.isFinite(value)) return 1
@@ -137,6 +141,7 @@ class OneKVMTransport {
   private audio: HTMLAudioElement | null = null
   private hidSocket: WebSocket | null = null
   private hidReconnectTimer = 0
+  private hidReconnectFailures = 0
   private websocketVideo: WebSocketVideo | null = null
   private websocketAudio: WebSocketAudio | null = null
   private audioReconnectTimer = 0
@@ -503,6 +508,12 @@ class OneKVMTransport {
     view.setUint16(2, clampAbsolute(x), true)
     view.setUint16(4, clampAbsolute(y), true)
     if (this.send(report)) this.emitActivity('mouse')
+  }
+
+  /** Touchscreen contacts; an empty list sends nothing. */
+  sendTouch(contacts: readonly TouchContact[]) {
+    const report = encodeTouchReport(contacts)
+    if (report && this.send(report)) this.emitActivity('mouse')
   }
 
   sendGamepad(report: GamepadReport) {
@@ -1117,7 +1128,8 @@ class OneKVMTransport {
 		return false
 	  }
 	}
-    const channel = report[0] === 2 || report[0] === 3 ? this.pointer ?? this.control : this.control
+    const pointerReport = report[0] === 2 || report[0] === 3 || report[0] === TOUCH_REPORT_TYPE
+    const channel = pointerReport ? this.pointer ?? this.control : this.control
     if (channel?.readyState !== 'open') return false
     channel.send(Uint8Array.from(report))
     this.emitHIDReport(report)
@@ -1169,6 +1181,7 @@ class OneKVMTransport {
 		  return
 		}
 		opened = true
+		this.hidReconnectFailures = 0
 		resolve()
 	  }
 	  socket.onmessage = (event) => {
@@ -1182,24 +1195,39 @@ class OneKVMTransport {
 		if (active) {
 		  this.hidSocket = null
 		  this.resetKeyboardLED()
-		  if (this.state.videoMode === 'webrtc') this.scheduleHIDSocketReconnect(generation)
+		  // A dropped socket comes back while the video keeps playing. Failed
+		  // first attempts in WebSocket and MJPEG modes belong to connect().
+		  if (this.state.videoMode === 'webrtc') {
+			this.scheduleHIDSocketReconnect(generation)
+		  } else if (opened) {
+			this.setState({ controlReady: false })
+			this.scheduleHIDSocketReconnect(generation)
+		  }
 		}
-		if (!opened) {
-		  reject(new Error('HID WebSocket connection closed'))
-		} else if (active && this.state.videoMode !== 'webrtc') {
-		  this.setState({ connection: 'disconnected', controlReady: false, error: 'HID WebSocket connection closed' })
-		}
+		if (!opened) reject(new Error('HID WebSocket connection closed'))
 	  }
 	})
   }
 
   private scheduleHIDSocketReconnect(generation: number) {
-    if (generation !== this.connectionGeneration || this.hidReconnectTimer || this.state.videoMode !== 'webrtc') return
+    if (generation !== this.connectionGeneration || this.hidReconnectTimer) return
     if (!['connecting', 'connected', 'disconnected'].includes(this.state.connection)) return
+    const webrtc = this.state.videoMode === 'webrtc'
+    if (!webrtc && this.hidReconnectFailures >= HID_RECONNECT_ATTEMPTS) {
+      this.setState({ connection: 'disconnected', controlReady: false, error: 'HID WebSocket connection closed' })
+      return
+    }
     this.hidReconnectTimer = window.setTimeout(() => {
       this.hidReconnectTimer = 0
       if (generation !== this.connectionGeneration) return
-      void this.openHIDWebSocket().catch(() => this.scheduleHIDSocketReconnect(generation))
+      void this.openHIDWebSocket().then(() => {
+        if (!webrtc && generation === this.connectionGeneration && this.state.connection === 'connected') {
+          this.setState({ controlReady: true })
+        }
+      }, () => {
+        this.hidReconnectFailures += 1
+        this.scheduleHIDSocketReconnect(generation)
+      })
     }, 1000)
   }
 
@@ -1212,6 +1240,7 @@ class OneKVMTransport {
   private disposeHIDSocket() {
 	window.clearTimeout(this.hidReconnectTimer)
 	this.hidReconnectTimer = 0
+	this.hidReconnectFailures = 0
 	const socket = this.hidSocket
 	this.hidSocket = null
 	this.resetKeyboardLED()

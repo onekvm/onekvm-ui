@@ -46,6 +46,7 @@ import { useAsyncDialog } from '@/composables/useAsyncDialog'
 import AsyncPopconfirm from '@/components/AsyncPopconfirm'
 import ExtensionDropdown from '@/components/ExtensionDropdown'
 import ExtensionDetailsDialog from '@/components/ExtensionDetailsDialog.vue'
+import { serviceURL } from '@/api/service-url'
 import InstallLogDetails from '@/components/InstallLogDetails.vue'
 import ExtensionChildWindow from '@/components/toolbox/ExtensionChildWindow.vue'
 import {
@@ -157,6 +158,7 @@ interface PluginUIRuntimeV1 {
   i18n: PluginUII18nV1
   icons: Record<string, Component>
   language: () => string
+  serviceURL: (path: string) => string
   xterm: { load: () => Promise<PluginUIXtermV1> }
   dialogs: { StorageDirectoryPicker: Component; ExtensionDetails: typeof ExtensionDetailsDialog }
   components: { InstallLogDetails: typeof InstallLogDetails }
@@ -358,6 +360,7 @@ window.OneKVMPluginUI = {
     i18n: Object.freeze({ createTranslator, createMessages }),
     icons,
     language: () => currentLanguage.value,
+    serviceURL,
     xterm: Object.freeze({ load: loadHostXterm }),
     dialogs: Object.freeze({
       StorageDirectoryPicker: markRaw(XpStorageDirectoryPicker),

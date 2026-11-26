@@ -2,7 +2,9 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Mouse } from '@/icons'
 
+import type { OneKVMStatus } from '@/api/client'
 import { type MouseMode } from '@/composables/useMouse'
+import { mouseModesFor, primaryTouchDevice } from '@/lib/touchscreen'
 import { useOverlayMount } from '@/composables/useOverlayMount'
 import { t } from '@/i18n/runtime'
 import { DISMISS_CONTROL_OVERLAY_EVENT } from '@/lib/overlay-target'
@@ -15,7 +17,7 @@ const props = defineProps<{
   scrollInterval: number
   mouseReportRate: number
   hideLocalCursor?: boolean
-  hid?: { available: boolean; connected: boolean } | null
+  hid?: OneKVMStatus['hid'] | null
   placement?: 'top-end' | 'bottom-end' | 'right-start' | 'left-start'
   sheet?: boolean
   trackpad?: boolean
@@ -34,10 +36,15 @@ const overlayTo = useOverlayMount()
 const popoverOpen = ref(false)
 const menuOpen = ref(false)
 
-const mouseModeOptions = computed(() => [
-  { label: t('mouse.absolute', 'Absolute'), value: 'absolute' as const },
-  { label: t('mouse.relative', 'Relative'), value: 'relative' as const },
-])
+const mouseModeLabels = computed<Record<MouseMode, string>>(() => ({
+  absolute: t('mouse.absolute', 'Absolute'),
+  relative: t('mouse.relative', 'Relative'),
+  touchscreen: t('mouse.touchscreen', 'Touchscreen mode'),
+}))
+const touchDevice = primaryTouchDevice()
+const mouseModes = mouseModesFor(touchDevice)
+const mouseModeOptions = computed(() =>
+  mouseModes.map((value) => ({ label: mouseModeLabels.value[value], value })))
 const mouseModeLabel = computed(() => mouseModeOptions.value.find((option) => option.value === props.mouseMode)?.label || '')
 const scrollOptions = Array.from({ length: 16 }, (_, index) => {
   const value = index * 10
@@ -79,9 +86,9 @@ function forceClose() {
 }
 
 function updateMode(value: string | number | null) {
-  if (value !== 'absolute' && value !== 'relative') return
-  if (value === props.mouseMode) return
-  emit('update:mouseMode', value)
+  const mode = mouseModes.find((option) => option === value)
+  if (!mode || mode === props.mouseMode) return
+  emit('update:mouseMode', mode)
 }
 
 function updateScroll(value: string | number | null) {
@@ -139,10 +146,10 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
           :subtitle="`${t('mouse.mode', 'Mouse mode')} · ${mouseModeLabel}`"
         />
       </header>
-      <HidHostAlert :hid="hid" />
+      <HidHostAlert :hid="hid" anchor="mouse" />
       <div class="display-status-values">
         <div v-if="sheet">
-          <span>{{ t('mouse.trackpad', 'Trackpad') }}</span>
+          <span>{{ t('mouse.floatingTrackpad', 'Floating trackpad') }}</span>
           <n-switch
             :size="sheet ? 'medium' : 'small'"
             :value="Boolean(trackpad)"
@@ -167,6 +174,12 @@ onBeforeUnmount(() => window.removeEventListener(DISMISS_CONTROL_OVERLAY_EVENT, 
             @update:show="menuOpen = $event"
           />
         </div>
+        <p v-if="touchDevice && mouseMode === 'relative'" class="mouse-touch-hint">
+          {{ t('mouse.touchpadGestures', 'Tap to left-click, long-press to right-click, slide two fingers up or down to scroll. Long-press then slide, or hold a floating button and slide, to drag. Drag the handle to move the buttons.') }}
+        </p>
+        <p v-if="mouseMode === 'touchscreen'" class="mouse-touch-hint">
+          {{ t('mouse.touchscreenHint', 'Up to 10 fingers. macOS does not support touchscreens; use Absolute mode there.') }}
+        </p>
         <div>
           <span>{{ t('settings.mouse.scroll', 'Scroll interval') }}</span>
           <n-select

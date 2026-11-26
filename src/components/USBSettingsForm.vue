@@ -24,6 +24,7 @@ const usbStringValid = (value: string, allowEmpty = false) =>
 const scsiStringValid = (value: string, maximum: number) =>
   value.length > 0 && value.length <= maximum && /^[\x20-\x7e]+$/.test(value)
 if (usb.value.gamepad == null) usb.value.gamepad = false
+if (usb.value.camera == null) usb.value.camera = false
 if (usb.value.mass_storage == null) usb.value.mass_storage = true
 if (usb.value.mtp == null) usb.value.mtp = true
 if (!usb.value.keyboard_name) usb.value.keyboard_name = 'Keyboard'
@@ -60,6 +61,7 @@ const networkAdapterOn = computed({
 })
 const networkBlocked = computed(() => !usb.value.network_adapter && !wouldFit({ network: true }))
 const gamepadBlocked = computed(() => !usb.value.gamepad && !wouldFit({ gamepad: true }))
+const cameraBlocked = computed(() => !usb.value.camera && !wouldFit({ camera: true }))
 const storageBlocked = computed(() => usb.value.mass_storage === false && !wouldFit({ storage: true }))
 const mtpBlocked = computed(() => usb.value.mtp === false && !wouldFit({ mtp: true }))
 const speakerOn = computed({
@@ -252,6 +254,23 @@ const remoteWakeup = computed({
                 </span>
               </template>
               {{ t('settings.advancedSettings.usbPage.gamepadBlocked', 'Not enough USB capacity. Turn off audio, the microphone, virtual storage, or file transfer first.') }}
+            </n-tooltip>
+          </div>
+        </li>
+        <li v-if="gadget?.camera_available">
+          <div>
+            <strong>{{ t('settings.advancedSettings.usbPage.camera', 'USB camera') }}</strong>
+            <small>{{ t('settings.advancedSettings.usbPage.cameraHint', 'Lets the controlled device use a camera shared from the web console. Turning it on or off disconnects USB briefly.') }}</small>
+          </div>
+          <div class="usb-function-controls">
+            <USBCapacityBadge :endpoints="endpointCosts.camera" />
+            <n-tooltip :disabled="!cameraBlocked" placement="left">
+              <template #trigger>
+                <span class="usb-function-switch">
+                  <n-switch v-model:value="usb.camera" :disabled="props.disabled || cameraBlocked" :aria-label="t('settings.advancedSettings.usbPage.camera', 'USB camera')" />
+                </span>
+              </template>
+              {{ t('settings.advancedSettings.usbPage.networkSharingBlocked', 'Not enough USB capacity. Turn off unused USB functions first.') }}
             </n-tooltip>
           </div>
         </li>
